@@ -1,21 +1,27 @@
 import ast
 import contextlib
+import keyword
 import dataclasses
+import itertools
+import re
 import sys
 import token
 from argparse import ArgumentError
-from io import BytesIO
+from io import StringIO
 from pathlib import Path
-from tokenize import tokenize, TokenInfo
+from tokenize import generate_tokens, TokenInfo
 from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
+from rewrite.utils import replace_if_changed
 from rewrite.java import Space, JRightPadded, JContainer, JLeftPadded, JavaType, J, Statement, Semicolon, TrailingComma, \
     NameTree, OmitParentheses, Expression, TypeTree, TypedTree, Comment
 from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
-from .markers import CanonicalName, KeywordArguments, KeywordOnlyArguments, Quoted
+from .annotation_utils import VALUE_SUBSCRIPTS, subscript_head
+from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
+from .printer import PythonPrinter
 from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
@@ -43,6 +49,7 @@ TSTRING_END = getattr(token, 'TSTRING_END', -7)
 # AST types for t-strings (Python 3.14+); sentinels on older versions
 _TemplateStr = getattr(ast, 'TemplateStr', type('_TemplateStr', (), {}))
 _Interpolation = getattr(ast, 'Interpolation', type('_Interpolation', (), {}))
+_DeclarationScope = ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
 
 # Token types to skip when looking for significant (non-whitespace) tokens
 _SKIP_TOKEN_TYPES = (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
@@ -59,6 +66,79 @@ class _ParenStackEntry(NamedTuple):
     open_paren_idx: int                    # Token index of the '(' itself
 
 
+class _EmbeddedTypeMapping:
+    """The types of a quoted annotation's body, read from the enclosing file's index.
+
+    A body position is the file position it was cut from, less the quote's own, so
+    every lookup restates its node's position before delegating. ty reports a quoted
+    annotation as one string node, so nothing matches until ty-types descends into the
+    body, whose nodes carry file offsets.
+    """
+
+    def __init__(self, enclosing: PythonTypeMapping, line_offset: int, col_offset: int):
+        self._enclosing = enclosing
+        self._line_offset = line_offset
+        self._col_offset = col_offset
+
+    def __getattr__(self, name: str):
+        delegate = getattr(self._enclosing, name)
+        if not callable(delegate):
+            return delegate
+
+        def in_file_positions(*args, **kwargs):
+            with self.__shifted(args[0] if args else None):
+                return delegate(*args, **kwargs)
+
+        return in_file_positions
+
+    @contextlib.contextmanager
+    def __shifted(self, node):
+        """``node`` and its descendants at their positions in the enclosing file.
+
+        A lookup for a call reads its callee's position too, so the whole subtree moves.
+        """
+        if not isinstance(node, ast.AST):
+            yield
+            return
+        moved = []
+        for descendant in ast.walk(node):
+            if getattr(descendant, 'lineno', None) is None:
+                continue
+            moved.append((descendant, descendant.lineno, descendant.col_offset,
+                          descendant.end_lineno, descendant.end_col_offset))
+            descendant.lineno, descendant.col_offset = \
+                self.__in_file(descendant.lineno, descendant.col_offset)
+            if descendant.end_lineno is not None:
+                descendant.end_lineno, descendant.end_col_offset = \
+                    self.__in_file(descendant.end_lineno, descendant.end_col_offset)
+        try:
+            yield
+        finally:
+            for descendant, line, col, end_line, end_col in moved:
+                (descendant.lineno, descendant.col_offset,
+                 descendant.end_lineno, descendant.end_col_offset) = line, col, end_line, end_col
+
+    def __in_file(self, line: int, col: int) -> Tuple[int, int]:
+        # Only the body's first line shares a line with the opening quote.
+        return line + self._line_offset, (col + self._col_offset) if line == 1 else col
+
+
+_BARE_QUALIFIERS = frozenset({'typing.Final', 'typing_extensions.Final'})
+
+
+def _with_type(node: T, resolved: Optional[JavaType]) -> T:
+    """``node`` carrying ``resolved``, unless it has a type already or no slot for one."""
+    if getattr(node, 'type', None) is not None or not hasattr(node, '_type'):
+        return node
+    return replace_if_changed(node, _type=resolved)
+
+
+def _with_line_breaks_of(source: str, text: str) -> str:
+    """``text``, which the tokenizer read with every line break as ``\\n``, with the line breaks ``source`` has."""
+    line_breaks = iter(re.findall(r'\r\n|\r|\n', source))
+    return re.sub('\n', lambda _: next(line_breaks, '\n'), text)
+
+
 class ParserVisitor(ast.NodeVisitor):
     _source: str
     _parentheses_stack: List[_ParenStackEntry]
@@ -70,7 +150,8 @@ class ParserVisitor(ast.NodeVisitor):
     # UTF-8 BOM character
     _BOM = '\ufeff'
 
-    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None,
+                 type_mapping: Optional['_EmbeddedTypeMapping'] = None):
         super().__init__()
         # Detect and strip UTF-8 BOM if present
         if source.startswith(self._BOM):
@@ -84,18 +165,23 @@ class ParserVisitor(ast.NodeVisitor):
 
         # Single pass: compute lines, byte offsets, and byte-to-char mapping together
         source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
-        self._type_mapping = PythonTypeMapping(source, file_path, ty_client,
-                                               source_lines=source_lines,
-                                               line_byte_offsets=line_byte_offsets)
+        self._type_mapping = type_mapping if type_mapping is not None else PythonTypeMapping(
+            source, file_path, ty_client,
+            source_lines=source_lines, line_byte_offsets=line_byte_offsets)
 
-        # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
-        # but keep the original source for whitespace extraction
-        tokenizer_source = source.replace('\r\n', '\n') if '\r\n' in source else source
+        # The tokenizer wants a single line-ending spelling (it rejects a mix), so it
+        # gets \n throughout while the original source keeps the spelling that
+        # whitespace extraction reproduces. The row/col scans below step over all three.
+        tokenizer_source = source.replace('\r\n', '\n').replace('\r', '\n') if '\r' in source else source
+        # Tokenized as text: given bytes, the tokenizer decodes them in the encoding a coding
+        # line names, which is not the one they would be encoded in here.
+        encoding = TokenInfo(token.ENCODING, 'utf-8', (0, 0), (0, 0), '')
         self._tokens, self._paren_pairs = self._build_tokens(
-            tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
+            itertools.chain([encoding], generate_tokens(StringIO(tokenizer_source).readline))
         )
         self._token_idx = 1  # Skip ENCODING token
         self._type_context_depth = 0
+        self._declaration_scopes: List[_DeclarationScope] = []
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -133,7 +219,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan += 2
                     continue
-                elif self._source[scan] == '\n':
+                elif self._source[scan] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -165,11 +251,11 @@ class ParserVisitor(ast.NodeVisitor):
             elif tok.type in (FSTRING_END, TSTRING_END):
                 formatted_string_depth -= 1
 
-            # Track paren pairs
+            # Track paren pairs, and square brackets, which nest with them
             if tok.type == token.OP:
-                if tok.string == '(':
+                if tok.string in ('(', '['):
                     paren_stack.append(len(result))
-                elif tok.string == ')' and paren_stack:
+                elif tok.string in (')', ']') and paren_stack:
                     paren_pairs[paren_stack.pop()] = len(result)
 
             # Update row/col to the token's end position and compute prev_end
@@ -182,7 +268,7 @@ class ParserVisitor(ast.NodeVisitor):
                     col = 0
                     scan_end += 2
                     continue
-                elif self._source[scan_end] == '\n':
+                elif self._source[scan_end] in ('\n', '\r'):
                     row += 1
                     col = 0
                 else:
@@ -205,8 +291,13 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 # Replace token string with original source text to preserve \r\n
                 original_text = self._source[tok_start:scan_end]
-                if original_text != tok.string and tok.type in (token.NEWLINE, token.NL, token.INDENT, token.STRING):
-                    tok = TokenInfo(tok.type, original_text, tok.start, tok.end, tok.line)
+                if original_text != tok.string:
+                    if tok.type in (token.NEWLINE, token.NL, token.INDENT, token.STRING):
+                        tok = TokenInfo(tok.type, original_text, tok.start, tok.end, tok.line)
+                    elif tok.type in (FSTRING_MIDDLE, TSTRING_MIDDLE) and '\r' in original_text:
+                        # The text has its braces undoubled, so only its line breaks are taken back.
+                        tok = TokenInfo(tok.type, _with_line_breaks_of(original_text, tok.string),
+                                        tok.start, tok.end, tok.line)
                 result.append(tok)
 
             # Track from/import context for ellipsis normalization
@@ -472,6 +563,13 @@ class ParserVisitor(ast.NodeVisitor):
         else:
             interfaces = None
             self._token_idx = save_token_idx
+        self._declaration_scopes.append(node)
+        try:
+            body = self.__convert_block(node.body)
+            declared_type = self._type_mapping.declared_class_type(
+                node, node.decorator_list, self._declaration_scopes)
+        finally:
+            self._declaration_scopes.pop()
         return j.ClassDeclaration(
             random_id(),
             prefix,
@@ -491,8 +589,8 @@ class ParserVisitor(ast.NodeVisitor):
             None,  # no `extends`, all in `implements`
             interfaces,
             None,
-            self.__convert_block(node.body),
-            self._type_mapping.type(node)
+            body,
+            declared_type
         )
 
     def visit_Delete(self, node):
@@ -508,45 +606,64 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
 
         if node.value:
+            target_prefix = self.__whitespace()
+            target = self.__convert(node.target)
+            hint_prefix = self.__source_before(':')
+            type_tree = self.__convert_type(node.annotation)
+            if self._type_mapping.is_field_specifier_call(node.value):
+                assigned_type = getattr(type_tree, 'type', None)
+                if getattr(assigned_type, 'fully_qualified_name', None) in _BARE_QUALIFIERS:
+                    # The type is the value's, which ty hides behind its field marker.
+                    assigned_type = JavaType.Unknown()
+                if isinstance(target, j.Identifier):
+                    target = target.replace(
+                        type=assigned_type,
+                        field_type=dataclasses.replace(target.field_type, _type=assigned_type)
+                        if target.field_type is not None else None)
+            else:
+                assigned_type = self._type_mapping.type(node)
             return j.Assignment(
                 random_id(),
                 prefix,
                 Markers.EMPTY,
                 py.TypeHintedExpression(
                     random_id(),
-                    self.__whitespace(),
+                    target_prefix,
                     Markers.EMPTY,
-                    self.__convert(node.target),
+                    target,
                     py.TypeHint(
                         random_id(),
-                        self.__source_before(':'),
+                        hint_prefix,
                         Markers.EMPTY,
-                        self.__convert_type(node.annotation),
-                        self._type_mapping.type(node.annotation)
+                        type_tree,
+                        getattr(type_tree, 'type', None)
                     ),
-                    self._type_mapping.type(node)
+                    assigned_type
                 ),
                 self.__pad_left(
                     self.__source_before('='),
                     self.__convert(node.value)
-                ) if node.value else None,
-                self._type_mapping.type(node)
+                ),
+                assigned_type
             )
         else:
             # No value - type annotation only (e.g., `x: int`)
+            target = self.__convert(node.target)
+            hint_prefix = self.__source_before(':')
+            type_tree = self.__convert_type(node.annotation)
             return py.ExpressionStatement(
                 random_id(),
                 py.TypeHintedExpression(
                     random_id(),
                     prefix,
                     Markers.EMPTY,
-                    self.__convert(node.target),
+                    target,
                     py.TypeHint(
                         random_id(),
-                        self.__source_before(':'),
+                        hint_prefix,
                         Markers.EMPTY,
-                        self.__convert_type(node.annotation),
-                        self._type_mapping.type(node.annotation)
+                        type_tree,
+                        getattr(type_tree, 'type', None)
                     ),
                     self._type_mapping.type(node)
                 )
@@ -835,12 +952,10 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_alias(self, node):
         alias_type = self._type_mapping.import_alias_type(node)
-        canonical = self._type_mapping.import_canonical_fqn(node)
         return j.Import(
             random_id(),
             self.__whitespace(),
-            Markers.EMPTY if canonical is None else
-            Markers(random_id(), [CanonicalName(random_id(), canonical)]),
+            Markers.EMPTY,
             self.__pad_left(Space.EMPTY, False),
             self.__convert_qualified_name(node.name, alias_type),
             None if not node.asname else
@@ -855,7 +970,9 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 self.__convert_name(node.arg),
                 self.__pad_left(self.__source_before('='), self.__convert(node.value)),
-                self._type_mapping.type(node)
+                # A keyword argument is an expression whose type is its value's;
+                # ty attributes the value, not the `ast.keyword` wrapping it.
+                self._type_mapping.type(node.value)
             )
         prefix = self.__whitespace()
         if self.__skip('**'):
@@ -1086,10 +1203,9 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_ExceptHandler(self, node, is_exception_group: bool = False):
         prefix = self.__source_before('except')
-        # For except*, consume the '*' after 'except' and let __convert_type capture the space after '*'
+        # For except*, the space ahead of the '*' is kept here and the space after it by __convert_type
         if is_exception_group:
-            self.__source_before('*')
-            type_prefix = Space.EMPTY  # Space goes on inner type via __convert_type
+            type_prefix = self.__source_before('*')
         else:
             type_prefix = self.__whitespace()
         except_type = self.__convert_type(node.type) if node.type else j.Empty(random_id(), Space.EMPTY,
@@ -1263,11 +1379,11 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_MatchSequence(self, node):
         prefix = self.__whitespace()
         end_delim = None
-        if self.__at_token('[') and self.__is_own_sequence_delimiter(node, '['):
+        if self.__at_token('[') and self.__is_own_sequence_delimiter(node):
             self.__skip('[')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_LIST
             end_delim = ']'
-        elif self.__at_token('(') and self.__is_own_sequence_delimiter(node, '('):
+        elif self.__at_token('(') and self.__is_own_sequence_delimiter(node):
             self.__skip('(')
             kind = py.MatchCase.Pattern.Kind.SEQUENCE_TUPLE
             end_delim = ')'
@@ -1278,10 +1394,11 @@ class ParserVisitor(ast.NodeVisitor):
         if node.patterns:
             elements = [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1,
                                                 end_delim=end_delim) for i, e in enumerate(node.patterns)]
+        elif end_delim:
+            # an empty sequence holds the space between its delimiters
+            elements = [self.__pad_right(
+                j.Empty(random_id(), self.__source_before(end_delim), Markers.EMPTY), Space.EMPTY)]
         else:
-            # Empty sequence - need to consume the closing delimiter
-            if end_delim:
-                self.__source_before(end_delim)
             elements = []
 
         return py.MatchCase(
@@ -1361,7 +1478,7 @@ class ParserVisitor(ast.NodeVisitor):
                     Space.EMPTY,
                     [
                         self.__pad_right(self.__convert(node.keys[i]), self.__source_before(':')),
-                        self.__pad_right(self.__convert(node.patterns[i]), Space.EMPTY),
+                        self.__pad_right(self.__convert_match_pattern(node.patterns[i]), Space.EMPTY),
                     ],
                     Markers.EMPTY
                 ),
@@ -1384,6 +1501,11 @@ class ParserVisitor(ast.NodeVisitor):
                 None
             )
             elements.append(self.__pad_list_element(rest_pattern, last=True, end_delim='}'))
+
+        if not elements:
+            # an empty mapping holds the space between its braces
+            elements.append(self.__pad_right(
+                j.Empty(random_id(), self.__source_before('}'), Markers.EMPTY), Space.EMPTY))
 
         return py.MatchCase(
             random_id(),
@@ -1419,24 +1541,22 @@ class ParserVisitor(ast.NodeVisitor):
                 children.append(converted)
             # Process keyword patterns
             for i, kwd in enumerate(node.kwd_attrs):
-                kwd_var = j.VariableDeclarations(
+                kwd_pattern = py.MatchCase.Pattern(
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    _EMPTY_LIST, _EMPTY_LIST, None, None, _EMPTY_LIST,
-                    [
-                        self.__pad_right(j.VariableDeclarations.NamedVariable(
-                            random_id(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            cast(j.Identifier, self.__convert_name(kwd)),
-                            _EMPTY_LIST,
-                            self.__pad_left(self.__source_before('='), self.__convert_match_pattern(node.kwd_patterns[i])),
-                            None
-                        ), Space.EMPTY)
-                    ]
+                    py.MatchCase.Pattern.Kind.KEYWORD,
+                    JContainer(
+                        Space.EMPTY,
+                        [
+                            self.__pad_right(self.__convert_name(kwd), self.__source_before('=')),
+                            self.__pad_right(self.__convert_match_pattern(node.kwd_patterns[i]), Space.EMPTY),
+                        ],
+                        Markers.EMPTY
+                    ),
+                    None
                 )
-                converted = self.__pad_list_element(kwd_var, last=i == len(node.kwd_attrs) - 1,
+                converted = self.__pad_list_element(kwd_pattern, last=i == len(node.kwd_attrs) - 1,
                                                     end_delim=')')
                 children.append(converted)
         else:
@@ -1556,15 +1676,15 @@ class ParserVisitor(ast.NodeVisitor):
                 bounds = JContainer(
                     self.__source_before(':'),
                     [
-                        self.__pad_right(self.__convert(node.bound), self.__source_before('=')),
-                        self.__pad_right(self.__convert(default), Space.EMPTY),
+                        self.__pad_right(self.__convert_type(node.bound), self.__source_before('=')),
+                        self.__pad_right(self.__convert_type(default), Space.EMPTY),
                     ],
                     Markers.EMPTY
                 )
             else:
                 bounds = JContainer(
                     self.__source_before(':'),
-                    [self.__pad_right(self.__convert(node.bound), Space.EMPTY)],
+                    [self.__pad_right(self.__convert_type(node.bound), Space.EMPTY)],
                     Markers.EMPTY
                 )
         elif default:
@@ -1572,7 +1692,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )
@@ -1606,7 +1726,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )
@@ -1640,7 +1760,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self.__source_before('='),
                 [
                     self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY),
-                    self.__pad_right(self.__convert(default), Space.EMPTY),
+                    self.__pad_right(self.__convert_type(default), Space.EMPTY),
                 ],
                 Markers.EMPTY
             )
@@ -1678,7 +1798,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             name,
             type_parameters,
-            self.__pad_left(self.__source_before('='), self.__convert(node.value)),
+            self.__pad_left(self.__source_before('='), self.__convert_type(node.value)),
             self._type_mapping.type(node)
         )
 
@@ -1873,7 +1993,7 @@ class ParserVisitor(ast.NodeVisitor):
         return left.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # complex union type
 
     def __convert_binary_operator(self, op) -> Union[JLeftPadded[j.Binary.Type], JLeftPadded[py.Binary.Type]]:
-        operation_map: Dict[type, Tuple[j.Binary.Type, str]] = {
+        operation_map: Dict[type, Tuple[j.Binary.Type | py.Binary.Type, str]] = {
             ast.Add: (j.Binary.Type.Addition, '+'),
             ast.And: (j.Binary.Type.And, 'and'),
             ast.BitAnd: (j.Binary.Type.BitAnd, '&'),
@@ -1906,22 +2026,30 @@ class ParserVisitor(ast.NodeVisitor):
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
 
-    @staticmethod
-    def _hoist_concat_prefix(node):
-        if not isinstance(node, py.Binary) or node.prefix != Space.EMPTY:
-            return node
-        leftmost = node
-        chain = []
-        while isinstance(leftmost.left, py.Binary):
-            chain.append(leftmost)
-            leftmost = leftmost.left
-        if leftmost.left.prefix == Space.EMPTY:
-            return node
-        prefix = leftmost.left.prefix
-        leftmost = leftmost.replace(left=leftmost.left.replace(prefix=Space.EMPTY))
-        for parent in reversed(chain):
-            leftmost = parent.replace(left=leftmost)
-        return leftmost.replace(prefix=prefix)
+    def _string_concatenation(self, parts: list[J], node: ast.AST) -> J:
+        """Join implicitly concatenated parts in a balanced tree, as a left-leaning one is as deep as it is long.
+
+        Each subtree carries the prefix of its leftmost part.
+        """
+        concatenation_type = self._type_mapping.type(node) if len(parts) > 1 else None
+
+        def join(lo: int, hi: int) -> J:
+            if hi - lo == 1:
+                return parts[lo]
+            mid = (lo + hi + 1) // 2
+            left = join(lo, mid)
+            return py.Binary(
+                random_id(),
+                left.prefix,
+                Markers.EMPTY,
+                left.replace(prefix=Space.EMPTY),
+                self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
+                None,
+                join(mid, hi),
+                concatenation_type
+            )
+
+        return join(0, len(parts))
 
     @staticmethod
     def _is_byte_string(tok_string: str) -> bool:
@@ -1943,7 +2071,7 @@ class ParserVisitor(ast.NodeVisitor):
         tok, _ = self._peek_significant_token()
 
         is_byte_string = self._is_byte_string(tok.string)
-        res = None
+        parts: list[J] = []
         is_first = True
 
         while tok.type in (token.STRING, FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
@@ -1973,19 +2101,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 current, tok = self.__map_literal(node, tok)
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
@@ -1994,7 +2110,7 @@ class ParserVisitor(ast.NodeVisitor):
             if idx >= len(self._tokens) - 1 and tok.type == token.ENDMARKER:
                 break
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def __map_literal_simple(self, node):
         """Map a non-string constant (numbers, None, True, False, Ellipsis)."""
@@ -2228,16 +2344,19 @@ class ParserVisitor(ast.NodeVisitor):
             return_type = None
         else:
             arrow = self.__source_before('->')
-            with self.__type_context():
-                returns = self.__convert(node.returns)
+            returns_tree = self.__convert_type(node.returns)
             return_type = py.TypeHint(
                 random_id(),
                 arrow,
                 Markers.EMPTY,
-                returns,
-                self._type_mapping.type(node.returns)
+                returns_tree,
+                getattr(returns_tree, 'type', None)
             )
-        body = self.__convert_block(node.body)
+        self._declaration_scopes.append(node)
+        try:
+            body = self.__convert_block(node.body)
+        finally:
+            self._declaration_scopes.pop()
 
         return j.MethodDeclaration(
             random_id(),
@@ -2280,10 +2399,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 break
 
-        if isinstance(decorator, (ast.Attribute, ast.Name, ast.Subscript)):
-            name = self.__convert(decorator)
-            args = None
-        elif isinstance(decorator, ast.Call):
+        if isinstance(decorator, ast.Call):
             # If there are extra parentheses around the call, convert the entire call
             # and wrap it, setting args=None since args are part of the wrapped call
             if extra_parens:
@@ -2301,7 +2417,8 @@ class ParserVisitor(ast.NodeVisitor):
                     Markers.EMPTY
                 )
         else:
-            raise NotImplementedError("Unsupported decorator type: " + str(type(decorator)))
+            name = self.__convert(decorator)
+            args = None
 
         # Apply the whitespace after @ to the name when there are no extra parentheses.
         # When extra_parens is non-empty, this is handled differently (prefix is set on the wrapped paren).
@@ -2326,7 +2443,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name
+            wrapped: J = name
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
@@ -2338,13 +2455,11 @@ class ParserVisitor(ast.NodeVisitor):
                     self.__pad_right(wrapped, suffix)
                 )
 
-            # Wrap in ExpressionTypeTree to satisfy NameTree type requirement
-            name = py.ExpressionTypeTree(
-                random_id(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                wrapped
-            )
+            name = wrapped
+
+        # PEP 614 allows any expression here, but Annotation.annotation_type is a NameTree
+        if not isinstance(name, NameTree):
+            name = py.ExpressionTypeTree(random_id(), Space.EMPTY, Markers.EMPTY, name)
 
         return j.Annotation(
             random_id(),
@@ -2383,7 +2498,7 @@ class ParserVisitor(ast.NodeVisitor):
             return self.__map_fstring_as_literal(node, leading_prefix, tok)
 
         value_idx = 0
-        res = None
+        parts: list[J] = []
         is_first = True
         # Loop while we have STRING or FSTRING_START tokens to process
         # Note: AST merges adjacent strings, so we may have more tokens than AST values
@@ -2436,23 +2551,11 @@ class ParserVisitor(ast.NodeVisitor):
                 # No more f-strings or strings to process (should only happen for first element)
                 break
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def visit_TemplateStr(self, node):
         leading_prefix = self.__whitespace()
@@ -2462,7 +2565,7 @@ class ParserVisitor(ast.NodeVisitor):
             tok = self._advance_token()
 
         value_idx = 0
-        res = None
+        parts: list[J] = []
         is_first = True
         # Loop while we have STRING or TSTRING_START tokens to process
         while True:
@@ -2503,23 +2606,11 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 break
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def visit_FormattedValue(self, node):
         raise ValueError("This method should not be called directly")
@@ -2929,6 +3020,57 @@ class ParserVisitor(ast.NodeVisitor):
                 converted_type
             )
 
+    def __structured_string_annotation(self, node: ast.Constant, body: str,
+                                       quote_style: Quoted.Style,
+                                       prefix: Space) -> Optional[TypeTree]:
+        """The type nodes a quoted annotation contains, or None to keep it flat text.
+
+        The body has to reproduce byte-identically to become structure, since a type
+        node has no slot for text it cannot print, such as padding after the body.
+        """
+        try:
+            return self.__structure(node, body, quote_style, prefix)
+        except Exception:
+            # The body is text first and structure second: a gap anywhere in the attempt
+            # leaves the flat identifier rather than failing the file.
+            return None
+
+    def __structure(self, node: ast.Constant, body: str, quote_style: Quoted.Style,
+                    prefix: Space) -> Optional[TypeTree]:
+        # A body that is one plain name already models as the identifier the caller
+        # falls back to, so it does not need re-parsing. Keywords do not: `None` and
+        # `...` are types of their own.
+        if body.isidentifier() and not keyword.iskeyword(body):
+            return None
+        # An expression may not open with an indent, so the body parses from its first
+        # column and the indent goes back on afterwards.
+        indent = body[:len(body) - len(body.lstrip(' \t\f'))]
+        core = body[len(indent):]
+        body_ast = ast.parse(core, mode='eval')
+        sub = ParserVisitor(core, type_mapping=_EmbeddedTypeMapping(
+            self._type_mapping, node.lineno - 1,
+            node.col_offset + len(quote_style.quote) + len(indent)))
+        tree = sub.__convert_type(body_ast.body)
+        if not isinstance(tree, TypeTree):
+            return None
+        # `find_first` reads one Quoted marker per node, so a body that is itself a
+        # quoted string has nowhere to record both its own quotes and the outer ones.
+        if tree.markers.find_first(Quoted) is not None:
+            return None
+
+        tree = tree.replace(prefix=Space.EMPTY)
+        if PythonPrinter().print(tree) != core:
+            return None
+
+        tree = _with_type(tree, self._type_mapping.string_annotation_type(node))
+        quoted = Markers.build(random_id(), [Quoted(random_id(), quote_style)])
+        if not indent:
+            return tree.replace(prefix=prefix, markers=quoted)
+        # A prefix is the space before the opening quote, so an indent inside the quotes
+        # lives one level in, under the node those quotes print around.
+        return py.ExpressionTypeTree(
+            random_id(), prefix, quoted, tree.replace(prefix=Space.build([], indent)))
+
     def __convert_type_mapper(self, node) -> Optional[TypeTree]:
         if isinstance(node, ast.Constant):
             if node.value is None or node.value is Ellipsis:
@@ -2953,6 +3095,7 @@ class ParserVisitor(ast.NodeVisitor):
                         Markers.EMPTY,
                         converted.replace(prefix=Space.EMPTY)
                     )
+                expression = converted
                 # Unwrap parenthesized literals to get to the Literal inside
                 while isinstance(converted, j.Parentheses):
                     converted = converted.tree
@@ -2968,6 +3111,16 @@ class ParserVisitor(ast.NodeVisitor):
                 quote_start = 0
                 while quote_start < len(source) and source[quote_start] not in ('"', "'"):
                     quote_start += 1
+
+                if 0 < quote_start < len(source):
+                    # The Quoted marker records only the quote style, so a string carrying a
+                    # prefix (r, b, u) stays a literal, where value_source holds the prefix.
+                    return py.ExpressionTypeTree(
+                        random_id(),
+                        expression.prefix,
+                        Markers.EMPTY,
+                        expression.replace(prefix=Space.EMPTY)
+                    )
 
                 if quote_start < len(source):
                     quote_char = source[quote_start]
@@ -2985,18 +3138,32 @@ class ParserVisitor(ast.NodeVisitor):
                     # Non-string literal: use value_source to preserve case (e.g., 1J vs 1j)
                     name = source
 
+                if quote_style is not None:
+                    structured = self.__structured_string_annotation(
+                        node, name, quote_style, literal.prefix)
+                    if structured is not None:
+                        return structured
+
+                if quote_style is None:
+                    # A constant that is not a forward reference is the value it spells.
+                    return expression
+
                 return j.Identifier(
                     random_id(),
                     literal.prefix,
-                    Markers.build(random_id(), [Quoted(random_id(), quote_style)]) if quote_style else Markers.EMPTY,
+                    Markers.build(random_id(), [Quoted(random_id(), quote_style)]),
                     _EMPTY_LIST,
                     name,
-                    self._type_mapping.type(node),
+                    self._type_mapping.string_annotation_type(node)
+                    if quote_style else self._type_mapping.type(node),
                     None
                 )
         elif isinstance(node, ast.Subscript):
             prefix = self.__whitespace()
             converted_value = self.__convert(node.value)
+            # ParameterizedType.clazz is a NameTree, which a subscripted subscript or a call is not
+            if not isinstance(converted_value, NameTree):
+                converted_value = py.ExpressionTypeTree(random_id(), Space.EMPTY, Markers.EMPTY, converted_value)
             bracket_prefix = self.__source_before('[')
 
             # Determine slice elements. For tuples:
@@ -3011,6 +3178,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 slices = [node.slice]
 
+            values_from = VALUE_SUBSCRIPTS.get(subscript_head(node.value))
             return j.ParameterizedType(
                 random_id(),
                 prefix,
@@ -3018,9 +3186,11 @@ class ParserVisitor(ast.NodeVisitor):
                 converted_value,
                 JContainer(
                     bracket_prefix,
-                    [self.__pad_list_element(self.__convert_type(s), last=i == len(slices) - 1, end_delim=']') for
-                     i, s in
-                     enumerate(slices)],
+                    [self.__pad_list_element(
+                        self.__convert(s) if values_from is not None and i >= values_from
+                        else self.__convert_type(s),
+                        last=i == len(slices) - 1, end_delim=']')
+                     for i, s in enumerate(slices)],
                     Markers.EMPTY
                 ),
                 self._type_mapping.type(node)
@@ -3031,9 +3201,8 @@ class ParserVisitor(ast.NodeVisitor):
             if isinstance(node.op, ast.BitOr):
                 prefix = self.__whitespace()
                 # FIXME consider flattening nested unions
-                left = self.__pad_right(self.__convert_internal(node.left, self.__convert_type),
-                                        self.__source_before('|'))
-                right = self.__pad_right(self.__convert_internal(node.right, self.__convert_type), Space.EMPTY)
+                left = self.__pad_right(self.__convert_type(node.left), self.__source_before('|'))
+                right = self.__pad_right(self.__convert_type(node.right), Space.EMPTY)
                 return py.UnionType(
                     random_id(),
                     prefix,
@@ -3442,7 +3611,7 @@ class ParserVisitor(ast.NodeVisitor):
         fidelity but without structural access to the f-string internals.
         Handles implicit string concatenation (e.g. f"a" "b").
         """
-        res = None
+        parts: list[J] = []
         prefix = leading_prefix
         is_first = True
         while True:
@@ -3477,25 +3646,52 @@ class ParserVisitor(ast.NodeVisitor):
                 None,
                 JavaType.Primitive.String,
             )
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
             is_first = False
-        assert res is not None
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
+
+    def __consume_fstring_middles(self, _middle, raw: bool) -> \
+            Tuple[str, str, Optional[List[j.Literal.UnicodeEscape]]]:
+        """Consume a run of MIDDLE tokens, returning `(source, value_source, escapes)`.
+
+        The tokenizer ends a MIDDLE after each `{{`, `}}` and `\\N{...}`, so one literal
+        chunk spans several of them.
+        """
+        source = ''
+        while self._tokens[self._token_idx].type == _middle:
+            source += self._tokens[self._token_idx].string
+            self._token_idx += 1
+        value_source, unicode_escapes = self.__extract_surrogate_escapes(self.__redouble_braces(source, raw))
+        return source, value_source, unicode_escapes
+
+    @staticmethod
+    def __redouble_braces(source: str, raw: bool) -> str:
+        """Put back the `{{`/`}}` that a MIDDLE token's text holds as a single brace.
+
+        A chunk's other braces belong to a `\\N{...}` escape and are single already.
+        Spotting one takes the backslash run's parity and `raw`: neither `f"\\\\N{{x}}"`
+        nor `rf"\\N{{x}}"` has an escape there.
+        """
+        out = []
+        i = 0
+        while i < len(source):
+            if source[i] == '\\':
+                run_end = i
+                while run_end < len(source) and source[run_end] == '\\':
+                    run_end += 1
+                out.append(source[i:run_end])
+                escape_end = source.find('}', run_end + 2)
+                if not raw and (run_end - i) % 2 and source.startswith('N{', run_end) and escape_end != -1:
+                    out.append(source[run_end:escape_end + 1])
+                    run_end = escape_end + 1
+                i = run_end
+            else:
+                out.append({'{': '{{', '}': '}}'}.get(source[i], source[i]))
+                i += 1
+        return ''.join(out)
 
     def __map_fstring(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0, *,
-                      _start=None, _middle=None, _end=None) -> \
+                      _start=None, _middle=None, _end=None, _raw: bool = False) -> \
             Tuple[J, TokenInfo, int]:
         """Map an f-string or t-string to a FormattedString AST node.
 
@@ -3511,14 +3707,17 @@ class ParserVisitor(ast.NodeVisitor):
                 _start, _middle, _end = FSTRING_START, FSTRING_MIDDLE, FSTRING_END
 
         if tok.type != _start:
-            if len(node.values) == 1 and isinstance(node.values[0], ast.Constant):
-                # format specifiers are stored as f-strings in the AST; e.g. `f'{1:n}'`
-                format_val = node.values[0].value
-                format_str = str(format_val) if format_val is not None else None
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(format_str) if format_str else (None, None)
+            # A format specifier is an f-string in the AST (e.g. `f'{1:n}'`), but a
+            # `\N{...}` escape makes an all-literal one arrive as a bare `Constant` or as
+            # one `Constant` per chunk, depending on the CPython patch release.
+            spec_values = [node] if isinstance(node, ast.Constant) else node.values
+            if spec_values and all(isinstance(v, ast.Constant) for v in spec_values):
+                format_val = ''.join(v.value for v in spec_values)
+                # The printer emits `value_source`, so it comes from the specifier's MIDDLE
+                # tokens: the decoded `ast` constant has lost escapes and line continuations.
+                _, value_source, unicode_escapes = self.__consume_fstring_middles(_middle, _raw)
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else format_val
-                self._token_idx += 1  # consume the format token
                 return (j.Literal(
                     random_id(),
                     self.__whitespace(),
@@ -3533,13 +3732,18 @@ class ParserVisitor(ast.NodeVisitor):
             consume_end_delim = False
         else:
             delimiter = tok.string
+            _raw = 'r' in delimiter[:delimiter.index(delimiter[-1])].lower()
             tok = self._advance_token()  # consume start token, get next
             consume_end_delim = True
 
         # tokenizer tokens: START, MIDDLE, OP, ..., OP, MIDDLE, END
         parts = []
         prev_token_idx = -1
-        while tok.type != _end and value_idx < len(node.values):
+        # A literal chunk that decodes to the empty string (e.g. a line continuation)
+        # contributes no `Constant` to `node.values`, yet the tokenizer still emits its
+        # source as a MIDDLE token, so keep consuming those after the values run out.
+        while tok.type != _end and (
+                value_idx < len(node.values) or (tok.type == _middle and tok.string)):
             # Safety check: ensure loop is making progress
             if self._token_idx == prev_token_idx:
                 raise RuntimeError(
@@ -3554,18 +3758,10 @@ class ParserVisitor(ast.NodeVisitor):
                 tok = self._advance_token()
                 continue
 
-            value = node.values[value_idx]
+            value = node.values[value_idx] if value_idx < len(node.values) else None
             if tok.type == _middle:
-                # Accumulate text from consecutive MIDDLE tokens
-                s = tok.string
-                tok = self._advance_token()  # consume first MIDDLE, get next
-                while tok.type == _middle:
-                    s += tok.string
-                    tok = self._advance_token()  # consume and get next
-                # For value_source, escape braces so the printer outputs them correctly
-                # In f-strings, {{ becomes { and }} becomes }, so we reverse that
-                value_source = s.replace('{', '{{').replace('}', '}}')
-                value_source, unicode_escapes = self.__extract_surrogate_escapes(value_source)
+                s, value_source, unicode_escapes = self.__consume_fstring_middles(_middle, _raw)
+                tok = self._tokens[self._token_idx]
                 # Set value to None when there are unicode escapes (surrogates)
                 literal_value = None if unicode_escapes else s
                 parts.append(j.Literal(
@@ -3577,8 +3773,12 @@ class ParserVisitor(ast.NodeVisitor):
                     unicode_escapes,
                     JavaType.Primitive.String
                 ))
-                if cast(ast.Constant, value).value == s:
-                    value_idx += 1
+                # Adjacent string literals are merged into one `Constant`, so a chunk ending
+                # at the closing delimiter may continue in the next literal; anywhere else it
+                # covers every `Constant` up to the next field.
+                if isinstance(value, ast.Constant) and tok.type != _end:
+                    while value_idx < len(node.values) and isinstance(node.values[value_idx], ast.Constant):
+                        value_idx += 1
             elif tok.type == token.OP and tok.string == '{':
                 tok = self._advance_token()  # consume '{', get next
                 if not isinstance(value, (ast.FormattedValue, _Interpolation)):
@@ -3590,6 +3790,7 @@ class ParserVisitor(ast.NodeVisitor):
                 if isinstance(value_inner, (ast.JoinedStr, _TemplateStr)):
                     joined = value_inner
                     nested, tok, inner_vi = self.__map_fstring(joined, Space.EMPTY, tok)
+                    nested_parts: list[J] = [nested]
 
                     # Handle concatenated f-strings/strings within this expression
                     while True:
@@ -3606,15 +3807,9 @@ class ParserVisitor(ast.NodeVisitor):
                                        else ast.Constant(value=ast.literal_eval(tok.string)))
                             right, tok = self.__map_literal(ast_val, tok)
                             right = right.replace(prefix=concat_prefix)
-                        nested = py.Binary(
-                            random_id(), Space.EMPTY, Markers.EMPTY,
-                            nested,
-                            self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                            None, right,
-                            self._type_mapping.type(node)
-                        )
+                        nested_parts.append(right)
 
-                    expr = self.__pad_right(self._hoist_concat_prefix(nested), Space.EMPTY)
+                    expr = self.__pad_right(self._string_concatenation(nested_parts, node), Space.EMPTY)
                 else:
                     expr = self.__pad_right(
                         self.__convert(value_inner),
@@ -3639,7 +3834,7 @@ class ParserVisitor(ast.NodeVisitor):
 
                 # debug specifier
                 if tok.type == token.OP and tok.string == '=':
-                    debug = self.__pad_right(True, self.__whitespace('\n'))
+                    debug = self.__pad_right(True, self.__whitespace())
                     tok = self._tokens[self._token_idx]  # get token after whitespace
                 else:
                     debug = None
@@ -3652,7 +3847,9 @@ class ParserVisitor(ast.NodeVisitor):
                         self._token_idx += 1  # advance past '!' (only needed after debug specifier)
                     tok = self._tokens[self._token_idx]  # get conversion char
                     conv = py.FormattedString.Value.Conversion.ASCII if tok.string == 'a' else py.FormattedString.Value.Conversion.STR if tok.string == 's' else py.FormattedString.Value.Conversion.REPR
-                    tok = self._advance_token()  # consume conversion char, get next
+                    self._token_idx += 1  # consume conversion char
+                    conv = self.__pad_right(conv, self.__whitespace())
+                    tok = self._tokens[self._token_idx]  # get token after whitespace
                 else:
                     conv = None
 
@@ -3664,7 +3861,7 @@ class ParserVisitor(ast.NodeVisitor):
                         self._token_idx += 1  # advance past ':' (needed after conversion or debug specifier)
                     format_spec, tok, _ = self.__map_fstring(
                         cast(ast.JoinedStr, value.format_spec), Space.EMPTY, self._tokens[self._token_idx],
-                        _start=_start, _middle=_middle, _end=_end)
+                        _start=_start, _middle=_middle, _end=_end, _raw=_raw)
                 else:
                     format_spec = None
 
@@ -3706,25 +3903,12 @@ class ParserVisitor(ast.NodeVisitor):
             return False
         return self._tokens[self._token_idx].string == s
 
-    def __is_own_sequence_delimiter(self, node, delim: str) -> bool:
-        """Check if the delimiter at the current token belongs to this MatchSequence.
-
-        When the current token is '[' (or '('), it could belong to this
-        sequence or to its first child (e.g., ``[c], _`` vs ``[c, _]``).
-
-        If the first child pattern is itself a MatchSequence, the delimiter
-        might belong to the child.  We disambiguate by peeking at the next
-        token: if it is also a delimiter (``[`` or ``(``), the current one
-        opens this sequence (e.g., ``[[a], b]``); otherwise the current
-        delimiter belongs to the child (e.g., ``[c], _``).
-        """
-        import ast as stdlib_ast
-        if node.patterns and isinstance(node.patterns[0], stdlib_ast.MatchSequence):
-            # The first child is also a sequence — check whether there are
-            # two consecutive delimiters, meaning the outer one is ours.
-            next_idx = self._token_idx + 1
-            if next_idx < len(self._tokens):
-                next_tok = self._tokens[next_idx].string
-                return next_tok in ('[', '(')
-            return False
-        return True
+    def __is_own_sequence_delimiter(self, node) -> bool:
+        """Whether the bracket at the current token is this MatchSequence's own, which is so when
+        its closer is where the sequence ends. Otherwise it opens the first element, as the
+        parenthesis of ``(a, b) as c, d`` does."""
+        close_idx = self._paren_pairs.get(self._token_idx)
+        if close_idx is None:
+            return True
+        end_col = self._byte_offset_to_char_offset(node.end_lineno, node.end_col_offset)
+        return self._tokens[close_idx].end == (node.end_lineno, end_col)

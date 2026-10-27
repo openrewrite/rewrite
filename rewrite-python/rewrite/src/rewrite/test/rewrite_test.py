@@ -17,15 +17,18 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import uuid4
 
 from rewrite import (
+    Cursor,
     ExecutionContext,
     InMemoryExecutionContext,
     InMemoryLargeSourceSet,
+    PrintOutputCapture,
     Recipe,
     TreeVisitor,
 )
@@ -33,7 +36,9 @@ from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
 
+from .added_markers import assert_no_added_markers
 from .spec import SourceSpec, AfterRecipeText, dedent
+from .well_formed import assert_well_formed
 
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
@@ -101,6 +106,24 @@ def from_visitor(visitor: TreeVisitor[Any, ExecutionContext]) -> Recipe:
 
 
 @dataclass
+class _Workspace:
+    """Where a run's sources sit on disk while they parse."""
+
+    paths: Dict[int, Path]
+    written: Dict[int, str]
+    ty_client: Optional[Any]
+    # Whether ty attributed this run, and if not, why.
+    ty_status: str
+
+    def source_path(self, spec: SourceSpec) -> Path:
+        return self.paths[id(spec)]
+
+    def file_path(self, spec: SourceSpec) -> Optional[str]:
+        # Only a ty session reads this path; an untyped parse has no use for it.
+        return self.written.get(id(spec)) if self.ty_client is not None else None
+
+
+@dataclass
 class RecipeSpec:
     """
     Configuration for running recipe tests.
@@ -134,21 +157,19 @@ class RecipeSpec:
     # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
     allow_empty_diff: bool = False
 
+    # Whether to fail a recipe that leaves markers on the LST that neither its inputs
+    # nor a fresh parse of its output carry
+    check_reporting_markers_only: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
 
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
-        return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
-                          check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=self.allow_empty_diff,
-                          type_attribution=self.type_attribution)
+        return replace(self, recipe=recipe)
 
     def with_allow_empty_diff(self, value: bool) -> "RecipeSpec":
-        return RecipeSpec(recipe=self.recipe, execution_context=self.execution_context,
-                          check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=value,
-                          type_attribution=self.type_attribution)
+        return replace(self, allow_empty_diff=value)
 
     def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
         if len(recipes) == 1:
@@ -164,7 +185,12 @@ class RecipeSpec:
         2. Parses them using appropriate parsers
         3. Validates parse/print idempotence if enabled
         4. Runs the recipe
-        5. Compares results with expected "after" states
+        5. Checks that the recipe added no markers for its own use, if enabled
+        6. Compares results with expected "after" states
+
+        Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
+        attribution, and a recipe that produces no change names the nodes that
+        carry none. See the README section "Inspecting type attribution".
 
         Args:
             *source_specs: Variable number of source specifications
@@ -172,17 +198,21 @@ class RecipeSpec:
         Raises:
             AssertionError: If any validation fails
         """
-        # Group specs by kind
-        specs_by_kind = self._group_by_kind(list(source_specs))
+        specs = list(source_specs)
+        specs_by_kind = self._group_by_kind(specs)
 
         # Parse and validate all source files
         all_parsed: List[Tuple[SourceSpec, SourceFile]] = []
-        for kind, specs in specs_by_kind.items():
-            parsed = self._parse(specs)
-            self._expect_no_parse_failures(parsed)
-            if self.check_parse_print_idempotence:
-                self._expect_parse_print_idempotence(parsed)
-            all_parsed.extend(parsed)
+        with self._workspace(specs) as workspace:
+            ty_status = workspace.ty_status
+            for kind, kind_specs in specs_by_kind.items():
+                parsed = self._parse(kind_specs, workspace)
+                self._expect_no_parse_failures(parsed)
+                for _, sf in parsed:
+                    assert_well_formed(sf)
+                if self.check_parse_print_idempotence:
+                    self._expect_parse_print_idempotence(parsed)
+                all_parsed.extend(parsed)
 
         # Apply before_recipe hooks (after idempotence check, before recipe execution)
         all_parsed = [
@@ -194,11 +224,18 @@ class RecipeSpec:
         source_files = [sf for _, sf in all_parsed]
         lss = InMemoryLargeSourceSet(source_files)
         results = self.recipe.run(lss, self.execution_context)
+        if self.check_reporting_markers_only:
+            assert_no_added_markers(source_files, results, self._reparse)
 
         # Build result map: source_file.id -> after_source_file
         result_map: Dict[Any, Optional[SourceFile]] = {}
+        generated: List[SourceFile] = []
         for result in results:
-            if result._before is not None:
+            if result._before is None:
+                # A file the recipe created, which no spec's `before` can be keyed by.
+                if result._after is not None:
+                    generated.append(result._after)
+            else:
                 # Check if there was a change
                 if result._after is not None and result._after is not result._before:
                     result_map[result._before.id] = result._after
@@ -206,7 +243,8 @@ class RecipeSpec:
                     result_map[result._before.id] = None
 
         # Validate results match expected after states
-        self._expect_results_to_match_after(source_specs, all_parsed, result_map)
+        self._expect_results_to_match_after(source_specs, all_parsed, result_map, ty_status)
+        self._expect_generated(source_specs, generated)
 
     def _group_by_kind(self, specs: List[SourceSpec]) -> Dict[str, List[SourceSpec]]:
         """Group source specs by their kind."""
@@ -217,7 +255,9 @@ class RecipeSpec:
             groups[spec.kind].append(spec)
         return groups
 
-    def _parse(self, specs: List[SourceSpec]) -> List[Tuple[SourceSpec, SourceFile]]:
+    def _parse(
+        self, specs: List[SourceSpec], workspace: "_Workspace"
+    ) -> List[Tuple[SourceSpec, SourceFile]]:
         """Parse all specs using the appropriate parser."""
         result: List[Tuple[SourceSpec, SourceFile]] = []
 
@@ -227,77 +267,130 @@ class RecipeSpec:
                 continue
 
             if spec.kind != "python":
-                # Only Python specs are parsed (e.g., toml specs from pyproject()
-                # are consumed by uv() and don't need parsing)
+                # Non-Python specs shape the workspace rather than being parsed:
+                # a pyproject() is there to declare the project.
                 continue
 
-            # Determine source path
-            source_path = spec.path or Path(f"_{uuid4().hex}.{spec.ext}")
+            parsed = self._parse_python(
+                dedent(spec.before),
+                workspace.source_path(spec),
+                workspace.file_path(spec),
+                workspace.ty_client,
+            )
 
-            # Parse the source
-            source = dedent(spec.before)
-            parsed = self._parse_python(source, source_path, spec.project_root)
+            # Reports the attribution this run produced, which is the one a
+            # pattern written for this test has to match.
+            from rewrite.python.type_report import dump_types_if_requested
+            dump_types_if_requested(parsed, ty_status=workspace.ty_status)
 
             result.append((spec, parsed))
 
         return result
 
+    @contextmanager
+    def _workspace(self, specs: List[SourceSpec]):
+        """Hold every source in the run in one directory while it parses.
+
+        ty reads the sources and the project metadata from there, so a declared
+        Python version picks the typeshed and the sources resolve against each
+        other. ``uv()`` supplies its dependency workspace through the specs;
+        otherwise the run owns one.
+        """
+        import shutil
+        import tempfile
+        from rewrite.python._version_detect import detect_from_project, ty_python_version
+
+        paths = {id(spec): spec.path or Path(f"_{uuid4().hex}.{spec.ext}") for spec in specs}
+
+        if not self.type_attribution:
+            yield _Workspace(paths, {}, None, "off, type_attribution=False")
+            return
+
+        root = next((spec.project_root for spec in specs if spec.project_root), None)
+        owns_root = root is None
+        if owns_root:
+            root = tempfile.mkdtemp()
+
+        written: Dict[int, str] = {}
+        created: List[Path] = []
+        ty_client = None
+        ty_status = "on"
+        try:
+            for spec in specs:
+                if spec.before is None:
+                    continue
+                logical = paths[id(spec)]
+                if logical.is_absolute() or ".." in logical.parts:
+                    # The run removes what it writes, so a path leading out of the
+                    # workspace would write and delete on the caller's tree.
+                    raise ValueError(f"a source path stays inside the workspace: {logical}")
+                destination = Path(root) / logical
+                created.extend(p for p in reversed(destination.parents) if not p.exists())
+                if not destination.exists():
+                    created.append(destination)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(dedent(spec.before))
+                written[id(spec)] = str(destination)
+
+            try:
+                from rewrite.python.ty_client import TyTypesClient
+                # handle_parse resolves this same version for a real parse.
+                ty_client = TyTypesClient(python_version=ty_python_version(detect_from_project(root)))
+                if not ty_client.initialize(root):
+                    ty_status = f"off, ty could not initialize against {root}"
+            except (ImportError, RuntimeError) as exc:
+                ty_client = None
+                ty_status = f"off, ty-types unavailable: {exc}"
+
+            yield _Workspace(paths, written, ty_client, ty_status)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if owns_root:
+                shutil.rmtree(root, ignore_errors=True)
+            else:
+                # A uv() workspace is cached across runs and holds the project's own
+                # files — among them the pyproject.toml it was built from — so give
+                # back what this run added and nothing else.
+                for path in reversed(created):
+                    try:
+                        if path.is_dir():
+                            path.rmdir()
+                        else:
+                            path.unlink()
+                    except OSError:
+                        pass
+
     def _parse_python(
         self,
         source: str,
         source_path: Path,
-        project_root: Optional[str] = None,
+        file_path: Optional[str],
+        ty_client: Optional[Any],
     ) -> CompilationUnit:
         """Parse Python source code into a CompilationUnit.
 
-        Args:
-            source: Python source code.
-            source_path: Logical path for the source file.
-            project_root: Optional workspace directory for type attribution
-                (e.g., from ``uv()``).  When ``None`` a temporary directory is
-                created and cleaned up after parsing.
+        ``source_path`` is the logical path the tree carries; ``file_path`` is where
+        the source sits in the workspace, and is None for an untyped parse.
         """
-        import tempfile
-        import os
         from rewrite.python._parser_visitor import ParserVisitor
 
-        ty_client = None
-        workspace = project_root
-        owns_workspace = workspace is None
-        file_path = None
+        visitor = ParserVisitor(source, file_path, ty_client)
+        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+        source_for_ast = source[1:] if source.startswith('\ufeff') else source
+        tree = ast.parse(source_for_ast)
+        cu = visitor.visit_Module(tree)
+        return cu.replace(source_path=source_path)
 
-        if self.type_attribution:
-            try:
-                from rewrite.python.ty_client import TyTypesClient
-                if owns_workspace:
-                    workspace = tempfile.mkdtemp()
-                file_name = source_path.name if source_path.name else 'test.py'
-                file_path = os.path.join(workspace, file_name)
-                with open(file_path, 'w') as f:
-                    f.write(source)
-                ty_client = TyTypesClient()
-                ty_client.initialize(workspace)
-            except (ImportError, RuntimeError):
-                file_path = None
-
-        try:
-            visitor = ParserVisitor(source, file_path, ty_client)
-            # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
-            source_for_ast = source[1:] if source.startswith('\ufeff') else source
-            tree = ast.parse(source_for_ast)
-            cu = visitor.visit_Module(tree)
-            return cu.replace(source_path=source_path)
-        finally:
-            if ty_client is not None:
-                ty_client.shutdown()
-            if owns_workspace and workspace is not None:
-                import shutil
-                shutil.rmtree(workspace, ignore_errors=True)
-            elif file_path is not None:
-                try:
-                    os.unlink(file_path)
-                except OSError:
-                    pass
+    def _reparse(self, source_file: SourceFile) -> Optional[SourceFile]:
+        """Parse what ``source_file`` prints, or return None for a source this harness cannot parse."""
+        from rewrite.python.tree import CompilationUnit
+        if not isinstance(source_file, CompilationUnit):
+            return None
+        # Printed without search markers, which print as comments that are not Python.
+        printed = source_file.print(Cursor(None, Cursor.ROOT_VALUE),
+                                    PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
+        return self._parse_python(printed, source_file.source_path, None, None)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]
@@ -326,6 +419,7 @@ class RecipeSpec:
         specs: Tuple[SourceSpec, ...],
         parsed: List[Tuple[SourceSpec, SourceFile]],
         result_map: Dict[Any, Optional[SourceFile]],
+        ty_status: str,
     ) -> None:
         """Validate recipe results match expected after states."""
         # Build a map from spec to parsed source file
@@ -333,7 +427,8 @@ class RecipeSpec:
 
         for spec in specs:
             if spec.before is None:
-                # Generated file case - not implemented yet
+                # A generated file, which `_expect_generated` checks: there is no parsed
+                # source file here to key a result by.
                 continue
 
             source_file = parsed_map.get(id(spec))
@@ -342,6 +437,8 @@ class RecipeSpec:
 
             # Get the result (may be None if no change, or the changed file)
             after_sf = result_map.get(source_file.id)
+            if after_sf is not None:
+                assert_well_formed(after_sf)
 
             if spec.after is None:
                 # No change expected
@@ -362,8 +459,11 @@ class RecipeSpec:
             else:
                 # Change expected
                 if after_sf is None:
+                    from rewrite.python.type_report import attribution_hint
+                    before_sf = parsed_map.get(id(spec))
+                    hint = "" if before_sf is None else attribution_hint(before_sf, ty_status=ty_status)
                     raise AssertionError(
-                        f"Expected recipe to produce a change for:\n{dedent(spec.before)}"
+                        f"Expected recipe to produce a change for:\n{dedent(spec.before)}{hint}"
                     )
 
                 actual = after_sf.print_all()
@@ -379,6 +479,67 @@ class RecipeSpec:
                 final_sf = after_sf if after_sf is not None else source_file
                 spec.after_recipe(final_sf)
 
+    def _match_generated(
+        self, spec: SourceSpec, unclaimed: List[SourceFile],
+    ) -> Optional[SourceFile]:
+        """The generated file `spec` describes, or None when the recipe produced no match.
+
+        Matched on the source path when the spec gives one, and otherwise on contents, which
+        is what the Java test framework does and is the only thing left to match on.
+        """
+        if spec.path is not None:
+            for source_file in unclaimed:
+                if Path(str(source_file.source_path)) == Path(spec.path):
+                    return source_file
+            return None
+        for source_file in unclaimed:
+            actual = source_file.print_all()
+            if actual == self._resolve_after(spec.after, actual):
+                return source_file
+        return None
+
+    def _expect_generated(
+        self,
+        specs: Tuple[SourceSpec, ...],
+        generated: List[SourceFile],
+    ) -> None:
+        """Check the files the recipe created against the specs that have no `before`."""
+        unclaimed = list(generated)
+        for spec in specs:
+            if spec.before is not None:
+                continue
+            if spec.after is None:
+                raise AssertionError(
+                    "A source spec with neither a `before` nor an `after` describes nothing. "
+                    "Pass the expected contents as `after`, and a `path` when the recipe "
+                    "chooses where the file lands."
+                )
+
+            match = self._match_generated(spec, unclaimed)
+            if match is None:
+                raise AssertionError(
+                    "Expected the recipe to generate a source file%s, and it generated:\n%s"
+                    % ("" if spec.path is None else f" at {spec.path}",
+                       _source_paths(generated))
+                )
+            unclaimed.remove(match)
+            assert_well_formed(match)
+
+            actual = match.print_all()
+            expected = self._resolve_after(spec.after, actual)
+            assert actual == expected, (
+                f"Generated {match.source_path} does not match expected.\n"
+                f"Expected:\n{repr(expected)}\n\nActual:\n{repr(actual)}"
+            )
+            if spec.after_recipe:
+                spec.after_recipe(match)
+
+        if unclaimed:
+            raise AssertionError(
+                "The recipe generated source files the test did not expect:\n%s"
+                % _source_paths(unclaimed)
+            )
+
     def _resolve_after(self, after: AfterRecipeText, actual: str) -> str:
         """Resolve the expected after value."""
         if callable(after):
@@ -387,6 +548,12 @@ class RecipeSpec:
                 return actual  # Callable returned None = actual is acceptable
             return result
         return dedent(after) if after else actual
+
+
+def _source_paths(source_files: List[SourceFile]) -> str:
+    if not source_files:
+        return "    (nothing)"
+    return "\n".join(f"    {source_file.source_path}" for source_file in source_files)
 
 
 class _CompositeRecipe(Recipe):

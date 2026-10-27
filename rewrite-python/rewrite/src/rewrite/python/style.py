@@ -523,7 +523,7 @@ class IntelliJ(NamedStyles):
             _name='org.openrewrite.python.style.IntelliJ',
             _display_name='IntelliJ IDEA',
             _description='IntelliJ IDEA default Python style.',
-            _tags={},
+            _tags=set(),
             _styles=(
                 IntelliJ.spaces(),
                 IntelliJ.wrapping_and_braces(),

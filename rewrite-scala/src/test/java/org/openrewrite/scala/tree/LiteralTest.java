@@ -16,8 +16,13 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class LiteralTest implements RewriteTest {
@@ -147,5 +152,29 @@ class LiteralTest implements RewriteTest {
           scala("(42)"),
           scala("((42))")
         );
+    }
+
+    @Test
+    void loneSurrogatesKeepTheirEscapeInValue() {
+        rewriteRun(
+          scala("val c = '\\uD83D'", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("\\uD83D"))),
+
+          scala("val s = \"{\\\"test\\uD83D\\\": 2}\"", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("{\"test\\uD83D\": 2}"))),
+
+          scala("val s = \"\\uD83D\\uDE00\\uDE00\"", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("\uD83D\uDE00\\uDE00")))
+        );
+    }
+
+    private static J.Literal firstLiteral(S.CompilationUnit cu) {
+        return new JavaIsoVisitor<AtomicReference<J.Literal>>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, AtomicReference<J.Literal> first) {
+                first.compareAndSet(null, literal);
+                return literal;
+            }
+        }.reduce(cu, new AtomicReference<>()).get();
     }
 }

@@ -39,7 +39,7 @@ public class CsDocCommentRpcTest
 
         var batches = new Queue<List<RpcObjectData>>();
         var sendQueue = new RpcSendQueue(1, batch => batches.Enqueue(Encode(batch)),
-            new Dictionary<object, int>(ReferenceEqualityComparer.Instance), null, false);
+            new RpcRefs(), null, false);
         new CSharpSender().VisitSpace(space, sendQueue);
         sendQueue.Flush();
 

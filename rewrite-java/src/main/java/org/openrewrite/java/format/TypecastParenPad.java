@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
@@ -61,7 +62,9 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, tc)
+            JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+            return (J.TypeCast) cu.service(AutoFormatService.class)
+                    .spacesVisitor(cu, spacesStyle, tc)
                     .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
         }
     }

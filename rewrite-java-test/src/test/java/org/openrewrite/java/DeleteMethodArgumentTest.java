@@ -133,7 +133,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeleteMethodArgument("B foo(String)", 0)),
           java(
-            "public class A {{ B.foo(null); }}",
+            "public class A {{ B.foo((String) null); }}",
             "public class A {{ B.foo(); }}"
           )
         );

@@ -88,8 +88,8 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 		// these would all be nil because importer.Default() doesn't know
 		// about example.com/foo/sub.
 		identTypes := collectIdentTypes(cu)
-		assert.NotNil(t,identTypes["sub"], "expected `sub` identifier in main.go to have a resolved Type, got nil")
-		assert.NotNil(t,identTypes["Hello"], "expected `Hello` identifier in main.go to have a resolved Type, got nil")
+		assert.NotNil(t, identTypes["sub"], "expected `sub` identifier in main.go to have a resolved Type, got nil")
+		assert.NotNil(t, identTypes["Hello"], "expected `Hello` identifier in main.go to have a resolved Type, got nil")
 	}
 
 	spec := test.NewRecipeSpec()

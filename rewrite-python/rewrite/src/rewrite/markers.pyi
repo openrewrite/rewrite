@@ -10,31 +10,45 @@ import weakref
 M = TypeVar('M', bound=Marker)
 
 from abc import ABC, abstractmethod
+from .parser import Parser
+from .visitor import Cursor
+from .utils import id_to_int as id_to_int, random_id as random_id, list_map as list_map, replace_if_changed as replace_if_changed
 
 class Marker(ABC):
     @property
     def id(self) -> UUID: ...
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
-    def replace(self, **kwargs: Any) -> 'Marker': ...
+    def replace(self, **kwargs: Any) -> Self: ...
 
 class Markup(Marker, ABC):
     @property
+    @abstractmethod
     def message(self) -> str: ...
     @property
+    @abstractmethod
     def detail(self) -> Optional[str]: ...
+    @staticmethod
+    def warn(message: str, detail: Optional[str]=...) -> 'MarkupWarn': ...
+    @staticmethod
+    def error(message: str, detail: Optional[str]=...) -> 'MarkupError': ...
+    @staticmethod
+    def info(message: str, detail: Optional[str]=...) -> 'MarkupInfo': ...
+    @staticmethod
+    def debug(message: str, detail: Optional[str]=...) -> 'MarkupDebug': ...
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
 
 @dataclass(frozen=True)
 class Markers:
     EMPTY: ClassVar[Markers]
+    _LAST_EMPTY: ClassVar[Optional[Markers]]
 
-    _id: UUID
+    _id: int | UUID
     _markers: List[Marker]
 
     def replace(self, **kwargs: Any) -> 'Markers': ...
 
     @classmethod
-    def build(cls, id: UUID, markers: List[Marker]) -> Markers: ...
+    def build(cls, id: int | UUID, markers: List[Marker]) -> Markers: ...
 
     @property
     def id(self) -> UUID: ...
@@ -44,13 +58,16 @@ class Markers:
     def find_first(self, cls: Type[M]) -> Optional[M]: ...
     def find_all(self, cls: Type[M]) -> List[M]: ...
     def compute_by_type(self, cls: Type[M], remap_fn: Callable[[M], Marker]) -> Markers: ...
+    def add(self, marker: Marker) -> Markers: ...
 
 @dataclass(frozen=True)
 class SearchResult(Marker):
-    _id: UUID
+    _id: int | UUID
     _description: Optional[str]
 
-    def replace(self, **kwargs: Any) -> Self: ...
+
+    @staticmethod
+    def found(tree: Any, description: Optional[str]=...) -> Any: ...
 
     @property
     def description(self) -> Optional[str]: ...
@@ -59,11 +76,10 @@ class SearchResult(Marker):
 
 @dataclass(frozen=True)
 class MarkupWarn(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def message(self) -> str: ...
@@ -72,11 +88,10 @@ class MarkupWarn(Markup):
 
 @dataclass(frozen=True)
 class MarkupError(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def message(self) -> str: ...
@@ -85,11 +100,10 @@ class MarkupError(Markup):
 
 @dataclass(frozen=True)
 class MarkupInfo(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def message(self) -> str: ...
@@ -98,11 +112,10 @@ class MarkupInfo(Markup):
 
 @dataclass(frozen=True)
 class MarkupDebug(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def message(self) -> str: ...
@@ -110,24 +123,51 @@ class MarkupDebug(Markup):
     def detail(self) -> Optional[str]: ...
 
 @dataclass(frozen=True)
+class RecipeThatMadeChanges:
+    _name: str
+    _display_name: Optional[str] = ...
+    _instance_name: Optional[str] = ...
+    _options: Optional[Dict[str, Any]] = ...
+    _estimated_effort_per_occurrence_millis: Optional[int] = ...
+
+
+    @property
+    def name(self) -> str: ...
+    @property
+    def display_name(self) -> Optional[str]: ...
+    @property
+    def instance_name(self) -> Optional[str]: ...
+    @property
+    def options(self) -> Optional[Dict[str, Any]]: ...
+    @property
+    def estimated_effort_per_occurrence_millis(self) -> Optional[int]: ...
+
+@dataclass(frozen=True)
+class RecipesThatMadeChanges(Marker):
+    _id: int | UUID
+    _recipes: Optional[List[List[RecipeThatMadeChanges]]]
+
+
+    @property
+    def recipes(self) -> Optional[List[List[RecipeThatMadeChanges]]]: ...
+
+@dataclass(frozen=True)
 class UnknownJavaMarker(Marker):
-    _id: UUID
+    _id: int | UUID
     _data: Dict[str, Any]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def data(self) -> Dict[str, Any]: ...
 
 @dataclass(frozen=True)
 class ParseExceptionResult(Marker):
-    _id: UUID
+    _id: int | UUID
     _parser_type: str
     _exception_type: str
     _message: str
     _tree_type: Optional[str] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult: ...

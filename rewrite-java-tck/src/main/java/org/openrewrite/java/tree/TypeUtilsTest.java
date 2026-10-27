@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -444,6 +445,32 @@ class TypeUtilsTest implements RewriteTest {
             }.visit(cu, new InMemoryExecutionContext()))
           )
         );
+    }
+
+    @Test
+    void annotationArrayElementValuesWithoutValuesAreOfSameType() {
+        // Hand-built because the parser routes through `ArrayElementValue.from`, which sets
+        // exactly one of the two arrays; an RPC peer builds the type directly and can set neither.
+        JavaType.Method element = new JavaType.Method(null, 0L, JavaType.ShallowClass.build("com.example.Foo"),
+          "value", JavaType.Primitive.String, emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList());
+        JavaType.Annotation neither = annotationWithArray(element, null, null);
+        JavaType.Annotation empty = annotationWithArray(element, new Object[0], null);
+        JavaType.Annotation constants = annotationWithArray(element, new Object[]{"a"}, null);
+        JavaType.Annotation references = annotationWithArray(element, null,
+          new JavaType[]{JavaType.ShallowClass.build("java.lang.String")});
+
+        assertTrue(TypeUtils.isOfType(neither, annotationWithArray(element, null, null)));
+        assertTrue(TypeUtils.isOfType(neither, empty));
+        assertTrue(TypeUtils.isOfType(empty, neither));
+
+        assertFalse(TypeUtils.isOfType(neither, constants));
+        assertFalse(TypeUtils.isOfType(neither, references));
+    }
+
+    private static JavaType.Annotation annotationWithArray(JavaType.Method element, Object @Nullable [] constantValues,
+                                                           JavaType @Nullable [] referenceValues) {
+        return new JavaType.Annotation(JavaType.ShallowClass.build("com.example.Foo"),
+          singletonList(new JavaType.Annotation.ArrayElementValue(element, constantValues, referenceValues)));
     }
 
     @Test

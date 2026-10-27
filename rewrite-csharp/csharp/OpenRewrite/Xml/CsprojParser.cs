@@ -63,7 +63,7 @@ public class CsprojParser
         try
         {
             tempDir = Path.Combine(Path.GetTempPath(),
-                "openrewrite-csproj-" + Guid.NewGuid().ToString("N")[..8]);
+                "openrewrite-csproj-" + Tree.RandomId().ToString("N")[..8]);
             Directory.CreateDirectory(tempDir);
 
             // Write all files to the shared temp directory

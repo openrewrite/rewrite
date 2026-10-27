@@ -22,7 +22,6 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -35,6 +34,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +50,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
+@CheckReturnValue
 public class Assertions {
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
@@ -263,7 +264,7 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
         return sourceFiles -> {
-            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, new JavaTypeCache(), false);
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath);
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);

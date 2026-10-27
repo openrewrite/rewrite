@@ -494,3 +494,101 @@ export function isValidSurrogateRange(unicodeString: string): boolean {
     }
     return true;
 }
+
+const SURR_FIRST = 0xD800;
+const SURR_LAST = 0xDFFF;
+const HIGH_SURR_LAST = 0xDBFF;
+const LOW_SURR_FIRST = 0xDC00;
+
+const SINGLE_CHARACTER_ESCAPES: Record<string, string> = {b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", "0": "\0"};
+
+/** The value a string literal's body, the text between its quotes, stands for. */
+export function unescapeStringLiteral(body: string): string {
+    return body.replace(/\\(?:u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|(\r\n|[\s\S]))/g,
+        (_, codePoint: string | undefined, unit: string | undefined, byte: string | undefined, escaped: string) =>
+            codePoint !== undefined ? String.fromCodePoint(parseInt(codePoint, 16)) :
+                (unit ?? byte) !== undefined ? String.fromCharCode(parseInt((unit ?? byte)!, 16)) :
+                    /^(\r\n|[\n\r\u2028\u2029])$/.test(escaped) ? "" :
+                        SINGLE_CHARACTER_ESCAPES[escaped] ?? escaped);
+}
+
+/**
+ * Escapes each lone surrogate as `\uXXXX`, the form {@link extractSurrogateEscapes} holds it in.
+ * Print idempotence is measured against this form, and type attribution names members in it.
+ */
+export function escapeLoneSurrogates(source: string): string {
+    let escaped = '';
+    for (let j = 0; j < source.length; j++) {
+        const charCode = source.charCodeAt(j);
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = source.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                escaped += source.charAt(j) + source.charAt(j + 1);
+                j++;
+                continue;
+            }
+            escaped += "\\u" + charCode.toString(16).toUpperCase().padStart(4, '0');
+            continue;
+        }
+        escaped += source.charAt(j);
+    }
+    return escaped;
+}
+
+/**
+ * Extracts invalid UTF-16 surrogate pairs from a string literal's value source.
+ * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
+ * by technologies like Jackson. So we separate and store the code point off and reconstruct
+ * the escape sequence when printing later.
+ * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
+ * treated well by tools like Jackson.
+ *
+ * Handles both:
+ * 1. Unicode escape sequences (\uXXXX) where XXXX is in the surrogate range
+ * 2. Raw surrogate characters in the source (character codes 0xD800-0xDFFF)
+ */
+export function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, unicodeEscapes: J.LiteralUnicodeEscape[] } {
+    const unicodeEscapes: J.LiteralUnicodeEscape[] = [];
+    let cleanedSource = '';
+    let cleanedIndex = 0;
+
+    for (let j = 0; j < valueSource.length; j++) {
+        const c = valueSource.charAt(j);
+        const charCode = valueSource.charCodeAt(j);
+
+        // Check for unicode escape sequence: \uXXXX
+        // Ensure we're not escaped (previous char is not \) or we're at the start
+        if (c === '\\' && j < valueSource.length - 1 && (j === 0 || valueSource.charAt(j - 1) !== '\\')) {
+            if (valueSource.charAt(j + 1) === 'u' && j < valueSource.length - 5) {
+                const codePoint = valueSource.substring(j + 2, j + 6);
+                const codePointNumeric = parseInt(codePoint, 16);
+                if (!isNaN(codePointNumeric) && codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
+                    unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+                    j += 5; // Skip the \uXXXX sequence (we're already at \, skip u and 4 hex digits)
+                    continue;
+                }
+            }
+        }
+
+        // A raw surrogate pair spells one code point — an emoji, say — and is carried as itself. A lone
+        // surrogate is not text on its own and does not survive serialization (#6599), so it is held as a
+        // `\uXXXX` escape and prints back as one.
+        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
+            const next = valueSource.charCodeAt(j + 1);
+            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
+                cleanedSource += c + valueSource.charAt(j + 1);
+                cleanedIndex += 2;
+                j++;
+                continue;
+            }
+            const codePoint = charCode.toString(16).toUpperCase().padStart(4, '0');
+            unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
+            continue;
+        }
+
+        cleanedSource += c;
+        cleanedIndex++;
+    }
+
+    return { cleanedSource, unicodeEscapes };
+}

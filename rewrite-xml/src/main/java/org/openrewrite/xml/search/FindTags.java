@@ -57,8 +57,7 @@ public class FindTags extends Recipe {
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
         XPathMatcher matcher = new XPathMatcher(xPath);
-        Set<Xml.Tag> ts = new HashSet<>();
-        new XmlVisitor<Set<Xml.Tag>>() {
+        return new XmlVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
                 if (matcher.matches(getCursor())) {
@@ -66,8 +65,7 @@ public class FindTags extends Recipe {
                 }
                 return super.visitTag(tag, ts);
             }
-        }.visit(x, ts);
-        return ts;
+        }.reduce(x, new HashSet<>());
     }
 
     /**

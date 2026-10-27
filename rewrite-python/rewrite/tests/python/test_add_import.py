@@ -14,16 +14,20 @@
 
 """Tests for AddImport / maybe_add_import."""
 
+from pathlib import Path
+
 import pytest
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
+from rewrite.java.tree import Import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
 
 from ._java_import_arm import java_add_import
+from ._parse_shape import parse_shape
 
 
 def _assert_ids_accessible(source_file):
@@ -83,8 +87,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_add_to_a_comment_only_file(self):
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('native', 'os', 'path')))
+        spec.rewrite_run(
+            python(
+                "# c\n",
+                "from os import path\n# c\n",
+                after_recipe=parse_shape("from os import path\n# c\n"),
+            )
+        )
+
     def test_add_direct_import(self, arm):
-        """Add 'import os' to a file."""
+        """Add 'import os' to a file, as the bare `Import` a parse of it gives."""
+        def bare_import(cu):
+            assert isinstance(cu.statements[0], Import)
+
         spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os')))
         spec.rewrite_run(
             python(
@@ -95,6 +112,7 @@ class TestMaybeAddImport:
                 import os
                 x = 1
                 """,
+                after_recipe=bare_import,
             )
         )
 
@@ -148,6 +166,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_only_if_referenced_ignores_a_member_name_that_merely_matches(self, arm):
+        """``json`` occurs only in slots naming a member, never as a reference."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'json', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                def handle(resp, url, body, item):
+                    resp.json()
+                    post(url, json=body)
+                    return item.payload.json
+                """,
+            )
+        )
+
     def test_only_if_referenced_adds_when_referenced(self, arm):
         """The name is used, so the import is added."""
         spec = RecipeSpec(recipe=from_visitor(
@@ -164,18 +197,55 @@ class TestMaybeAddImport:
             )
         )
 
-    def test_only_if_referenced_finds_a_reference_inside_a_string_annotation(self, arm):
+    def test_only_if_referenced_adds_a_dotted_module_read_through_its_root(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'os.path', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
+                """
+                x = os.path.join('a', 'b')
+                """,
+                """
+                import os.path
+                x = os.path.join('a', 'b')
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "Dict[Any, Any]": ...'),
+    ])
+    def test_only_if_referenced_finds_a_reference_inside_a_string_annotation(
+            self, arm, annotation_position, source):
         """A compound forward reference names the symbol, so it is a reference."""
         spec = RecipeSpec(recipe=from_visitor(
             _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
         spec.rewrite_run(
             python(
+                f"""
+                {source}
+                """,
+                f"""
+                from typing import Any
+                {source}
+                """,
+            )
+        )
+
+    def test_only_if_referenced_finds_a_reference_nested_inside_a_string_annotation(self, arm):
+        """A forward reference nested in another one names the symbol just the same."""
+        spec = RecipeSpec(recipe=from_visitor(
+            _add_import_visitor(arm, 'typing', 'Any', only_if_referenced=True)))
+        spec.rewrite_run(
+            python(
                 """
-                m: "Dict[Any, Any]" = {}
+                m: "'Dict[str, Any]'" = {}
                 """,
                 """
                 from typing import Any
-                m: "Dict[Any, Any]" = {}
+                m: "'Dict[str, Any]'" = {}
                 """,
             )
         )
@@ -393,14 +463,14 @@ class TestMaybeAddImport:
 
 class TestCanonicalAddImportDedup:
     """An existing import already satisfies a requested (module, name) when
-    its canonical FQN matches (``os.path.join`` is canonically
-    ``posixpath.join``), not just when its written path does."""
+    its canonical FQN matches (``posixpath.join`` is canonically ``os.path.join``),
+    not just when its written path does."""
 
     def test_canonical_request_matches_written_from_import(self, arm):
-        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'posixpath', 'join'))).rewrite_run(
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os.path', 'join'))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = join('a', 'b')
                 """,
             )
@@ -446,5 +516,146 @@ class TestCanonicalAddImportDedup:
                 from posixpath import exists
                 x = 1
                 """,
+            )
+        )
+
+
+class TestAddImportLineBreaks:
+    """A synthesized line break is the one the file is written with."""
+
+    @pytest.mark.parametrize("module, name, before, after", [
+        pytest.param('os', 'path', "import sys\r\n\r\nx = 1\r\n",
+                     "import sys\r\nfrom os import path\r\n\r\nx = 1\r\n", id='after-imports'),
+        pytest.param('os', 'path', "x = 1\r\ny = 2\r\n",
+                     "from os import path\r\nx = 1\r\ny = 2\r\n", id='first-statement'),
+        pytest.param('os', 'path', "\r\nx = 1\r\n",
+                     "from os import path\r\nx = 1\r\n", id='first-statement-after-a-blank-line'),
+        pytest.param('os', None, '"""Doc."""\r\nx = 1\r\n',
+                     '"""Doc."""\r\nimport os\r\nx = 1\r\n', id='after-docstring'),
+        pytest.param('os', None, "# c\r\n", "import os\r\n# c\r\n", id='comment-only'),
+    ])
+    def test_crlf(self, arm, module, name, before, after):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, module, name))).rewrite_run(
+            python(before, after))
+
+    def test_lf_in_a_file_mostly_written_with_lf(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os', 'path'))).rewrite_run(
+            python(
+                "import sys\n\nx = 1\r\ny = 2\n",
+                "import sys\nfrom os import path\n\nx = 1\r\ny = 2\n",
+            )
+        )
+class TestAddImportGrouping:
+    """Where the imports already sit in isort's sections, a new import joins its own."""
+
+    GROUPED = (
+        "import os\n"
+        "import sys\n"
+        "\n"
+        "import requests\n"
+        "\n"
+        "from mypkg import util\n"
+        "\n"
+        "x = 1\n"
+    )
+
+    @pytest.mark.parametrize("module, name, after", [
+        pytest.param('json', None,
+                     "import json\nimport os\nimport sys\n\nimport requests\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='first-in-stdlib'),
+        pytest.param('collections.abc', 'Mapping',
+                     "import os\nimport sys\nfrom collections.abc import Mapping\n\nimport requests\n\n"
+                     "from mypkg import util\n\nx = 1\n",
+                     id='from-after-straight-in-stdlib'),
+        pytest.param('attr', None,
+                     "import os\nimport sys\n\nimport attr\nimport requests\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='first-in-third-party'),
+        pytest.param('yaml', None,
+                     "import os\nimport sys\n\nimport requests\nimport yaml\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='last-in-third-party'),
+        pytest.param('mypkg.helpers', 'helper',
+                     "import os\nimport sys\n\nimport requests\n\nfrom mypkg import util\n"
+                     "from mypkg.helpers import helper\n\nx = 1\n",
+                     id='local-by-path'),
+        pytest.param('__future__', 'annotations',
+                     "from __future__ import annotations\n\nimport os\nimport sys\n\nimport requests\n\n"
+                     "from mypkg import util\n\nx = 1\n",
+                     id='new-future-group'),
+    ])
+    def test_grouped(self, arm, module, name, after):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, module, name))).rewrite_run(
+            python(self.GROUPED, after, path=Path('mypkg/sub/mod.py')))
+
+    def test_a_section_the_file_lacks_gets_its_own_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mypkg'))).rewrite_run(
+            python(
+                "import os\n\nimport requests\n\nx = 1\n",
+                "import os\n\nimport requests\n\nimport mypkg\n\nx = 1\n",
+                path=Path('mypkg/mod.py'),
+            )
+        )
+
+    def test_a_group_ahead_of_the_first_keeps_the_header_above_it(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os', 'path'))).rewrite_run(
+            python(
+                '"""Doc."""\n\nimport requests  # c\n\nfrom . import util\n\nx = 1\n',
+                '"""Doc."""\n\nfrom os import path\n\nimport requests  # c\n\nfrom . import util\n\nx = 1\n',
+            )
+        )
+
+    def test_one_run_of_imports_shows_no_layout(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import requests\nimport yaml\n\nx = 1\n",
+                "import requests\nimport yaml\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_crlf(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\r\n\r\nimport requests\r\n\r\nx = 1\r\n",
+                "import json\r\nimport os\r\n\r\nimport requests\r\n\r\nx = 1\r\n",
+            )
+        )
+
+    def test_ungrouped_imports_take_the_new_one_last(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\nimport requests\nimport sys\n\nx = 1\n",
+                "import os\nimport requests\nimport sys\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\nimport requests  # pinned\n\nx = 1\n",
+                "import os\nimport requests  # pinned\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line_inside_a_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'pathlib'))).rewrite_run(
+            python(
+                "import os  # first\nimport sys\n\nimport requests\n\nx = 1\n",
+                "import os  # first\nimport pathlib\nimport sys\n\nimport requests\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_ending_the_file_stays_on_its_line(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'yaml'))).rewrite_run(
+            python(
+                "import os\n\nimport requests  # pinned\n",
+                "import os\n\nimport requests  # pinned\nimport yaml\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line_ahead_of_a_new_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mypkg'))).rewrite_run(
+            python(
+                "import os\n\nimport requests  # pinned\n\nx = 1\n",
+                "import os\n\nimport requests  # pinned\n\nimport mypkg\n\nx = 1\n",
+                path=Path('mypkg/mod.py'),
             )
         )

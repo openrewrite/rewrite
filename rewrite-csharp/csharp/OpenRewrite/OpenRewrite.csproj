@@ -31,15 +31,22 @@
 
   <ItemGroup>
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="NuGet.Frameworks" Version="7.6.0" />
-    <PackageReference Include="NuGet.Versioning" Version="7.6.0" />
+    <PackageReference Include="NuGet.Frameworks" Version="7.9.0" />
+    <PackageReference Include="NuGet.Versioning" Version="7.9.0" />
     <!-- In-process NuGet restore (PackageSpec/DependencyGraphSpec -> RestoreRunner -> LockFile).
          Commands transitively supplies ProjectModel, Protocol, Packaging, Configuration, Common. -->
-    <PackageReference Include="NuGet.Commands" Version="7.6.0" />
-    <!-- Plain runtime dependency, used only for managed .sln parsing (SolutionFile.Parse).
-         No MSBuildLocator: project evaluation happens in the SDK's own `dotnet msbuild`
-         (NuGetResolver) or Roslyn's out-of-process BuildHost (MSBuildWorkspace). -->
-    <PackageReference Include="Microsoft.Build" Version="18.8.2" />
+    <PackageReference Include="NuGet.Commands" Version="7.9.0" />
+    <!-- In-process MSBuild: .sln parsing (SolutionFile.Parse) and restore-graph evaluation
+         (NuGetResolver). Tasks.Core/Utilities.Core carry the task assemblies the SDK targets
+         load; without them evaluation fails with MSB4062. MSBuildLocator.Register* is not
+         needed with these versions - see MSBuildEnvironment in NuGetResolver.cs. -->
+    <PackageReference Include="Microsoft.Build" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.9.6" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.9.6" />
+    <!-- Overrides the 10.0.10 that Microsoft.Build.Tasks.Core pulls in, for CVE-2026-96958,
+         CVE-2026-96959, CVE-2026-96960, CVE-2026-84008 and CVE-2026-70162. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" PrivateAssets="none" />
@@ -47,6 +54,8 @@
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="StreamJsonRpc" Version="2.25.29" />
+    <!-- Overrides the 2.5.302 that StreamJsonRpc pulls in, for CVE-2026-92707. -->
+    <PackageReference Include="MessagePack" Version="2.5.307" />
     <!-- xunit (assertion/fixture API only) is consumed by the public Test/ helpers (RewriteTest, RpcFixture, ...). -->
     <!-- The runner packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) live in the sibling OpenRewrite.Tests project. -->
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="none" />

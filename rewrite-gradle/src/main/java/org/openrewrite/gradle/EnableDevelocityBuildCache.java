@@ -20,14 +20,21 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
+import org.openrewrite.java.tree.Statement;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -64,15 +71,13 @@ public class EnableDevelocityBuildCache extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if ("develocity".equals(method.getSimpleName()) && !hasBuildCache(method)) {
-                    J.MethodInvocation buildCache = createBuildCache(ctx);
-                    return maybeAutoFormat(method, method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
-                        if (arg instanceof J.Lambda) {
-                            J.Lambda lambda = (J.Lambda) arg;
-                            J.Block block = (J.Block) lambda.getBody();
-                            return lambda.withBody(block.withStatements(ListUtils.concat(block.getStatements(), buildCache)));
+                    return method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
+                        if (!(arg instanceof J.Lambda)) {
+                            return arg;
                         }
-                        return arg;
-                    })), ctx);
+                        J.Block body = (J.Block) ((J.Lambda) arg).getBody();
+                        return addBuildCache(new Cursor(getCursor(), arg), body.getCoordinates().lastStatement(), ctx);
+                    }));
                 }
                 return method;
             }
@@ -92,23 +97,39 @@ public class EnableDevelocityBuildCache extends Recipe {
         });
     }
 
-    private J.MethodInvocation createBuildCache(ExecutionContext ctx) {
-        String conf = "buildCache {\n" +
-                "    remote(develocity.buildCache) {\n";
+    private Expression addBuildCache(Cursor scope, JavaCoordinates coordinates, ExecutionContext ctx) {
+        StringBuilder template = new StringBuilder("buildCache {\n    remote(develocity.buildCache) {\n");
+        List<Expression> settings = new ArrayList<>(2);
         if (!StringUtils.isBlank(remoteEnabled)) {
-            conf += "        enabled = " + remoteEnabled + "\n";
+            template.append("        enabled = #{any()}\n");
+            settings.add(parseExpression(remoteEnabled, ctx));
         }
         if (!StringUtils.isBlank(remotePushEnabled)) {
-            conf += "        push = " + remotePushEnabled + "\n";
+            template.append("        push = #{any()}\n");
+            settings.add(parseExpression(remotePushEnabled, ctx));
         }
-        conf += "    }" +
-                "}";
-        return (J.MethodInvocation) GradleParser.builder().build()
-                .parse(ctx, conf)
+        template.append("    }\n}");
+        return GroovyTemplate.builder(template.toString())
+                .build()
+                .apply(scope, coordinates, settings.toArray());
+    }
+
+    /**
+     * Parses an option's value on its own, so that the template receives the user's expression as a tree. Were it
+     * spliced into the template text instead, a value like {@code System.getenv("#{CI}") != null} would have its
+     * {@code #{...}} claimed by the template's own placeholder syntax.
+     */
+    private static Expression parseExpression(String source, ExecutionContext ctx) {
+        Statement statement = GradleParser.builder().build()
+                .parse(ctx, source)
                 .map(requireParsed(G.CompilationUnit.class))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle: " + source))
                 .getStatements()
                 .get(0);
+        // A script's trailing statement carries an implicit return
+        return statement instanceof J.Return ?
+                requireNonNull(((J.Return) statement).getExpression()) :
+                (Expression) statement;
     }
 }

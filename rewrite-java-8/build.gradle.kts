@@ -29,8 +29,6 @@ dependencies {
     implementation(project(":rewrite-java-lombok"))
     implementation("org.ow2.asm:asm:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
-
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
 }
@@ -54,6 +52,8 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.isFork = true
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    options.isWarnings = false
+    options.compilerArgs.add("-XDsuppressNotes")
 }
 
 tasks.withType<Test>().configureEach {

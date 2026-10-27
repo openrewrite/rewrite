@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp.Format;
 
 /// <summary>
@@ -311,7 +313,7 @@ public class EditorConfigResolver
         var wrappingKeepStatementsOnSingleLine = GetBoolSetting(settings, "csharp_preserve_single_line_statements", "true", true);
 
         return new CSharpFormatStyle(
-            Guid.NewGuid(), useTabs, indentSize, tabSize, newLine,
+            Tree.RandomId(), useTabs, indentSize, tabSize, newLine,
             // Indentation
             indentBlock, indentBraces, indentSwitchCaseSection,
             indentSwitchCaseSectionWhenBlock, indentSwitchSection, labelPositioning,

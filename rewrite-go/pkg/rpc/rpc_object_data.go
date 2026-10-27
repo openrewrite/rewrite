@@ -20,10 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf16"
 )
 
 type State int
@@ -35,6 +36,12 @@ const (
 	Change
 	EndOfObject
 )
+
+// Text, not JSON: the encoder quotes and escapes this directly, where a Marshaler's
+// JSON bytes would have to be reparsed and re-emitted to splice into the stream.
+func (s State) MarshalText() ([]byte, error) {
+	return []byte(s.String()), nil
+}
 
 func (s State) String() string {
 	switch s {
@@ -64,21 +71,6 @@ type RpcObjectData struct {
 	Ref       *int    `json:"ref,omitempty"`
 }
 
-func (d RpcObjectData) MarshalJSON() ([]byte, error) {
-	type Alias struct {
-		State     string  `json:"state"`
-		ValueType *string `json:"valueType,omitempty"`
-		Value     any     `json:"value,omitempty"`
-		Ref       *int    `json:"ref,omitempty"`
-	}
-	return json.Marshal(Alias{
-		State:     d.State.String(),
-		ValueType: d.ValueType,
-		Value:     wireNumber(d.Value),
-		Ref:       d.Ref,
-	})
-}
-
 // A value that carries no valueType is bound on the JVM side by its JSON shape,
 // and Go writes a float64 without a fraction or an exponent for every magnitude
 // between 1e-6 and 1e21 -- a shape the receiver reads as an integer. Only a value
@@ -96,74 +88,249 @@ func wireNumber(v any) any {
 	return json.Number(s)
 }
 
-type wireObjectData struct {
-	State     string  `json:"state"`
-	ValueType *string `json:"valueType"`
-	Value     any     `json:"value"`
-	Ref       *int    `json:"ref"`
-}
-
+// DecodeBatch reads a page of messages straight out of its bytes: strings interned, numbers
+// typed by their JSON shape, objects as maps. A truncated page is an error, not a short batch.
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	open, err := dec.Token()
-	if err != nil {
-		if err == io.EOF {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if open == nil {
+	i := skipSpace(data, 0)
+	if i >= len(data) {
 		return nil, nil
 	}
-	if d, ok := open.(json.Delim); !ok || d != '[' {
-		return nil, fmt.Errorf("expected JSON array, got %v", open)
+	if hasLiteral(data, i, "null") {
+		return nil, nil
 	}
+	if data[i] != '[' {
+		return nil, fmt.Errorf("expected JSON array, got %s", describe(data, i))
+	}
+	i++
 	batch := make([]RpcObjectData, 0, len(data)/40+1)
-	var w wireObjectData
-	for dec.More() {
-		w = wireObjectData{}
-		if err := dec.Decode(&w); err != nil {
+	for {
+		i = skipSpace(data, i)
+		if i >= len(data) {
+			return nil, fmt.Errorf("unterminated JSON array")
+		}
+		switch data[i] {
+		case ']':
+			return batch, nil
+		case ',':
+			i++
+			continue
+		}
+		d, next, err := scanMessage(data, i, intern)
+		if err != nil {
 			return nil, err
 		}
-		d := RpcObjectData{State: parseState(w.State), ValueType: w.ValueType, Ref: w.Ref}
-		if w.Value != nil {
-			d.Value = decodeValue(w.Value, intern)
-		}
 		batch = append(batch, d)
+		i = next
 	}
-	return batch, nil
 }
 
-func decodeValue(v any, tbl map[string]string) any {
-	switch x := v.(type) {
-	case string:
-		return internString(x, tbl)
-	case json.Number:
-		return decodeNumber(x)
-	case []any:
-		for i := range x {
-			x[i] = decodeValue(x[i], tbl)
+// Reads one message. Unknown members are skipped rather than rejected, so a remote that learns a
+// new field does not break a reader that has not.
+func scanMessage(data []byte, i int, tbl map[string]string) (RpcObjectData, int, error) {
+	var d RpcObjectData
+	if data[i] != '{' {
+		return d, 0, fmt.Errorf("expected JSON object, got %s", describe(data, i))
+	}
+	i++
+	for {
+		i = skipSpace(data, i)
+		if i >= len(data) {
+			return d, 0, fmt.Errorf("unterminated JSON object")
 		}
-		return x
-	case map[string]any:
-		for k, val := range x {
-			x[k] = decodeValue(val, tbl)
+		switch data[i] {
+		case '}':
+			return d, i + 1, nil
+		case ',':
+			i++
+			continue
 		}
-		return x
+		key, next, err := scanString(data, i, tbl)
+		if err != nil {
+			return d, 0, err
+		}
+		i = skipSpace(data, next)
+		if i >= len(data) || data[i] != ':' {
+			return d, 0, fmt.Errorf("expected a colon after member %q", key)
+		}
+		i = skipSpace(data, i+1)
+		if i >= len(data) {
+			return d, 0, fmt.Errorf("member %q has no value", key)
+		}
+
+		switch key {
+		case "state":
+			name, next, err := scanString(data, i, tbl)
+			if err != nil {
+				return d, 0, fmt.Errorf("state is not a string: %w", err)
+			}
+			d.State = parseState(name)
+			i = next
+		// A valueType or ref that is not of the member's type — null, most often — leaves the
+		// field unset rather than failing the page, as binding into the struct did.
+		case "valueType":
+			if data[i] != '"' {
+				next, err := skipValue(data, i)
+				if err != nil {
+					return d, 0, err
+				}
+				i = next
+				break
+			}
+			name, next, err := scanString(data, i, tbl)
+			if err != nil {
+				return d, 0, err
+			}
+			d.ValueType = &name
+			i = next
+		case "ref":
+			if !isDigit(data[i]) && data[i] != '-' {
+				next, err := skipValue(data, i)
+				if err != nil {
+					return d, 0, err
+				}
+				i = next
+				break
+			}
+			end, err := endOfNumber(data, i)
+			if err != nil {
+				return d, 0, err
+			}
+			ref, err := strconv.Atoi(string(data[i:end]))
+			if err != nil {
+				return d, 0, err
+			}
+			d.Ref = &ref
+			i = end
+		case "value":
+			value, next, err := scanValue(data, i, tbl)
+			if err != nil {
+				return d, 0, err
+			}
+			d.Value = value
+			i = next
+		default:
+			next, err := skipValue(data, i)
+			if err != nil {
+				return d, 0, err
+			}
+			i = next
+		}
+	}
+}
+
+// An array is always non-nil, which the receive queue relies on to tell empty from absent.
+func scanValue(data []byte, i int, tbl map[string]string) (any, int, error) {
+	switch data[i] {
+	case '{':
+		m := map[string]any{}
+		i++
+		for {
+			i = skipSpace(data, i)
+			if i >= len(data) {
+				return nil, 0, fmt.Errorf("unterminated JSON object")
+			}
+			switch data[i] {
+			case '}':
+				return m, i + 1, nil
+			case ',':
+				i++
+				continue
+			}
+			key, next, err := scanString(data, i, tbl)
+			if err != nil {
+				return nil, 0, err
+			}
+			i = skipSpace(data, next)
+			if i >= len(data) || data[i] != ':' {
+				return nil, 0, fmt.Errorf("expected a colon after member %q", key)
+			}
+			i = skipSpace(data, i+1)
+			if i >= len(data) {
+				return nil, 0, fmt.Errorf("member %q has no value", key)
+			}
+			value, next, err := scanValue(data, i, tbl)
+			if err != nil {
+				return nil, 0, err
+			}
+			m[key] = value
+			i = next
+		}
+	case '[':
+		arr := []any{}
+		i++
+		for {
+			i = skipSpace(data, i)
+			if i >= len(data) {
+				return nil, 0, fmt.Errorf("unterminated JSON array")
+			}
+			switch data[i] {
+			case ']':
+				return arr, i + 1, nil
+			case ',':
+				i++
+				continue
+			}
+			value, next, err := scanValue(data, i, tbl)
+			if err != nil {
+				return nil, 0, err
+			}
+			arr = append(arr, value)
+			i = next
+		}
+	case '"':
+		text, next, err := scanString(data, i, tbl)
+		return text, next, err
+	case 't':
+		if !hasLiteral(data, i, "true") {
+			return nil, 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return true, i + len("true"), nil
+	case 'f':
+		if !hasLiteral(data, i, "false") {
+			return nil, 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return false, i + len("false"), nil
+	case 'n':
+		if !hasLiteral(data, i, "null") {
+			return nil, 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return nil, i + len("null"), nil
 	default:
-		return v
+		end, err := endOfNumber(data, i)
+		if err != nil {
+			return nil, 0, err
+		}
+		return decodeNumber(json.Number(data[i:end])), end, nil
 	}
 }
 
 // The remote's numbers arrive as text (see UseNumber above) and take the Go type
 // their JSON shape implies, so a value keeps both its kind and its full precision
 // across a round trip.
+// Converting an int64 to an interface allocates unless the runtime holds the value
+// statically, which it does only for 0..255. List positions are small and dominated
+// by ADDED_LIST_ITEM, so the range that covers them is pre-boxed once.
+var boxedInts = func() [1025]any {
+	var b [1025]any
+	for i := range b {
+		b[i] = int64(i - 1)
+	}
+	return b
+}()
+
+func boxInt(v int64) any {
+	// Bounded before the shift: v+1 overflows for MaxInt64 and would index negatively.
+	if v >= -1 && v < int64(len(boxedInts))-1 {
+		return boxedInts[v+1]
+	}
+	return v
+}
+
 func decodeNumber(n json.Number) any {
 	s := n.String()
 	if !strings.ContainsAny(s, ".eE") {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
+			return boxInt(i)
 		}
 		if i, ok := new(big.Int).SetString(s, 10); ok {
 			return i
@@ -199,4 +366,236 @@ func parseState(s string) State {
 	default:
 		return NoChange
 	}
+}
+
+func skipSpace(data []byte, i int) int {
+	for i < len(data) {
+		switch data[i] {
+		case ' ', '\t', '\n', '\r':
+			i++
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+func hasLiteral(data []byte, i int, literal string) bool {
+	return i+len(literal) <= len(data) && string(data[i:i+len(literal)]) == literal
+}
+
+func describe(data []byte, i int) string {
+	if i >= len(data) {
+		return "end of input"
+	}
+	end := i + 12
+	if end > len(data) {
+		end = len(data)
+	}
+	return strconv.Quote(string(data[i:end]))
+}
+
+// endOfNumber bounds a number against JSON's grammar rather than strconv's, which differs at both
+// ends: strconv takes "01", "+1" and ".5", and rejects the out-of-range "1e999" that JSON allows
+// and decodeNumber reads as an infinity. Parsing stays with decodeNumber, which is what gives a
+// number the Go type its JSON shape implies.
+func endOfNumber(data []byte, i int) (int, error) {
+	end := i
+	if end < len(data) && data[end] == '-' {
+		end++
+	}
+	whole := end
+	for end < len(data) && isDigit(data[end]) {
+		end++
+	}
+	if end == whole {
+		return 0, fmt.Errorf("expected a number, got %s", describe(data, i))
+	}
+	if data[whole] == '0' && end-whole > 1 {
+		return 0, fmt.Errorf("number has a leading zero at %s", describe(data, i))
+	}
+	if end < len(data) && data[end] == '.' {
+		end++
+		fraction := end
+		for end < len(data) && isDigit(data[end]) {
+			end++
+		}
+		if end == fraction {
+			return 0, fmt.Errorf("number has no digits after the point at %s", describe(data, i))
+		}
+	}
+	if end < len(data) && (data[end] == 'e' || data[end] == 'E') {
+		end++
+		if end < len(data) && (data[end] == '+' || data[end] == '-') {
+			end++
+		}
+		exponent := end
+		for end < len(data) && isDigit(data[end]) {
+			end++
+		}
+		if end == exponent {
+			return 0, fmt.Errorf("number has no exponent digits at %s", describe(data, i))
+		}
+	}
+	return end, nil
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+
+func skipValue(data []byte, i int) (int, error) {
+	switch data[i] {
+	case '{', '[':
+		depth := 0
+		for ; i < len(data); i++ {
+			switch data[i] {
+			case '{', '[':
+				depth++
+			case '}', ']':
+				if depth--; depth == 0 {
+					return i + 1, nil
+				}
+			case '"':
+				end, err := endOfString(data, i)
+				if err != nil {
+					return 0, err
+				}
+				i = end - 1
+			}
+		}
+		return 0, fmt.Errorf("unterminated structure")
+	case '"':
+		return endOfString(data, i)
+	case 't':
+		if !hasLiteral(data, i, "true") {
+			return 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return i + len("true"), nil
+	case 'f':
+		if !hasLiteral(data, i, "false") {
+			return 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return i + len("false"), nil
+	case 'n':
+		if !hasLiteral(data, i, "null") {
+			return 0, fmt.Errorf("invalid literal at %s", describe(data, i))
+		}
+		return i + len("null"), nil
+	default:
+		return endOfNumber(data, i)
+	}
+}
+
+func endOfString(data []byte, i int) (int, error) {
+	if data[i] != '"' {
+		return 0, fmt.Errorf("expected a string, got %s", describe(data, i))
+	}
+	for j := i + 1; j < len(data); j++ {
+		switch data[j] {
+		case '\\':
+			j++
+		case '"':
+			return j + 1, nil
+		}
+	}
+	return 0, fmt.Errorf("unterminated string at %s", describe(data, i))
+}
+
+// Interns every string it returns.
+func scanString(data []byte, i int, tbl map[string]string) (string, int, error) {
+	end, err := endOfString(data, i)
+	if err != nil {
+		return "", 0, err
+	}
+	body := data[i+1 : end-1]
+	if bytes.IndexByte(body, '\\') < 0 {
+		return internString(string(body), tbl), end, nil
+	}
+	unescaped, err := unescape(body)
+	if err != nil {
+		return "", 0, err
+	}
+	return internString(unescaped, tbl), end, nil
+}
+
+// unescape applies JSON's escape rules — not Go's, which differ over \/ and over how a surrogate
+// pair is written. A lone surrogate becomes the replacement character, as encoding/json does.
+func unescape(body []byte) (string, error) {
+	var out strings.Builder
+	out.Grow(len(body))
+	for i := 0; i < len(body); {
+		c := body[i]
+		if c != '\\' {
+			out.WriteByte(c)
+			i++
+			continue
+		}
+		i++
+		if i >= len(body) {
+			return "", fmt.Errorf("string ends in a backslash")
+		}
+		switch body[i] {
+		case '"', '\\', '/':
+			out.WriteByte(body[i])
+			i++
+		case 'b':
+			out.WriteByte('\b')
+			i++
+		case 'f':
+			out.WriteByte('\f')
+			i++
+		case 'n':
+			out.WriteByte('\n')
+			i++
+		case 'r':
+			out.WriteByte('\r')
+			i++
+		case 't':
+			out.WriteByte('\t')
+			i++
+		case 'u':
+			r, next, err := unescapeRune(body, i)
+			if err != nil {
+				return "", err
+			}
+			out.WriteRune(r)
+			i = next
+		default:
+			return "", fmt.Errorf("invalid escape \\%c", body[i])
+		}
+	}
+	return out.String(), nil
+}
+
+// Expects body[i] == 'u'. Joins a surrogate pair when one follows.
+func unescapeRune(body []byte, i int) (rune, int, error) {
+	first, next, err := hex4(body, i+1)
+	if err != nil {
+		return 0, 0, err
+	}
+	if !utf16.IsSurrogate(first) {
+		return first, next, nil
+	}
+	if next+1 < len(body) && body[next] == '\\' && body[next+1] == 'u' {
+		second, after, err := hex4(body, next+2)
+		if err != nil {
+			return 0, 0, err
+		}
+		if joined := utf16.DecodeRune(first, second); joined != unicode.ReplacementChar {
+			return joined, after, nil
+		}
+	}
+	return unicode.ReplacementChar, next, nil
+}
+
+func hex4(body []byte, i int) (rune, int, error) {
+	if i+4 > len(body) {
+		return 0, 0, fmt.Errorf("truncated \\u escape")
+	}
+	value, err := strconv.ParseUint(string(body[i:i+4]), 16, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid \\u escape %q", string(body[i:i+4]))
+	}
+	return rune(value), i + 4, nil
 }

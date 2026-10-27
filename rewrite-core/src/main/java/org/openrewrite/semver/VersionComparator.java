@@ -82,19 +82,23 @@ public interface VersionComparator extends Comparator<String> {
         boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
         String versionMeta = parsed.qualifier();
         if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
+            if (versionMeta != null && versionMeta.matches(metadataPattern)) {
+                return true;
+            }
+        } else if (versionMeta == null || !requireRelease) {
             return true;
-        } else if (requireRelease) {
+        } else {
             String lowercaseVersionMeta = versionMeta.toLowerCase();
             for (String suffix : RELEASE_SUFFIXES) {
                 if (suffix.equals(lowercaseVersionMeta)) {
                     return true;
                 }
             }
-            return false;
         }
-        return true;
+
+        // A backpatch is admitted wherever the version it patches is.
+        String patchedVersion = parsed.patchedVersion();
+        return patchedVersion != null && checkVersion(patchedVersion, metadataPattern, requireRelease);
     }
 
 }

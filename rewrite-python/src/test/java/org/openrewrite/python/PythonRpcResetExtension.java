@@ -21,11 +21,10 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 
 /**
- * JUnit 5 extension that ensures each test gets an isolated Python RPC channel.
+ * JUnit 5 extension that gives each test a clean Python RPC channel.
  * <p>
- * This follows the same pattern as JavaScript tests, where the RPC process is
- * shut down after each test to ensure complete isolation. This prevents any
- * state leakage between tests and ensures each test starts with a fresh RPC channel.
+ * Tests share one Python process, because starting one takes longer than most tests do.
+ * A failed test can leave a request half-finished, so after one the process is shut down instead of reset.
  * <p>
  * Usage:
  * <pre>
@@ -56,8 +55,14 @@ public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCal
 
     @Override
     public void afterEach(ExtensionContext context) {
-        // Shutdown after each test to ensure complete isolation
-        // This matches the JavaScript test pattern
-        PythonRewriteRpc.shutdownCurrent();
+        if (context.getExecutionException().isPresent()) {
+            PythonRewriteRpc.shutdownCurrent();
+            return;
+        }
+        try {
+            PythonRewriteRpc.resetCurrent();
+        } catch (RuntimeException e) {
+            PythonRewriteRpc.shutdownCurrent();
+        }
     }
 }

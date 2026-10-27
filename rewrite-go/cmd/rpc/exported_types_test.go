@@ -285,7 +285,7 @@ func TestHandleDependencyTypes_VendorTree(t *testing.T) {
 			byFqn[cls.FullyQualifiedName] = cls
 		}
 	}
-	assert.NotNilf(t,byFqn["example.com/foo.Greeter"], "vendored Greeter not enumerated; got %v", keys(byFqn))
+	assert.NotNilf(t, byFqn["example.com/foo.Greeter"], "vendored Greeter not enumerated; got %v", keys(byFqn))
 }
 
 // A coordinate found in neither the vendor tree nor the module cache is a per-dependency

@@ -63,9 +63,13 @@ public class RpcFixture : IDisposable
             _javaProcess.StandardOutput.BaseStream,
             formatter);
 
-        _jsonRpc = new JsonRpc(handler);
+        _jsonRpc = new StringErrorDataJsonRpc(handler);
 
         _server = new RewriteRpcServer(new RecipeMarketplace());
+        // A page per message, so every object in every test spans several pages and the tests
+        // cover paging rather than only the single-page case. Java and JavaScript size their
+        // RPC test fixtures the same way.
+        _server.BatchSize = 1;
         _server.Connect(_jsonRpc);
         RewriteRpcServer.SetCurrent(_server);
     }
@@ -81,6 +85,7 @@ public class RpcFixture : IDisposable
         var classpath = File.ReadAllText(cpFile).Trim();
         var psi = new ProcessStartInfo("java", "org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
+            WorkingDirectory = AppContext.BaseDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

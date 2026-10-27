@@ -143,7 +143,7 @@ describe("jsx mapping", () => {
         ));
 
     test("jsx namespace element", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             tsx("<foo:bar />"),
         )
@@ -151,7 +151,7 @@ describe("jsx mapping", () => {
 
 
     test("jsx member expression", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             // noinspection JSXUnresolvedComponent
             tsx("<Foo.Bar />"),
@@ -159,7 +159,7 @@ describe("jsx mapping", () => {
     });
 
     test("jsx text", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             tsx("<div>hello world</div>"),
         )

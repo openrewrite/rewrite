@@ -23,8 +23,6 @@ import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.fir.FirElement;
-import org.jetbrains.kotlin.fir.backend.FirMetadataSource;
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
@@ -32,20 +30,12 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.ir.IrElement;
-import org.jetbrains.kotlin.ir.declarations.IrFile;
-import org.jetbrains.kotlin.ir.declarations.IrMetadataSourceOwner;
-import org.jetbrains.kotlin.ir.declarations.MetadataSource;
-import org.jetbrains.kotlin.ir.expressions.IrConst;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.internal.DefaultJavaTypeFactory;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.KotlinIrTypeMapping;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.*;
@@ -66,7 +56,6 @@ public class PsiTreePrinter {
 
     private static final String CONTINUE_PREFIX = "----";
     private static final String UNVISITED_PREFIX = "#";
-    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new DefaultJavaTypeFactory(new JavaTypeCache()));
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
     private final static boolean printTypes = true;
@@ -83,10 +72,6 @@ public class PsiTreePrinter {
 
     public static String print(Parser.Input input) {
         return printIndexedSourceCode(input.getSource(new InMemoryExecutionContext()).readFully());
-    }
-
-    public static String print(@Nullable  IrFile file) {
-        return printIrFile(file);
     }
 
     public static String print(Tree tree) {
@@ -190,32 +175,6 @@ public class PsiTreePrinter {
             }
         }.visitElement(firElement, context);
         sb.append(String.join("\n", lines));
-        return sb.toString();
-    }
-
-    public static class IrPrinter {
-        public void printElement(IrElement element, PsiTreePrinter.TreePrinterContext ctx) {
-            StringBuilder line = new StringBuilder();
-            line.append(leftPadding(ctx.getDepth()))
-                    .append(printIrElement(element));
-            connectToLatestSibling(ctx.getDepth(), ctx.getLines());
-            ctx.getLines().add(line);
-        }
-    }
-
-    public static String printIrFile(@Nullable IrFile file) {
-        if (file == null) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        List<StringBuilder> lines = new ArrayList<>();
-        sb.append("------------").append("\n");
-        sb.append("IrFile:").append("\n\n");
-
-        TreePrinterContext context = new TreePrinterContext(lines, 1);
-        new IrTreePrinterVisitor(new IrPrinter()).visitFile(file, context);
-        sb.append(java.lang.String.join("\n", lines));
         return sb.toString();
     }
 
@@ -443,41 +402,6 @@ public class PsiTreePrinter {
         return visitor.print();
     }
 
-
-    public static String printIrElement(IrElement element) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("(").append(element.getStartOffset()).append(",").append(element.getEndOffset())
-                .append(") | ").append(element.getClass().getSimpleName());
-
-        if (element instanceof IrMetadataSourceOwner) {
-            String typeFromIr = getType(element);
-            if (!typeFromIr.isEmpty()) {
-                sb.append(" | IrType = ").append(typeFromIr);
-            }
-
-            IrMetadataSourceOwner irMetadataSourceOwner = (IrMetadataSourceOwner) element;
-            MetadataSource metadata = irMetadataSourceOwner.getMetadata();
-            if (metadata != null) {
-                if (metadata instanceof FirMetadataSource) {
-                    FirMetadataSource firMetadataSource = (FirMetadataSource) irMetadataSourceOwner.getMetadata();
-                    FirDeclaration firDeclaration = firMetadataSource.getFir();
-                    if (firDeclaration != null) {
-                        sb.append(" | ").append(printFirElement(firDeclaration));
-                    }
-                } else {
-                    throw new UnsupportedOperationException("TODO");
-                }
-            }
-        } else if (element instanceof IrConst) {
-            IrConst irConst = (IrConst) element;
-            sb.append(" | ").append(irConst.getValue());
-        }
-        return sb.toString();
-    }
-
-    public static String getType(IrElement element) {
-        return irTypeMapping.type(element).toString();
-    }
 
     public static String printFirElement(FirElement firElement) {
         StringBuilder sb = new StringBuilder();

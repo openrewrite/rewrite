@@ -155,6 +155,27 @@ class SimpleIndexClientTest {
     }
 
     @Test
+    void sizeAndUploadTimeReadFromHtmlAttributes() {
+        server.enqueue(new MockResponse()
+          .setHeader("Content-Type", "text/html")
+          .setBody("""
+            <html><body>
+            <a href="/packages/foo-1.0-py3-none-any.whl" data-size="4096" data-upload-time="2023-10-06T21:38:50Z">foo-1.0-py3-none-any.whl</a>
+            <a href="/packages/foo-0.9-py3-none-any.whl" data-upload-time="not a timestamp">foo-0.9-py3-none-any.whl</a>
+            </body></html>
+            """));
+
+        PackageListing listing = client.listFiles(index(), "foo");
+
+        assertThat(listing.getFiles().get(0).getSize()).isEqualTo(4096L);
+        assertThat(listing.getFiles().get(0).getUploadTime()).isEqualTo("2023-10-06T21:38:50Z");
+
+        // an unusable value counts as absent
+        assertThat(listing.getFiles().get(1).getSize()).isNull();
+        assertThat(listing.getFiles().get(1).getUploadTime()).isNull();
+    }
+
+    @Test
     void legacyDistInfoMetadataHonoredInJson() {
         server.enqueue(new MockResponse()
           .setHeader("Content-Type", "application/vnd.pypi.simple.v1+json")
@@ -213,6 +234,19 @@ class SimpleIndexClientTest {
           .isInstanceOfSatisfying(PythonIndexException.class, e -> {
               assertThat(e.getReason()).isEqualTo(PythonIndexException.Reason.AUTH_FAILED);
               assertThat(e.getIndexUrl()).isEqualTo(index().getUrl());
+          });
+    }
+
+    @Test
+    void rejectionNamesUnresolvedCredentialPlaceholders() {
+        server.enqueue(new MockResponse().setResponseCode(401));
+        PythonPackageIndex unresolved = index().withUnresolvedCredentialPlaceholders(List.of("${INDEX_TOKEN}"));
+        assertThatThrownBy(() -> client.listFiles(unresolved, "requests"))
+          .isInstanceOfSatisfying(PythonIndexException.class, e -> {
+              assertThat(e.getReason()).isEqualTo(PythonIndexException.Reason.AUTH_FAILED);
+              assertThat(e.getMessage())
+                .startsWith("HTTP 401 from " + server.url("/simple/requests/"))
+                .contains("reference ${INDEX_TOKEN}, which is not set");
           });
     }
 

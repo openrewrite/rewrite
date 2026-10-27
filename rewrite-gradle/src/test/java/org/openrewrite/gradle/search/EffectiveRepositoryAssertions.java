@@ -20,6 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
 
 final class EffectiveRepositoryAssertions {
 
@@ -29,12 +30,36 @@ final class EffectiveRepositoryAssertions {
     }
 
     /**
+     * Maven Central's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror in its
+     * place.
+     */
+    static String mavenCentral() {
+        return mirrorOr("https://repo.maven.apache.org/maven2/");
+    }
+
+    /**
+     * The Gradle plugin portal's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror
+     * in its place too.
+     */
+    static String gradlePluginPortal() {
+        return mirrorOr("https://plugins.gradle.org/m2");
+    }
+
+    private static String mirrorOr(String url) {
+        String mirror = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        if (isNullOrEmpty(mirror) || isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")) ||
+            isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD"))) {
+            return url;
+        }
+        return mirror;
+    }
+
+    /**
      * Builds the expected output for tests of recipes that annotate Gradle scripts with the list
      * of effective repository URLs. Extracts the leading {@code /*~~(URL[\nURL...])~~>*\/} comment
      * from {@code actual}, asserts that every URL listed in {@code mustInclude} is present, and
-     * returns the extracted comment concatenated with {@code body}. Allows mirror entries
-     * prepended at runtime (e.g. an Artifactory cache configured via init script in CI) to coexist
-     * with the URLs the test cares about.
+     * returns the extracted comment concatenated with {@code body}. Other repositories in the
+     * comment, such as ones an init script adds, don't fail the test.
      *
      * <p>If {@code mustInclude} is empty, the comment is optional: when the actual output has no
      * comment (e.g. local run with no mirror configured and no repositories declared in the

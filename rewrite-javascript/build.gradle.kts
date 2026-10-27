@@ -2,8 +2,6 @@
 
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
 import java.time.ZoneOffset
@@ -127,6 +125,8 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
     // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
     dependsOn(tasks.named("generateTestClasspath"))
+    // test/rpc/server.test.ts starts the built server
+    dependsOn("npmBuild")
     inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
@@ -139,6 +139,13 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
         .withNormalizer(ClasspathNormalizer::class)
+    // the tests under test/rpc run against the Java classes that file lists, not only the list itself
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(fileTree("src/integTest/resources/printer-parity"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
@@ -149,8 +156,6 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
 
     args = listOf("run", "ci:test")
 }
-
-ImportJUnitXmlReports.register(tasks, npmTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(npmTest)
@@ -393,7 +398,7 @@ extensions.configure<LicenseExtension> {
 //    )
 }
 
-// The lock regeneration test fixtures (recorded package-manager output, ~1000 files including binary
+// The lock regeneration test fixtures (recorded package-manager output, ~18000 files including binary
 // tarballs) live in openrewrite/rewrite-javascript-lock-fixtures. The latest main is fetched once into
 // build/lock-fixtures and joins the test classpath; `clean` picks up newer fixtures.
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")

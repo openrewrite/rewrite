@@ -16,7 +16,7 @@
 # Transcribed from the npm/node-semver test fixture test/fixtures/range-exclude.js at tag v7.6.3.
 # node-semver is copyright (c) Isaac Z. Schlueter and Contributors, licensed under the ISC
 # License; see LICENSE-node-semver in this directory.
-# Rows where satisfies(version, range[, includePrerelease]) is FALSE. Many exercise node's
+# Rows where satisfies(version, range) is FALSE. Many exercise node's
 # prerelease-inclusion guard: a prerelease is rejected unless a comparator names its exact
 # major.minor.patch tuple AND itself carries a prerelease.
 # Column 3 options tag: empty = strict, `loose` = skipped (loose parsing is unsupported).

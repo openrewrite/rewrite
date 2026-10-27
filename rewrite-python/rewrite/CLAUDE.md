@@ -15,7 +15,7 @@ From `rewrite-python/rewrite/`:
 uv pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+ (`pyproject.toml` specifies `>=3.10`).
+Requires Python 3.12+ (`pyproject.toml` specifies `>=3.12`).
 
 ## Running Tests
 
@@ -30,6 +30,10 @@ pytest tests/python/all/tree/import_test.py -v --timeout=60
 # From repo root: ./gradlew :rewrite-python:generateTestClasspath
 pytest tests/rpc/ --timeout=120
 ```
+
+`REWRITE_PYTHON_DUMP_TYPES=1 pytest ... -s` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has
+to match. `missing`, `all` and `supertypes` are the other accepted values.
 
 **RPC tests can hang indefinitely** if communication fails (deadlock, malformed response, printer bugs). Always use explicit `--timeout`.
 
@@ -53,6 +57,7 @@ rewrite-python/rewrite/
 │   │   ├── _py2_parser_visitor.py        # Python 2 parser visitor
 │   │   ├── add_import.py                 # Import addition logic
 │   │   ├── remove_import.py              # Import removal logic
+│   │   ├── type_report.py                # Type attribution listing (rewrite-python-types)
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)
@@ -79,9 +84,11 @@ rewrite-python/rewrite/
 
 ## Development Patterns
 
-### Frozen Dataclasses with Padding
+### Read-only Dataclasses with Padding
 
-All LST nodes are immutable frozen dataclasses. Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
+LST nodes are read-only to a type checker and plain dataclasses to the interpreter: `@lst_dataclass` is a `dataclass_transform` carrying `frozen_default=True`. Nothing raises on assignment, and `Space.build`/`Markers.build` return shared instances, so one in-place write can rewrite every node holding that instance.
+
+Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
 
 ```python
 # Updating a node
@@ -109,7 +116,29 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 ### Import Detection
 
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
-- `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
+- `import datetime`, `import datetime as dt` and `import os.path` → a bare `Import` statement, with no `MultiImport` around it
+- `import os, sys` → `MultiImport` with `from_=None`, names contain one `Import` per module
+
+A visitor that only overrides `visit_multi_import` misses every single-module `import`.
+
+### Moving a binding: `maybe_bind` and `maybe_rebind`
+
+`binding.py` ports the JavaScript `maybeBind`/`maybeRebind`. `ChangeImport` is a thin wrapper over `maybe_rebind`.
+
+Which name a moved binding takes:
+
+- A pinned `alias` is used verbatim. If the file spells it elsewhere, nothing moves.
+- An aliased import keeps its alias.
+- An unaliased `from` import follows the new member's name. If the file spells that name for anything other than a module-scope import of that very member, it keeps its old name as an alias. A parameter or nested import of the name counts, since it would capture a renamed reference. So does an import or rebind queued earlier in the visit.
+- An unaliased `import m` follows the new module where nothing reads `m`, or where both names are single segments and the new one is free. Otherwise it keeps `m` as an alias. A dotted `import a.b` that is read refuses, since `a.b.x` has no counterpart.
+
+One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. So does one read through `import a.m`, `from a import m` or `import a`, as `a.m.member` or `m.member`. The old import stays while anything still reads through it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block.
+
+What the attribution follows:
+
+- The old identity is read from the canonical types on the import's own name and on `m.member` references, as well as from `module.member`.
+- A parse names a class or function after the module that defines it (`acme.http._client.HttpClient`). That module cannot be read off an import path, so `declared_in` names it. Without it the new names use `to_module`, which differs from a fresh parse wherever the target re-exports.
+- A whole-module move renames the module object, and with it the functions it declares and the classes declared directly in it. Classes from its submodules keep their names.
 
 ### Padding and Whitespace
 
@@ -117,7 +146,7 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 - `JLeftPadded[T]`: before-space + element T (used for operators like `=`)
 - `JContainer[T]`: leading `(`, elements, trailing `)` with full padding control
 - Always access public properties (`.statements`, `.names`); use `.padding` for modifications
-- All tree nodes are frozen. Use `replace_if_changed()` or `.padding.replace()` for modifications.
+- Never assign to a node's field. Use `replace_if_changed()` or `.padding.replace()` for modifications.
 
 ### Recipe Pattern
 

@@ -26,15 +26,16 @@ import csv
 import json
 import logging
 import os
-import re
 import select
 import sys
 import tempfile
 import time
+import tokenize
 import traceback
 import threading
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
@@ -45,6 +46,12 @@ except ImportError:  # not available on Windows
     resource = None
 
 from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.execution import ExecutionContext
+from rewrite.python._version_detect import (
+    detect_from_project, detect_from_source, requested_python_version, ty_python_version)
+from rewrite.python.printer import PythonPrinter
+from rewrite.result import Result
+from rewrite.rpc import json_codec
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -71,10 +78,20 @@ remote_refs: Dict[int, Any] = {}
 # Refs sent to Java, so a type sent for one source file is cited rather than resent
 # by the next (mirrors RewriteRpc.localRefs).
 local_refs = ReferenceMap()
+# The latest transfer sent, as [object id, ref high-water before it], for AbortGetObject to undo.
+_last_sent: List[Any] = []
 # Per-source-file ref high-water on each side, captured before a file is first visited
 # so handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
 _ref_checkpoints: Dict[str, int] = {}
 _local_ref_checkpoints: Dict[str, int] = {}
+
+
+def _checkpoint_refs(tree_id: str) -> None:
+    """Snapshot both directions' ref high-water before any of a file's data moves, so
+    handle_evict rolls back exactly what that file introduced (first sight of the file wins)."""
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+
 
 # Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
 _metrics_file = None
@@ -118,22 +135,12 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
-    """Send a JSON-RPC request to Java and wait for the response.
+def _issue_request(method: str, params: dict) -> Any:
+    """Write a request and register its id, without waiting for the reply.
 
-    This enables bidirectional communication - Python can request
-    objects from Java while processing an incoming request.
-
-    Args:
-        method: The RPC method name
-        params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 30s)
-
-    Returns:
-        The result from the RPC response
-
-    Raises:
-        RuntimeError: If request times out or fails
+    Separating the write from the wait lets a caller keep a request in flight
+    while it works; :func:`_await_response` collects it. A reply arriving for
+    another registered id is stashed by that function rather than discarded.
     """
     request_id = _next_request_id()
 
@@ -145,12 +152,17 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     }
 
     if _trace_rpc:
-        logger.debug(f"Sending request to Java: {json.dumps(request)}")
+        logger.debug(f"Sending request to Java: {json_codec.dumps(request).decode()}")
 
     # Send the request to Java via stdout
     write_message(request)
 
     _awaiting_ids.add(request_id)
+    return request_id
+
+
+def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0) -> Any:
+    """Wait for the reply to a request :func:`_issue_request` already wrote."""
     try:
         while True:
             response = _pending_responses.pop(request_id, None)
@@ -178,7 +190,7 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
                 continue
 
             if _trace_rpc:
-                logger.debug(f"Received response from Java: {json.dumps(response)}")
+                logger.debug(f"Received response from Java: {json_codec.dumps(response).decode()}")
 
             if 'error' in response:
                 error = response['error']
@@ -188,6 +200,26 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     finally:
         _awaiting_ids.discard(request_id)
         _pending_responses.pop(request_id, None)
+
+
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
+    """Send a JSON-RPC request to Java and wait for the response.
+
+    This enables bidirectional communication - Python can request
+    objects from Java while processing an incoming request.
+
+    Args:
+        method: The RPC method name
+        params: The request parameters
+        timeout_seconds: Maximum time to wait for response (default 30s)
+
+    Returns:
+        The result from the RPC response
+
+    Raises:
+        RuntimeError: If request times out or fails
+    """
+    return _await_response(_issue_request(method, params), method, timeout_seconds)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -232,6 +264,14 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
+    # Id of a page asked for and not yet collected, so the peer serializes it while
+    # this side turns the previous one into a tree. Only the stdio transport can
+    # hold one: a client that replaces send_request writes and waits in one call,
+    # with no seam to issue against, so there the pages are fetched on demand.
+    pending_page = None
+    can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
+    # True while a page is being waited for, when a failure is the peer's or the transport's.
+    awaiting_page = False
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -245,16 +285,21 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end
+        nonlocal received_end, pending_page, awaiting_page
 
-        if received_end:
+        if pending_page is not None:
+            page_id, pending_page = pending_page, None
+            awaiting_page = True
+            batch = _await_response(page_id, 'GetObject')
+        elif received_end:
             return []
-
-        # Request the next batch from Java
-        batch = send_request('GetObject', {
-            'id': obj_id,
-            'sourceFileType': source_file_type
-        })
+        else:
+            awaiting_page = True
+            batch = send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
+        awaiting_page = False
 
         if not batch:
             received_end = True
@@ -266,6 +311,13 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+        elif can_prefetch:
+            # A batch ending in END_OF_OBJECT has no successor: the peer drops its
+            # transfer state on that marker, so asking again would restart it.
+            pending_page = _issue_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         return batch
 
@@ -292,6 +344,27 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
+        if pending_page is not None:
+            # A page was requested ahead and is still owed a reply. Collecting it
+            # retires the request, so no id is left registered and at most one page
+            # is ever in flight.
+            try:
+                _await_response(pending_page, 'GetObject')
+            except Exception:
+                pass
+            pending_page = None
+        if awaiting_page:
+            # The peer failed to send it, and has dropped the refs it had assigned.
+            q.roll_back_refs()
+        else:
+            # The failure is this side's, so the peer still counts the object and the refs it
+            # sent with it as received. One without the method goes on citing those refs,
+            # which is why they are dropped here only once it has dropped them too.
+            try:
+                if send_request('AbortGetObject', {'id': obj_id}) is True:
+                    q.roll_back_refs()
+            except Exception:
+                pass
         raise
 
     if obj is not None:
@@ -308,20 +381,55 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+def _source_path(path: str, relative_to: Optional[str]) -> Path:
+    """The path an LST carries: relative to the project root when it sits under it."""
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return source_path
+
+
 def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
                       language_level: Optional[str] = None,
-                      project_language_level: Optional[str] = None) -> dict:
+                      project_language_level: Optional[str] = None,
+                      check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    with open(path, 'r', encoding='utf-8') as f:
-        source = f.read()
+    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
+    with open(path, 'rb') as f:
+        raw = f.read()
+    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
+    try:
+        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
+    except SyntaxError:
+        # A coding line the interpreter rejects: read as before one was looked for.
+        declared = 'utf-8'
+    charset_name = None
+    if declared in ('utf-8', 'utf-8-sig'):
+        # A byte order mark is left in the text for the parser, which records it.
+        source = raw.decode('utf-8')
+    else:
+        source = raw.decode(declared)
+        try:
+            # Reported to the host only where the bytes depend on it, as a name it may not know.
+            if raw.decode('utf-8') != source:
+                charset_name = declared
+        except UnicodeDecodeError:
+            charset_name = declared
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
-                               project_language_level=project_language_level)
+                               project_language_level=project_language_level,
+                               check_print=check_print,
+                               charset_name=charset_name)
 
 
 def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
                         language_level: Optional[str] = None,
-                        project_language_level: Optional[str] = None) -> dict:
+                        project_language_level: Optional[str] = None,
+                        check_print: bool = True,
+                        charset_name: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the effective language version, resolved in
@@ -338,7 +446,6 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
     Values starting with "2" select the parso-based Py2ParserVisitor; anything
     else uses the ast-based Python 3 parser.
     """
-    from rewrite.python._version_detect import detect_from_source
 
     effective_version = (
         language_level
@@ -347,13 +454,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         or _python_version
     )
 
-    # Compute the source_path that will be stored on the LST
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
 
     try:
         from rewrite import Markers
@@ -383,6 +484,18 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
+        if charset_name is not None:
+            # what the host writes the file back in
+            cu = cu.replace(charset_name=charset_name)
+
+        if check_print:
+            printed = PythonPrinter().print(cu)
+            if printed != source:
+                return _create_parse_error(
+                    str(source_path),
+                    f"{source_path} is not print idempotent. \n"
+                    f"{Result.diff(source, printed, source_path)}",
+                    source)
 
         # Store and return
         obj_id = str(cu.id)
@@ -440,6 +553,20 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+def _make_dirs(directory: str) -> List[str]:
+    """``os.makedirs``, reporting the directories it had to create, deepest first."""
+    created = []
+    d = directory
+    while d and not os.path.isdir(d):
+        created.append(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    os.makedirs(directory, exist_ok=True)
+    return created
+
+
 # Files larger than this are recorded as Quarks rather than parsed into an AST.
 # Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
 MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
@@ -452,12 +579,7 @@ def _create_quark(path: str, relative_to: Optional[str]) -> dict:
     from ``sourcePath`` locally, so no content crosses the wire.
     """
     from rewrite import random_id
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
     return {
         'id': str(random_id()),
         'sourceFileType': 'org.openrewrite.quark.Quark',
@@ -497,6 +619,18 @@ def _infer_project_root(inputs: list) -> Optional[str]:
 _last_dependency_path: Optional[str] = None
 
 
+def _require_print_equals_input(options: dict) -> bool:
+    """Whether parse results must print back to their input, which they must
+    unless the client says otherwise. Option maps are loosely typed across
+    peers, so both the string and the bool form count."""
+    value = options.get(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ('false', '0', 'no', 'off')
+    return True
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -504,10 +638,19 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Where ty is rooted, and so where it finds its `ty.toml`. Separate from
+    # `relative_to`: relativizing a source path against a config directory the
+    # sources are not under silently leaves that path absolute.
+    project_root = params.get('projectRoot')
     # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
+    # What materializing inline sources put on disk, removed once the batch is parsed so
+    # a caller's own directory is left as it was found.
+    created_files: List[str] = []
+    created_dirs: List[str] = []
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
@@ -519,72 +662,110 @@ def handle_parse(params: dict) -> List[str]:
         _last_dependency_path = dependency_path
     results = []
 
-    # If no relativeTo provided, try to infer from absolute input paths
-    if not relative_to:
-        relative_to = _infer_project_root(inputs)
+    # Only roots ty: the host's other parsers keep its input paths as given when it
+    # sent no `relativeTo`, so relativizing against an inferred root would desync them.
+    if not project_root:
+        project_root = relative_to or _infer_project_root(inputs)
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
-    # parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
+    # parse_python_source. The manifests declaring it sit with the sources, which
+    # `project_root` need not contain — it may hold only a ty config.
     project_language_level = detect_from_project(relative_to) if relative_to else None
+    if project_language_level is None and project_root and project_root != relative_to:
+        project_language_level = detect_from_project(project_root)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
     ty_client = None
     tmpdir = None
+    ty_root = project_root
     try:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
-        if relative_to:
-            ty_client.initialize(relative_to)
-        else:
-            # For inline text inputs without a project root, create a temp directory
-            # so ty-types can still provide type attribution
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_version)
+        if not ty_root:
+            # A scratch root gives inline text inputs somewhere on disk that ty can see.
             tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
-            ty_client.initialize(tmpdir)
+            ty_root = tmpdir
+        ty_client.initialize(ty_root)
     except (ImportError, RuntimeError):
         ty_client = None  # ty-types not available
 
     try:
-        for i, input_item in enumerate(inputs):
-            if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
-                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                # For relative paths, write the source under the project root
-                # (tmpdir or relative_to) so ty-types can resolve imports from
-                # the project's .venv and dependencies.
-                base_dir = tmpdir or relative_to
-                if base_dir and not os.path.isabs(path):
-                    disk_path = os.path.join(base_dir, path)
-                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                    with open(disk_path, 'w', encoding='utf-8') as f:
-                        f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
+        for input_item in inputs:
+            # The client pairs this list to its input list by position, so every
+            # input owes the batch one result — a file too broken to read included.
+            path = '<unknown>'
+            source = ''
+            try:
+                if isinstance(input_item, str):
+                    path = input_item
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                elif input_item.get('text') is None and input_item.get('source') is None:
+                    # An input carrying no text names a file the peer reads itself.
+                    named = (input_item.get('path') or input_item.get('sourcePath') or
+                             input_item.get('relativePath'))
+                    if named is None:
+                        raise ValueError('input carries neither source text nor a path')
+                    path = named
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
-            else:
-                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-                continue
+                    source = input_item.get('text')
+                    if source is None:
+                        source = input_item.get('source')
+                    path = (input_item.get('sourcePath') or input_item.get('path') or
+                            input_item.get('relativePath', '<unknown>'))
+                    # ty analyses files from disk and resolves only what lies under the
+                    # root it was initialized at, so materialize the source there. Passing
+                    # that same root as the relativization base keeps the LST's source path
+                    # equal to the caller's own.
+                    base_dir = ty_root
+                    if base_dir and not os.path.isabs(path):
+                        disk_path = os.path.join(base_dir, path)
+                        created_dirs.extend(_make_dirs(os.path.dirname(disk_path)))
+                        if not os.path.exists(disk_path):
+                            created_files.append(disk_path)
+                        # ty must read the same bytes the LST was built from.
+                        with open(disk_path, 'w', encoding='utf-8', newline='') as f:
+                            f.write(source)
+                        result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+                    else:
+                        result = parse_python_source(source, path, relative_to, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+            except Exception as e:
+                logger.exception(f"Error parsing {path}: {e}")
+                result = _create_parse_error(str(_source_path(path, relative_to)), str(e), source)
             results.append(result['id'])
     finally:
         if ty_client is not None:
             ty_client.shutdown()
         if tmpdir is not None:
             shutil.rmtree(tmpdir, ignore_errors=True)
+        for created in created_files:
+            try:
+                os.remove(created)
+            except OSError:
+                pass
+        # rmdir only takes an empty directory, so one the caller had content in stays.
+        for created in created_dirs:
+            try:
+                os.rmdir(created)
+            except OSError:
+                pass
 
     return results
 
@@ -627,6 +808,7 @@ def handle_parse_project(params: dict) -> List[dict]:
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
     if dependency_path:
@@ -635,8 +817,8 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(project_path)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     results = []
 
@@ -645,7 +827,8 @@ def handle_parse_project(params: dict) -> List[dict]:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_version)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass
@@ -662,10 +845,13 @@ def handle_parse_project(params: dict) -> List[dict]:
             try:
                 result = parse_python_file(path, relative_to, ty_client,
                                            language_level=language_level,
-                                           project_language_level=project_language_level)
+                                           project_language_level=project_language_level,
+                                           check_print=check_print)
                 results.append(result)
             except Exception as e:
-                logger.error(f"Error parsing {path}: {e}")
+                logger.exception(f"Error parsing {path}: {e}")
+                # Every file the walk finds is accounted for in the response.
+                results.append(_create_parse_error(str(_source_path(path, relative_to)), str(e)))
     finally:
         if ty_client is not None:
             ty_client.shutdown()
@@ -690,7 +876,7 @@ def _richness(cls) -> int:
 
 def _artifact_files(path: Path) -> List[str]:
     """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
-    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    its runtime sibling (.py)."""
     files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
     files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
     return [str(f) for f in files]
@@ -724,6 +910,19 @@ def _module_name(fp: str, root: str) -> str:
     return '.'.join(parts)
 
 
+def _module_class_literals(mapping, client, module: str):
+    """The classLiterals of ``module`` a file's mapping sees: those its own response
+    carried, then those earlier files' responses did, in the order ty sent them.
+    Looked up by module rather than scanning the session's whole table per file."""
+    own = mapping._type_registry
+    for tid, descriptor in own.items():
+        if descriptor.get('kind') == 'classLiteral' and (descriptor.get('moduleName') or '') == module:
+            yield tid, descriptor
+    for tid in getattr(client, 'session_classes_by_module', {}).get(module, ()):
+        if tid not in own:
+            yield tid, client.session_types[tid]
+
+
 def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
                         processed_ids: Set[int]) -> None:
     """Collect the complete JavaType.Class for every class one package defines,
@@ -754,10 +953,21 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
 
     for fp in files:
         own_module = _module_name(fp, root)
+        # ty resolves a module with a stub to the stub, so the runtime file's
+        # classes are ones no consumer can reference.
+        if fp.endswith('.py') and os.path.exists(fp + 'i'):
+            continue
+        # A distribution's own test suite is no API of it, and inferring its test
+        # bodies is most of what some packages cost: numpy's took 54 of 56 seconds.
+        if 'tests' in own_module.split('.'):
+            continue
         try:
-            with open(fp, 'r', encoding='utf-8') as fh:
+            # Line endings as ty reads them: translated, every line of a CRLF file would put
+            # the module-level bindings below one byte further from ty's nodes.
+            with open(fp, 'r', encoding='utf-8', newline='') as fh:
                 source = fh.read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # A file in another encoding costs its own types, not the package's.
             continue
         try:
             mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
@@ -770,16 +980,11 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         if source.strip() and not mapping._node_index:
             logger.warning("ExportedTypes: ty returned no types for %s", fp)
             continue
-        for tid, descriptor in mapping._type_registry.items():
+        # Keep only classes defined in this file's own module — precise per-file scoping so ty's
+        # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
+        # and a dist sharing a namespace-package dir contributes only its own types.
+        for tid, descriptor in _module_class_literals(mapping, client, own_module):
             if tid in processed_ids:
-                continue
-            if descriptor.get('kind') != 'classLiteral':
-                continue
-            module_name = descriptor.get('moduleName') or ''
-            # Keep only classes defined in this file's own module — precise per-file scoping so ty's
-            # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
-            # and a dist sharing a namespace-package dir contributes only its own types.
-            if module_name != own_module:
                 continue
             processed_ids.add(tid)
             try:
@@ -824,15 +1029,10 @@ def _typeshed_stdlib_dir() -> Path:
     raise ValueError(f"no typeshed stdlib/VERSIONS under {env}")
 
 
-def _requested_python_version(value: Any) -> Optional[str]:
-    """The value if it looks like a Python minor version ("3.12"), else None."""
-    return value if isinstance(value, str) and re.fullmatch(r'\d+\.\d+', value) else None
-
-
 def _write_stdlib_ty_config(stdlib: Path, python_version: Optional[str]) -> str:
     """Throwaway ty.toml dir pointing ty's typeshed at the checkout so it resolves as the
     stdlib and names modules os, not stdlib.os — matching the parser's stdlib attribution."""
-    version = _requested_python_version(python_version) \
+    version = requested_python_version(python_version) \
               or '%d.%d' % (sys.version_info.major, sys.version_info.minor)
     ty_config_dir = tempfile.mkdtemp(prefix='ty-stdlib-')
     with open(os.path.join(ty_config_dir, 'ty.toml'), 'w') as f:
@@ -946,15 +1146,18 @@ def handle_dependency_types(params: dict) -> List[dict]:
     its pip coordinate (a null version names a standard-library module), streamed back terminated
     by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
     client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    An optional ``path`` is a site-packages-shaped directory holding the distribution, used in
+    place of the last parse's dependency environment.
     """
     name = params.get('name')
     version = params.get('version')
+    path = params.get('path')
     # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
-    python_version = _requested_python_version(params.get('pythonVersion'))
+    python_version = requested_python_version(params.get('pythonVersion'))
     if not name:
         raise ValueError("DependencyTypes requires a dependency name")
 
-    key = (name, version, python_version)
+    key = (name, version, python_version, path)
     data = _dependency_types_pending.get(key)
     if data is None:
         if version is None:
@@ -966,6 +1169,9 @@ def handle_dependency_types(params: dict) -> List[dict]:
                     raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
             data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
                                               python_version=python_version)
+        elif path:
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(path))
+            data = _build_exported_types_data(own_artifacts, path, None, None)
         else:
             dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
             if not dependency_path:
@@ -1014,6 +1220,7 @@ def handle_get_object(params: dict) -> List[dict]:
         before = remote_objects.get(obj_id)
 
         saved_refs = local_refs.snapshot()
+        _last_sent[:] = [obj_id, saved_refs]
         q = RpcSendQueue(source_file_type, local_refs)
         try:
             result = q.generate(obj, before)
@@ -1032,6 +1239,23 @@ def handle_get_object(params: dict) -> List[dict]:
         source_path = getattr(obj, 'source_path', None)
         logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
+
+
+def handle_abort_get_object(params: dict) -> bool:
+    """Handle an AbortGetObject RPC request: undo the transfer of an object that its receiver
+    failed to take. Forgetting that the peer holds it, and the refs assigned while sending it,
+    has both next go out whole instead of as a delta or a bare ref the peer cannot resolve.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    remote_objects.pop(obj_id, None)
+    if _last_sent and _last_sent[0] == obj_id:
+        local_refs.rollback_to(_last_sent[1])
+    else:
+        # Not the latest transfer, so which refs it assigned is no longer known.
+        local_refs.clear()
+    return True
 
 
 def _serialize_object_fallback(obj: Any) -> List[dict]:
@@ -1078,10 +1302,11 @@ def handle_print(params: dict) -> str:
         logger.warning(f"Object {obj_id} not found")
         return ""
 
-    # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
-    # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
-    name = params.get('markerPrinter')
-    try:
+    from rewrite.java import J
+    if isinstance(obj, J):
+        # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
+        # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
+        name = params.get('markerPrinter')
         from rewrite.python.printer import PythonPrinter, PrintOutputCapture
         from rewrite.tree import PrintOutputCapture as CorePrintOutputCapture
         marker_printer = {
@@ -1092,13 +1317,10 @@ def handle_print(params: dict) -> str:
         # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
         if marker_printer is None and name not in (None, 'DEFAULT'):
             logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
-        printer = PythonPrinter()
-        return printer.print(obj, PrintOutputCapture(marker_printer))
-    except ImportError as e:
-        logger.error(f"Failed to import PythonPrinter: {e}")
-        pass
-    except Exception as e:
-        logger.exception(f"Error printing object: {e}")
+        # The ancestors of a subtree decide some of its syntax, such as `=` over `:=`.
+        cursor_ids = params.get('cursor')
+        cursor = _build_cursor(cursor_ids, source_file_type) if cursor_ids else None
+        return PythonPrinter().print(obj, PrintOutputCapture(marker_printer), cursor)
 
     # Fallback: return stored source if available
     if hasattr(obj, 'source'):
@@ -1116,7 +1338,7 @@ def handle_reset(params: dict) -> bool:
     remote_refs.clear()
     _prepared_recipes.clear()
     _delegating_recipes.clear()
-    _prepared_editor_overrides.clear()
+    _prepared_unwrapped_editors.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1125,6 +1347,16 @@ def handle_reset(params: dict) -> bool:
     _ref_checkpoints.clear()
     _local_ref_checkpoints.clear()
     local_refs.clear()
+    _last_sent.clear()
+    _hub_tree.clear()
+    _hub_served.clear()
+    _hub_send_refs.clear()
+    _hub_recv_refs.clear()
+    _hub_send_checkpoint.clear()
+    _hub_recv_checkpoint.clear()
+    _hub_last_served.clear()
+    # A half-drained page would resume mid-list for a host that expects to start over.
+    _dependency_types_pending.clear()
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -1277,6 +1509,7 @@ def handle_install_recipes(params: dict) -> dict:
             - 'recipes': str - A local file path (installed into the recipe-install
               dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+            - 'venv': str - Only in facade mode, a prebuilt venv to run a local path's bundle on
 
     Returns:
         Dict with:
@@ -1297,6 +1530,9 @@ def handle_install_recipes(params: dict) -> dict:
     installed_version = None
     package_name: Optional[str] = None
     recipes_added = 0
+
+    if params.get('venv'):
+        raise ValueError("Attaching a prebuilt venv needs facade mode (--recipe-install-dir)")
 
     if isinstance(recipes, str):
         # Local file path. When a recipe-install dir is configured, install the
@@ -1621,13 +1857,10 @@ _prepared_recipes: Dict[str, Any] = {}
 # resolves it here and answers with a delegatesTo response so the JVM runs the
 # real recipe natively.
 _delegating_recipes: Dict[str, Any] = {}
-# Cached bare-editor visitors keyed by prepared recipe id. Populated at
-# PrepareRecipe time when recipe.editor() returns a Preconditions.check
-# wrapper: we strip the wrapper, register the precondition's wire identity
-# in editPreconditions (so the host evaluates it Java-side), and store the
-# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
-# return this bare editor so the precondition does not double-run.
-_prepared_editor_overrides: Dict[str, Any] = {}
+# Prepared recipe ids whose recipe.editor() is a Preconditions.check wrapper
+# with every precondition sent in editPreconditions. The host evaluates those,
+# so dispatching edit:<id> unwraps the editor to keep them from running twice.
+_prepared_unwrapped_editors: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1704,7 +1937,7 @@ def _get_visitor_registry() -> Dict[str, Any]:
     return _VISITOR_REGISTRY
 
 
-def _prepare_instance(recipe, marketplace) -> dict:
+def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = False) -> dict:
     """Prepare a recipe instance and, recursively, its whole child tree — storing every node in
     _prepared_recipes and returning the response with ``recipeList`` populated, so the host builds
     the tree locally instead of a PrepareRecipe round trip per child.
@@ -1733,11 +1966,8 @@ def _prepare_instance(recipe, marketplace) -> dict:
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # Introspect recipe.editor() once at prepare time. If the recipe wrapped its editor in
-    # Preconditions.check(...), we extract the precondition's wire identity (so the Java host can
-    # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
-    # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
-    # the precondition would also run Python-side and double the cost).
+    # A Preconditions.check(...) wrapper around the editor is sent as editPreconditions, so the
+    # host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1747,9 +1977,8 @@ def _prepare_instance(recipe, marketplace) -> dict:
         if editor_visitor is not None:
             extracted = _extract_preconditions_from_editor(editor_visitor)
             if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
+                _prepared_unwrapped_editors.add(prepared_id)
+                edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
 
     response = {
@@ -1760,6 +1989,9 @@ def _prepare_instance(recipe, marketplace) -> dict:
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
+    # Older Java hosts reject unknown response fields, so this is only sent when asked.
+    if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
+        response['causesAnotherCycle'] = True
 
     if is_delegating:
         response['delegatesTo'] = {
@@ -1793,7 +2025,7 @@ def _prepare_instance(recipe, marketplace) -> dict:
         else:
             if not marketplace.find_recipe(child.name):
                 marketplace.install(type(child), [])
-            child_responses.append(_prepare_instance(child, marketplace))
+            child_responses.append(_prepare_instance(child, marketplace, accepts_causes_another_cycle))
     response['recipeList'] = child_responses
 
     return response
@@ -1873,7 +2105,7 @@ def handle_prepare_recipe(params: dict) -> dict:
     # Instantiate the recipe with options, then prepare it and its whole child tree.
     recipe = recipe_class(**options) if options else recipe_class()
 
-    response = _prepare_instance(recipe, marketplace)
+    response = _prepare_instance(recipe, marketplace, params.get('acceptsCausesAnotherCycle') is True)
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 
@@ -2082,10 +2314,7 @@ def handle_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot both directions' ref high-water for this file before fetching its tree
-    # (first visit wins).
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+    _checkpoint_refs(tree_id)
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -2142,9 +2371,7 @@ def handle_batch_visit(params: dict) -> dict:
 
     ctx = _context_for(p_id)
 
-    # Snapshot both directions' ref high-water for this file before fetching its tree.
-    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
-    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+    _checkpoint_refs(tree_id)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -2252,14 +2479,14 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
-        # If the recipe wrapped its editor in Preconditions.check(...) and we
-        # captured the bare editor at PrepareRecipe time, return it here so
-        # the precondition does not double-run on the Python side. The host
-        # has already evaluated it via the editPreconditions wire slot.
-        override = _prepared_editor_overrides.get(recipe_id)
-        if override is not None:
-            return override
-        return recipe.editor()
+        # A fresh editor per dispatch, as in Recipe.run, so state an editor
+        # keeps on self does not carry over to the next file.
+        editor = recipe.editor()
+        if recipe_id in _prepared_unwrapped_editors:
+            from rewrite.preconditions import Check
+            while isinstance(editor, Check):
+                editor = editor.wrapped
+        return editor
 
     elif visitor_name.startswith('scan:'):
         recipe_id = visitor_name[5:]
@@ -2366,14 +2593,20 @@ def handle_generate(params: dict) -> dict:
 # child's stream directly to a sibling is unsafe.
 _hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
 _hub_send_refs: Dict[str, ReferenceMap] = {}  # bundle -> send ref map      (facade -> child)
+_hub_recv_refs: Dict[str, Dict[int, Any]] = {}  # bundle -> receive ref map (child -> facade)
 _hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
 _hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
+_hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
+_hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
 
 def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
     """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
     first time it is needed and owned by the facade from then on."""
     if obj_id is None:
         return None
+    # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
+    # it sees a file early enough to checkpoint the facade<->Java tables.
+    _checkpoint_refs(obj_id)
     tree = _hub_tree.get(obj_id)
     if tree is None:
         tree = get_object_from_java(obj_id, source_file_type)
@@ -2399,17 +2632,40 @@ def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) 
     # Remember where this child's ref numbering stood before this file, so Evict can roll it back
     # in lockstep with the child's own rollback (see _hub_release).
     _hub_send_checkpoint.setdefault((bundle, obj_id), refs.snapshot())
+    _hub_last_served[bundle] = (obj_id, refs.snapshot())
     data = RpcSendQueue(source_file_type, refs).generate(tree, _hub_served.get((bundle, obj_id)))
     _hub_served[(bundle, obj_id)] = tree
     return data
 
 
-def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str]) -> None:
+def _hub_abort_child(bundle: str, obj_id: Optional[str]) -> bool:
+    """A child failed to take what it was served: forget that it holds the tree, and the refs
+    assigned while serving it, so that it is next served both whole."""
+    if obj_id is None:
+        return True
+    _hub_served.pop((bundle, obj_id), None)
+    refs = _hub_send_refs.get(bundle)
+    if refs is not None:
+        last = _hub_last_served.get(bundle)
+        if last is not None and last[0] == obj_id:
+            refs.rollback_to(last[1])
+        else:
+            # Not the latest transfer, so which refs it assigned is no longer known.
+            refs.clear()
+    return True
+
+
+def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str],
+                         may_delete: bool = False) -> None:
     """Pull a child's edit back as a diff against what it was served and apply it to the facade's
     tree, so the next bundle starts from this bundle's result."""
     from rewrite.rpc.receive_queue import RpcReceiveQueue
 
     served = _hub_served.get((bundle, obj_id))
+    # The child's send map spans its connection, so a bundle pulled twice — a BatchVisit whose
+    # owners alternate, or a later file — cites on the second pull a ref it ADDed on the first.
+    refs = _hub_recv_refs.setdefault(bundle, {})
+    _hub_recv_checkpoint.setdefault((bundle, obj_id), max(refs, default=-1))
     remaining = [children.request(bundle, 'GetObject',
                                   {'id': obj_id, 'sourceFileType': source_file_type})]
 
@@ -2418,8 +2674,25 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             return []
         return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
 
-    edited = RpcReceiveQueue({}, source_file_type, pull).receive(served, None)
-    if edited is not None:
+    q = RpcReceiveQueue(refs, source_file_type, pull)
+    try:
+        edited = q.receive(served, None)
+    except Exception:
+        # The child counts its edit and the refs sent with it as received. Its baseline and
+        # those refs are dropped here only once it has dropped them, as a child without the
+        # method goes on answering against both.
+        try:
+            if children.request(bundle, 'AbortGetObject', {'id': obj_id}) is True:
+                q.roll_back_refs()
+                _hub_served.pop((bundle, obj_id), None)
+        except Exception:
+            pass
+        raise
+    if edited is None:
+        if not may_delete:
+            raise RuntimeError(f"{bundle} reported {obj_id} as modified but no longer holds it")
+        _hub_forget(obj_id)
+    else:
         _hub_tree[obj_id] = edited
         _hub_served[(bundle, obj_id)] = edited
         local_objects[obj_id] = edited
@@ -2427,19 +2700,43 @@ def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: O
             local_objects[str(edited.id)] = edited
 
 
-def _hub_release(obj_id: str) -> None:
-    """The rollback must be symmetric with the child's own Evict: the child drops the refs this file
-    introduced from its receive map, so if the facade kept them in its send map it would emit a
-    GET_REF for a ref the child no longer has ("Received reference to unknown object").
-    """
+def _hub_drop_bundle(bundle: str) -> None:
+    """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
+    _hub_send_refs.pop(bundle, None)
+    _hub_recv_refs.pop(bundle, None)
+    _hub_last_served.pop(bundle, None)
+    for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
+        for key in [k for k in table if k[0] == bundle]:
+            del table[key]
+
+
+def _hub_forget(obj_id: str) -> None:
+    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
+    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
+    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
     _hub_tree.pop(obj_id, None)
+    local_objects.pop(obj_id, None)
     for key in [k for k in _hub_served if k[1] == obj_id]:
         del _hub_served[key]
+
+
+def _hub_release(obj_id: str) -> None:
+    """The rollback must be symmetric with the child's own Evict, in both directions: the child drops
+    this file's refs from both of its maps, so a ref kept here would name an id the child no longer
+    holds ("Received reference to unknown object").
+    """
+    _hub_forget(obj_id)
     for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
         checkpoint = _hub_send_checkpoint.pop(key)
         refs = _hub_send_refs.get(key[0])
         if refs is not None:
             refs.rollback_to(checkpoint)
+    for key in [k for k in _hub_recv_checkpoint if k[1] == obj_id]:
+        checkpoint = _hub_recv_checkpoint.pop(key)
+        refs = _hub_recv_refs.get(key[0])
+        if refs is not None:
+            for ref_id in [r for r in refs if r > checkpoint]:
+                del refs[ref_id]
 
 
 def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
@@ -2472,7 +2769,7 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
             'searchResultIds': [],
         })
         if after is None:
-            _hub_release(tree_id)
+            _hub_forget(tree_id)
             tree = None
             break
         tree = after
@@ -2492,6 +2789,9 @@ def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
 def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
     """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
     to Java."""
+    if method == 'AbortGetObject' and bundle is not None:
+        # It is the facade that served this child, so relaying would have Java undo a transfer of its own.
+        return _hub_abort_child(bundle, params.get('id'))
     if method != 'GetObject':
         return send_request(method, params)
 
@@ -2517,8 +2817,11 @@ def _get_facade():
         if removed:
             logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
                         len(removed), _recipe_install_dir, ", ".join(removed))
-        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir, upstream=_serve_child_object),
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
+                                        upstream=_serve_child_object,
+                                        on_child_replaced=_hub_drop_bundle),
                          hub_pull=_hub_pull_child_edit,
+                         hub_drop=_hub_forget,
                          local_visit=_hub_local_visit,
                          is_local_visitor=_hub_is_builtin_visitor)
     return _facade
@@ -2533,6 +2836,9 @@ def handle_request(method: str, params: dict) -> Any:
             facade.evict(params)
             _hub_release(params.get('id'))
             return handle_evict(params)
+        if method == 'Reset':
+            facade.reset(params)
+            return handle_reset(params)
         facade_handlers = {
             'InstallRecipes': facade.install_recipes,
             'GetMarketplace': facade.get_marketplace,
@@ -2564,6 +2870,7 @@ def handle_request(method: str, params: dict) -> Any:
         'ParseProject': handle_parse_project,
         'DependencyTypes': handle_dependency_types,
         'GetObject': handle_get_object,
+        'AbortGetObject': handle_abort_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
@@ -2595,12 +2902,17 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    _CHUNK_SIZE = 8192
+    # For the reads that cannot say how much is wanted: the header scan, and a body read that
+    # fell through to the loop below. A sized body read instead asks for the whole frame, since
+    # a read returns what it asks for, not what the pipe holds.
+    _CHUNK_SIZE = 65536
 
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
         self.at_eof = False
+        self._pending_read: Optional[threading.Thread] = None
+        self._pending_chunk: list = []
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -2622,7 +2934,24 @@ class _StdinBuffer:
                 return None
 
     def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
-        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout.
+
+        The bytes object ``os.read`` allocates for a frame-sized read is already what this
+        returns, so with nothing buffered there is no append, slice or second copy — the general
+        path below costs three. Skipped when a deadline applies, because :meth:`_fill` then reads
+        through ``select`` or a thread.
+        """
+        # Positive n only: os.read(fd, 0) returns b'' and cannot be told from end of stream, and
+        # a negative n raises where the general path below slices silently.
+        if n > 0 and not self._buf and deadline is None:
+            chunk = os.read(self._get_fd(), n)
+            if not chunk:
+                self.at_eof = True
+                return None
+            if len(chunk) == n:
+                return chunk
+            self._buf += chunk
+
         while len(self._buf) < n:
             if not self._fill(deadline):
                 return None
@@ -2642,22 +2971,28 @@ class _StdinBuffer:
             if remaining <= 0:
                 return False
             if os.name == 'nt':
-                # Windows: select() doesn't support pipes, use a thread
-                result: list = []
+                # Windows: select() doesn't support pipes, so a thread does the read. It
+                # takes from the pipe whether or not this call is still waiting for it, so
+                # the thread and its chunk belong to the buffer -- a later _fill collects
+                # what an in-flight read returned, keeping those bytes in the stream.
+                if self._pending_read is None:
+                    self._pending_chunk = []
+                    pending = self._pending_chunk
 
-                def _read():
-                    try:
-                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
-                        result.append(data)
-                    except OSError:
-                        result.append(b'')
+                    def _read():
+                        try:
+                            pending.append(os.read(self._get_fd(), self._CHUNK_SIZE))
+                        except OSError:
+                            pending.append(b'')
 
-                t = threading.Thread(target=_read, daemon=True)
-                t.start()
-                t.join(timeout=remaining)
-                if not result:
+                    self._pending_read = threading.Thread(target=_read, daemon=True)
+                    self._pending_read.start()
+
+                self._pending_read.join(timeout=remaining)
+                if self._pending_read.is_alive():
                     return False
-                chunk = result[0]
+                self._pending_read = None
+                chunk = self._pending_chunk[0] if self._pending_chunk else b''
             else:
                 readable, _, _ = select.select([self._get_fd()], [], [], remaining)
                 if not readable:
@@ -2707,7 +3042,7 @@ def _read_body(header_line: bytes) -> Optional[dict]:
         raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
     try:
-        return json.loads(content_bytes.decode('utf-8'))
+        return json_codec.loads(content_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise _ProtocolError(f"invalid message body: {e}")
 
@@ -2747,10 +3082,16 @@ def write_message(response: dict):
     Uses unbuffered binary I/O to avoid line-ending translation on Windows
     that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
     used by read_message() which uses os.read() on the read side.
+
+    Header and body go out as separate writes: concatenating copies the whole body to prepend a
+    short header, a cost that scales with the message where the extra syscall does not.
+    ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
-    content_bytes = json.dumps(response).encode('utf-8')
+    content_bytes = json_codec.dumps(response)
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
-    os.write(sys.stdout.fileno(), header + content_bytes)
+    fd = sys.stdout.fileno()
+    os.write(fd, header)
+    os.write(fd, content_bytes)
 
 
 def _error_response(request_id: Any, e: Exception) -> dict:
@@ -2774,7 +3115,7 @@ def _write_response(response: dict) -> None:
     """
     try:
         if _trace_rpc:
-            logger.debug(f"Sending: {json.dumps(response)}")
+            logger.debug(f"Sending: {json_codec.dumps(response).decode()}")
         write_message(response)
     except (TypeError, ValueError) as e:
         request_id = response.get('id')
@@ -2793,7 +3134,7 @@ def _serve(message: dict) -> None:
         return
 
     if _trace_rpc:
-        logger.debug(f"Received: {json.dumps(message)}")
+        logger.debug(f"Received: {json_codec.dumps(message).decode()}")
 
     metric_start = time.monotonic()
     metric_error = ''

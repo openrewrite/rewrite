@@ -41,7 +41,7 @@ func TestParsePackageResolvesCrossFileSymbols(t *testing.T) {
 	require.Len(t, cus, 2, "expected 2 CUs")
 
 	mainTypes := collectIdentTypes(cus[0])
-	assert.NotNil(t,mainTypes["helper"], "expected `helper` reference in main.go to have a non-nil Type after multi-file parse; got nil (cross-file resolution still broken)")
+	assert.NotNil(t, mainTypes["helper"], "expected `helper` reference in main.go to have a non-nil Type after multi-file parse; got nil (cross-file resolution still broken)")
 }
 
 // TestGoProjectMultiFilePackageResolves is the harness-level integration:
@@ -56,7 +56,7 @@ func TestGoProjectMultiFilePackageResolves(t *testing.T) {
 	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		ids := collectIdentTypes(cu)
-		assert.NotNil(t,ids["helper"], "`helper` reference should have a resolved Type when parsed alongside helper.go; got nil")
+		assert.NotNil(t, ids["helper"], "`helper` reference should have a resolved Type when parsed alongside helper.go; got nil")
 	}
 
 	helperSrc := test.Golang(`

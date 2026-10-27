@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,9 +28,13 @@ import (
 var defaultReceiver = NewGoReceiver()
 
 type ReceiveQueue struct {
-	batch []RpcObjectData
-	refs  map[int]any
-	pull  func() []RpcObjectData
+	batch    []RpcObjectData
+	refs     map[int]any
+	received []int // the refs defined through this queue
+	pull     func() []RpcObjectData
+
+	// Set while the next value read is an entry of a Markers.
+	readingMarkers bool
 
 	typePool map[string]java.JavaType
 }
@@ -61,25 +66,43 @@ func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueu
 	}
 }
 
+// RollBackRefs drops the refs received through this queue, for when what it
+// was receiving failed to arrive whole. The sender of a failed transfer
+// forgets the refs it assigned in it as well.
+func (q *ReceiveQueue) RollBackRefs() {
+	for _, ref := range q.received {
+		delete(q.refs, ref)
+	}
+	q.received = nil
+}
+
 // PeekBatch returns the current batch without consuming. Useful for checking
 // if END_OF_OBJECT is waiting without triggering a new fetch.
 func (q *ReceiveQueue) PeekBatch() []RpcObjectData {
 	return q.batch
 }
 
-func (q *ReceiveQueue) Take() RpcObjectData {
+// fill leaves a message in the batch for Take and peek to index.
+func (q *ReceiveQueue) fill() {
 	if len(q.batch) == 0 {
 		q.batch = q.pull()
+		if len(q.batch) == 0 {
+			// Every object terminates with END_OF_OBJECT, so a pull that yields nothing
+			// means the transfer broke or a reader asked past this object's end.
+			panic(errors.New("RPC receive: no more data for this object"))
+		}
 	}
+}
+
+func (q *ReceiveQueue) Take() RpcObjectData {
+	q.fill()
 	msg := q.batch[0]
 	q.batch = q.batch[1:]
 	return msg
 }
 
 func (q *ReceiveQueue) peek() RpcObjectData {
-	if len(q.batch) == 0 {
-		q.batch = q.pull()
-	}
+	q.fill()
 	return q.batch[0]
 }
 
@@ -106,7 +129,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// New object or forward declaration
 		if msg.ValueType == nil {
 			before = msg.Value
-		} else if obj, known := newObjIfKnown(*msg.ValueType); known {
+		} else if obj, known := q.newObj(*msg.ValueType); known {
 			before = obj
 		} else if scalar, ok := inlineScalar(msg.Value); ok {
 			before = scalar
@@ -116,6 +139,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		if ref != nil {
 			// Store before deserialization to handle cycles
 			q.refs[*ref] = before
+			q.received = append(q.received, *ref)
 		}
 		// Intentional fall-through to CHANGE
 		fallthrough
@@ -126,7 +150,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// before=nil drop every sub-field message of a CHANGE-typed object,
 		// silently desyncing the wire.
 		if isNilValue(before) && msg.ValueType != nil {
-			if obj, known := newObjIfKnown(*msg.ValueType); known {
+			if obj, known := q.newObj(*msg.ValueType); known {
 				before = obj
 			} else if scalar, ok := inlineScalar(msg.Value); ok {
 				before = scalar
@@ -334,6 +358,16 @@ func receiveTypedList[T any](q *ReceiveQueue, before []T, onChange func(any) any
 				after[i] = before[pos]
 				continue
 			}
+			if !hasBefore && q.peek().State == NoChange {
+				// The sender diffed the edited tree against a baseline it believes
+				// this side holds and shipped this element as NO_CHANGE — but our
+				// baseline has nothing at this position, so its content never came
+				// over the wire and cannot be reconstructed. Fail with the cause
+				// named rather than letting the zero element nil-deref downstream in
+				// coerceToStatementRP/coerceToExpressionRP (openrewrite/rewrite#8424).
+				q.Take()
+				panic(fmt.Sprintf("RPC baseline desync: NO_CHANGE list element at position %d has no baseline (before holds %d element(s)); the sender diffed against a tree this receiver never received", pos, len(before)))
+			}
 			var beforeItem any
 			if hasBefore {
 				beforeItem = before[pos]
@@ -387,6 +421,19 @@ func toInt(v any) int {
 	default:
 		panic(fmt.Sprintf("cannot convert %T to int", v))
 	}
+}
+
+// newObj creates the instance a message's type names. An entry of a Markers is
+// a marker whatever its class is called, so one this side has no type for is
+// kept as a GenericMarker.
+func (q *ReceiveQueue) newObj(valueType string) (any, bool) {
+	if obj, known := newObjIfKnown(valueType); known {
+		return obj, true
+	}
+	if q.readingMarkers {
+		return java.GenericMarker{JavaType: valueType}, true
+	}
+	return nil, false
 }
 
 // Factory registry for creating empty instances by Java class name.

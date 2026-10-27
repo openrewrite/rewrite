@@ -21,6 +21,12 @@ import {mapAsync} from "./util";
 
 const OPTIONS_KEY = "__recipe_options__";
 
+/**
+ * Java's OptionDescriptor declares `type` non-nullable, so an option omitting one
+ * degrades to String rather than reporting no type.
+ */
+export const DEFAULT_OPTION_TYPE = "String";
+
 export type Minutes = number;
 
 export abstract class Recipe {
@@ -65,6 +71,12 @@ export abstract class Recipe {
 
     readonly estimatedEffortPerOccurrence: Minutes = 5
 
+    /**
+     * Set to true when changes made by this recipe should trigger another recipe cycle,
+     * mirroring Java's `Recipe.causesAnotherCycle()`.
+     */
+    readonly causesAnotherCycle: boolean = false
+
     readonly dataTables: DataTableDescriptor[] = []
 
     async recipeList(): Promise<Recipe[]> {
@@ -100,6 +112,7 @@ export abstract class Recipe {
                 name: key,
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
+                type: descriptor.type ?? DEFAULT_OPTION_TYPE,
                 ...descriptor
             })),
             preconditions: [],
@@ -154,6 +167,12 @@ export interface OptionDescriptor {
     readonly required?: boolean
     readonly example?: string
     readonly valid?: string[]
+
+    /**
+     * Java simple type name, for example String, Long or Boolean. TypeScript erases types at
+     * runtime, so this cannot be derived; defaults to {@link DEFAULT_OPTION_TYPE}.
+     */
+    readonly type?: string
 }
 
 export abstract class ScanningRecipe<P> extends Recipe {
@@ -216,7 +235,7 @@ export function Option(descriptor: OptionDescriptor) {
         // Ensure the constructor has options storage.
         if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
             Object.defineProperty(target.constructor, OPTIONS_KEY, {
-                value: {},
+                value: {...(target.constructor[OPTIONS_KEY] ?? {})},
                 writable: true,
                 configurable: true,
             });

@@ -95,9 +95,9 @@ class MappedTypeFallbackShadowingTest {
 
     @Test
     fun `substring matcher targets kotlin_text_StringsKt`() {
-        // The DSL emits arg-count-precise patterns; the receiver plus two args
-        // produce three wildcards. The owner is what matters: not the synthetic facade.
+        // The lifted extension receiver stays a wildcard; the owner is what
+        // matters here, not the synthetic facade.
         assertThat(matcherFor("rewrite { s: String, n: Int -> s.substring(0, n) } to { s, n -> s.substring(0, n) }"))
-            .isEqualTo("kotlin.text.StringsKt substring(*, *, *)")
+            .isEqualTo("kotlin.text.StringsKt substring(*, int, int)")
     }
 }

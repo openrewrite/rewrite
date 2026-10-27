@@ -138,25 +138,17 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private Xml.Attribute maybeReplaceNamespaceAttribute(Xml.Attribute attribute) {
-                if (isXmlnsAttribute(attribute) && isOldValue(attribute)) {
-                    return attribute.withValue(
-                            new Xml.Attribute.Value(attribute.getId(),
-                                    "",
-                                    attribute.getMarkers(),
-                                    attribute.getValue().getQuote(),
-                                    newValue));
+                if (isXmlnsAttribute(attribute) && isOldValue(attribute) &&
+                    !newValue.equals(attribute.getValueAsString())) {
+                    return attribute.withValue(attribute.getValue().withValue(newValue));
                 }
                 return attribute;
             }
 
             private Xml.Attribute maybeReplaceVersionAttribute(Xml.Attribute attribute) {
-                if (isVersionAttribute(attribute) && newVersion != null) {
-                    return attribute.withValue(
-                            new Xml.Attribute.Value(attribute.getId(),
-                                    "",
-                                    attribute.getMarkers(),
-                                    attribute.getValue().getQuote(),
-                                    newVersion));
+                if (isVersionAttribute(attribute) && newVersion != null &&
+                    !newVersion.equals(attribute.getValueAsString())) {
+                    return attribute.withValue(attribute.getValue().withValue(newVersion));
                 }
                 return attribute;
             }
@@ -274,8 +266,8 @@ public class ChangeNamespaceValue extends Recipe {
                         if (attributeByKey.containsKey(key)) {
                             Xml.Attribute attribute = attributeByKey.get(key);
                             if (!ns.getValue().equals(attribute.getValueAsString())) {
-                                ListUtils.map(attributes, a -> a.getKeyAsString().equals(key) ?
-                                        attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue())) :
+                                attributes = ListUtils.map(attributes, a -> a == attribute ?
+                                        a.withValue(a.getValue().withValue(ns.getValue())) :
                                         a
                                 );
                             }

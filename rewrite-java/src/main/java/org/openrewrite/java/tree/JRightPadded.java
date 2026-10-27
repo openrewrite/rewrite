@@ -128,8 +128,6 @@ public class JRightPadded<T> {
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
-        Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
-        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
         if (before != null) {
             // a cheaper check for the most common case when there are no changes
             if (elements.size() == before.size()) {
@@ -146,11 +144,23 @@ public class JRightPadded<T> {
             } else if (elements.isEmpty()) {
                 return emptyList();
             }
+        }
 
-            for (JRightPadded<J2> j : before) {
-                if (beforeById.put(j.getElement().getId(), j) != null) {
-                    throw new IllegalStateException("Duplicate key");
-                }
+        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
+        if (before == null || before.isEmpty()) {
+            // Nothing to carry padding over from, so every element is padded fresh and
+            // an index over `before` would answer every lookup with a miss.
+            for (J2 t : elements) {
+                after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
+            }
+            return after;
+        }
+
+        // Sized from what it holds, which is one entry per before element.
+        Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(before.size() / 0.75));
+        for (JRightPadded<J2> j : before) {
+            if (beforeById.put(j.getElement().getId(), j) != null) {
+                throw new IllegalStateException("Duplicate key");
             }
         }
 

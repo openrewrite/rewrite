@@ -158,7 +158,9 @@ public class MergeYaml extends Recipe {
                         if (valueKey != null) {
                             // No matching element already exists, so it must be constructed.
                             @Language("yml") String snippet;
-                            if (incoming instanceof Yaml.Mapping) {
+                            boolean blockSequence = incoming instanceof Yaml.Sequence &&
+                                                    ((Yaml.Sequence) incoming).getOpeningBracketPrefix() == null;
+                            if (incoming instanceof Yaml.Mapping || blockSequence) {
                                 // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
                                 snippet = valueKey + ":\n  " + yaml.replace("\n", "\n  ");
                             } else {
@@ -230,7 +232,7 @@ public class MergeYaml extends Recipe {
                 if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                     m = MergeYamlVisitor.removeInlineCommentFromLastEntry(m);
                 }
-                return m;
+                return MergeYamlVisitor.removeCopiedEntryComments(m, getCursor());
             }
 
             @Override

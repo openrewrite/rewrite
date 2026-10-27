@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -70,8 +70,7 @@ public class EnableDevelocityBuildCache extends Recipe {
 
                 if ("develocity".equals(rootTag.getName()) && !rootTag.getChild("buildCache").isPresent()) {
                     Xml.Tag tag = Xml.Tag.build(buildCacheConfig());
-                    rootTag = maybeAutoFormat(rootTag, rootTag.withContent(ListUtils.concat(rootTag.getChildren(), tag)), ctx);
-                    return document.withRoot(rootTag);
+                    return document.withRoot(AddToTagVisitor.addToTag(rootTag, tag, getCursor()));
                 }
                 return document;
             }

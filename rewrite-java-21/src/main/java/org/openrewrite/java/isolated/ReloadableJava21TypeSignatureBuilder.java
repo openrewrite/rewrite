@@ -19,6 +19,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Position;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
@@ -47,11 +48,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
         } else if (type instanceof Type.ClassType) {
-            try {
-                return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
-            } catch (Symbol.CompletionFailure ignored) {
-                return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
-            }
+            return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
             return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {
@@ -74,14 +71,6 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
-    }
-
-    private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
-        try {
-            classSymbol.complete();
-        } catch (Symbol.CompletionFailure ignore) {
-            // Ignore
-        }
     }
 
     @Override
@@ -133,11 +122,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         }
 
-        Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
-        if (!sym.completer.isTerminal()) {
-            completeClassSymbol(sym);
-        }
-        return sym.flatName().toString();
+        return ((Type.ClassType) type).tsym.flatName().toString();
     }
 
     @Override
@@ -318,6 +303,11 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             }
         }
 
-        return owner + "{name=" + symbol.name.toString() + ",type=" + signature(symbol.type) + '}';
+        String signature = owner + "{name=" + symbol.name.toString() + ",type=" + signature(symbol.type);
+        if (!(symbol.owner instanceof Symbol.ClassSymbol) && symbol instanceof Symbol.VarSymbol &&
+            ((Symbol.VarSymbol) symbol).pos != Position.NOPOS) {
+            signature += ",pos=" + ((Symbol.VarSymbol) symbol).pos;
+        }
+        return signature + '}';
     }
 }

@@ -36,6 +36,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 import org.opentest4j.AssertionFailedError;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -49,6 +50,7 @@ import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
+@CheckReturnValue
 public final class Assertions {
 
     private Assertions() {
@@ -368,6 +370,11 @@ public final class Assertions {
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
             if (v == variable) {
+                if (!(v.getDeclarator() instanceof J.Identifier)) {
+                    // A destructuring pattern names its variables through its own identifiers, which carry and are
+                    // checked against their own types; the declaration itself names no single variable.
+                    return v;
+                }
                 JavaType.Variable variableType = v.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     if (isValidated(variable)) {

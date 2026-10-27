@@ -14,14 +14,24 @@
 
 """Tests for the Python test harness."""
 
+from pathlib import Path
+from typing import Callable, List, Optional, Set
+from uuid import UUID, uuid4
+
 import pytest
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor
+from rewrite import ExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor, random_id
+from rewrite.execution import Result
+from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
+from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
+from rewrite.python.markers import Quoted
 from rewrite.python.visitor import PythonVisitor
-from rewrite.python.tree import CompilationUnit
-from rewrite.java import J
+from rewrite.java.tree import Identifier, MethodInvocation, Yield
+from rewrite.python.tree import Await, CompilationUnit
+from rewrite.java import J, JavaType, Space
+from rewrite.utils import lst_dataclass
 
 
 class TestDedent:
@@ -342,6 +352,65 @@ def _uv_available() -> bool:
     return shutil.which("uv") is not None
 
 
+def _ty_types_available() -> bool:
+    """Check if the ty-types CLI is installed."""
+    import shutil
+    try:
+        from ty_types.__main__ import find_ty_types_bin  # noqa: F401
+        return True
+    except Exception:
+        return shutil.which("ty-types") is not None
+
+
+class TestWorkspace:
+    """Tests for the directory a run parses its sources under."""
+
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_sources_in_a_run_resolve_against_each_other(self):
+        returns = {}
+
+        class Collect(PythonVisitor):
+            def visit_method_invocation(self, mi, p):
+                returns[mi.name.simple_name] = (
+                    mi.method_type.return_type if mi.method_type else None
+                )
+                return super().visit_method_invocation(mi, p)
+
+        def collect(cu):
+            Collect().visit(cu, None)
+
+        RecipeSpec().rewrite_run(
+            python("def answer() -> int:\n    return 42\n", path=Path("helper.py")),
+            python("import helper\n\nvalue = helper.answer()\n", before_recipe=collect),
+        )
+
+        # Resolved through the import, which names a module of the same directory.
+        assert returns["answer"] == JavaType.Primitive.Int
+
+    def test_a_source_path_leading_out_of_the_workspace_is_rejected(self):
+        with pytest.raises(ValueError, match="inside the workspace"):
+            RecipeSpec().rewrite_run(python("x = 1\n", path=Path("../escaped.py")))
+
+    @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
+    def test_a_borrowed_workspace_keeps_its_own_files(self):
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                """
+            ),
+            python("x = 1\n"),
+        )
+        root = Path(specs[0].project_root)
+
+        RecipeSpec().rewrite_run(*specs)
+
+        assert (root / "pyproject.toml").is_file()
+
+
 class TestPyprojectHelper:
     """Tests for the pyproject() helper."""
 
@@ -412,25 +481,295 @@ class TestUvHelper:
         assert os.path.isdir(os.path.join(specs[0].project_root, ".venv"))
 
     @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
-    def test_uv_spec_parses_with_type_attribution(self):
-        """Source specs from uv() are parsed with workspace type attribution."""
-        spec = RecipeSpec()
-        spec.rewrite_run(
-            *uv(
-                pyproject(
-                    """
-                    [project]
-                    name = "test"
-                    version = "0.0.0"
-                    requires-python = ">=3.10"
-                    dependencies = ["six==1.17.0"]
-                    """
-                ),
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_uv_spec_resolves_types_from_its_dependencies(self, monkeypatch):
+        import sys
+        # The runner's environment, which lacks the declared dependency.
+        monkeypatch.setenv("VIRTUAL_ENV", sys.prefix)
+        types = {}
+
+        class Collect(PythonVisitor):
+            def visit_method_invocation(self, mi, p):
+                types[mi.name.simple_name] = mi.type
+                return super().visit_method_invocation(mi, p)
+
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                dependencies = ["semver==3.0.4"]
+                """
+            ),
+            python(
+                """
+                import semver
+                v = semver.Version(1, 2, 3)
+                """,
+                before_recipe=lambda cu: Collect().visit(cu, None),
+            ),
+        )
+        if specs[0].project_root is None:
+            pytest.skip("uv could not build the workspace")
+
+        RecipeSpec().rewrite_run(*specs)
+
+        assert isinstance(types["Version"], JavaType.FullyQualified)
+        assert types["Version"].fully_qualified_name == "semver.version.Version"
+
+
+def _await(node: J) -> Await:
+    return Await(uuid4(), node.prefix, Markers.EMPTY, node.replace(prefix=Space([], ' ')), None)
+
+
+class TestWellFormedness:
+    """The harness rejects an `after` tree whose slots hold the wrong node kind."""
+
+    def test_expression_in_statement_list_slot(self):
+        class AwaitEveryCall(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                return _await(mi)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryCall()))
+        with pytest.raises(AssertionError, match=r"CompilationUnit\.statements\[0\] holds Await, expected Statement"):
+            spec.rewrite_run(python("foo()"))
+
+    def test_expression_in_single_statement_slot(self):
+        class AwaitEveryYield(PythonVisitor[ExecutionContext]):
+            def visit_yield(self, y: Yield, ctx: ExecutionContext) -> J:
+                return _await(y)
+
+        spec = RecipeSpec(recipe=from_visitor(AwaitEveryYield()))
+        with pytest.raises(AssertionError, match=r"holds Await, expected Statement \(StatementExpression\.statement\)"):
+            spec.rewrite_run(
                 python(
                     """
-                    import six
-                    x = 1
+                    def f():
+                        yield 1
                     """
-                ),
+                )
             )
+
+
+def _type_name(marker_type: type) -> str:
+    return f"{marker_type.__module__}.{marker_type.__qualname__}"
+
+
+def _marking_calls(marker: Callable[[], Marker], rename: Optional[str] = None) -> Recipe:
+    """A recipe that adds ``marker()`` to every call, and renames the call when ``rename`` is given."""
+
+    class MarkCalls(PythonVisitor[ExecutionContext]):
+        def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+            mi = super().visit_method_invocation(mi, ctx)
+            if rename is not None:
+                mi = mi.replace(name=mi.name.replace(simple_name=rename))
+            return mi.replace(markers=mi.markers.add(marker()))
+
+    return from_visitor(MarkCalls())
+
+
+# The marker types a recipe defines for itself are declared in the tests that use them: one declared
+# at module level would count among the package's own marker types in tests/rpc/test_marker_codecs.py.
+class TestAddedMarkers:
+    """The harness rejects a recipe that leaves markers on the LST for its own use."""
+
+    def test_marker_added_alongside_a_change(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", "bar()\n", path=Path("a.py")))
+
+        assert str(failure.value) == (
+            "The recipe added markers to the LST that neither the sources it was given nor a fresh parse of its "
+            "output contain:\n"
+            "  a.py\n"
+            f"    {_type_name(Visited)} on MethodInvocation `bar()`\n"
+            "Markers travel with the LST to every recipe that runs after this one and to every tool that reads the "
+            "result, so they are not a place for a recipe to keep information for itself. Instead:\n"
+            "  - share information between the visit methods of one visitor with cursor messages, "
+            "e.g. self.cursor.put_message(...) and self.cursor.get_nearest_message(...)\n"
+            "  - share information between source files, or from scanning to editing, through the accumulator of a "
+            "ScanningRecipe\n"
+            "  - keep the recipe idempotent by recognizing code it has already changed, rather than tagging that code\n"
+            "  - report a finding with SearchResult, and a problem with Markup"
         )
+
+    def test_marker_added_without_a_change(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id())), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", path=Path("a.py")))
+
+        assert "  a.py (the printed source is unchanged)\n" in str(failure.value)
+        assert f"    {_type_name(Visited)} on MethodInvocation `foo()`\n" in str(failure.value)
+
+    def test_source_file_marker_moved_to_an_element(self):
+        @lst_dataclass
+        class BuildMetadata(Marker):
+            _id: int | UUID
+
+        def with_metadata(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(BuildMetadata(random_id())))
+
+        class MetadataOnCalls(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                metadata = self.cursor.first_enclosing_or_throw(CompilationUnit).markers.find_first(BuildMetadata)
+                return mi.replace(markers=mi.markers.add(metadata))
+
+        spec = RecipeSpec(recipe=from_visitor(MetadataOnCalls()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", before_recipe=with_metadata))
+
+        assert f"    {_type_name(BuildMetadata)} on MethodInvocation `foo()`\n" in str(failure.value)
+
+    def test_search_result_passes(self):
+        spec = RecipeSpec(recipe=_marking_calls(lambda: SearchResult(random_id(), None)), type_attribution=False)
+        spec.rewrite_run(python("foo()\n", "/*~~>*/foo()\n"))
+
+    def test_syntax_marker_of_written_code_passes(self):
+        class QuoteAnnotation(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                if ident.simple_name != "int":
+                    return ident
+                # A forward reference, which the parser marks as Quoted.
+                quoted = Quoted(random_id(), Quoted.Style.DOUBLE)
+                return ident.replace(simple_name="Model", markers=ident.markers.add(quoted))
+
+        spec = RecipeSpec(recipe=from_visitor(QuoteAnnotation()), type_attribution=False)
+        spec.rewrite_run(python("x: int = 1\n", 'x: "Model" = 1\n'))
+
+    def test_generated_source(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        generated = RecipeSpec()._parse_python("x = 1\n", Path("b.py"), None, None)
+        generated = generated.replace(markers=generated.markers.add(Visited(random_id())))
+
+        with pytest.raises(AssertionError) as failure:
+            assert_no_added_markers([], [Result(None, generated)], lambda source_file: None)
+
+        assert f"  b.py (generated)\n    {_type_name(Visited)} on the source file\n" in str(failure.value)
+
+    def test_host_marker_held_as_a_mapping_is_named_by_its_host_type(self):
+        before = RecipeSpec()._parse_python("x = 1\n", Path("a.py"), None, None)
+        # How the RPC receiver holds a host marker that Python has no class for.
+        after = before.replace(markers=Markers(random_id(), [{'kind': 'org.example.HostMarker'}]))
+
+        with pytest.raises(AssertionError) as failure:
+            assert_no_added_markers([before], [Result(before, after)], lambda source_file: None)
+
+        assert "  a.py (the printed source is unchanged)\n    org.example.HostMarker on the source file\n" \
+               in str(failure.value)
+
+    def test_check_turned_off_passes(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"),
+                          check_reporting_markers_only=False, type_attribution=False)
+        spec.rewrite_run(python("foo()\n", "bar()\n"))
+
+
+class TestGeneratedSources:
+    """A source spec with no `before` describes a file the recipe creates."""
+
+    COMPAT = 'def helper():\n    return None\n'
+
+    @staticmethod
+    def _recipe(file_name="pkg/_helper.py", contents=None):
+        contents = contents if contents is not None else TestGeneratedSources.COMPAT
+
+        class Generates(ScanningRecipe[Set[str]]):
+            @property
+            def name(self) -> str:
+                return "org.openrewrite.test.Generates"
+
+            @property
+            def display_name(self) -> str:
+                return "Generate a module"
+
+            @property
+            def description(self) -> str:
+                return "Generate a module."
+
+            def initial_value(self, ctx: ExecutionContext) -> Set[str]:
+                return set()
+
+            def scanner(self, acc: Set[str]) -> TreeVisitor:
+                class Scan(PythonVisitor[ExecutionContext]):
+                    def visit_compilation_unit(self, cu: CompilationUnit, ctx) -> J:
+                        acc.add(str(cu.source_path))
+                        return cu
+
+                return Scan()
+
+            def generate(self, acc: Set[str], ctx: ExecutionContext) -> List[SourceFile]:
+                if not acc:
+                    return []
+                import ast
+
+                from rewrite.python._parser_visitor import ParserVisitor
+
+                cu = ParserVisitor(contents, None, None).visit_Module(ast.parse(contents))
+                return [cu.replace(_source_path=Path(file_name))]
+
+        return Generates()
+
+    def test_matched_on_its_source_path(self):
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT, path=Path("pkg/_helper.py")),
+        )
+
+    def test_matched_on_its_contents_when_the_spec_gives_no_path(self):
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT),
+        )
+
+    def test_the_after_recipe_hook_sees_it(self):
+        seen = []
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT, path=Path("pkg/_helper.py"),
+                   after_recipe=lambda sf: seen.append(str(sf.source_path))),
+        )
+        assert seen == ["pkg/_helper.py"]
+
+    def test_contents_that_do_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, "def other():\n    pass\n", path=Path("pkg/_helper.py")),
+            )
+
+    def test_a_path_nothing_was_generated_at(self):
+        with pytest.raises(AssertionError,
+                           match="Expected the recipe to generate a source file"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, self.COMPAT, path=Path("elsewhere/_helper.py")),
+            )
+
+    def test_a_generated_file_no_spec_describes(self):
+        with pytest.raises(AssertionError, match="did not expect"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+            )
+
+    def test_a_spec_with_neither_before_nor_after(self):
+        with pytest.raises(AssertionError, match="describes nothing"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, None, path=Path("pkg/_helper.py")),
+            )

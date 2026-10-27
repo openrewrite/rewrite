@@ -18,12 +18,14 @@ import pytest
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
+from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImportOptions, maybe_remove_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
 
 from ._java_import_arm import java_remove_import
+from ._parse_shape import parse_shape
 
 
 def _assert_ids_accessible(source_file):
@@ -80,6 +82,32 @@ class TestMaybeRemoveImport:
                 """
                 x = 1
                 """,
+            )
+        )
+
+    def test_removing_the_only_statement_leaves_an_empty_module(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, '__future__', 'division', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                "from __future__ import division",
+                "",
+                after_recipe=parse_shape(""),
+            )
+        )
+
+    def test_an_import_added_to_an_emptied_module_replaces_its_empty_statement(self):
+        class _V(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(module='os', only_if_unused=False))
+                maybe_add_import(self, AddImportOptions(module='os', name='path', only_if_referenced=False))
+                return cu
+
+        RecipeSpec(recipe=from_visitor(_V())).rewrite_run(
+            python(
+                "import os\n",
+                "from os import path\n",
+                after_recipe=parse_shape("from os import path\n"),
             )
         )
 
@@ -347,9 +375,23 @@ class TestMaybeRemoveImport:
         )
 
     def test_partial_direct_import_removal_keeps_ids_accessible(self, arm):
-        """Removing one module from 'import X, Y' rebuilds the MultiImport from the
-        public `.id` property; the rebuilt node's id must remain accessible
-        (regression for the 8.84.8 int-id migration)."""
+        """Removing one module from 'import X, Y' leaves the surviving `Import` bare, as a
+        parse of 'import Y' gives it, with its id (regression for the 8.84.8 int-id migration)."""
+        surviving_id = []
+
+        def record_sys_id(cu):
+            surviving_id.append(cu.statements[0].names[1].id)
+            return cu
+
+        def bare_sys(cu):
+            _assert_ids_accessible(cu)
+            parse_shape(after)(cu)
+            assert cu.statements[0].id == surviving_id[0]
+
+        after = """
+                import sys
+                x = 1
+                """
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'os', only_if_unused=False)))
         spec.rewrite_run(
@@ -358,26 +400,24 @@ class TestMaybeRemoveImport:
                 import os, sys
                 x = 1
                 """,
-                """
-                import sys
-                x = 1
-                """,
-                after_recipe=_assert_ids_accessible,
+                after,
+                before_recipe=record_sys_id,
+                after_recipe=bare_sys,
             )
         )
 
 
 class TestCanonicalRemoveImport:
     """A requested (module, name) also matches an import by its canonical FQN
-    (``os.path.join`` is canonically ``posixpath.join``), not just by its
+    (``posixpath.join`` is canonically ``os.path.join``), not just by its
     written path."""
 
     def test_remove_reexported_function_by_canonical_fqn(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import join
+                from posixpath import join
                 x = 1
                 """,
                 """
@@ -402,14 +442,14 @@ class TestCanonicalRemoveImport:
 
     def test_canonical_removal_keeps_other_names(self, arm):
         RecipeSpec(recipe=from_visitor(
-            _remove_import_visitor(arm, 'posixpath', 'join', only_if_unused=False))).rewrite_run(
+            _remove_import_visitor(arm, 'os.path', 'join', only_if_unused=False))).rewrite_run(
             python(
                 """
-                from os.path import exists, join
+                from posixpath import exists, join
                 x = 1
                 """,
                 """
-                from os.path import exists
+                from posixpath import exists
                 x = 1
                 """,
             )
@@ -471,12 +511,37 @@ class TestCanonicalRemoveImport:
 
 
 class TestRemoveImportUsageScoping:
-    """``only_if_unused`` counts every reference the enclosing scopes do not
-    rebind, including references that appear only in annotations."""
+    """``only_if_unused`` counts the references the code reads: not a name an enclosing
+    scope rebinds, nor one filling a slot that names a member, and including references
+    that appear only in annotations."""
 
     @staticmethod
     def _remove(arm, module, name):
         return from_visitor(_remove_import_visitor(arm, module, name))
+
+    def test_remove_import_a_member_name_merely_matches(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'json', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import json
+
+
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                    """\
+                    def handle(resp, url, body, item):
+                        resp.json()
+                        post(url, json=body)
+                        return item.payload.json
+                    """,
+                )
+            )
 
     def test_keep_import_referenced_in_function_annotations(self, arm):
         for type_attribution in (False, True):
@@ -491,6 +556,20 @@ class TestRemoveImportUsageScoping:
                     def f(q: Deque[int]) -> Deque[int]:
                         local: Deque[int] = q
                         return local
+                    """,
+                )
+            )
+
+    def test_keep_import_referenced_in_a_type_alias_type_parameter(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'typing', 'Deque'),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+                    type Queues[U: Deque[int]] = dict[str, U]
                     """,
                 )
             )
@@ -528,6 +607,20 @@ class TestRemoveImportUsageScoping:
 
                     def uses():
                         return join("a", "b")
+                    """,
+                )
+            )
+
+    def test_keep_a_dotted_module_import_referenced_through_its_root(self, arm):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=self._remove(arm, 'os.path', None),
+                              type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    import os.path
+
+                    x = os.path.join("a", "b")
                     """,
                 )
             )
@@ -672,6 +765,57 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_remove_a_read_import_an_enclosing_block_binds(self, arm):
+        RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'collections'))).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+                    if TYPE_CHECKING:
+                        import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_submodule_import_another_import_binds_the_package_of_goes_once_nothing_spells_it(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'legacy.http')), type_attribution=False)
+        spec.rewrite_run(
+            python(
+                """
+                import legacy.http
+                import legacy
+                h = legacy.http.make_headers()
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import legacy.http
+                import legacy.auth
+                legacy.auth.login()
+                """,
+                """
+                import legacy.auth
+                legacy.auth.login()
+                """,
+                after_recipe=parse_shape("import legacy.auth\nlegacy.auth.login()\n"),
+            )
+        )
+
     def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
@@ -787,16 +931,24 @@ class TestRemoveImportStringAnnotations:
         module = types.ModuleType('after_recipe')
         exec(source_file.print_all(), module.__dict__)
         typing.get_type_hints(module)
+        for value in list(module.__dict__.values()):
+            if isinstance(value, types.FunctionType):
+                typing.get_type_hints(value)
 
-    def test_names_inside_a_compound_reference_keep_their_imports(self, arm):
+    @pytest.mark.parametrize('annotation_position, source', [
+        ('variable', 'm: "typing.Dict[Any, Any]" = {}'),
+        ('parameter', 'def f(m: "typing.Dict[Any, Any]") -> None: ...'),
+        ('return', 'def f() -> "typing.Dict[Any, Any]": ...'),
+    ])
+    def test_names_inside_a_compound_reference_keep_their_imports(self, arm, annotation_position, source):
         spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing')))
         spec.rewrite_run(
             python(
-                """\
+                f"""\
                 import typing
                 from typing import Any
 
-                m: "typing.Dict[Any, Any]" = {}
+                {source}
                 """,
                 after_recipe=self._assert_type_hints_resolve,
             )
@@ -810,6 +962,45 @@ class TestRemoveImportStringAnnotations:
                 from typing import Any
 
                 m: "Any" = None
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('annotation', [
+        pytest.param('''"'List[int]'"''', id='whole_annotation'),
+        pytest.param('''"Dict[str, 'List[int]'] "''', id='inside_a_subscript'),
+        pytest.param('''"Annotated['List[int]', 'meta'] "''', id='annotated_type_argument'),
+    ])
+    def test_a_nested_reference_keeps_its_import(self, arm, annotation):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Annotated, Dict, List
+
+                m: {annotation} = None
+                """,
+                after_recipe=self._assert_type_hints_resolve,
+            )
+        )
+
+    @pytest.mark.parametrize('annotation', [
+        pytest.param('''"Literal['List'] "''', id='literal'),
+        pytest.param('''"Annotated[int, 'List'] "''', id='annotated_metadata'),
+    ])
+    def test_a_string_in_a_value_position_does_not_keep_an_import(self, arm, annotation):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Annotated, List, Literal
+
+                m: {annotation} = None
+                """,
+                f"""\
+                from typing import Annotated, Literal
+
+                m: {annotation} = None
                 """,
             )
         )
@@ -830,3 +1021,106 @@ class TestRemoveImportStringAnnotations:
                 """,
             )
         )
+
+
+class TestRemoveImportAllReExports:
+    """A name listed in `__all__` is re-exported, so the module still needs its
+    import even where nothing else reads the name."""
+
+    @pytest.mark.parametrize('all_form', ['["List"]', '("List",)'])
+    def test_re_exported_name_keeps_its_import(self, arm, all_form):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import List
+
+                __all__ = {all_form}
+                """,
+            )
+        )
+
+    def test_augmented_all_keeps_its_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["Any"]
+                __all__ += ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('unreadable_all', [
+        pytest.param('__all__ = ["Any"]\n__all__.extend(["List"])', id='extend'),
+        pytest.param('if True:\n    __all__ = ["List"]\nelse:\n    __all__ = []', id='if_else'),
+    ])
+    def test_unreadable_all_keeps_the_import(self, arm, unreadable_all):
+        body = unreadable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+            )
+        )
+
+    def test_unrelated_export_does_not_keep_an_unrelated_import(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'Any')))
+        spec.rewrite_run(
+            python(
+                """\
+                from typing import Any, List
+
+                __all__ = ["List"]
+                """,
+                """\
+                from typing import List
+
+                __all__ = ["List"]
+                """,
+            )
+        )
+
+    @pytest.mark.parametrize('readable_all', [
+        pytest.param('__all__ = []', id='empty'),
+        pytest.param('__all__ = _x = ["Any"]', id='chained'),
+        pytest.param('__all__ = ["Any"]\n__all__.sort()', id='sort'),
+        pytest.param('__all__ = []\n__all__ += ["Any"]', id='augmented'),
+        pytest.param('if True:\n    __all__ = ["Any"]', id='nested_if'),
+    ])
+    def test_readable_all_leaves_unrelated_imports_removable(self, arm, readable_all):
+        body = readable_all.replace('\n', '\n                ')
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'typing', 'List')))
+        spec.rewrite_run(
+            python(
+                f"""\
+                from typing import Any, List
+
+                {body}
+                """,
+                f"""\
+                from typing import Any
+
+                {body}
+                """,
+            )
+        )
+
+
+class TestRemoveImportLineBreaks:
+    @pytest.mark.parametrize("module, name, before, after", [
+        pytest.param('os', None, "import os\r\nimport sys\r\n\r\nx = 1\r\n",
+                     "import sys\r\n\r\nx = 1\r\n", id='first-import'),
+        pytest.param('typing', 'List', "import os\r\nfrom typing import List, Dict\r\nx = 1\r\n",
+                     "import os\r\nfrom typing import Dict\r\nx = 1\r\n", id='member'),
+        pytest.param('os', None, "import os\r\n\r\nx = 1\r\n", "x = 1\r\n", id='only-import'),
+    ])
+    def test_crlf(self, arm, module, name, before, after):
+        RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, module, name, only_if_unused=False))).rewrite_run(
+            python(before, after))

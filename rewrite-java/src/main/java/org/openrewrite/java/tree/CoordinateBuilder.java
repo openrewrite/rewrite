@@ -171,6 +171,21 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class If extends Statement {
+        If(J.If tree) {
+            super(tree);
+        }
+
+        /**
+         * Adds a branch to this {@code if}: a template producing an {@code if} becomes an {@code else if},
+         * anything else a plain {@code else}. An existing {@code else} is chained onto the new branch
+         * rather than replaced.
+         */
+        public JavaCoordinates addElseBranch() {
+            return new JavaCoordinates(tree, Space.Location.ELSE_PREFIX, JavaCoordinates.Mode.AFTER, null);
+        }
+    }
+
     public static class Identifier extends Expression {
         public Identifier(J.Identifier tree) {
             super(tree);

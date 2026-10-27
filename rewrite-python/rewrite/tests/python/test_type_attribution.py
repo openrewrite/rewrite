@@ -26,12 +26,14 @@ import ast
 import pytest
 import tempfile
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from rewrite.java import JavaType
 
 # Import type mapping modules
-from rewrite.python.type_mapping import PythonTypeMapping, compute_source_line_data
+from rewrite.python.type_mapping import PythonTypeMapping, _WithFallback, compute_source_line_data
 from rewrite.python.ty_client import TyTypesClient
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.visitor import PythonVisitor
@@ -73,7 +75,8 @@ class TestTyTypesClient:
 
     def test_client_context_manager(self):
         """Test that TyTypesClient shuts down on context exit."""
-        with TyTypesClient() as client:
+        with TyTypesClient() as client, tempfile.TemporaryDirectory() as tmpdir:
+            assert client.initialize(tmpdir)
             assert client._process is not None
         assert client._process is None
 
@@ -149,7 +152,7 @@ class TestPythonTypeMappingPrimitives:
         assert result == JavaType.Primitive.Boolean
 
     def test_none_constant(self):
-        """Test that None maps to JavaType.Primitive.None_."""
+        """Test that None maps to JavaType.Primitive.Null."""
         source = 'None'
         tree = ast.parse(source)
         mapping = PythonTypeMapping(source)
@@ -158,7 +161,7 @@ class TestPythonTypeMappingPrimitives:
         result = mapping.type(const)
 
         mapping.close()
-        assert result == JavaType.Primitive.None_
+        assert result == JavaType.Primitive.Null
 
 
 class TestMethodInvocationType:
@@ -666,13 +669,17 @@ class TestStructuredCallSignatures:
         mapping.close()
 
 
-def _make_mapping(source: str) -> tuple:
+def _make_mapping(source: str, modules: Optional[Dict[str, str]] = None) -> tuple:
     """Helper: create a temp file, TyTypesClient, and PythonTypeMapping.
 
-    Returns (mapping, tree, tmpdir_path) inside active context managers.
-    Use with _with_mapping() instead for automatic cleanup.
+    Returns ``(mapping, tree, tmpdir, client)``; pass the last three to
+    :func:`_cleanup_mapping`.
 
-    ``source`` is dedented so callers can pass cleanly indented triple-quoted
+    ``source`` becomes ``test.py``, so types it defines are rooted at the module
+    name ``test``. ``modules`` maps additional filenames to sources written into
+    the same workspace, so ty can resolve cross-module references.
+
+    Every source is dedented so callers can pass cleanly indented triple-quoted
     strings; byte offsets used for type lookup are relative to the dedented text.
     """
     source = dedent(source)
@@ -681,6 +688,9 @@ def _make_mapping(source: str) -> tuple:
     file_path = os.path.join(tmpdir, 'test.py')
     with open(file_path, 'w') as f:
         f.write(source)
+    for name, src in (modules or {}).items():
+        with open(os.path.join(tmpdir, name), 'w') as f:
+            f.write(dedent(src))
     client = TyTypesClient()
     client.initialize(tmpdir)
     mapping = PythonTypeMapping(source, file_path, ty_client=client)
@@ -870,6 +880,29 @@ class TestDeclaringTypeWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_construction_receiver_declaring_type_when_ty_untypes_the_call(self):
+        """A construction ty leaves untyped still yields a declaring type."""
+        source = """
+            import array
+
+            class Subclass(array.array):
+                pass
+
+            Subclass().tobytes()
+        """
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # Subclass().tobytes()
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            # `array.array` has no zero-argument overload, so ty resolves no
+            # member on the construction.
+            declaring = result._declaring_type
+            assert declaring._fully_qualified_name == f'{_SOURCE_MODULE}.Subclass'
+            assert declaring._supertype._fully_qualified_name == 'array.array'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_user_defined_class_method(self):
         """Method call on a user-defined class instance."""
         source = '''
@@ -951,25 +984,50 @@ class TestUnionTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_union_return_type(self):
-        """Function returning Optional[str] should have str or Unknown return type."""
+    def test_optional_keeps_none_as_a_union_member(self):
         source = '''
             from typing import Optional
-            def maybe_name() -> Optional[str]:
-                return "Alice"
+            def f(x: bool | None, o: Optional[int]) -> Optional[str]:
+                x
+                o
+                return None
 
-            maybe_name()
+            f(None, None)
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            call = tree.body[2].value  # maybe_name()
-            result = mapping.method_invocation_type(call)
-            assert result is not None
-            assert result._name == 'maybe_name'
-            # Return type should resolve to str (unwrapping Optional).
-            # May be Unknown if ty-types doesn't emit descriptors for union members.
-            if result._return_type is not None and not isinstance(result._return_type, JavaType.Unknown):
-                assert result._return_type == JavaType.Primitive.String
+            body = tree.body[1].body
+            for reference, member in ((body[0].value, JavaType.Primitive.Boolean),
+                                      (body[1].value, JavaType.Primitive.Int)):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Union)
+                assert set(result.bounds) == {member, JavaType.Primitive.Null}
+            returned = mapping.method_invocation_type(tree.body[2].value)._return_type
+            assert set(returned.bounds) == {JavaType.Primitive.String, JavaType.Primitive.Null}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_optional_of_an_unresolved_type_is_unknown_rather_than_none(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'None'}
+        mapping._type_registry[2] = {'kind': 'union', 'members': [999, 1]}
+        assert isinstance(mapping._resolve_type(2), JavaType.Unknown)
+
+    def test_bytes_is_a_class_distinct_from_str(self):
+        source = '''
+            def f(b: bytes):
+                b
+                inferred = b"x"
+                inferred
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            body = tree.body[0].body
+            for reference in (body[0].value, body[2].value):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Class)
+                assert result.fully_qualified_name == 'bytes'
+                assert result.supertype is not None
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1078,15 +1136,18 @@ class TestTupleElements:
         assert result._type_parameters == [JavaType.Primitive.Int,
                                            JavaType.Primitive.String]
 
-    def test_homogeneous_element_becomes_single_type_parameter(self):
+    def test_homogeneous_element_becomes_array_type_parameter(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        # tuple[*tuple[int, ...], int]
         mapping._type_registry[400] = self._tuple_descriptor(
-            [{'typeId': 1, 'kind': 'homogeneous'}], type_args=[1])
+            [{'typeId': 1, 'kind': 'homogeneous'}, {'typeId': 1, 'kind': 'fixed'}],
+            type_args=[1])
 
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Parameterized)
-        assert result._type_parameters == [JavaType.Primitive.Int]
+        assert result._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int),
+                                           JavaType.Primitive.Int]
 
     def test_type_var_tuple_element_resolves(self):
         mapping = PythonTypeMapping("", file_path=None)
@@ -1163,16 +1224,21 @@ class TestTupleElementsWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_homogeneous_tuple_has_one_element(self):
+    def test_homogeneous_tuple_differs_from_one_tuple(self):
         source = '''
             def homo() -> tuple[int, ...]: ...
+            def one() -> tuple[int]: ...
             homo()
+            one()
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            result = mapping.type(tree.body[1].value)
-            assert isinstance(result, JavaType.Parameterized)
-            assert result._type_parameters == [JavaType.Primitive.Int]
+            homo = mapping.type(tree.body[2].value)
+            one = mapping.type(tree.body[3].value)
+            assert isinstance(homo, JavaType.Parameterized)
+            assert homo._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int)]
+            assert isinstance(one, JavaType.Parameterized)
+            assert one._type_parameters == [JavaType.Primitive.Int]
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1368,9 +1434,8 @@ class TestCyclicTypeResolution:
         # This should NOT raise RecursionError
         result = mapping._resolve_type(10)
 
-        # Should get a Class (possibly empty) instead of crashing
         assert result is not None
-        assert isinstance(result, JavaType.Class)
+        assert result.fully_qualified_name == 'type'
 
     def test_cyclic_union_does_not_recurse(self):
         """Cyclic union members should not cause infinite recursion."""
@@ -2020,67 +2085,52 @@ class TestWrapperDescriptor:
 class TestKnownInstanceDescriptor:
     """Tests for the knownInstance kind."""
 
-    def test_known_instance_resolves_to_class(self):
-        """A knownInstance with className should resolve to a class type."""
+    def test_known_instance_is_named_by_its_module(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': 'TypeVar',
+            'className': 'Field',
+            'moduleName': 'dataclasses',
+            'knownInstanceKind': 'Field',
         }
 
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'typing.TypeVar'
+        assert result._fully_qualified_name == 'dataclasses.Field'
 
-    def test_known_instance_special_form(self):
-        """A knownInstance for _SpecialForm should resolve correctly."""
+    def test_known_instance_no_module_exports_is_unknown(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': '_SpecialForm',
+            'className': 'Field',
+            'knownInstanceKind': 'Field',
         }
+        assert isinstance(mapping._resolve_type(400), JavaType.Unknown)
 
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert 'typing' in result._fully_qualified_name
-
-    def test_known_instance_empty_classname_returns_unknown(self):
-        """A knownInstance without className should return Unknown."""
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
+        mapping._type_registry[401] = {
             'kind': 'knownInstance',
             'className': '',
+            'moduleName': 'typing',
         }
+        assert isinstance(mapping._resolve_type(401), JavaType.Unknown)
 
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Unknown)
+        mapping._type_registry[402] = {
+            'kind': 'knownInstance',
+            'className': 'ConstraintSet',
+            'moduleName': 'ty_extensions',
+            'knownInstanceKind': 'ConstraintSet',
+        }
+        assert isinstance(mapping._resolve_type(402), JavaType.Unknown)
 
-    def test_known_instance_range_is_a_builtin(self):
+    def test_partial_call_is_named_by_the_partial(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[400] = {
             'kind': 'knownInstance',
-            'className': 'range',
-            'knownInstanceKind': 'Range',
-            'isNonEmpty': True,
+            'className': 'MethodWrapperType',
+            'moduleName': 'types',
+            'knownInstanceKind': 'FunctoolsPartialCall',
         }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'range'
-
-    @pytest.mark.parametrize('known_instance_kind',
-                             ['FunctoolsPartial', 'FunctoolsPartialCall'])
-    def test_known_instance_functools_partial(self, known_instance_kind):
-        mapping = PythonTypeMapping("", file_path=None)
-        mapping._type_registry[400] = {
-            'kind': 'knownInstance',
-            'className': 'partial',
-            'knownInstanceKind': known_instance_kind,
-        }
-
-        result = mapping._resolve_type(400)
-        assert isinstance(result, JavaType.Class)
-        assert result._fully_qualified_name == 'functools.partial'
+        assert _fqn(mapping._resolve_type(400)) == 'functools.partial'
 
 
 class TestTypeAliasDescriptor:
@@ -2098,6 +2148,46 @@ class TestTypeAliasDescriptor:
 
         result = mapping._resolve_type(500)
         assert result == JavaType.Primitive.Int
+
+    @staticmethod
+    def _recursive_tuple_alias():
+        # R = tuple[int, "R | None"]: the alias's value refers back to the alias.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[500] = {'kind': 'typeAlias', 'name': 'R', 'valueType': 501}
+        mapping._type_registry[501] = {
+            'kind': 'instance', 'className': 'tuple', 'moduleName': 'builtins',
+            'tupleElements': [{'kind': 'fixed', 'typeId': 1},
+                              {'kind': 'fixed', 'typeId': 502}],
+        }
+        mapping._type_registry[502] = {'kind': 'union', 'members': [500, 1]}
+        return mapping
+
+    def test_recursive_alias_entered_at_the_alias_resolves_to_its_value(self):
+        mapping = self._recursive_tuple_alias()
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.fully_qualified_name == 'tuple'
+        assert result.type_parameters[0] == JavaType.Primitive.Int
+
+        # Json = list["Json"] | str
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'str'}
+        mapping._type_registry[600] = {'kind': 'typeAlias', 'name': 'Json', 'valueType': 601}
+        mapping._type_registry[601] = {'kind': 'union', 'members': [602, 2]}
+        mapping._type_registry[602] = {'kind': 'instance', 'className': 'list',
+                                       'moduleName': 'builtins', 'typeArgs': [600]}
+        json = mapping._resolve_type(600)
+        assert isinstance(json, JavaType.Union)
+        json_list = next(t for t in json.bounds if isinstance(t, JavaType.Parameterized))
+        assert isinstance(json_list.type_parameters[0], JavaType.Unknown)
+
+    def test_recursive_alias_entered_at_its_value_resolves_to_its_value(self):
+        mapping = self._recursive_tuple_alias()
+        mapping._resolve_type(501)
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.type_parameters[0] == JavaType.Primitive.Int
 
     def test_type_alias_without_value_type(self):
         """A typeAlias without valueType should fall back to class from name."""
@@ -2286,6 +2376,33 @@ class TestNewDescriptorsWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_classmethod_over_a_callable_instance_keeps_its_call_site_method(self):
+        # A classmethod binding a callable instance has no definition to take a
+        # name, module or declaring class from, so ty sends a boundMethod
+        # carrying none of them; the call site rebuilds the method regardless.
+        source = '''
+            class Caller:
+                def __call__(self, x: int) -> str:
+                    return ""
+
+            class Holder:
+                cm = classmethod(Caller())
+
+            Holder.cm(1)
+            Holder.cm
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            method = mapping.method_invocation_type(tree.body[-2].value)
+            assert method is not None
+            assert method._name == 'cm'
+            assert _fqn(method._declaring_type) == 'test.Holder'
+
+            attribute_type, _ = mapping.attribute_type_info(tree.body[-1].value)
+            assert isinstance(attribute_type, JavaType.Unknown)
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_typevar_with_constraints_from_ty_types(self):
         """TypeVar with constraints should produce GenericTypeVariable with bounds."""
         source = '''
@@ -2359,19 +2476,77 @@ class TestDeclarationDeclaringType:
         assert result._declaring_type is None
 
     @requires_ty_types_cli
-    def test_declaration_declaring_type_with_ty_types(self):
-        """With ty-types, a function declaration should get a declaring type from the descriptor."""
-        source = 'def greet(name: str) -> str:\n    return name\n'
+    def test_declaring_type_is_the_enclosing_class_else_the_module(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(x): ...
+                @classmethod
+                def c(cls, x): ...
+                class Inner:
+                    def i(self): ...
+
+            def top(x): ...
+
+            def outer():
+                class Local:
+                    def m(self): ...
+
+            Mine().warn("x")
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            func_node = tree.body[0]
-            result = mapping.method_declaration_type(func_node)
-            assert result is not None
-            assert isinstance(result, JavaType.Method)
-            assert result._declaring_type is not None, \
-                "Declaration should have a declaring type, not None"
-            assert isinstance(result._declaring_type, JavaType.Class)
-            assert result._declaring_type._fully_qualified_name != "<unknown>"
+            declaring = {
+                node.name: mapping.method_declaration_type(node)._declaring_type.fully_qualified_name
+                for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+            }
+            assert declaring == {
+                'warn': 'test.Mine',
+                's': 'test.Mine',
+                'c': 'test.Mine',
+                'i': 'test.Mine.Inner',
+                'top': 'test',
+                'outer': 'test',
+                'm': "test.<locals of function 'outer'>.Local",
+            }
+            call = mapping.method_invocation_type(tree.body[-1].value)
+            assert call._declaring_type.fully_qualified_name == declaring['warn']
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    @requires_ty_types_cli
+    def test_every_declaration_but_an_instance_method_is_static(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(other: "Mine"): ...
+                @classmethod
+                def c(cls, x): ...
+
+            def top(x):
+                def nested(): ...
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            static = {
+                node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+                and mapping.method_declaration_type(node).flags_bit_map & JavaType.Flag.Static
+            }
+            assert static == {'s', 'c', 'top', 'nested'}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    @requires_ty_types_cli
+    def test_module_function_types_are_static(self):
+        source = '''
+            from helpers import util
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source, {'helpers.py': 'def util(x): ...\n'})
+        try:
+            alias = mapping.import_alias_type(tree.body[0].names[0])
+            assert alias.flags_bit_map & JavaType.Flag.Static
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2419,7 +2594,8 @@ class TestDeclaringTypeUnification:
             mt = mapping.method_invocation_type(call)
             assert mt is not None
             assert mt._declaring_type is not None
-            assert mt._declaring_type.fully_qualified_name == 'os.PathLike'
+            # `register` is declared on the metaclass.
+            assert mt._declaring_type.fully_qualified_name == 'abc.ABCMeta'
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2454,7 +2630,7 @@ class TestDeclaringTypeUnification:
         assert t.fully_qualified_name == 'missing_dep.Widget'
 
 
-class TestCyclicTypeResolution:
+class TestFqnDedupSupertypes:
     """Tests that FQN-deduplicated types don't produce self-referential supertypes.
 
     Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
@@ -2561,6 +2737,78 @@ def _collect_class_declarations(cu) -> dict:
 
 
 @requires_ty_types_cli
+def test_field_specifier_assignment_takes_declared_type():
+    src = '''
+        from dataclasses import dataclass, field
+        from typing import Final
+
+        @dataclass
+        class D:
+            q: int = field(default=1)
+            r: "int" = field(default=2)
+            s: Final = field(default=3)
+            t: Missing = field(default=4)
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        found: list = []
+
+        class _Collector(PythonVisitor):
+            def visit_assignment(self, a, p):
+                found.append(a)
+                return super().visit_assignment(a, p)
+
+        _Collector().visit(cu, None)
+        assignment = found[0]
+        target = assignment.variable.expression
+        assert assignment.type == JavaType.Primitive.Int
+        assert target.type == JavaType.Primitive.Int
+        assert target.field_type.type == JavaType.Primitive.Int
+
+        quoted = found[1]
+        assert quoted.type == JavaType.Primitive.Int
+        assert quoted.variable.expression.type == JavaType.Primitive.Int
+
+        bare_final = found[2]
+        assert isinstance(bare_final.type, JavaType.Unknown)
+        assert isinstance(bare_final.variable.expression.type, JavaType.Unknown)
+
+        # a name that resolves to nothing is unknown too, and has no qualified name to compare
+        unresolved = found[3]
+        assert isinstance(unresolved.type, JavaType.Unknown)
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+def test_quoted_type_hint_takes_the_type_it_names():
+    src = '''
+        def f() -> "int":
+            return 1
+
+        a: "int"
+        b: "list[int]" = []
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        hints: list = []
+
+        class _Collector(PythonVisitor):
+            def visit_type_hint(self, hint, p):
+                hints.append(hint)
+                return super().visit_type_hint(hint, p)
+
+        _Collector().visit(cu, None)
+        returns, annotation_only, with_value = hints
+        assert returns.type == JavaType.Primitive.Int
+        assert annotation_only.type == JavaType.Primitive.Int
+        assert isinstance(with_value.type, JavaType.Parameterized)
+        assert with_value.type.fully_qualified_name == 'list'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestMethodInvocationResultType:
     """J.MethodInvocation.type must reflect the callee's return type.
 
@@ -2658,6 +2906,189 @@ class TestSupertypeChainResolution:
             assert grand.fully_qualified_name == 'basemod.Base'
         finally:
             _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+@pytest.mark.parametrize('decorator', ['mock.patch.object(Request, "send")', 'mock.patch("m.Request.send")'])
+def test_a_class_decorated_into_a_union_is_typed_as_itself(decorator):
+    """A decorator read through a name bound twice types the decorated binding as a union,
+    which a class declaration, as the class it declares, never is."""
+    src = f'''
+        try:
+            from unittest import mock
+        except ImportError:
+            import mock
+
+
+        class Request:
+            def send(self): ...
+
+
+        @{decorator}
+        class TestBuildProxy:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['TestBuildProxy'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.TestBuildProxy'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+@pytest.mark.parametrize('returned', ['int', '"Bar"'])
+def test_a_class_decorated_into_another_type_is_typed_as_itself(returned):
+    src = f'''
+        class Bar:
+            pass
+
+
+        def replace(c) -> {returned}:
+            ...
+
+
+        @replace
+        class Foo:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['Foo'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.Foo'
+        assert [annotation.fully_qualified_name for annotation in declared._annotations] == ['m.replace']
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+def test_decorated_nested_classes_keep_their_declaration_scopes():
+    src = '''
+        def replace(c) -> int:
+            ...
+
+
+        class Outer:
+            @replace
+            class Nested:
+                pass
+
+            def method(self):
+                @replace
+                class Local:
+                    pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        classes = _collect_class_declarations(cu)
+        nested = classes['Nested'].type
+        local = classes['Local'].type
+        assert isinstance(nested, JavaType.Class)
+        assert nested.fully_qualified_name == 'm.Outer.Nested'
+        assert isinstance(local, JavaType.Class)
+        assert local.fully_qualified_name == "m.Outer.<locals of function 'method'>.Local"
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestInheritedCallDeclaringType:
+    """Attribution of a call to a method the receiver's class does not override."""
+
+    SRC = '''
+        import threading
+
+        class Worker(threading.Thread):
+            def run(self):
+                pass
+
+        w = Worker()
+        w.getName()
+        w.run()
+    '''
+
+    def test_an_inherited_call_names_the_declaring_class(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
+        try:
+            declaring = {c.name.simple_name: c.method_type.declaring_type
+                         for c in _collect_method_invocations(cu)}
+
+            assert _fqn(declaring['getName']) == 'threading.Thread', \
+                f"inherited without override: got {declaring['getName']!r}"
+
+            assert _fqn(declaring['run']) == 'm.Worker', \
+                f"overridden, so the subclass declares it: got {declaring['run']!r}"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSelfReceiverDeclaringType:
+    """A call through ``self`` or ``cls`` resolves to a class, not to ``Unknown``,
+    which ``MethodMatcher`` and ``UsesMethod`` cannot gate on."""
+
+    SRC = '''
+        class Base:
+            def greet(self):
+                return "hi"
+
+            @classmethod
+            def build(cls):
+                return cls()
+
+        class Child(Base):
+            def go(self):
+                self.greet()
+
+            @classmethod
+            def make(cls):
+                return cls.build()
+    '''
+
+    def test_self_and_cls_receivers_resolve_to_the_declaring_class(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self.SRC})
+        try:
+            declaring = {c.name.simple_name: c.method_type.declaring_type
+                         for c in _collect_method_invocations(cu)}
+
+            assert _fqn(declaring['greet']) == 'm.Base', \
+                f"self-rooted call: got {declaring['greet']!r}"
+
+            assert _fqn(declaring['build']) == 'm.Base', \
+                f"cls-rooted call: got {declaring['build']!r}"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSuperReceiverDeclaringType:
+    """A `super()`-rooted call is owned by the class declaring what it resolves to."""
+
+    SRC = '''
+        class A:
+            def f(self) -> int:
+                return 1
+
+        class B(A):
+            pass
+
+        class C(B):
+            def f(self) -> str:
+                return "s"
+
+            def go(self):
+                super().f()
+    '''
+
+    def test_super_takes_the_declaring_class_not_the_pivot(self):
+        mapping, tree, tmpdir, client = _make_mapping(self.SRC)
+        try:
+            super_f = tree.body[2].body[1].body[0].value
+            assert _fqn(mapping._get_declaring_type(super_f)) == 'test.A'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
 
 
 class TestSubprocessEnvironment:
@@ -3098,6 +3529,21 @@ class TestSubprocessEnvVirtualEnv:
         )
         assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
+    def test_project_venv_outranks_inherited_environments_but_not_an_explicit_one(self, tmp_path):
+        venv = tmp_path / '.venv'
+        venv.mkdir()
+        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv'}
+
+        def subprocess_env(**kwargs):
+            return TyTypesClient._subprocess_env(base_env=inherited, project_root=str(tmp_path), **kwargs)
+
+        assert subprocess_env()['VIRTUAL_ENV'] == '/inherited/.venv'
+
+        (venv / 'pyvenv.cfg').write_text('home = /usr/bin\n')
+        assert subprocess_env(prefix='/dev/.venv', base_prefix='/usr')['VIRTUAL_ENV'] == str(venv)
+
+        assert subprocess_env(virtual_env='/tmp/ws/.venv')['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
     def test_no_virtual_env_keeps_existing_sys_prefix_behavior(self):
         env = TyTypesClient._subprocess_env(
             base_env={'PATH': '/usr/bin'},
@@ -3123,7 +3569,7 @@ class TestDependencyPathForwarding:
     _captured: list = []
 
     class _StubTyClient:
-        def __init__(self, virtual_env=None):
+        def __init__(self, virtual_env=None, python_version=None):
             TestDependencyPathForwarding._captured.append(virtual_env)
 
         def initialize(self, project_root):
@@ -3514,6 +3960,45 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_each_class_attribute_is_one_method_or_member_under_its_own_name(self):
+        src = '''
+            from typing import Any, Callable, ParamSpec, TypeVar
+
+            P = ParamSpec('P')
+            R = TypeVar('R')
+
+            def deco(f: Callable[P, R]) -> Callable[P, R]:
+                return f
+
+            def helper(self) -> int:
+                return 1
+
+            class V:
+                def __mul__(self, o: int) -> int:
+                    return o
+                __rmul__ = __mul__
+
+                @deco
+                def wrapped(self) -> int:
+                    return 1
+
+                hook: Any
+                hook = helper
+
+                def go(self) -> None: ...
+
+            V().go()
+        '''
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            # `@deco` gives `wrapped` a nameless callable descriptor.
+            assert sorted(m._name for m in cls._methods or []) == \
+                ['__mul__', '__rmul__', 'go', 'wrapped']
+            # The `Any` declaration claims the name before the function binding.
+            assert [v._name for v in cls._members or []] == ['hook']
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_self_typed_member_does_not_hang(self):
         # A member whose declared type is the owning class must resolve without
         # infinitely recursing (the cycle guard already covers methods; members
@@ -3536,6 +4021,65 @@ class TestClassMembers:
             next_type = by_name['next']._type
             assert isinstance(next_type, JavaType.Class)
             assert next_type.fully_qualified_name.endswith('Node')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    _HOOK = '''
+        class Hook:
+            count: int = 0
+            def __init__(self) -> None:
+                self.x = 1
+            def __setattr__(self, k: str, v: object) -> None: ...
+            @property
+            def y(self) -> int: return 1
+            def m(self) -> None:
+                self
+        h = Hook(); h.x; h.y
+    '''
+
+    @staticmethod
+    def _assert_hook_fields(cls):
+        by_name = {v._name: v for v in cls._members or []}
+        assert sorted(by_name) == ['count', 'x', 'y']
+        assert by_name['x']._type == JavaType.Primitive.Int
+        assert by_name['y']._type == JavaType.Primitive.Int
+
+    def test_properties_and_self_assigned_attributes_are_fields(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self._assert_hook_fields(mapping.type(tree.body[1].targets[0]))
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_self_assigned_attribute_is_a_field_whatever_its_value(self):
+        src = '''
+            import os
+            def f() -> int: return 1
+            class K: ...
+            class C:
+                def __init__(self) -> None:
+                    self.g = f
+                    self.k = K
+                    self.mod = os
+            c = C()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(src)
+        try:
+            cls = mapping.type(tree.body[-1].targets[0])
+            assert [m._name for m in cls._methods or []] == ['__init__']
+            by_name = {v._name: v._type for v in cls._members or []}
+            assert by_name['g'] == JavaType.Primitive.Int
+            assert by_name['k'].fully_qualified_name == 'test.K'
+            assert by_name['mod'].fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_fields_are_reachable_through_self(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self_type = mapping.type(tree.body[0].body[-1].body[-1].value)
+            assert isinstance(self_type, JavaType.GenericTypeVariable)
+            self._assert_hook_fields(self_type._bounds[0])
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -3695,24 +4239,179 @@ class TestPydanticModelMembers:
         assert 'greeting' in [m._name for m in cls._methods]
 
 
+def _first_import(cu):
+    """The first import name a compilation unit binds."""
+    from rewrite.python.tree import MultiImport
+    stmt = cu.statements[0]
+    return stmt.names[0] if isinstance(stmt, MultiImport) else stmt
+
+
+@requires_ty_types_cli
+class TestSymbolIdentityAcrossImportForms:
+    """A function's identity is its declaring type's FQN plus its name, the module ty
+    defines it in — the same pair however the source spelled the import, as a class's
+    own FQN already is."""
+
+    def _assert_names(self, source, owner, name):
+        cu, tmpdir, client = _parse_with_types({'m.py': source})
+        try:
+            call = cu.statements[1]
+            assert (call.method_type.declaring_type.fully_qualified_name,
+                    call.method_type.name) == (owner, name)
+            qualid_type = _first_import(cu).qualid.type
+            if isinstance(qualid_type, JavaType.Method):
+                assert (qualid_type.declaring_type.fully_qualified_name,
+                        qualid_type.name) == (owner, name)
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    # `asyncio` re-exports the `sleep` that `asyncio.tasks` defines, written through
+    # the facade, through the defining module, as an attribute of the package, and
+    # under a name of the file's own choosing.
+    @pytest.mark.parametrize('source', [
+        'from asyncio import sleep\nsleep(1)\n',
+        'from asyncio.tasks import sleep\nsleep(1)\n',
+        'import asyncio\nasyncio.sleep(1)\n',
+        'from asyncio import sleep as nap\nnap(1)\n',
+    ], ids=['through-facade', 'through-definer', 'as-attribute', 'under-an-alias'])
+    def test_a_reexported_function_has_one_identity(self, source):
+        self._assert_names(source, 'asyncio.tasks', 'sleep')
+
+    def test_a_platform_module_is_named_by_its_portable_alias(self):
+        self._assert_names('from posixpath import join\njoin("a", "b")\n', 'os.path', 'join')
+
+    @pytest.mark.parametrize('member', [
+        'def bar():\n    return 1\n',
+        'def factory():\n    def d():\n        return 1\n    return d\n\n\nbar = factory()\n',
+    ], ids=['typed', 'untyped'])
+    @pytest.mark.parametrize('source', [
+        'import pkg.api\npkg.api.baz()\n',
+        'from pkg.api import baz\nbaz()\n',
+    ], ids=['as-attribute', 'through-facade'])
+    def test_a_reexported_module_member_names_the_definition(self, member, source):
+        cu, tmpdir, client = _parse_with_types({
+            'pkg/__init__.py': '',
+            'pkg/_impl.py': member,
+            'pkg/api.py': 'from pkg._impl import bar as baz\n',
+            'm.py': source,
+        })
+        try:
+            method_type = cu.statements[1].method_type
+            assert (method_type.declaring_type.fully_qualified_name,
+                    method_type.name) == ('pkg._impl', 'bar')
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSymbolTheStubsDoNotDeclare:
+    """A symbol no stub declares is named by the import that binds it — reached through
+    a from-import, or through a receiver whose own import names the module."""
+
+    LIB = 'def present():\n    return 1\n'
+
+    def _call_names(self, source, call_index=1):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            method_type = cu.statements[call_index].method_type
+            declaring_type = method_type.declaring_type
+            return (getattr(declaring_type, 'fully_qualified_name', None), method_type.name)
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    @pytest.mark.parametrize('source', [
+        'import lib\nlib.gone()\n',
+        'from lib import gone\ngone()\n',
+        'from lib import gone as g\ng()\n',
+    ], ids=['as-attribute', 'through-from-import', 'under-an-alias'])
+    def test_an_undeclared_symbol_has_one_identity(self, source):
+        assert self._call_names(source) == ('lib', 'gone')
+
+    def test_a_rebound_name_is_not_attributed_from_its_import(self):
+        owner, _ = self._call_names('from lib import gone\ngone = None\ngone()\n', 2)
+        assert owner is None, 'a name the file rebinds no longer names what it imported'
+
+    def _call_owners(self, source):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            return [getattr(c.method_type.declaring_type, 'fully_qualified_name', None)
+                    for c in _collect_method_invocations(cu)]
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_a_name_another_scope_binds_keeps_its_import_here(self):
+        assert self._call_owners(
+            'from lib import gone\ngone()\n'
+            'class C:\n    def gone(self):\n        pass\n    def m(self):\n        gone()\n'
+            'def f(gone=None):\n    pass\n') == ['lib', 'lib'], \
+            'a class body is not visible to its methods, and a parameter only to its function'
+        assert self._call_owners(
+            'from lib import gone as g\ng()\nclass C:\n    def g(self):\n        pass\n') == ['lib']
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    return gone\n') == ['lib'], \
+            'a global declaration binds nothing until something assigns it'
+
+    def test_a_name_an_enclosing_scope_binds_is_not_attributed(self):
+        assert self._call_owners(
+            'from lib import gone\n'
+            'def f(gone):\n    def inner():\n        gone()\n'
+            'class C:\n    gone = None\n    gone()\n') == [None, None]
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    gone = None\n') == [None], \
+            'a global declaration binds at module scope'
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f(a=(gone := 1)):\n    pass\n') == [None], \
+            'a default is evaluated in the scope around its function'
+        assert self._call_owners(
+            'from lib import gone\nclass C[gone]:\n    def m(self):\n        gone()\n') == [None], \
+            "a class's type parameters reach its methods"
+
+    def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
+        owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')
+        assert owner is None, 'a function-scope import binds only inside that function'
+
+    @pytest.mark.parametrize('source', [
+        'import sys\nif sys.version_info < (3, 11):\n    from lib import gone\ngone()\n',
+        'import sys\nif sys.platform == "linux":\n    if sys.version_info < (3, 11):\n'
+        '        from lib import gone\ngone()\n',
+    ], ids=['guarded', 'nested-guards'])
+    def test_an_import_under_an_unconditional_if_binds_at_module_scope(self, source):
+        assert self._call_names(source, -1) == ('lib', 'gone')
+
+    def test_an_import_with_an_else_branch_is_not_attributed(self):
+        owner, _ = self._call_names(
+            'import sys\nif sys.version_info < (3, 11):\n    from lib import gone\n'
+            'else:\n    from lib import present\ngone()\n', -1)
+        assert owner is None, 'the branches are alternatives, so neither one binds'
+
+    def test_an_import_in_a_try_is_not_attributed(self):
+        owner, _ = self._call_names(
+            'try:\n    from lib import gone\nexcept ImportError:\n    pass\ngone()\n', -1)
+        assert owner is None, 'a `try` body is not one of the scopes this reads'
+
+    def test_a_receiver_names_the_module_its_import_binds(self):
+        cu, tmpdir, client = _parse_with_types(
+            {'m.py': 'import nosuchmod\nimport nosuch.pkg as np\n'
+                     'nosuchmod.gone()\nnp.sub.gone()\n'})
+        try:
+            owners = [c.method_type.declaring_type.fully_qualified_name
+                      for c in _collect_method_invocations(cu)]
+            assert owners == ['nosuchmod', 'nosuch.pkg.sub'], \
+                'a receiver names the module its import binds, not the chain it spells'
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
 @requires_ty_types_cli
 class TestImportNameAttribution:
-    """Each import name's qualid carries the type of the symbol it binds, named under
-    the module the source imported from — the module a call to it names too. The
-    defining module rides on a ``CanonicalName`` marker."""
-
-    @staticmethod
-    def _first_import(cu):
-        from rewrite.python.tree import MultiImport
-        stmt = cu.statements[0]
-        if isinstance(stmt, MultiImport):
-            return stmt.names[0]
-        return stmt
+    """Each import name's qualid carries the type of the symbol it binds."""
 
     def _qualid_type(self, src):
         cu, tmpdir, client = _parse_with_types({'m.py': src})
         try:
-            return self._first_import(cu).qualid.type
+            return _first_import(cu).qualid.type
         finally:
             _cleanup_parse(tmpdir, client)
 
@@ -3733,11 +4432,11 @@ class TestImportNameAttribution:
         cu, tmpdir, client = _parse_with_types(
             {'m.py': 'from os.path import join\nx = join("/tmp", "f")\n'})
         try:
-            imp = self._first_import(cu)
+            imp = _first_import(cu)
             call = cu.statements[1].assignment
             assert imp.qualid.name.type.declaring_type.fully_qualified_name == \
                 call.method_type.declaring_type.fully_qualified_name == 'os.path'
-            assert get_canonical_fqn(imp) == 'posixpath.join'
+            assert get_canonical_fqn(imp) == 'os.path.join'
         finally:
             _cleanup_parse(tmpdir, client)
 
@@ -3770,6 +4469,392 @@ class TestImportNameAttribution:
     def test_unresolvable_import_stays_untyped(self):
         t = self._qualid_type('from nonexistent_module_xyz import something\n')
         assert t is None or isinstance(t, JavaType.Unknown)
+
+
+@dataclass(frozen=True)
+class FqnCase:
+    """One row of the descriptor→FQN contract. ``source``'s last statement is a
+    bare expression; the type attributed to it must be keyed by ``expected``.
+    ``type_parameters``, when set, additionally pins the resolved generic
+    arguments.
+    """
+    id: str
+    kind: str
+    source: str
+    expected: str
+    type_parameters: Optional[Tuple[object, ...]] = None
+
+
+# The fully-qualified name each ty descriptor kind must map to. `test.py` is the
+# module under test, so locally-defined types are rooted at `test`; `builtins` is
+# stripped. The Java port at
+# core/serialization/.../v3/type/python/PythonTypeMapping.java in moderne-cli
+# must agree row for row — see TestDescriptorFqnContract for why.
+_FQN_CASES = (
+    FqnCase(
+        id='class_literal',
+        kind='classLiteral',
+        source='''
+            class C:
+                pass
+
+            C
+        ''',
+        expected='test.C',
+    ),
+    FqnCase(
+        id='instance',
+        kind='instance',
+        source='''
+            class C:
+                pass
+
+            c = C()
+            c
+        ''',
+        expected='test.C',
+    ),
+    FqnCase(
+        id='builtin_instance',
+        kind='instance (builtins)',
+        source='''
+            xs = [1]
+            xs
+        ''',
+        expected='list',
+        type_parameters=(JavaType.Primitive.Int,),
+    ),
+    FqnCase(
+        id='tuple_elements',
+        kind='instance (tupleElements)',
+        # `tuple` has one generic slot, so `typeArgs` collapses this to
+        # `tuple[int | str]`; only `tupleElements` keeps the positions apart.
+        source='''
+            t: tuple[int, str] = (1, "a")
+            t
+        ''',
+        expected='tuple',
+        type_parameters=(JavaType.Primitive.Int, JavaType.Primitive.String),
+    ),
+    FqnCase(
+        id='known_instance_functools_partial',
+        kind='knownInstance',
+        source='''
+            import functools
+
+            p = functools.partial(len)
+            p
+        ''',
+        expected='functools.partial',
+    ),
+    FqnCase(
+        id='known_instance_range',
+        kind='knownInstance',
+        source='''
+            r = range(3)
+            r
+        ''',
+        expected='range',
+    ),
+    FqnCase(
+        id='known_instance_method_wrapper',
+        kind='knownInstance',
+        # Wrapping a callable instance rather than a function makes this a
+        # MethodWrapper. The call expression is the wrapper; a class attribute
+        # holding it reads back as `Caller`, which the descriptor protocol unwraps.
+        source='''
+            class Caller:
+                def __call__(self, x: int) -> str:
+                    return ""
+
+            staticmethod(Caller())
+        ''',
+        expected='staticmethod',
+    ),
+    FqnCase(
+        id='special_form',
+        kind='specialForm',
+        # ty emits specialForm names qualified, so the descriptor's `name` is the FQN.
+        source='''
+            import typing
+
+            typing.Protocol
+        ''',
+        expected='typing.Protocol',
+    ),
+    FqnCase(
+        id='enum_member',
+        kind='enumLiteral',
+        source='''
+            from enum import Enum
+
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+
+            Color.RED
+        ''',
+        expected='test.Color',
+    ),
+    FqnCase(
+        id='typed_dict',
+        kind='typedDict',
+        source='''
+            from typing import TypedDict
+
+
+            class Movie(TypedDict):
+                name: str
+
+            m: Movie = {"name": "x"}
+            m
+        ''',
+        expected='test.Movie',
+    ),
+    FqnCase(
+        id='new_type',
+        kind='newType',
+        source='''
+            from typing import NewType
+
+            UserId = NewType("UserId", int)
+            u = UserId(1)
+            u
+        ''',
+        expected='test.UserId',
+    ),
+    FqnCase(
+        id='nested_class_instance',
+        kind='instance (nested)',
+        source='''
+            class Outer:
+                class Inner:
+                    pass
+
+            o = Outer.Inner()
+            o
+        ''',
+        expected='test.Outer.Inner',
+    ),
+)
+
+
+def _fqn(java_type) -> Optional[str]:
+    """The name a resolved type is keyed by, unwrapping a Parameterized to its raw
+    type (``list[int]`` is keyed by ``list``)."""
+    if isinstance(java_type, JavaType.Parameterized):
+        java_type = java_type._type
+    return (java_type.fully_qualified_name
+            if isinstance(java_type, JavaType.FullyQualified)
+            and not isinstance(java_type, JavaType.Unknown) else None)
+
+
+def _fqn_params(case: FqnCase):
+    return pytest.param(case, id=case.id)
+
+
+@requires_ty_types_cli
+class TestDescriptorFqnContract:
+    """The FQN each ty descriptor kind maps to, stated as a table. A dependency
+    type table resolves only when its entries carry the FQNs attribution mints at
+    parse time: an unqualified name fails to resolve and collides with its
+    namesakes.
+    """
+
+    @pytest.mark.parametrize('case', [_fqn_params(c) for c in _FQN_CASES])
+    def test_descriptor_maps_to_fqn(self, case: FqnCase):
+        mapping, tree, tmpdir, client = _make_mapping(case.source)
+        try:
+            resolved = mapping.type(tree.body[-1].value)
+            assert _fqn(resolved) == case.expected, \
+                f"{case.kind} mapped to {_fqn(resolved)!r}"
+            if case.type_parameters is not None:
+                assert isinstance(resolved, JavaType.Parameterized)
+                assert tuple(resolved._type_parameters) == case.type_parameters
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_same_named_typed_dicts_in_different_modules_stay_distinct(self):
+        source = '''
+            from typing import TypedDict
+
+            from other import Movie as OtherMovie
+
+
+            class Movie(TypedDict):
+                name: str
+
+            here: Movie = {"name": "x"}
+            there: OtherMovie = {"title": "y"}
+        '''
+        other = '''
+            from typing import TypedDict
+
+
+            class Movie(TypedDict):
+                title: str
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source, {'other.py': other})
+        try:
+            here = mapping.type(tree.body[-2].target)
+            there = mapping.type(tree.body[-1].target)
+            assert _fqn(here) != _fqn(there), \
+                f"both TypedDicts collapsed onto {_fqn(here)!r}"
+            assert _fqn(here) == 'test.Movie'
+            assert _fqn(there) == 'other.Movie'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestQualifiedNameForwardCompatibility:
+    """Descriptor-level coverage of ``_class_fqn`` and the declaring-type path,
+    driven from hand-built descriptors so each shape is pinned independently of
+    what a given ty-types build emits.
+    """
+
+    @staticmethod
+    def _resolve(descriptor, type_id=400):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[type_id] = descriptor
+        return mapping, mapping._resolve_type(type_id)
+
+    def test_nested_class_literal_uses_qualified_name(self):
+        _, result = self._resolve({
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner',
+        })
+        assert _fqn(result) == 'a.b.Outer.Inner'
+
+    def test_class_literal_falls_back_to_module_name(self):
+        _, result = self._resolve({
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+        })
+        assert _fqn(result) == 'a.b.Inner'
+
+    def test_nested_instance_uses_qualified_name(self):
+        mapping, result = self._resolve({
+            'kind': 'instance', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner',
+        })
+        assert _fqn(result) == 'a.b.Outer.Inner'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.b.Outer.Inner'
+
+    def test_builtins_stays_unqualified(self):
+        _, result = self._resolve({
+            'kind': 'instance', 'className': 'list', 'moduleName': 'builtins',
+            'qualifiedName': 'builtins.list',
+        })
+        assert _fqn(result) == 'list'
+
+    def test_typed_dict_uses_qualified_name(self):
+        mapping, result = self._resolve({
+            'kind': 'typedDict', 'name': 'Movie', 'qualifiedName': 'a.Movie',
+            'fields': [],
+        })
+        assert _fqn(result) == 'a.Movie'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.Movie'
+
+    def test_method_qualified_name_reduces_to_its_owning_class(self):
+        # A boundMethod's `qualifiedName` names the method; a declaring type is the
+        # class, so taking it verbatim would stop MethodMatcher binding anything.
+        mapping = PythonTypeMapping("", file_path=None)
+        desc = {'kind': 'boundMethod', 'className': 'C', 'moduleName': 'a',
+                'name': 'm', 'qualifiedName': 'a.C.m'}
+        assert _fqn(mapping._class_reference(desc)) == 'a.C'
+        assert _fqn(mapping._get_declaration_declaring_type(desc)) == 'a.C'
+
+    def test_member_named_after_its_own_class_keeps_the_class(self):
+        # `class Color(Enum): Color = 1` is legal, so a suffix match alone would
+        # strip the class segment and leave the module.
+        mapping = PythonTypeMapping("", file_path=None)
+        assert mapping._class_fqn({
+            'kind': 'enumLiteral', 'className': 'Color', 'memberName': 'Color',
+            'qualifiedName': 'a.Color'}) != 'a'
+
+    def test_absent_name_yields_no_fqn(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        assert mapping._class_fqn({'kind': 'newType', 'name': None,
+                                   'moduleName': 'a'}, 'name') == ''
+
+    def test_class_mid_resolution_is_not_named_by_its_placeholder(self):
+        # A cycle placeholder has no name yet, so the descriptor's own FQN is better.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'classLiteral', 'className': 'C',
+                                     'moduleName': 'a'}
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'C',
+                                     'moduleName': 'a', 'classId': 1}
+        mapping._resolving_type_ids.add(1)
+        assert _fqn(mapping._class_reference(mapping._type_registry[2])) == 'a.C'
+
+    def test_value_and_declaring_agree_when_only_the_class_is_qualified(self):
+        # ty may qualify classLiteral before instance. An explicit classId names the
+        # class outright, so both paths must take its FQN rather than the instance's.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner'}
+        mapping._type_registry[2] = {
+            'kind': 'instance', 'className': 'Inner', 'moduleName': 'a.b', 'classId': 1}
+        assert _fqn(mapping._resolve_type(2)) == 'a.b.Outer.Inner'
+        assert _fqn(mapping._resolve_declaring_type(2)) == 'a.b.Outer.Inner'
+
+    def test_same_name_in_another_module_is_not_borrowed_from_the_index(self):
+        # The classLiteral index is keyed by simple name, so without a classId it can
+        # offer an unrelated module's class; only an FQN match may be taken.
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral', 'className': 'Inner', 'moduleName': 'a.b',
+            'qualifiedName': 'a.b.Outer.Inner'}
+        mapping._class_literal_index['Inner'] = 1
+        mapping._type_registry[2] = {
+            'kind': 'instance', 'className': 'Inner', 'moduleName': 'z',
+            'qualifiedName': 'z.Inner'}
+        assert _fqn(mapping._resolve_type(2)) == 'z.Inner'
+        assert _fqn(mapping._resolve_declaring_type(2)) == 'z.Inner'
+
+    def test_member_qualified_enum_name_resolves_to_the_class(self):
+        # Holds under either reading of `qualifiedName` on a member descriptor.
+        _, result = self._resolve({
+            'kind': 'enumLiteral', 'className': 'Color', 'memberName': 'RED',
+            'qualifiedName': 'a.Color.RED',
+        })
+        assert _fqn(result) == 'a.Color'
+
+    def test_new_type_uses_qualified_name(self):
+        mapping, result = self._resolve({
+            'kind': 'newType', 'name': 'UserId', 'qualifiedName': 'a.UserId',
+        })
+        assert _fqn(result) == 'a.UserId'
+        # An invocation binds only when the declaring path agrees.
+        assert _fqn(mapping._resolve_declaring_type(400)) == 'a.UserId'
+
+    def test_enum_literal_uses_qualified_name(self):
+        _, result = self._resolve({
+            'kind': 'enumLiteral', 'className': 'Color', 'memberName': 'RED',
+            'qualifiedName': 'a.Color',
+        })
+        assert _fqn(result) == 'a.Color'
+        assert result._kind == JavaType.FullyQualified.Kind.Enum
+
+    def test_enum_complement_uses_module_name(self):
+        # enumComplement carries moduleName, so the fallback qualifies it — this
+        # row holds whether or not the descriptor gains `qualifiedName`.
+        _, result = self._resolve({
+            'kind': 'enumComplement', 'className': 'Color', 'moduleName': 'a',
+            'excludedNames': ['RED'],
+        })
+        assert _fqn(result) == 'a.Color'
+        assert result._kind == JavaType.FullyQualified.Kind.Enum
+
+    def test_type_alias_fallback_uses_qualified_name(self):
+        _, result = self._resolve({
+            'kind': 'typeAlias', 'name': 'Alias', 'qualifiedName': 'a.Alias',
+        })
+        assert _fqn(result) == 'a.Alias'
+
 
 
 @requires_ty_types_cli
@@ -3840,11 +4925,14 @@ class TestDecoratorAttribution:
         assert not (isinstance(t, JavaType.Class) and
                     t.fully_qualified_name == 'deco.require'), f"falsely attributed {t!r}"
 
-    # A package re-exporting from a private module, the shape pytest and click have
+    # A package re-exporting from a private module, the shape pytest and click have.
+    # `require` is what an untyped factory produced, so ty has no type for it.
     PACKAGE = {
         'pkg/__init__.py': '',
-        'pkg/_impl.py': 'def tag(fn):\n    return fn\n',
-        'pkg/api.py': 'from pkg._impl import tag\n',
+        'pkg/_impl.py': 'def tag(fn):\n    return fn\n\n\n'
+                        'def factory(m):\n    def d(fn):\n        return fn\n    return d\n\n\n'
+                        'require = factory("GET")\n',
+        'pkg/api.py': 'from pkg._impl import tag, require\n',
     }
 
     def _assert_named_in_package(self, src, fqn):
@@ -3869,15 +4957,36 @@ class TestDecoratorAttribution:
     def test_decorator_the_file_defines_itself(self):
         self._assert_named('def wrap(fn):\n    return fn\n\n@wrap\ndef f():\n    pass\n', 'm.wrap')
 
-    def test_dotted_decorator_names_the_module_re_exporting_it(self):
+    def test_decorator_names_the_module_defining_it(self):
         self._assert_named_in_package(
-            'import pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')
+            'import pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg._impl.tag')
 
-    def test_re_export_survives_an_unrelated_rebinding_of_the_name(self):
         self._assert_named_in_package(
-            'from pkg.api import tag\n\ndef g(tag):\n    return tag\n\n@tag\ndef f():\n    pass\n',
-            'pkg.api.tag')
+            'from pkg.api import tag\n\n@tag\ndef f():\n    pass\n', 'pkg._impl.tag')
 
-    def test_a_package_and_its_submodule_bind_the_same_root(self):
+    def test_an_untyped_decorator_names_the_module_defining_it(self):
         self._assert_named_in_package(
-            'import pkg\nimport pkg.api\n\n@pkg.api.tag\ndef f():\n    pass\n', 'pkg.api.tag')
+            'import pkg\nimport pkg.api\n\n@pkg.api.require\ndef f():\n    pass\n',
+            'pkg._impl.require')
+
+        # A star import spells no name at all, so only the binding can name what it binds.
+        self._assert_named_in_package(
+            'from pkg.api import *\n\n@require\ndef f():\n    pass\n', 'pkg._impl.require')
+
+
+class TestSessionTypeFallback:
+    """A file's registry reads the ty session's descriptors without copying them in."""
+
+    def test_a_files_own_descriptor_comes_first_then_the_sessions(self):
+        session = {1: {'kind': 'instance', 'className': 'int'},
+                   2: {'kind': 'instance', 'className': 'str'}}
+        registry = _WithFallback(session)
+        registry[2] = {'kind': 'instance', 'className': 'bytes'}
+
+        assert registry.get(1) is session[1]
+        assert registry.get(2) == {'kind': 'instance', 'className': 'bytes'}
+        assert registry.get(3) is None
+        assert registry.get(3, {}) == {}
+        # Iterating and membership see only the file's own descriptors.
+        assert list(registry) == [2]
+        assert 1 not in registry

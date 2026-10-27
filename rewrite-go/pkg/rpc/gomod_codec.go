@@ -46,9 +46,9 @@ func init() {
 
 func sendGoMod(gm *golang.GoMod, q *SendQueue) {
 	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Ident.String() }, nil)
-	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Prefix },
+	q.GetAndSend(gm, func(v any) any { return spaceRef(v.(*golang.GoMod).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Markers },
+	q.GetAndSend(gm, func(v any) any { return AsRef(v.(*golang.GoMod).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).SourcePath }, nil)
 	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Charset }, nil)
@@ -59,16 +59,16 @@ func sendGoMod(gm *golang.GoMod, q *SendQueue) {
 		func(v any) []any { return goModStmtSlice(v.(*golang.GoMod).Statements) },
 		goModStmtRPID,
 		func(v any) { sendGoModRightPadded(v, q) })
-	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Eof },
+	q.GetAndSend(gm, func(v any) any { return spaceRef(v.(*golang.GoMod).Eof) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 }
 
 func sendGoModRightPadded(rp any, q *SendQueue) {
 	q.GetAndSend(rp, func(v any) any { return v.(java.RightPadded[golang.GoModStatement]).Element },
 		func(v any) { sendGoModStatement(v.(golang.GoModStatement), q) })
-	q.GetAndSend(rp, func(v any) any { return v.(java.RightPadded[golang.GoModStatement]).After },
+	q.GetAndSend(rp, func(v any) any { return spaceRef(v.(java.RightPadded[golang.GoModStatement]).After) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(rp, func(v any) any { return v.(java.RightPadded[golang.GoModStatement]).Markers },
+	q.GetAndSend(rp, func(v any) any { return AsRef(v.(java.RightPadded[golang.GoModStatement]).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
 
@@ -83,9 +83,9 @@ func sendGoModStatement(s golang.GoModStatement, q *SendQueue) {
 
 func sendGoModDirective(d *golang.GoModDirective, q *SendQueue) {
 	q.GetAndSend(d, func(v any) any { return v.(*golang.GoModDirective).Ident.String() }, nil)
-	q.GetAndSend(d, func(v any) any { return v.(*golang.GoModDirective).Prefix },
+	q.GetAndSend(d, func(v any) any { return spaceRef(v.(*golang.GoModDirective).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(d, func(v any) any { return v.(*golang.GoModDirective).Markers },
+	q.GetAndSend(d, func(v any) any { return AsRef(v.(*golang.GoModDirective).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(d, func(v any) any { return v.(*golang.GoModDirective).Keyword }, nil)
 	q.GetAndSendList(d,
@@ -96,26 +96,26 @@ func sendGoModDirective(d *golang.GoModDirective, q *SendQueue) {
 
 func sendGoModBlock(b *golang.GoModBlock, q *SendQueue) {
 	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).Ident.String() }, nil)
-	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).Prefix },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*golang.GoModBlock).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).Markers },
+	q.GetAndSend(b, func(v any) any { return AsRef(v.(*golang.GoModBlock).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).Keyword }, nil)
-	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).BeforeLParen },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*golang.GoModBlock).BeforeLParen) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSendList(b,
 		func(v any) []any { return goModStmtSlice(v.(*golang.GoModBlock).Entries) },
 		goModStmtRPID,
 		func(v any) { sendGoModRightPadded(v, q) })
-	q.GetAndSend(b, func(v any) any { return v.(*golang.GoModBlock).BeforeRParen },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*golang.GoModBlock).BeforeRParen) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 }
 
 func sendGoModValue(val *golang.GoModValue, q *SendQueue) {
 	q.GetAndSend(val, func(v any) any { return v.(*golang.GoModValue).Ident.String() }, nil)
-	q.GetAndSend(val, func(v any) any { return v.(*golang.GoModValue).Prefix },
+	q.GetAndSend(val, func(v any) any { return spaceRef(v.(*golang.GoModValue).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(val, func(v any) any { return v.(*golang.GoModValue).Markers },
+	q.GetAndSend(val, func(v any) any { return AsRef(v.(*golang.GoModValue).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(val, func(v any) any { return v.(*golang.GoModValue).Text }, nil)
 }
@@ -245,9 +245,6 @@ func recvGoModMarkers(q *ReceiveQueue, before java.Markers) java.Markers {
 }
 
 func goModStmtSlice(s []java.RightPadded[golang.GoModStatement]) []any {
-	if s == nil {
-		return nil
-	}
 	out := make([]any, len(s))
 	for i, v := range s {
 		out[i] = v
@@ -256,9 +253,6 @@ func goModStmtSlice(s []java.RightPadded[golang.GoModStatement]) []any {
 }
 
 func goModValueSlice(s []*golang.GoModValue) []any {
-	if s == nil {
-		return nil
-	}
 	out := make([]any, len(s))
 	for i, v := range s {
 		out[i] = v

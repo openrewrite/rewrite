@@ -19,6 +19,7 @@ import dotty.tools.dotc.ast.{Trees, untpd, tpd}
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
@@ -28,8 +29,12 @@ import org.openrewrite.java.marker.Quoted
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
+import org.openrewrite.scala.marker.EtaExpansion
 import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.ImplicitArguments
+import org.openrewrite.scala.marker.ImplicitConversion
+import org.openrewrite.scala.marker.ImplicitImport
 import org.openrewrite.scala.marker.InfixTypeNotation
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -52,6 +57,7 @@ import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
 import org.openrewrite.scala.marker.RightAssociative
+import org.openrewrite.scala.marker.UnicodeArrow
 import org.openrewrite.scala.marker.ValVarKeyword
 import org.openrewrite.scala.tree.S
 
@@ -69,8 +75,17 @@ class ScalaTreeVisitor(
 )(implicit ctx: Context) {
 
   private var cursor = 0
+  private var lastConsumedSemicolon = -1
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
+  private var inPattern = false
+  private val namedArgumentCalls = new java.util.IdentityHashMap[Trees.NamedArg[?], Trees.Apply[?]]()
+
+  private def patternContext[T](pattern: Boolean)(visit: => T): T = {
+    val saved = inPattern
+    inPattern = pattern
+    try visit finally inPattern = saved
+  }
 
   /** Look up JavaType by span (primary) or name (fallback). */
   private def typeFor(span: Spans.Span): JavaType = typeMapping.map(_.typeFor(span)).orNull
@@ -87,6 +102,35 @@ class ScalaTreeVisitor(
   /** Resolve a fully-qualified type name to a JavaType. */
   private def typeForFqn(fqn: String): JavaType = typeMapping.map(_.typeForFqn(fqn)).orNull
 
+  private def ofNode[T](tree: Trees.Tree[?])(lookup: (ScalaTypeMapping, untpd.Tree) => Option[T]): Option[T] =
+    typeMapping.flatMap(lookup(_, tree.asInstanceOf[untpd.Tree]))
+
+  /** Look up JavaType by the node's own typed tree, falling back to its span. */
+  private def typeAt(tree: Trees.Tree[?]): JavaType =
+    ofNode(tree)(_.typeOf(_)).getOrElse(typeFor(tree.span))
+
+  private def methodTypeAt(tree: Trees.Tree[?]): JavaType.Method =
+    ofNode(tree)(_.methodTypeOf(_)).getOrElse(methodTypeFor(tree.span))
+
+  private def variableTypeAt(tree: Trees.Tree[?]): JavaType.Variable =
+    ofNode(tree)(_.variableTypeOf(_)).getOrElse(variableTypeFor(tree.span))
+
+  /** Mark what the typer did to the node's value beyond typing it as written. */
+  private def withAdaptationMarkers(tree: Trees.Tree[?], j: J): J = {
+    if (j == null || typeMapping.isEmpty) return j
+    var markers = j.getMarkers
+    ofNode(tree)(_.implicitConversionOf(_)).foreach { (conversion, convertedType) =>
+      markers = markers.computeByType(new ImplicitConversion(Tree.randomId(), conversion, convertedType), (_, m) => m)
+    }
+    ofNode(tree)(_.etaExpansionOf(_)).foreach { (method, functionType) =>
+      markers = markers.computeByType(new EtaExpansion(Tree.randomId(), method, functionType), (_, m) => m)
+    }
+    ofNode(tree)(_.implicitArgumentsOf(_)).foreach { arguments =>
+      markers = markers.computeByType(new ImplicitArguments(Tree.randomId(), arguments), (_, m) => m)
+    }
+    if (markers eq j.getMarkers) j else j.withMarkers(markers)
+  }
+
   /** Dotty sometimes produces an extra erroneous ValDef/TypeDef element in a comma-separated
     * list when the source has a trailing comma (e.g. `class Foo(x: Int,)` produces two ValDef
     * entries — the real `x` and an `<error>` artifact). Strip it so the LST has the right count. */
@@ -102,11 +146,18 @@ class ScalaTreeVisitor(
     } else nodes
   }
 
-  /** Extract JavaType from a tree node: try span-based, then direct .tpe, then name-based. */
+  /** Extract JavaType from a tree node: try its own typed tree, then span-based, then direct .tpe, then name-based. */
   private def typeOfTree(tree: Trees.Tree[?]): JavaType = {
-    // 1. Span-based lookup (matches untpd spans to tpd tree via start position)
+    ofNode(tree)(_.typeOf(_)) match {
+      case Some(t) => return t
+      case None =>
+    }
+    // 1. Span-based lookup (matches untpd spans to tpd tree via source range)
     if (tree.span.exists) {
-      val result = typeFor(tree.span)
+      val result = tree match {
+        case _: untpd.Function => typeMapping.map(_.closureTypeFor(tree.span)).orNull
+        case _ => typeFor(tree.span)
+      }
       if (result != null) return result
     }
     // 2. Direct .tpe (works if tree is already typed)
@@ -137,6 +188,10 @@ class ScalaTreeVisitor(
 
   /** Extract JavaType.Method from a tree node. */
   private def methodTypeOfTree(tree: Trees.Tree[?]): JavaType.Method = {
+    ofNode(tree)(_.methodTypeOf(_)) match {
+      case Some(t) => return t
+      case None =>
+    }
     // 1. Span-based lookup
     if (tree.span.exists) {
       val result = methodTypeFor(tree.span)
@@ -175,6 +230,10 @@ class ScalaTreeVisitor(
 
   /** Extract JavaType.Variable from a tree node. */
   private def variableTypeOfTree(tree: Trees.Tree[?]): JavaType.Variable = {
+    ofNode(tree)(_.variableTypeOf(_)) match {
+      case Some(t) => return t
+      case None =>
+    }
     // 1. Span-based lookup
     if (tree.span.exists) {
       val result = variableTypeFor(tree.span)
@@ -212,6 +271,23 @@ class ScalaTreeVisitor(
   }
   
   def visitTree(tree: Trees.Tree[?]): J = {
+    rememberNamedArgumentCalls(tree)
+    withAdaptationMarkers(tree, visitTreeAsWritten(tree))
+  }
+
+  /** Curried calls map their inner applications without visiting them as trees of their own. */
+  private def rememberNamedArgumentCalls(tree: Trees.Tree[?]): Unit = tree match {
+    case app: Trees.Apply[?] =>
+      app.args.foreach {
+        case namedArg: Trees.NamedArg[?] => namedArgumentCalls.put(namedArg, app)
+        case _ =>
+      }
+      rememberNamedArgumentCalls(app.fun)
+    case typeApply: Trees.TypeApply[?] => rememberNamedArgumentCalls(typeApply.fun)
+    case _ =>
+  }
+
+  private def visitTreeAsWritten(tree: Trees.Tree[?]): J = {
     tree match {
       // `Trees.TypeTree.isEmpty` returns true for compiler-synthesized inferred types
       // (because they have no symbol yet in the untyped tree), so this case must come
@@ -282,7 +358,11 @@ class ScalaTreeVisitor(
       throw unmappedException(lit)
     }
     val prefix = extractPrefix(lit.span)
-    val value = lit.const.value
+    val value = lit.const.value match {
+      case s: String => escapeLoneSurrogates(s)
+      case c: Character if Character.isSurrogate(c) => escapeLoneSurrogates(c.toString)
+      case v => v
+    }
     val valueSource = extractSource(lit.span)
     val javaType = constantToJavaType(lit.const)
     
@@ -295,6 +375,31 @@ class ScalaTreeVisitor(
       Collections.emptyList(),
       javaType
     )
+  }
+
+  /**
+   * Jackson's Smile writer rejects a lone surrogate, so the literal's value spells each one as its
+   * `\uXXXX` escape. A surrogate pair is a valid code point and stays decoded.
+   */
+  private def escapeLoneSurrogates(s: String): String = {
+    var sb: java.lang.StringBuilder = null
+    var i = 0
+    while (i < s.length) {
+      val c = s.charAt(i)
+      if (Character.isHighSurrogate(c) && i + 1 < s.length && Character.isLowSurrogate(s.charAt(i + 1))) {
+        if (sb != null) sb.append(c).append(s.charAt(i + 1))
+        i += 2
+      } else {
+        if (Character.isSurrogate(c)) {
+          if (sb == null) sb = new java.lang.StringBuilder(s.length + 5).append(s, 0, i)
+          sb.append("\\u").append(Integer.toHexString(c).toUpperCase)
+        } else if (sb != null) {
+          sb.append(c)
+        }
+        i += 1
+      }
+    }
+    if (sb == null) s else sb.toString
   }
   
   private def visitNumber(num: untpd.Number): J.Literal = {
@@ -406,9 +511,16 @@ class ScalaTreeVisitor(
     
     if (isAnnotationPattern) {
       // This is an annotation - convert to J.Annotation
-      return visitAnnotation(app)
+      return patternContext(pattern = false)(visitAnnotation(app))
     }
-    
+
+    if (inPattern) app.fun match {
+      case sel: Trees.Select[?] if sel.name.toString == "<init>" =>
+      case id: Trees.Ident[?] if id.name.toString == "<init>" =>
+      case _: Trees.Ident[?] | _: Trees.Select[?] | _: Trees.TypeApply[?] => return visitExtractorPattern(app)
+      case _ =>
+    }
+
     app.fun match {
       case newTree: Trees.New[?] =>
         // This is a constructor call with arguments (shouldn't happen in Scala 3)
@@ -509,7 +621,7 @@ class ScalaTreeVisitor(
         }
 
         updateCursor(app.span.end)
-        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val mt = methodTypeAt(app)
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         new J.MethodInvocation(Tree.randomId(), prefix,
@@ -560,7 +672,7 @@ class ScalaTreeVisitor(
     val closeParen = positionOfNext(")", cursor)
     if (closeParen >= 0) cursor = closeParen + 1
     updateCursor(app.span.end)
-    val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+    val mt = methodTypeAt(app)
     new J.MethodInvocation(Tree.randomId(), prefix, Markers.EMPTY,
       null, null, nameId,
       JContainer.build(argsBefore, args, Markers.EMPTY), mt)
@@ -576,7 +688,7 @@ class ScalaTreeVisitor(
       Markers.EMPTY,
       JLeftPadded.build(operator),
       expr,
-      typeFor(sel.span)
+      typeAt(sel)
     )
   }
 
@@ -611,7 +723,7 @@ class ScalaTreeVisitor(
     // Create the annotation type: an Ident for a simple name (@deprecated) or a
     // Select chain for a qualified name (@scala.annotation.implicitNotFound).
     val annotTypeTree: NameTree = tpt match {
-      case id: Trees.Ident[?] => ident(id.name.toString)
+      case id: Trees.Ident[?] => ident(id.name.toString, typeInfo = typeAt(id), quoted = isBacktickQuoted(id.span))
       case sel: Trees.Select[?] =>
         // Qualified name: skip the leading '@', then map the Select chain to a J.FieldAccess.
         val selStart = Math.max(0, sel.span.start - offsetAdjustment)
@@ -764,10 +876,10 @@ class ScalaTreeVisitor(
           Markers.EMPTY,
           JRightPadded.build(expr),
           null, // No type parameters for now
-          JLeftPadded.build(ident("_", spaceBeforeUnderscore, typeFor(postfixOp.span))),
-          typeFor(postfixOp.span),
-          methodTypeFor(postfixOp.span),
-          variableTypeFor(postfixOp.span)
+          JLeftPadded.build(ident("_", spaceBeforeUnderscore, typeAt(postfixOp))),
+          typeAt(postfixOp),
+          methodTypeAt(postfixOp),
+          variableTypeAt(postfixOp)
         )
         
       case _ =>
@@ -794,7 +906,7 @@ class ScalaTreeVisitor(
 
         updateCursor(postfixOp.span.end)
 
-        val name = ident(opName, namePrefix, typeFor(postfixOp.op.span), quoted = opQuoted)
+        val name = ident(opName, namePrefix, typeAt(postfixOp.op), quoted = opQuoted)
 
         val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
         markersList.add(InfixNotation.create())
@@ -807,7 +919,7 @@ class ScalaTreeVisitor(
           null,
           name,
           JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Expression]](), Markers.EMPTY),
-          methodTypeFor(postfixOp.span)
+          methodTypeAt(postfixOp)
         )
     }
   }
@@ -823,11 +935,17 @@ class ScalaTreeVisitor(
   private def visitFunctionApplication(app: Trees.Apply[?], id: Trees.Ident[?]): J.MethodInvocation = {
     val prefix = extractPrefix(app.span)
 
-    // In Scala, arr(0) is syntactic sugar for arr.apply(0)
-    // We'll represent it as a method invocation with "apply" as the method name
-
-    // The select is the identifier (e.g., "arr")
-    val select = visitIdent(id).asInstanceOf[Expression]
+    // `greet(x)` calling a method `greet` maps like Java's unqualified call: no select, name `greet`.
+    // `arr(0)`, `f(x)`, `List(1)` desugar to `<ident>.apply(...)`: select is the identifier, name is `apply`.
+    val methodType = methodTypeOfTree(app)
+    val callee = visitIdent(id).asInstanceOf[Expression]
+    val directCallName: Option[J.Identifier] = callee match {
+      case name: J.Identifier if name.getSimpleName != "apply" && (
+        if (methodType != null) methodType.getName == name.getSimpleName
+        else typeMapping.exists(_.refersToMethodWithParameters(id.asInstanceOf[untpd.Tree]))) =>
+        Some(name.withType(methodType).withFieldType(null))
+      case _ => None
+    }
 
     // Detect argument delimiter form:
     //   `{ ... }` — block argument (`Seq { 1 }`)
@@ -842,8 +960,9 @@ class ScalaTreeVisitor(
     val args = new util.ArrayList[JRightPadded[Expression]]()
     var argContainerPrefix = Space.EMPTY
     val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
-    import org.openrewrite.scala.marker.FunctionApplication
-    markers.add(FunctionApplication.create())
+    if (directCallName.isEmpty) {
+      markers.add(FunctionApplication.create())
+    }
 
     if (isBlockArg) {
       // Block argument: Seq { 1 } — mark as block arg and visit args directly
@@ -924,17 +1043,20 @@ class ScalaTreeVisitor(
       }
     }
 
-    val methodName = ident("apply")
+    val (select, methodName) = directCallName match {
+      case Some(name) => (null, name)
+      case None => (JRightPadded.build(callee), ident("apply"))
+    }
 
     new J.MethodInvocation(
       Tree.randomId(),
       prefix,
       Markers.build(markers),
-      JRightPadded.build(select),
+      select,
       null, // typeParameters
       methodName,
       JContainer.build(argContainerPrefix, args, Markers.EMPTY),
-      methodTypeOfTree(app)
+      methodType
     )
   }
 
@@ -958,7 +1080,7 @@ class ScalaTreeVisitor(
             // Preserve full source including ()
             val text = extractSource(app.span)
             updateCursor(app.span.end)
-            return ident(text, prefix, typeFor(app.span))
+            return ident(text, prefix, typeAt(app))
           case _ =>
             // Continue with regular method invocation (including explicit .apply() calls)
         }
@@ -1044,7 +1166,7 @@ class ScalaTreeVisitor(
           val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
           if (adjustedEnd > cursor && adjustedEnd <= source.length) cursor = adjustedEnd
         }
-        val methodType = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val methodType = methodTypeAt(app)
 
         val fn = asExpression(visitApply(innerApp))
         val innerEnd = Math.max(0, innerApp.span.end - offsetAdjustment)
@@ -1137,7 +1259,7 @@ class ScalaTreeVisitor(
           val end = Math.max(0, app.span.end - offsetAdjustment)
           if (end > cursor && end <= source.length) cursor = end
         }
-        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val mt = methodTypeAt(app)
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         return new J.MethodInvocation(Tree.randomId(), prefix,
@@ -1323,7 +1445,7 @@ class ScalaTreeVisitor(
       Markers.EMPTY,
       array,
       dimension,
-      typeFor(app.span)
+      typeAt(app)
     )
   }
 
@@ -1370,7 +1492,7 @@ class ScalaTreeVisitor(
       typeExpression,
       dimensions,
       initializer,
-      typeFor(app.span)
+      typeAt(app)
     )
   }
 
@@ -1528,12 +1650,13 @@ class ScalaTreeVisitor(
         faMarkers,
         target,
         new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
-        null
+        name.getType
       )
     }
   }
   
   private def visitInfixOp(infixOp: untpd.InfixOp): J = {
+    if (inPattern) return visitInfixExtractorPattern(infixOp)
     val opName = infixOp.op.name.toString
 
     // Compound assignment like +=, -=, *=, etc. Must end with a single '=' and base
@@ -1754,6 +1877,88 @@ class ScalaTreeVisitor(
     )
   }
 
+  /**
+   * An extractor pattern `Some(v)`, `Array(x, y)` or `NonFatal(e)` is a call of the extractor's
+   * `unapply` or `unapplySeq` that matches rather than constructs, so it maps to a
+   * `J.DeconstructionPattern` like a Java record pattern instead of an invocation.
+   */
+  private def visitExtractorPattern(app: Trees.Apply[?]): J.DeconstructionPattern = {
+    val prefix = extractPrefix(app.span)
+    val extractor = patternContext(pattern = false)(app.fun match {
+      case ta: Trees.TypeApply[?] => visitParameterizedType(ta, ta.fun, ta.args)
+      case fun => visitTree(fun)
+    })
+    if (extractor == null) throw unmappedException(app.fun)
+    val deconstructor = withExtractorType(extractor, methodTypeOfTree(app))
+
+    val openParen = positionOfNext("(")
+    val beforeParen = if (openParen > cursor) ScalaSpace.format(source, cursor, openParen) else Space.EMPTY
+    if (openParen >= 0) cursor = openParen + 1
+    val nested = new util.ArrayList[JRightPadded[J]]()
+    if (app.args.isEmpty) {
+      val closeParen = positionOfNext(")")
+      if (closeParen > cursor) {
+        nested.add(JRightPadded.build(new J.Empty(Tree.randomId(), ScalaSpace.format(source, cursor, closeParen), Markers.EMPTY)))
+      }
+    }
+    for ((arg, i) <- app.args.zipWithIndex) {
+      val pattern = visitTree(arg)
+      if (pattern == null) throw unmappedException(arg)
+      val argEnd = Math.max(cursor, Math.max(0, arg.span.end - offsetAdjustment))
+      val isLast = i == app.args.length - 1
+      val delimiter = positionOfNext(if (isLast) ")" else ",", argEnd)
+      val trailingComma = if (isLast) positionOfNext(",", argEnd) else -1
+      val padded = if (trailingComma >= 0 && trailingComma < delimiter) {
+        val beforeComma = if (trailingComma > argEnd) ScalaSpace.format(source, argEnd, trailingComma) else Space.EMPTY
+        val after = if (delimiter > trailingComma + 1) ScalaSpace.format(source, trailingComma + 1, delimiter) else Space.EMPTY
+        new JRightPadded[J](pattern, after, Markers.EMPTY.add(TrailingComma.create(beforeComma)))
+      } else {
+        JRightPadded.build(pattern).withAfter(if (delimiter > argEnd) ScalaSpace.format(source, argEnd, delimiter) else Space.EMPTY)
+      }
+      if (delimiter >= 0) cursor = delimiter + 1
+      nested.add(padded)
+    }
+    updateCursor(app.span.end)
+
+    new J.DeconstructionPattern(Tree.randomId(), prefix, Markers.EMPTY, deconstructor,
+      JContainer.build(beforeParen, nested, Markers.EMPTY), typeOfTree(app))
+  }
+
+  /** An infix extractor pattern such as `h :: t`, which matches `::(h, t)`. */
+  private def visitInfixExtractorPattern(infixOp: untpd.InfixOp): J.DeconstructionPattern = {
+    val prefix = extractPrefix(infixOp.span)
+    val left = visitTree(infixOp.left)
+    if (left == null) throw unmappedException(infixOp.left)
+
+    val opStart = Math.max(0, infixOp.op.span.start - offsetAdjustment)
+    val beforeOp = if (opStart > cursor) ScalaSpace.format(source, cursor, opStart) else Space.EMPTY
+    cursor = Math.max(cursor, Math.max(0, infixOp.op.span.end - offsetAdjustment))
+    val op = withExtractorType(
+      ident(infixOp.op.name.toString, beforeOp, quoted = isBacktickQuoted(infixOp.op.span)),
+      methodTypeOfTree(infixOp))
+
+    val right = visitTree(infixOp.right)
+    if (right == null) throw unmappedException(infixOp.right)
+    updateCursor(infixOp.span.end)
+
+    val nested = new util.ArrayList[JRightPadded[J]]()
+    nested.add(JRightPadded.build(left))
+    nested.add(JRightPadded.build(right))
+    new J.DeconstructionPattern(Tree.randomId(), prefix, Markers.build(Collections.singletonList(InfixNotation.create())),
+      op, JContainer.build(Space.EMPTY, nested, Markers.EMPTY), typeOfTree(infixOp))
+  }
+
+  /** An extractor name the typer left untyped, like the operator of `h :: t`, is typed by the owner of its `unapply`. */
+  private def withExtractorType(extractor: J, unapply: JavaType.Method): Expression = {
+    val extractorType = if (unapply == null) null else unapply.getDeclaringType
+    extractor match {
+      case id: J.Identifier if extractorType != null && (id.getType == null || id.getType.isInstanceOf[JavaType.Unknown]) =>
+        id.withType(extractorType)
+      case e: Expression => e
+      case _ => throw new IllegalStateException(s"Extractor did not map to an Expression: ${extractor.getClass.getName}")
+    }
+  }
+
   private def visitParentheses(parens: untpd.Parens): J = {
     // Extract prefix - but check if cursor is already at the opening paren
     val adjustedStart = Math.max(0, parens.span.start - offsetAdjustment)
@@ -1863,9 +2068,7 @@ class ScalaTreeVisitor(
     
     // Visit the type being instantiated
     val clazz = visitTree(newTree.tpt) match {
-      case typeTree: TypeTree => typeTree.withPrefix(typeSpace)
-      case id: J.Identifier => id.withPrefix(typeSpace)
-      case fieldAccess: J.FieldAccess => fieldAccess.withPrefix(typeSpace)
+      case typeTree: TypeTree => typeTree.withPrefix[TypeTree](typeSpace)
       case _ => throw unmappedException(app)
     }
     
@@ -1989,7 +2192,7 @@ class ScalaTreeVisitor(
       clazz,
       argContainer,
       null, // body for anonymous classes
-      {
+      ofNode(app)(_.methodTypeOf(_)).getOrElse {
         // Try span-based lookup first
         val mt = methodTypeOfTree(app)
         if (mt != null) mt
@@ -2053,7 +2256,7 @@ class ScalaTreeVisitor(
 
         // Extract the first parent's class type and constructor arguments (if any).
         // For multi-parent (mixin) Templates, only the first parent may carry args.
-        val (firstClazz, args): (TypeTree, JContainer[Expression]) = parents.headOption match {
+        val (firstClazz, args) = parents.headOption match {
           case None =>
             // `new {}` — no parents at all (anonymous class extending the implicit Object)
             (null, null)
@@ -2272,15 +2475,20 @@ class ScalaTreeVisitor(
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
+          val bodyEnd = if (newTree.span.exists) Math.max(0, newTree.span.end - offsetAdjustment) else source.length
+          if (!isBraceless) {
+            consumeEmptyStatements(bodyEnd, statementPaddings)
+          }
 
-          bodyStatements.foreach { stmt =>
-            val stmtJ = visitTree(stmt)
-            if (stmtJ.isInstanceOf[Statement]) {
-              statementPaddings.add(new JRightPadded[Statement](
-                stmtJ.asInstanceOf[Statement],
-                Space.EMPTY,
-                Markers.EMPTY
-              ))
+          for (idx <- bodyStatements.indices) {
+            val stmt = bodyStatements(idx)
+            visitTree(stmt) match {
+              case stmtJ: Statement =>
+                val nextStart = if (idx + 1 < bodyStatements.size) {
+                  Math.max(0, bodyStatements(idx + 1).span.start - offsetAdjustment)
+                } else bodyEnd
+                addStatement(statementPaddings, stmtJ, Math.max(0, stmt.span.end - offsetAdjustment), nextStart)
+              case _ =>
             }
           }
 
@@ -2350,7 +2558,7 @@ class ScalaTreeVisitor(
         new J.Import(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
+          implicitImportMarkers(imp, Markers.EMPTY),
           JLeftPadded.build(false),
           qualid,
           null
@@ -2398,7 +2606,7 @@ class ScalaTreeVisitor(
     keyword: String
   ): ImportShape.Value = {
     val text = spanSource(tree)
-    val hasBraces = text.contains("{") || text.contains(" as ") || text.contains("=>")
+    val hasBraces = text.contains("{") || text.contains(" as ") || containsArrow(text, "=>")
     val startsWithKeyword = text.trim.startsWith(keyword)
     if (startsWithKeyword) {
       if (hasBraces) ImportShape.Brace else ImportShape.Simple
@@ -2436,7 +2644,7 @@ class ScalaTreeVisitor(
     val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
 
     if (keyword == "import") {
-      new J.Import(Tree.randomId(), prefix, markers, JLeftPadded.build(false), qualid, null)
+      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(false), qualid, null)
     } else {
       new S.Export(Tree.randomId(), prefix, markers, qualid)
     }
@@ -2463,9 +2671,9 @@ class ScalaTreeVisitor(
             if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
             val selName = wildcardOrName(is, sIdent, tree.span)
             val selQuoted = cursor < source.length && source.charAt(cursor) == '`'
-            val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
+            val imported = importedBySelector(tree, is, selName)
             new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              id, JLeftPadded.build(ident(selName, Space.EMPTY, selectorType, quoted = selQuoted)), selectorType)
+              id, JLeftPadded.build(ident(selName, Space.EMPTY, imported.nameType, imported.variable, quoted = selQuoted)), imported.symbolType)
           case _ =>
             throw new IllegalStateException("Unexpected non-simple selector in continuation")
         }
@@ -2483,9 +2691,9 @@ class ScalaTreeVisitor(
           if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
           val selectorName = wildcardOrName(is, idTree, tree.span)
           val selectorQuoted = cursor < source.length && source.charAt(cursor) == '`'
-          val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
+          val imported = importedBySelector(tree, is, selectorName)
           qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, selectorType, quoted = selectorQuoted)), selectorType)
+            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, imported.nameType, imported.variable, quoted = selectorQuoted)), imported.symbolType)
         case _ =>
       }
     }
@@ -2616,7 +2824,7 @@ class ScalaTreeVisitor(
       val p = indexOfNextNonWhitespace(selStart)
       val selPrefix = ScalaSpace.format(source.substring(selStart, p))
       cursor = p
-      val selectorNode = parseImportSelector(sel)
+      val selectorNode = parseImportSelector(tree, keyword, sel)
       selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), Space.EMPTY, Markers.EMPTY))
       if (cursor < adjustedEnd) cursor = adjustedEnd
       val selectorContainerB: JContainer[S.ImportSelector] =
@@ -2650,7 +2858,7 @@ class ScalaTreeVisitor(
       val selPrefix = ScalaSpace.format(source.substring(selStart, p))
       cursor = p
 
-      val selectorNode = parseImportSelector(sel)
+      val selectorNode = parseImportSelector(tree, keyword, sel)
 
       val afterSel = cursor
       val q = indexOfNextNonWhitespace(afterSel)
@@ -2708,7 +2916,7 @@ class ScalaTreeVisitor(
    * The prefix space is set by the caller; this method produces a selector
    * with `Space.EMPTY` prefix.
    */
-  private def parseImportSelector(sel: untpd.ImportSelector): S.ImportSelector = {
+  private def parseImportSelector(tree: Trees.ImportOrExport[?], keyword: String, sel: untpd.ImportSelector): S.ImportSelector = {
     if (sel.isGiven) {
       val kw = "given"
       if (cursor + kw.length > source.length || !source.startsWith(kw, cursor)) {
@@ -2751,35 +2959,44 @@ class ScalaTreeVisitor(
       val nameStartAbs = Math.max(0, sel.imported.span.start - offsetAdjustment)
       val nameEndAbs = Math.max(0, sel.imported.span.end - offsetAdjustment)
       val displayName = source.substring(nameStartAbs, nameEndAbs)
-      val nameIdent = ident(displayName, Space.EMPTY, null)
+      val imported = ofNode(tree)(_.importedOf(_, sel.imported.name)).getOrElse(Imported(null, null, null, isImplicit = false))
+      val nameIdent = ident(displayName, Space.EMPTY, imported.nameType, imported.variable)
       cursor = nameEndAbs
+      val isImplicitImport = imported.isImplicit && keyword == "import"
+      val selectorMarkers = if (isImplicitImport) Markers.EMPTY.add(new ImplicitImport(Tree.randomId())) else Markers.EMPTY
 
       sel.renamed match {
         case untpd.EmptyTree =>
           S.ImportSelector.build(
-            Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            Tree.randomId(), Space.EMPTY, selectorMarkers,
             false, null, false, false, nameIdent, null, false
           )
         case renamed: Trees.Ident[?] =>
           val p = indexOfNextNonWhitespace(cursor)
           val beforeArrow = ScalaSpace.format(source.substring(cursor, p))
           val useAsKeyword = source.startsWith("as", p)
-          val useArrow = source.startsWith("=>", p)
+          val useUnicodeArrow = source.startsWith(unicodeArrowOf("=>"), p)
+          val useArrow = source.startsWith("=>", p) || useUnicodeArrow
           if (!useAsKeyword && !useArrow) {
             throw new IllegalStateException(
               s"Expected '=>' or 'as' between selector name and alias at position $p"
             )
           }
-          cursor = p + 2
+          cursor = p + (if (useUnicodeArrow) 1 else 2)
 
           val renamedStartAbs = Math.max(0, renamed.span.start - offsetAdjustment)
           val renamedEndAbs = Math.max(0, renamed.span.end - offsetAdjustment)
           val aliasPrefix = ScalaSpace.format(source.substring(cursor, renamedStartAbs))
           val aliasDisplay = source.substring(renamedStartAbs, renamedEndAbs)
           cursor = renamedEndAbs
-          val aliasIdent = ident(aliasDisplay, aliasPrefix, null)
+          val isHidden = renamed.name == nme.WILDCARD
+          val aliasIdent =
+            if (isHidden) ident(aliasDisplay, aliasPrefix, null)
+            else ident(aliasDisplay, aliasPrefix, imported.nameType, imported.variable)
+          val arrowMarkers = unicodeArrowMarkers(useUnicodeArrow)
           S.ImportSelector.build(
-            Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            Tree.randomId(), Space.EMPTY,
+            if (isImplicitImport && !isHidden) arrowMarkers.add(new ImplicitImport(Tree.randomId())) else arrowMarkers,
             false, null, false, false, nameIdent,
             new JLeftPadded(beforeArrow, aliasIdent, Markers.EMPTY),
             useAsKeyword
@@ -2853,6 +3070,24 @@ class ScalaTreeVisitor(
   }
 
   /**
+   * What the single selector of a simple import or export imports. Without a typing of the
+   * import, a selector naming a class is still attributed by its fully qualified name.
+   */
+  private def importedBySelector(tree: Trees.ImportOrExport[?], is: untpd.ImportSelector, selectorName: String): Imported =
+    if (is.isWildcard) Imported(null, null, null, isImplicit = false)
+    else ofNode(tree)(_.importedOf(_, is.imported.name)).getOrElse {
+      val tpe = lookupSelectorType(tree.expr, selectorName)
+      Imported(tpe, tpe, null, isImplicit = false)
+    }
+
+  private def implicitImportMarkers(tree: Trees.ImportOrExport[?], markers: Markers): Markers =
+    tree.selectors match {
+      case List(is: untpd.ImportSelector) if !is.isWildcard && ofNode(tree)(_.importedOf(_, is.imported.name)).exists(_.isImplicit) =>
+        markers.add(new ImplicitImport(Tree.randomId()))
+      case _ => markers
+    }
+
+  /**
    * Best-effort type lookup for a selector by FQN. Useful for imports
    * (`scala.collection.mutable` resolves to a known type); for exports the
    * selector usually names a member of a local value, so this typically
@@ -2875,7 +3110,7 @@ class ScalaTreeVisitor(
     val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
     if (adjustedStart < 0 || adjustedEnd > source.length || adjustedEnd <= adjustedStart) return false
     val text = source.substring(adjustedStart, adjustedEnd)
-    !text.contains("{") && !text.contains(" as ") && !text.contains("=>") &&
+    !text.contains("{") && !text.contains(" as ") && !containsArrow(text, "=>") &&
       text.trim.startsWith(keyword)
   }
   
@@ -2921,6 +3156,10 @@ class ScalaTreeVisitor(
     // the identifier itself carries the bare name and a Quoted marker.
     val identNameQuoted = displayName.length >= 2 && displayName.startsWith("`") && displayName.endsWith("`")
     val identName = if (identNameQuoted) displayName.substring(1, displayName.length - 1) else displayName
+    val variableType = variableTypeAt(vd)
+    val paramType = if (variableType != null) variableType.getType else null
+    // A `_` parameter is a fresh `_$N` variable the source never names
+    val paramVariableType = if (identName == "_") null else variableType
 
     // Detect `implicit` modifier on the lambda parameter. The Scala 3 parser
     // exposes it on `vd.mods` but it sits in the source *before* `vd.span.start`
@@ -2966,9 +3205,9 @@ class ScalaTreeVisitor(
     // that can carry it.
     if (!hasExplicitType || vd.tpt == untpd.EmptyTree) {
       if (implicitModifier == null) {
-        ident(identName, prefix, quoted = identNameQuoted)
+        ident(identName, prefix, paramType, paramVariableType, quoted = identNameQuoted)
       } else {
-        val name = ident(identName, namePrefix, quoted = identNameQuoted)
+        val name = ident(identName, namePrefix, paramType, paramVariableType, quoted = identNameQuoted)
         val variable = new J.VariableDeclarations.NamedVariable(
           Tree.randomId(),
           Space.EMPTY,
@@ -2976,7 +3215,7 @@ class ScalaTreeVisitor(
           name,
           Collections.emptyList(),
           null,
-          null
+          paramVariableType
         )
         new J.VariableDeclarations(
           Tree.randomId(),
@@ -2991,7 +3230,7 @@ class ScalaTreeVisitor(
       }
     } else {
       // With a type, we need a full variable declaration
-      val name = ident(identName, namePrefix, quoted = identNameQuoted)
+      val name = ident(identName, namePrefix, paramType, paramVariableType, quoted = identNameQuoted)
 
       // Extract the type
       val sourceText = extractSource(vd.span)
@@ -3028,7 +3267,7 @@ class ScalaTreeVisitor(
         name,
         Collections.emptyList(),
         null,
-        null
+        paramVariableType
       )
 
       val modifiers: java.util.List[J.Modifier] =
@@ -3439,7 +3678,10 @@ class ScalaTreeVisitor(
       varName, // VariableDeclarator - J.Identifier implements this
       Collections.emptyList(), // dimensionsAfterName - not used in Scala
       if (initializer != null) JLeftPadded.build(initializer).withBefore(beforeEquals) else null,
-      null // variableType - will be set later by type attribution
+      varName match {
+        case id: J.Identifier => id.getFieldType
+        case _ => null
+      }
     )
     
     val declarator = JRightPadded.build(namedVariable)
@@ -3864,7 +4106,10 @@ class ScalaTreeVisitor(
         val visitedSpans = new java.util.HashSet[Int]()
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-        sortedBody.foreach { stat =>
+        val objectEndForBody = if (md.span.exists) Math.max(0, md.span.end - offsetAdjustment) else source.length
+        consumeEmptyStatements(objectEndForBody, statements)
+        for (idx <- sortedBody.indices) {
+          val stat = sortedBody(idx)
           val isSynth = stat.span.isSynthetic || {
             def containsTripleQuestion(t: Trees.Tree[?]): Boolean = t match {
               case sel: Trees.Select[?] => sel.name.toString == "$qmark$qmark$qmark" || sel.name.toString == "???" || containsTripleQuestion(sel.qualifier)
@@ -3876,11 +4121,18 @@ class ScalaTreeVisitor(
             containsTripleQuestion(stat)
           }
           if (stat.span.exists && !isSynth && visitedSpans.add(stat.span.start)) {
-            visitTree(stat) match {
-              case stmt: Statement => statements.add(JRightPadded.build(stmt))
-              case expr: Expression =>
-                statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-              case _ =>
+            val visitedStmt: Statement = visitTree(stat) match {
+              case stmt: Statement => stmt
+              case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+              case _ => null
+            }
+            if (visitedStmt != null) {
+              val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+              val nextStart = sortedBody.drop(idx + 1)
+                .find(s => s.span.exists && !s.span.isSynthetic)
+                .map(s => Math.max(0, s.span.start - offsetAdjustment))
+                .getOrElse(objectEndForBody)
+              addStatement(statements, visitedStmt, statEnd, nextStart)
             }
           }
         }
@@ -4542,13 +4794,15 @@ class ScalaTreeVisitor(
     updateCursor(genFrom.pat.span.end)
 
     // Find "<-" in source between variable and iterable, extract after-variable space
+    var unicodeArrow = false
     val arrowSpace = {
       val exprStart = Math.max(0, genFrom.expr.span.start - offsetAdjustment)
       val searchRegion = if (exprStart > cursor) source.substring(cursor, exprStart) else ""
-      val arrowIdx = positionOfNextIn(searchRegion, "<-", 0)
+      val (arrowIdx, arrowLen) = positionOfNextArrowIn(searchRegion, "<-", 0)
       if (arrowIdx >= 0) {
         val spaceBeforeArrow = searchRegion.substring(0, arrowIdx)
-        cursor = cursor + arrowIdx + 2 // Skip past "<-"
+        cursor = cursor + arrowIdx + arrowLen
+        unicodeArrow = arrowLen == 1
         Space.format(spaceBeforeArrow)
       } else {
         Space.EMPTY
@@ -4570,7 +4824,7 @@ class ScalaTreeVisitor(
             Tree.randomId(),
             Space.EMPTY,
             Markers.EMPTY,
-            ident(varName, Space.EMPTY, typeFor(genFrom.pat.span)),
+            ident(varName, Space.EMPTY, typeAt(genFrom.pat)),
             Collections.emptyList(),
             null,
             null
@@ -4631,7 +4885,7 @@ class ScalaTreeVisitor(
     val forEachLoop = new J.ForEachLoop(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY.addIfAbsent(ScalaForLoop.create()),
+      unicodeArrowMarkers(unicodeArrow).addIfAbsent(ScalaForLoop.create()),
       control,
       JRightPadded.build(body)
     )
@@ -4681,8 +4935,17 @@ class ScalaTreeVisitor(
       }
     }
     
-    val statements = new util.ArrayList[JRightPadded[Statement]]()
+    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
+    // so dropping it leaves the cursor where the last statement ended.
+    val isSyntheticUnit = block.expr match {
+      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
+      case _ => false
+    }
 
+    val statements = new util.ArrayList[JRightPadded[Statement]]()
+    if (hasBraces) {
+      consumeEmptyStatements(blockEndAdj, statements)
+    }
 
     // Visit all statements in the block
     for (i <- block.stats.indices) {
@@ -4715,53 +4978,22 @@ class ScalaTreeVisitor(
             Math.max(0, block.span.end - offsetAdjustment) - 1
           }
           
-          var trailingSpace = Space.EMPTY
-          var rpMarkers = Markers.EMPTY
-          val trailStart = Math.max(statEnd, cursor)
-          if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
-            // A `;` already absorbed into the statement's span, which the forward scan
-            // below can't see — same recognition and cursor catch-up as
-            // consumeTrailingSemicolon (which documents the Dotty span behavior).
-            rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
-            cursor = Math.max(cursor, trailStart)
-          } else if (trailStart < nextStart && nextStart <= source.length) {
-            val between = source.substring(trailStart, nextStart)
-            // An explicit ';' separator appears before any newline and with only
-            // horizontal whitespace between it and the preceding statement.
-            val semiIdx = {
-              var idx = -1
-              var j = 0
-              while (idx < 0 && j < between.length) {
-                val c = between.charAt(j)
-                if (c == ';') idx = j
-                else if (c == '\n' || c == '\r') j = between.length
-                else if (c != ' ' && c != '\t') j = between.length
-                else j += 1
-              }
-              idx
-            }
-            if (semiIdx >= 0) {
-              trailingSpace = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
-              rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
-              cursor = trailStart + semiIdx + 1
-            } else {
-              trailingSpace = Space.format(between)
+          val semicolonLimit = if (i == block.stats.length - 1 && isSyntheticUnit) blockEndAdj else nextStart
+          var (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, semicolonLimit)
+          if (rpMarkers.getMarkers.isEmpty) {
+            val trailStart = Math.max(statEnd, cursor)
+            if (trailStart < nextStart && nextStart <= source.length) {
+              trailingSpace = Space.format(source.substring(trailStart, nextStart))
               cursor = nextStart
             }
           }
 
           statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+          consumeEmptyStatements(nextStart, statements)
         case _ => // Skip non-statement nodes
       }
     }
     
-    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
-    // so dropping it leaves the cursor where the last statement ended.
-    val isSyntheticUnit = block.expr match {
-      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
-      case _ => false
-    }
-
     // Handle the expression part of the block (if any)
     // Skip synthetic ??? added by compiler for procedure syntax
     val isSyntheticExpr = if (!block.expr.isEmpty && !isSyntheticUnit) {
@@ -4831,6 +5063,9 @@ class ScalaTreeVisitor(
           case _ => // Skip
         }
       }
+    }
+    if (hasBraces) {
+      consumeEmptyStatements(blockEndAdj, statements)
     }
     
     // Extract end padding before closing brace
@@ -5391,6 +5626,7 @@ class ScalaTreeVisitor(
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
           val classEndForBody = if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length
+          consumeEmptyStatements(classEndForBody, statements)
           for (idx <- sortedBody.indices) {
             val stat = sortedBody(idx)
             val isSyntheticStat = stat.span.isSynthetic || {
@@ -5427,8 +5663,7 @@ class ScalaTreeVisitor(
                     }
                     ns
                   }
-                  val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
-                  statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
+                  addStatement(statements, visitedStmt, statEnd, nextStart)
                 }
               }
             }
@@ -5753,7 +5988,7 @@ class ScalaTreeVisitor(
           }
         }
         cursor = endPos
-        return ident(text, prefix, typeFor(ta.span))
+        return ident(text, prefix, typeAt(ta))
     }
 
     // Shouldn't reach here — all cases return above
@@ -5845,12 +6080,15 @@ class ScalaTreeVisitor(
     if (isWithIntersectionType(at)) {
       return visitWithIntersectionType(at)
     }
+    visitParameterizedType(at, at.tpt, at.args)
+  }
 
-    // AppliedTypeTree represents a parameterized type like List[String]
+  /** A parameterized type like `List[String]`, or the type-applied extractor `Box[Int]` of a pattern `Box[Int](q)`. */
+  private def visitParameterizedType(at: Trees.Tree[?], tpt: Trees.Tree[?], args: List[Trees.Tree[?]]): J.ParameterizedType = {
     val prefix = extractPrefix(at.span)
 
     // Visit the base type (e.g., List, Map, Option)
-    val clazz = visitTree(at.tpt) match {
+    val clazz = visitTree(tpt) match {
       case nt: NameTree => nt
       case _ => throw unmappedException(at)
     }
@@ -5884,13 +6122,13 @@ class ScalaTreeVisitor(
     // Process type arguments
     val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
     
-    if (at.args.nonEmpty) {
+    if (args.nonEmpty) {
       // Position cursor right after the opening bracket so that the first arg's
       // own prefix-extraction picks up any whitespace between `[` and the arg.
       cursor = openBracketAbs + 1
 
-      for (i <- at.args.indices) {
-        val arg = at.args(i)
+      for (i <- args.indices) {
+        val arg = args(i)
         // Prefer the type-position helper so function types (`A => B`), tuple/union/
         // intersection types map to a TypeTree rather than being misread as expressions.
         val tt = visitTypeTree(arg)
@@ -5902,7 +6140,7 @@ class ScalaTreeVisitor(
         }
 
         // Extract trailing comma/space
-        val isLast = i == at.args.size - 1
+        val isLast = i == args.size - 1
         val afterSpace = if (isLast) {
           // Space before closing bracket
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
@@ -5915,8 +6153,8 @@ class ScalaTreeVisitor(
         } else {
           // Look for comma and space after it
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-          val nextArgStart = if (i + 1 < at.args.size) {
-            Math.max(0, at.args(i + 1).span.start - offsetAdjustment)
+          val nextArgStart = if (i + 1 < args.size) {
+            Math.max(0, args(i + 1).span.start - offsetAdjustment)
           } else {
             closeBracketAbs
           }
@@ -6511,14 +6749,6 @@ class ScalaTreeVisitor(
           if (closeParen >= 0) cursor = closeParen + 1
         }
 
-        // Build additional param lists as J.Lambda.Parameters for later wrapping
-        for (extraList <- valueParamLists.tail) {
-          val extraParams = extraList.collect { case vd: Trees.ValDef[?] => vd }
-          if (extraParams.nonEmpty) {
-            curriedParamLists.add(visitParamListAsLambdaParams(extraParams))
-          }
-        }
-
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
         buildEmptyParamList()
@@ -6533,6 +6763,13 @@ class ScalaTreeVisitor(
       // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
         Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+    }
+
+    // Build additional param lists as J.Lambda.Parameters for later wrapping
+    if (valueParamLists.nonEmpty) {
+      for (extraList <- valueParamLists.tail) {
+        curriedParamLists.add(visitParamListAsLambdaParams(extraList.collect { case vd: Trees.ValDef[?] => vd }))
+      }
     }
 
     // Handle return type `: ReturnType` — only if explicitly written in source
@@ -6778,7 +7015,9 @@ class ScalaTreeVisitor(
       } else {
         (Space.EMPTY, rawParamName, cursor, false)
       }
-    val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd), quoted = nameQuoted)
+    val paramVariableType = variableTypeOfTree(vd)
+    val paramName = ident(displayName, namePrefix, if (paramVariableType != null) paramVariableType.getType else null,
+      paramVariableType, quoted = nameQuoted)
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, nameEndCursor)
     }
@@ -6844,7 +7083,7 @@ class ScalaTreeVisitor(
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
-      variableTypeOfTree(vd)
+      paramVariableType
     )
 
     cursor = Math.max(cursor, paramEnd)
@@ -6937,7 +7176,9 @@ class ScalaTreeVisitor(
         backtickAwareName(cursor, rawNameStart, rawNameLen, rawParamName)
       } else (Space.EMPTY, rawParamName, cursor, false)
 
-    val paramName = ident(displayParamName, namePrefix, variableTypeOfTree(vd), quoted = paramNameQuoted)
+    val paramVariableType = variableTypeOfTree(vd)
+    val paramName = ident(displayParamName, namePrefix,
+      if (paramVariableType != null) paramVariableType.getType else null, paramVariableType, quoted = paramNameQuoted)
 
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, paramNameEnd)
@@ -7002,7 +7243,7 @@ class ScalaTreeVisitor(
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
-      variableTypeOfTree(vd)
+      paramVariableType
     )
 
     updateCursor(vd.span.end)
@@ -7240,7 +7481,7 @@ class ScalaTreeVisitor(
     val ck = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
     val cki = positionOfNextIn(ck, "case", 0); if (cki >= 0) cursor = cursor + cki + 4
 
-    val patternJ = visitTree(caseDef.pat) match { case j: J => j; case null => ident("_", Space.format(" ")) }
+    val patternJ = patternContext(pattern = true)(visitTree(caseDef.pat)) match { case j: J => j; case null => ident("_", Space.format(" ")) }
 
     // Handle guard: `case x if condition =>`
     // Store space-before-if in label's after space so the printer can emit it.
@@ -7249,7 +7490,8 @@ class ScalaTreeVisitor(
     var guard: Expression = null
     var labelAfter = Space.EMPTY
     var guardArrowSpace = Space.EMPTY
-    if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
+    val hasGuard = !caseDef.guard.isEmpty && caseDef.guard.span.exists
+    if (hasGuard) {
       val ifPos = positionOfNext("if")
       if (ifPos > cursor) labelAfter = ScalaSpace.format(source, cursor, ifPos)
       if (ifPos >= 0) cursor = ifPos + 2  // past "if"
@@ -7259,23 +7501,26 @@ class ScalaTreeVisitor(
         case j: J => guard = new S.StatementExpression(Tree.randomId(), j)
         case null =>
       }
-      val arrowPos = positionOfNext("=>", cursor)
-      if (arrowPos >= cursor) guardArrowSpace = ScalaSpace.format(source, cursor, arrowPos)
-    } else {
-      val arrowPos = positionOfNext("=>", cursor)
-      if (arrowPos >= cursor) labelAfter = ScalaSpace.format(source, cursor, arrowPos)
+    }
+    val (arrowPos, arrowLen) = positionOfNextArrow("=>", cursor)
+    if (arrowPos >= cursor) {
+      if (hasGuard) guardArrowSpace = ScalaSpace.format(source, cursor, arrowPos)
+      else labelAfter = ScalaSpace.format(source, cursor, arrowPos)
+      cursor = arrowPos + arrowLen
     }
     val labels = new util.ArrayList[JRightPadded[J]]()
     labels.add(JRightPadded.build(patternJ).withAfter(labelAfter))
-
-    val as = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-    val ai = positionOfNextIn(as, "=>", 0); if (ai >= 0) { val aa = positionOfNext("=>", cursor); if (aa >= 0) cursor = aa + 2 }
 
     val caseBodyJ = visitTree(caseDef.body) match { case j: J => JRightPadded.build(j); case null => null }
     // Compute the end of the body's actual content from the AST (not from
     // the cursor, which may have overshot when Dotty's body span included
     // the `;` or part of the next case).
+    val isBracedBody = caseBodyJ != null && (caseBodyJ.getElement match {
+      case jb: J.Block => !jb.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+      case _ => false
+    })
     val bodyContentEnd: Int = caseDef.body match {
+      case b: Trees.Block[?] if isBracedBody && b.span.exists => Math.max(0, b.span.end - offsetAdjustment)
       case b: Trees.Block[?] =>
         if (!b.expr.isEmpty && b.expr.span.exists) Math.max(0, b.expr.span.end - offsetAdjustment)
         else if (b.stats.nonEmpty && b.stats.last.span.exists) Math.max(0, b.stats.last.span.end - offsetAdjustment)
@@ -7290,16 +7535,18 @@ class ScalaTreeVisitor(
     // `;`, preserve it via a Semicolon marker on the JRightPadded wrapping
     // the case (e.g. `case a => x; case b => y`).
     var caseRpMarkers = Markers.EMPTY
-    val caseRpAfter = Space.EMPTY
+    var caseRpAfter = Space.EMPTY
     val nextNonWs = indexOfNextNonWhitespace(bodyContentEnd)
-    if (nextNonWs < source.length && source.charAt(nextNonWs) == ';') {
+    if (nextNonWs < source.length && source.charAt(nextNonWs) == ';' && nextNonWs != lastConsumedSemicolon) {
+      caseRpAfter = ScalaSpace.format(source, bodyContentEnd, nextNonWs)
       caseRpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
       cursor = nextNonWs + 1
+      lastConsumedSemicolon = nextNonWs
     }
 
     val statementsContainer: JContainer[Statement] =
       JContainer.build(guardArrowSpace, java.util.Collections.emptyList[JRightPadded[Statement]](), Markers.EMPTY)
-    val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
+    val jCase = new J.Case(Tree.randomId(), casePrefix, unicodeArrowMarkers(arrowLen == 1), J.Case.Type.Rule,
       null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guard, statementsContainer, caseBodyJ)
     new JRightPadded[Statement](jCase.asInstanceOf[Statement], caseRpAfter, caseRpMarkers)
   }
@@ -7335,7 +7582,7 @@ class ScalaTreeVisitor(
     }
     if (qualName == null) {
       updateCursor(thisTree.span.end)
-      ident("this", prefix, typeFor(thisTree.span))
+      ident("this", prefix, typeAt(thisTree))
     } else {
       // Qualified `this`, e.g. `Outer.this`, modeled as a field access onto the `this` keyword.
       val afterQual = Math.max(0, thisTree.span.start - offsetAdjustment) + qualName.length
@@ -7346,10 +7593,10 @@ class ScalaTreeVisitor(
       val namePrefix = ScalaSpace.format(source, dotIdx + 1, thisStart)
       val qualifier = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
         Collections.emptyList(), qualName, null, null)
-      val thisName = ident("this", namePrefix, typeFor(thisTree.span))
+      val thisName = ident("this", namePrefix, typeAt(thisTree))
       updateCursor(thisTree.span.end)
       new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY, qualifier,
-        new JLeftPadded(beforeDot, thisName, Markers.EMPTY), typeFor(thisTree.span))
+        new JLeftPadded(beforeDot, thisName, Markers.EMPTY), typeAt(thisTree))
     }
   }
 
@@ -7368,7 +7615,7 @@ class ScalaTreeVisitor(
       // Plain `super` — model as J.Identifier so the printer round-trips simply.
       updateCursor(superTree.span.end)
       return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(),
-        "super", typeFor(superTree.span), null)
+        "super", typeAt(superTree), null)
     }
 
     val qualifierIdent: J.Identifier = if (outerName != null) {
@@ -7383,7 +7630,7 @@ class ScalaTreeVisitor(
 
     updateCursor(superTree.span.end)
     new S.QualifiedSuper(Tree.randomId(), prefix, Markers.EMPTY,
-      qualifierIdent, mixIdent, typeFor(superTree.span))
+      qualifierIdent, mixIdent, typeAt(superTree))
   }
 
   /**
@@ -7444,7 +7691,7 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(interp.span)
     val interpStart = Math.max(0, interp.span.start - offsetAdjustment)
     val interpName = interp.id.toString
-    val interpolator = ident(interpName)
+    val interpolator = ident(interpName, typeInfo = methodTypeAt(interp))
     cursor = Math.max(cursor, interpStart + interpName.length)
     val delimiter = if (source.startsWith("\"\"\"", cursor)) "\"\"\"" else "\""
     cursor = Math.min(source.length, cursor + delimiter.length)
@@ -7575,7 +7822,11 @@ class ScalaTreeVisitor(
     // namedArg.name.toString strips the backticks, but the source may show `name`.
     val spanStart = Math.max(0, namedArg.span.start - offsetAdjustment)
     val isBacktickQuoted = isBacktickQuotedNameAt(spanStart + 1, nameText.length)
-    val nameId = ident(nameText, quoted = isBacktickQuoted)
+    val parameter = Option(namedArgumentCalls.get(namedArg))
+      .flatMap(call => typeMapping.flatMap(_.parameterOf(call.asInstanceOf[untpd.Tree], nameText)))
+      .orNull
+    val nameId = ident(nameText, typeInfo = if (parameter != null) parameter.getType else null,
+      fieldType = parameter, quoted = isBacktickQuoted)
 
     // Advance past name (and surrounding backticks if any), then find "="
     val nameLen = if (isBacktickQuoted) nameText.length + 2 else nameText.length
@@ -7593,14 +7844,15 @@ class ScalaTreeVisitor(
     }
     updateCursor(namedArg.span.end)
     new J.Assignment(Tree.randomId(), prefix, Markers.EMPTY, nameId,
-      JLeftPadded.build(arg).withBefore(beforeEq), typeFor(namedArg.span))
+      JLeftPadded.build(arg).withBefore(beforeEq), typeAt(namedArg))
   }
 
   private def visitBind(bind: Trees.Bind[?]): S.Binding = {
     // At-binding pattern: `p@Person(name, _)`, `all@List(head, _*)`, `msg@(_: String)`.
     val prefix = extractPrefix(bind.span)
     val nameStr = bind.name.toString
-    val name = ident(nameStr)
+    val bound = variableTypeAt(bind)
+    val name = ident(nameStr, typeInfo = if (bound != null) bound.getType else null, fieldType = bound)
     cursor = cursor + nameStr.length
     val atPos = positionOfNext("@", cursor)
     val beforeAt = if (atPos >= cursor) ScalaSpace.format(source, cursor, atPos) else Space.EMPTY
@@ -7612,7 +7864,7 @@ class ScalaTreeVisitor(
         s"Bind body did not produce an Expression: ${bind.body.getClass.getSimpleName}")
     }
     updateCursor(bind.span.end)
-    new S.Binding(Tree.randomId(), prefix, Markers.EMPTY, name, beforeAt, pattern, typeFor(bind.span))
+    new S.Binding(Tree.randomId(), prefix, Markers.EMPTY, name, beforeAt, pattern, typeAt(bind))
   }
 
   private def visitAlternative(alt: Trees.Alternative[?]): S.Alternative = {
@@ -7673,7 +7925,7 @@ class ScalaTreeVisitor(
     val dotIdx = positionOfNextIn(between, ".", 0)
     val beforeType = if (dotIdx > 0) Space.format(between.substring(0, dotIdx)) else Space.EMPTY
     cursor = endPos
-    new S.SingletonType(Tree.randomId(), prefix, Markers.EMPTY, qualifier, beforeType, typeFor(stt.span))
+    new S.SingletonType(Tree.randomId(), prefix, Markers.EMPTY, qualifier, beforeType, typeAt(stt))
   }
 
   private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): S.RefinedType = {
@@ -7710,6 +7962,10 @@ class ScalaTreeVisitor(
     val stmts = new util.ArrayList[JRightPadded[Statement]]()
     import scala.jdk.CollectionConverters.*
     val refList = rtt.refinements.asJava
+    val refinementEnd = Math.max(0, rtt.span.end - offsetAdjustment)
+    if (braceIdx >= 0) {
+      consumeEmptyStatements(refinementEnd, stmts)
+    }
     var i = 0
     while (i < refList.size) {
       val ref = refList.get(i)
@@ -7720,18 +7976,21 @@ class ScalaTreeVisitor(
         case _ => throw new UnsupportedOperationException(
           s"Refinement member did not produce a Statement: ${ref.getClass.getSimpleName}")
       }
-      stmts.add(JRightPadded.build(stmt))
+      val nextStart = if (i + 1 < refList.size && refList.get(i + 1).span.exists) {
+        Math.max(0, refList.get(i + 1).span.start - offsetAdjustment)
+      } else refinementEnd
+      addStatement(stmts, stmt, Math.max(0, ref.span.end - offsetAdjustment), nextStart)
       i += 1
     }
 
-    val endPos = Math.max(0, rtt.span.end - offsetAdjustment)
+    val endPos = refinementEnd
     val remaining = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     val closeIdx = remaining.lastIndexOf('}')
     val endSpace = if (closeIdx > 0) Space.format(remaining.substring(0, closeIdx)) else Space.EMPTY
     cursor = endPos
     val refinements = new J.Block(Tree.randomId(), blockPrefix, Markers.EMPTY,
       JRightPadded.build(false), stmts, endSpace)
-    new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeFor(rtt.span))
+    new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeAt(rtt))
   }
 
   private def visitAnnotated(ann: Trees.Annotated[?]): J = {
@@ -7772,7 +8031,7 @@ class ScalaTreeVisitor(
           s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
       }
       new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
-        expr, beforeColon, annotation, typeFor(ann.span))
+        expr, beforeColon, annotation, typeAt(ann))
     }
   }
 
@@ -7811,7 +8070,7 @@ class ScalaTreeVisitor(
     }
 
     updateCursor(mac.span.end)
-    new S.Macro(Tree.randomId(), prefix, Markers.EMPTY, kind, expr, typeFor(mac.span))
+    new S.Macro(Tree.randomId(), prefix, Markers.EMPTY, kind, expr, typeAt(mac))
   }
 
   private def visitExtMethods(ext: untpd.ExtMethods): S.ExtensionMethods = {
@@ -7913,6 +8172,9 @@ class ScalaTreeVisitor(
     }
 
     val methodStmts = new util.ArrayList[JRightPadded[Statement]]()
+    if (!isExtBraceless) {
+      consumeEmptyStatements(extEnd, methodStmts)
+    }
     val methods = ext.methods.asJava
     var i = 0
     while (i < methods.size) {
@@ -7922,7 +8184,8 @@ class ScalaTreeVisitor(
         case _ => throw new UnsupportedOperationException(
           s"Extension method did not produce a Statement: ${m.getClass.getSimpleName}")
       }
-      methodStmts.add(JRightPadded.build(mStmt))
+      val nextStart = if (i + 1 < methods.size) Math.max(0, methods.get(i + 1).span.start - offsetAdjustment) else extEnd
+      addStatement(methodStmts, mStmt, Math.max(0, m.span.end - offsetAdjustment), nextStart)
       i += 1
     }
 
@@ -7998,7 +8261,7 @@ class ScalaTreeVisitor(
 
   /** Build a single for-comprehension enumerator from a dotty tree. */
   private def buildForEnumerator(enumTree: Trees.Tree[?], isLast: Boolean, closeBracketPos: Int): JRightPadded[S.For.Enumerator] = {
-    val (kind, lhsTree, rhsTree, opStr): (S.For.Enumerator.Kind, Trees.Tree[?], Trees.Tree[?], String) = enumTree match {
+    val (kind, lhsTree, rhsTree, opStr) = enumTree match {
       case g: untpd.GenFrom => (S.For.Enumerator.Kind.Generator, g.pat, g.expr, "<-")
       case g: untpd.GenAlias => (S.For.Enumerator.Kind.Assignment, g.pat, g.expr, "=")
       case _ => (S.For.Enumerator.Kind.Guard, null, enumTree, "if")
@@ -8023,20 +8286,24 @@ class ScalaTreeVisitor(
       if (kind == S.For.Enumerator.Kind.Assignment && isGivenEnumeratorPat(lhsTree)) {
         lhs = buildGivenEnumeratorLhs(lhsTree)
       } else {
-        lhs = visitTree(lhsTree)
+        lhs = patternContext(pattern = true)(visitTree(lhsTree))
       }
     }
 
     val rhsStart = Math.max(0, rhsTree.span.start - offsetAdjustment)
     val between = if (cursor < rhsStart && rhsStart <= source.length) source.substring(cursor, rhsStart) else ""
+    var unicodeArrow = false
     val beforeOp: Space = kind match {
       case S.For.Enumerator.Kind.Guard =>
         // cursor is past `if`; capture space between `if` and rhs
         if (between.nonEmpty) Space.format(between) else Space.EMPTY
       case _ =>
-        val opIdx = positionOfNextIn(between, opStr, 0)
+        val (opIdx, opLen) =
+          if (kind == S.For.Enumerator.Kind.Generator) positionOfNextArrowIn(between, opStr, 0)
+          else (positionOfNextIn(between, opStr, 0), opStr.length)
         val s = if (opIdx >= 0) Space.format(between.substring(0, opIdx)) else Space.EMPTY
-        if (opIdx >= 0) cursor = cursor + opIdx + opStr.length
+        if (opIdx >= 0) cursor = cursor + opIdx + opLen
+        unicodeArrow = opLen == 1
         s
     }
     if (kind == S.For.Enumerator.Kind.Guard) cursor = rhsStart
@@ -8082,7 +8349,7 @@ class ScalaTreeVisitor(
       } else Space.EMPTY
     }
 
-    val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, Markers.EMPTY,
+    val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, unicodeArrowMarkers(unicodeArrow),
       kind, lhs, beforeOp, rhs)
     new JRightPadded(enumerator, after, rpMarkers)
   }
@@ -8196,11 +8463,12 @@ class ScalaTreeVisitor(
       } else {
         val afterClose = indexOfNextNonWhitespace(j)
         afterClose < source.length &&
-          (source.startsWith("<-", afterClose) || source.charAt(afterClose) == '=')
+          (source.startsWith("<-", afterClose) || source.startsWith(unicodeArrowOf("<-"), afterClose) ||
+            source.charAt(afterClose) == '=')
       }
     }
 
-    val (openIdx, openBracket): (Int, Char) = {
+    val (openIdx, openBracket) = {
       var i = cursor
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
       if (i < source.length && source.charAt(i) == '{') {
@@ -8306,12 +8574,17 @@ class ScalaTreeVisitor(
    */
   private def visitByNameTypeTree(bnt: Trees.ByNameTypeTree[?]): S.FunctionType = {
     val prefix = extractPrefix(bnt.span)
-    val beforeArrow = sourceBefore("=>")
+    val (arrowIdx, arrowLen) = positionOfNextArrow("=>")
+    val beforeArrow = if (arrowIdx < 0) Space.EMPTY else {
+      val s = Space.format(source.substring(cursor, arrowIdx))
+      cursor = arrowIdx + arrowLen
+      s
+    }
     val returnType = visitTypeTree(bnt.result)
     S.FunctionType.build(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      unicodeArrowMarkers(arrowLen == 1),
       false,
       JContainer.empty[TypeTree](),
       new JLeftPadded(beforeArrow, returnType, Markers.EMPTY),
@@ -8355,7 +8628,7 @@ class ScalaTreeVisitor(
    * `S.FunctionType`. For other tree shapes, delegates to `visitTree` and accepts any result
    * that is already a `TypeTree`.
    */
-  private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = tpt match {
+  private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = patternContext(pattern = false)(tpt match {
     case f: untpd.Function => visitFunctionType(f)
     case po: untpd.PostfixOp if po.op != null && po.op.name.toString == "*" =>
       visitRepeatedType(po)
@@ -8366,10 +8639,9 @@ class ScalaTreeVisitor(
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
-        case id: J.Identifier => id
         case _ => null
       }
-  }
+  })
 
   /**
    * Type-level infix operators are parsed as an `untpd.InfixOp`. They are modeled
@@ -8611,8 +8883,11 @@ class ScalaTreeVisitor(
       source.substring(funcStart, funcEnd)
     } else ""
 
-    // Find the arrow within the function-type source.
-    val relArrowIdx = positionOfNextIn(funcSource, "=>", 0)
+    // Find the arrow within the function-type source, after the last parameter so that an
+    // arrow nested in a parameter type (e.g. `(=> Int) => Int`) isn't mistaken for it.
+    val arrowSearchFrom = func.args.lastOption.filter(_.span.exists)
+      .map(a => Math.max(0, a.span.end - offsetAdjustment - funcStart)).getOrElse(0)
+    val (relArrowIdx, arrowLen) = positionOfNextArrowIn(funcSource, "=>", arrowSearchFrom)
     val arrowAbs = if (relArrowIdx >= 0) funcStart + relArrowIdx else funcEnd
 
     // Detect whether the parameter list is parenthesized. A single unnamed param like
@@ -8688,9 +8963,9 @@ class ScalaTreeVisitor(
       ScalaSpace.format(source, cursor, arrowTokenStart)
     } else Space.EMPTY
 
-    // Move past the arrow (`=>` is always the last two characters of the token).
+    // Move past the arrow (`=>`/`⇒` is always the end of the token).
     if (arrowAbs >= cursor) {
-      cursor = arrowAbs + 2
+      cursor = arrowAbs + arrowLen
     }
 
     // The return type's own prefix (extracted by visitTree) will carry the space
@@ -8701,7 +8976,7 @@ class ScalaTreeVisitor(
 
     val funcMarkers = if (isContextArrow)
       Markers.build(Collections.singletonList(new ContextFunctionArrow(java.util.UUID.randomUUID())))
-    else Markers.EMPTY
+    else unicodeArrowMarkers(arrowLen == 1)
 
     S.FunctionType.build(
       Tree.randomId(),
@@ -8987,6 +9262,27 @@ class ScalaTreeVisitor(
     -1
   }
 
+  /** The deprecated Scala 2 unicode glyph of an ASCII arrow token: `⇒` for `=>`, `←` for `<-`. */
+  private def unicodeArrowOf(asciiArrow: String): String =
+    if (asciiArrow == "<-") "\u2190" else "\u21D2"
+
+  /** As {@link positionOfNextIn} for an arrow token, also matching its unicode glyph.
+   *  Returns the index of whichever form comes first and that token's length. */
+  private def positionOfNextArrowIn(text: String, asciiArrow: String, startFrom: Int): (Int, Int) = {
+    val ascii = positionOfNextIn(text, asciiArrow, startFrom)
+    val unicode = positionOfNextIn(text, unicodeArrowOf(asciiArrow), startFrom)
+    if (unicode >= 0 && (ascii < 0 || unicode < ascii)) (unicode, 1) else (ascii, asciiArrow.length)
+  }
+
+  private def positionOfNextArrow(asciiArrow: String, startFrom: Int = cursor): (Int, Int) =
+    positionOfNextArrowIn(source, asciiArrow, startFrom)
+
+  private def containsArrow(text: String, asciiArrow: String): Boolean =
+    text.contains(asciiArrow) || text.contains(unicodeArrowOf(asciiArrow))
+
+  private def unicodeArrowMarkers(unicode: Boolean): Markers =
+    if (unicode) Markers.build(Collections.singletonList(UnicodeArrow.create())) else Markers.EMPTY
+
   /** Returns the index of the bracket that matches the open bracket assumed to be at
    *  {@code afterOpen - 1}, searching forward from {@code afterOpen} in {@code source}.
    *  Skips nested bracket pairs, {@code //} and {@code /* */} comments, and
@@ -9051,14 +9347,10 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
-   * position of the next significant character. Returns `source.length` if no
-   * such character exists.
-   */
-  /**
    * After visiting a statement that ended at `statEnd`, detect an explicit `;`
-   * separator on the same line and consume it. Returns the JRightPadded
-   * trailing space and markers; advances `cursor`.
+   * separator before `nextStart` and consume it. Only whitespace and comments may
+   * precede it, possibly spanning lines. Returns the JRightPadded trailing space
+   * and markers; advances `cursor`.
    */
   private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
@@ -9067,33 +9359,61 @@ class ScalaTreeVisitor(
     // forward scan below would miss it, dropping the explicit separator on print.
     // Recognize that already-absorbed `;` here so it is preserved via the marker.
     if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      // A nested statement list (e.g. a braceless body) may already own this `;`.
+      if (lastConsumedSemicolon == trailStart - 1) {
+        return (Space.EMPTY, Markers.EMPTY)
+      }
       // The cursor may still sit before the `;` when the statement visit didn't
       // consume its full span — move past it so it doesn't leak into whitespace.
       cursor = Math.max(cursor, trailStart)
+      lastConsumedSemicolon = trailStart - 1
       return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     }
-    if (trailStart >= nextStart || nextStart > source.length) {
+    val limit = Math.min(nextStart, source.length)
+    if (trailStart >= limit) {
       return (Space.EMPTY, Markers.EMPTY)
     }
-    val between = source.substring(trailStart, nextStart)
-    var semiIdx = -1
-    var j = 0
-    while (semiIdx < 0 && j < between.length) {
-      val c = between.charAt(j)
-      if (c == ';') semiIdx = j
-      else if (c == '\n' || c == '\r') j = between.length
-      else if (c != ' ' && c != '\t') j = between.length
-      else j += 1
-    }
-    if (semiIdx >= 0) {
-      val trailing = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
-      cursor = trailStart + semiIdx + 1
-      (trailing, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    val semiIdx = indexOfNextNonWhitespace(trailStart)
+    if (semiIdx < limit && source.charAt(semiIdx) == ';') {
+      cursor = semiIdx + 1
+      lastConsumedSemicolon = semiIdx
+      (ScalaSpace.format(source, trailStart, semiIdx), Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     } else {
       (Space.EMPTY, Markers.EMPTY)
     }
   }
 
+  /**
+   * Consume each further `;` before `limit` as an empty statement, as Java models `;;`.
+   */
+  private[internal] def consumeEmptyStatements(limit: Int, statements: util.List[JRightPadded[Statement]]): Unit = {
+    val end = Math.min(limit, source.length)
+    var semiIdx = indexOfNextNonWhitespace(cursor)
+    while (semiIdx < end && source.charAt(semiIdx) == ';') {
+      val empty = new J.Empty(Tree.randomId(), ScalaSpace.format(source, cursor, semiIdx), Markers.EMPTY)
+      statements.add(new JRightPadded[Statement](empty, Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId()))))
+      cursor = semiIdx + 1
+      lastConsumedSemicolon = semiIdx
+      semiIdx = indexOfNextNonWhitespace(cursor)
+    }
+  }
+
+  /**
+   * Add `stmt` to `statements` along with its `;` separator and any empty statements
+   * that follow it before `nextStart`.
+   */
+  private[internal] def addStatement(statements: util.List[JRightPadded[Statement]], stmt: Statement,
+                                     statEnd: Int, nextStart: Int): Unit = {
+    val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+    statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+    consumeEmptyStatements(nextStart, statements)
+  }
+
+  /**
+   * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
+   * position of the next significant character. Returns `source.length` if no
+   * such character exists.
+   */
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
     while (i < source.length) {
@@ -9599,10 +9919,10 @@ class ScalaTreeVisitor(
           Markers.EMPTY,
           JRightPadded.build(expr),
           null, // No type parameters for now
-          JLeftPadded.build(ident("_", Space.SINGLE_SPACE, typeFor(typed.span))),
-          typeFor(typed.span),
-          methodTypeFor(typed.span),
-          variableTypeFor(typed.span)
+          JLeftPadded.build(ident("_", Space.SINGLE_SPACE, typeAt(typed))),
+          typeAt(typed),
+          methodTypeAt(typed),
+          variableTypeAt(typed)
         )
       case _ =>
         // Type ascription: expr: Type
@@ -9658,7 +9978,7 @@ class ScalaTreeVisitor(
             markers,
             expr,
             typeTree,
-            typeFor(typed.span)
+            typeAt(typed)
           )
         } catch {
           case _: Exception =>
@@ -9696,7 +10016,7 @@ class ScalaTreeVisitor(
         val funcStart = Math.max(0, func.span.start - offsetAdjustment)
         val bodyStart = Math.max(0, func.body.span.start - offsetAdjustment)
         bodyStart > funcStart && bodyStart <= source.length &&
-          source.substring(funcStart, bodyStart).contains("=>")
+          containsArrow(source.substring(funcStart, bodyStart), "=>")
       } else false
       val hasUnderscorePlaceholder = funcSource.contains("_") && !isExplicitUnderscoreLambda
 
@@ -9800,7 +10120,6 @@ class ScalaTreeVisitor(
     val funcSource = extractSource(func.span)
     cursor = savedCursorBeforeFunc
     hasParentheses = funcSource.trim.startsWith("(")
-    val arrowIndex = positionOfNextIn(funcSource, "=>", 0)
 
     // When parenthesized, advance cursor past `(` so the first parameter's
     // extractPrefix captures the whitespace between `(` and the first arg.
@@ -9898,10 +10217,14 @@ class ScalaTreeVisitor(
       params
     )
     
-    // Extract arrow and spacing (arrowIndex already computed above).
+    // Extract arrow and spacing, searching after the last parameter so that an arrow
+    // nested in a parameter type (e.g. `(g: Int => Int) => g(1)`) isn't mistaken for it.
     // Scala 3 context-function arrow `?=>` puts a `?` immediately before `=>`;
     // treat the `?` as part of the arrow so that whitespace before it is captured
     // as the arrow prefix.
+    val arrowSearchFrom = effectiveArgs.lastOption.filter(_.span.exists)
+      .map(a => Math.max(0, a.span.end - func.span.start)).filter(_ <= funcSource.length).getOrElse(0)
+    val (arrowIndex, arrowLen) = positionOfNextArrowIn(funcSource, "=>", arrowSearchFrom)
     var arrowPrefix = Space.EMPTY
     var isContextArrow = false
     if (arrowIndex >= 0) {
@@ -9917,8 +10240,7 @@ class ScalaTreeVisitor(
       if (spaceStart < arrowTokenStart - 1) {
         arrowPrefix = Space.format(funcSource.substring(spaceStart + 1, arrowTokenStart))
       }
-      // Move cursor to right after the arrow (past =>)
-      val arrowEndPos = func.span.start + arrowIndex + 2 - offsetAdjustment
+      val arrowEndPos = func.span.start + arrowIndex + arrowLen - offsetAdjustment
       cursor = arrowEndPos
     }
 
@@ -9927,7 +10249,7 @@ class ScalaTreeVisitor(
 
     val lambdaMarkers = if (isContextArrow) {
       Markers.build(Collections.singletonList(new ContextFunctionArrow(java.util.UUID.randomUUID())))
-    } else Markers.EMPTY
+    } else unicodeArrowMarkers(arrowLen == 1)
 
     new J.Lambda(
       Tree.randomId(),

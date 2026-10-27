@@ -821,4 +821,36 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedFunctionType() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              interface Theme {
+                  fun theme(content: @Ann (() -> Unit))
+                  fun content(body: (@Ann (Int) -> Unit))
+                  fun scoped(body: @Ann (Theme.() -> Unit))
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedTypeArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Outer {
+                  class Inner<T>
+              }
+              fun f(): List<@Ann Outer.Inner<String>> = emptyList()
+              fun g(): List<@Ann Outer> = emptyList()
+              """
+          )
+        );
+    }
 }

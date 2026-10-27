@@ -37,8 +37,7 @@ class PythonVisitorCompletenessTest {
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new PythonVisitor<AtomicInteger>() {
+        return new PythonVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -54,8 +53,7 @@ class PythonVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     void check(String src) {
@@ -199,6 +197,7 @@ class PythonVisitorCompletenessTest {
       "d = {**a, **b}\n",
       // type alias (3.12)
       "type Alias = int\n",
+      "type Alias[\n    T: int,\n] = list[T]\n",
       // no trailing newline
       "x = 1",
       "def f():\n    pass",

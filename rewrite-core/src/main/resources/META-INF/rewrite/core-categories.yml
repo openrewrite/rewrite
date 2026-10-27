@@ -49,3 +49,235 @@ type: specs.openrewrite.org/v1beta/category
 packageName: software
 root: true
 ---
+# Generic top level domains that recipe authors use as a reverse DNS prefix
+type: specs.openrewrite.org/v1beta/category
+packageName: net
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: edu
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: gov
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: mil
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: int
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: dev
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: app
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: cloud
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: us
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: eu
+root: true
+---
+# Country code top level domains that recipe authors use as a reverse DNS prefix
+type: specs.openrewrite.org/v1beta/category
+packageName: uk
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: de
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: nl
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: fr
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: ch
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: at
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: be
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: dk
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: se
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: "no"
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: fi
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: ie
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: es
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: it
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: pl
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: cz
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: au
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: nz
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: ca
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: jp
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: cn
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: in
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: kr
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: sg
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: hk
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: br
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: mx
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: za
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: il
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: ae
+root: true
+---
+# Second level domains, which would otherwise be exposed as a top level category
+# once their country code parent is dropped
+type: specs.openrewrite.org/v1beta/category
+packageName: uk.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: uk.org
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: uk.ac
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: uk.gov
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: uk.me
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: jp.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: jp.ne
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: jp.or
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: au.com
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: au.net
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: au.org
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: br.com
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: za.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: nz.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: il.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: in.co
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: kr.co
+root: true
+---

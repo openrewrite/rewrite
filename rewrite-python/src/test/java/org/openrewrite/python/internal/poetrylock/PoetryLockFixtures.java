@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fixtures under {@code src/test/resources/poetrylock/} were generated with Poetry 2.4.1 against
+ * Fixtures under {@code lock/poetry/} were generated with Poetry 2.4.1 against
  * live pypi.org; see the README.md there for provenance. Contents are byte-exact reference outputs.
  */
 final class PoetryLockFixtures {
@@ -37,14 +37,15 @@ final class PoetryLockFixtures {
       "f-markers/poetry.lock",
       "g-git/poetry.lock",
       "i-upgrade/poetry.lock.before",
-      "i-upgrade/poetry.lock.after"
+      "i-upgrade/poetry.lock.after",
+      "k-group-markers/poetry.lock"
     };
 
     private PoetryLockFixtures() {
     }
 
     static String resource(String name) {
-        try (InputStream is = PoetryLockFixtures.class.getResourceAsStream("/poetrylock/" + name)) {
+        try (InputStream is = PoetryLockFixtures.class.getResourceAsStream("/lock/poetry/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

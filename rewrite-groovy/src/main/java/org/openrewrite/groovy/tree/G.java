@@ -24,9 +24,11 @@ import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
+import org.openrewrite.groovy.service.GroovySourceFileStatementService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -156,6 +158,8 @@ public interface G extends J {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName());
                 } else if (WhitespaceValidationService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName());
+                } else if (SourceFileStatementService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovySourceFileStatementService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
@@ -370,6 +374,7 @@ public interface G extends J {
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -682,6 +687,7 @@ public interface G extends J {
     @Data
     @With
     final class GString implements G, Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
@@ -707,6 +713,7 @@ public interface G extends J {
         @Data
         @With
         public static final class Value implements G {
+            @EqualsAndHashCode.Include
             UUID id;
             Markers markers;
             J tree;

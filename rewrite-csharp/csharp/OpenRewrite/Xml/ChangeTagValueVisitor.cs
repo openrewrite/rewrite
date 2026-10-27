@@ -47,7 +47,7 @@ public class ChangeTagValueVisitor<P>(Tag? scope, string? value) : XmlVisitor<P>
 
             t = t.WithContentList(new List<Content>
             {
-                new CharData(Guid.NewGuid(), prefix, Markers.Empty, false, value, afterText)
+                new CharData(Tree.RandomId(), prefix, Markers.Empty, false, value, afterText)
             });
         }
 

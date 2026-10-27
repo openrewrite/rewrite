@@ -150,7 +150,7 @@ export class TsConfigResolver {
         // the project's is the more direct statement of the two.
         const stated = resolution.moduleResolution as number | undefined;
         delete resolution.moduleResolution;
-        const mode = stated === undefined ? pairedModuleResolution(projectOptions) : MODULE_RESOLUTION[stated];
+        const mode = stated === undefined ? undefined : MODULE_RESOLUTION[stated];
         if (mode === NODE10) {
             withoutNodeModulesTargets(resolution);
         }
@@ -185,15 +185,16 @@ function rootPaths(options: CompilerOptions, configDirectory: string): void {
 
 /**
  * What a `ModuleResolutionKind` states in a config, by value, the enum itself not being on the
- * compiler's public surface. TypeScript 7 has dropped the two modes predating `exports`:
- * `node10` reads neither an `exports` nor an `imports` map, which `bundler` states directly,
- * while `classic` searches no `node_modules` at all and so has nothing to stand in for it.
+ * compiler's public surface. TypeScript 7 has dropped `node10`, which reads neither an `exports`
+ * nor an `imports` map, and `bundler` states that directly. The rest give way to the default.
+ * `classic` searches no `node_modules`. Under the pinned `preserve` module kind every import
+ * resolves in ESM mode, where the `node16` family demands extensions on relative paths.
  */
 const MODULE_RESOLUTION: Record<number, CompilerOptions | undefined> = {
     1: undefined,
     2: {moduleResolution: "bundler", resolvePackageJsonExports: false, resolvePackageJsonImports: false},
-    3: {moduleResolution: "node16"},
-    99: {moduleResolution: "nodenext"},
+    3: undefined,
+    99: undefined,
     100: {moduleResolution: "bundler"},
 };
 
@@ -222,29 +223,6 @@ function withoutNodeModulesTargets(options: CompilerOptions): void {
         options.paths = paths;
     } else {
         delete options.paths;
-    }
-}
-
-/** `ModuleKind` by value, for the module kinds that imply a resolution. */
-const MODULE_KIND = {CommonJS: 1, ESNext: 99, Node16: 100, NodeNext: 199, Preserve: 200};
-
-/**
- * The resolution TypeScript pairs with a project that states only its `module`. Only the pairing
- * is adopted, since a module kind such as `node16` classifies files as CJS or ESM, and an ESM-only
- * import from a CJS file is then the error TS1479, costing the file its LST.
- */
-function pairedModuleResolution(projectOptions: CompilerOptions): CompilerOptions | undefined {
-    switch (projectOptions.module) {
-        case MODULE_KIND.CommonJS:
-            return MODULE_RESOLUTION[2];
-        case MODULE_KIND.Node16:
-            return MODULE_RESOLUTION[3];
-        case MODULE_KIND.NodeNext:
-            return MODULE_RESOLUTION[99];
-        case MODULE_KIND.Preserve:
-            return MODULE_RESOLUTION[100];
-        default:
-            return undefined;
     }
 }
 

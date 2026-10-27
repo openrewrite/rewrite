@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * -------------------THIS FILE IS AUTO GENERATED--------------------------
- * Changes to this file may cause incorrect behavior and will be lost if
- * the code is regenerated.
-*/
-
 package org.openrewrite.csharp;
 
 import org.openrewrite.csharp.tree.Cs;
@@ -282,6 +276,11 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.SizeOf visitSizeOf(Cs.SizeOf sizeOf, P p) {
         return (Cs.SizeOf) super.visitSizeOf(sizeOf, p);
+    }
+
+    @Override
+    public Cs.TypeOf visitTypeOf(Cs.TypeOf typeOf, P p) {
+        return (Cs.TypeOf) super.visitTypeOf(typeOf, p);
     }
 
     @Override

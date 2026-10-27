@@ -42,13 +42,29 @@ class MSBuildProjectTest {
         MSBuildProject.PackageReference ref = new MSBuildProject.PackageReference(
           "Newtonsoft.Json", "$(NJVersion)", "13.0.3");
 
+        Map<String, String> dependencyRanges = new LinkedHashMap<>();
+        dependencyRanges.put("Newtonsoft.Json", "[13.0.1, )");
+        MSBuildProject.ResolvedPackage app = MSBuildProject.ResolvedPackage.builder()
+          .name("My.App.Core")
+          .resolvedVersion("1.0.0")
+          .depth(0)
+          .dependencyRanges(dependencyRanges)
+          .build();
+
         MSBuildProject.ResolvedPackage resolved = MSBuildProject.ResolvedPackage.builder()
           .name("Newtonsoft.Json")
           .resolvedVersion("13.0.3")
           .depth(0)
           .build();
+        assertThat(resolved.getDependencyRanges()).isEmpty();
+        assertThat(app.getDependencyRanges()).containsEntry("Newtonsoft.Json", "[13.0.1, )");
 
-        MSBuildProject.ProjectReference projRef = new MSBuildProject.ProjectReference("../Lib/Lib.csproj");
+        MSBuildProject.ProjectReference projRef = MSBuildProject.ProjectReference.builder()
+          .include("../Lib/Lib.csproj")
+          .name("Lib")
+          .depth(0)
+          .resolvedPackages(singletonList(resolved))
+          .build();
 
         MSBuildProject.TargetFramework tfm = MSBuildProject.TargetFramework.builder()
           .targetFramework("net8.0")
@@ -78,6 +94,10 @@ class MSBuildProjectTest {
           .isEqualTo("13.0.3");
         assertThat(marker.getTargetFrameworks().getFirst().getResolvedPackages()).hasSize(1);
         assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences()).hasSize(1);
+        assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences().getFirst().getName())
+          .isEqualTo("Lib");
+        assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences().getFirst().getResolvedPackages())
+          .containsExactly(resolved);
         assertThat(marker.getProperties()).containsKey("NJVersion");
         assertThat(marker.getProperties().get("NJVersion").getDefinedIn())
           .isEqualTo(Paths.get("project.csproj"));

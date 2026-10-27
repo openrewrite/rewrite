@@ -40,12 +40,14 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
         AsyncCallbackInSyncArrayMethod,
         AutoFormat,
         OrderImports,
-        ChangeImport
+        ChangeImport,
+        ChangeMethodTargetToImport
     } = await import("./javascript/recipes/index.js");
     await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
     await marketplace.install(AutoFormat, JavaScript);
     await marketplace.install(OrderImports, JavaScript);
     await marketplace.install(ChangeImport, JavaScript);
+    await marketplace.install(ChangeMethodTargetToImport, JavaScript);
 
     const {FindDependency, Search} = await import("./javascript/search/index.js");
     await marketplace.install(FindDependency, Search);
@@ -78,20 +80,20 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
-    async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.parserType);
-        await q.getAndSend(after, a => a.exceptionType);
-        await q.getAndSend(after, a => a.message);
-        await q.getAndSend(after, a => a.treeType);
+    rpcSend(after: ParseExceptionResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.parserType);
+        q.getAndSend(after, a => a.exceptionType);
+        q.getAndSend(after, a => a.message);
+        q.getAndSend(after, a => a.treeType);
     },
-    async rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): Promise<ParseExceptionResult> {
+    rpcReceive(before: ParseExceptionResult, q: RpcReceiveQueue): ParseExceptionResult {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            parserType: await q.receive(before.parserType),
-            exceptionType: await q.receive(before.exceptionType),
-            message: await q.receive(before.message),
-            treeType: await q.receive(before.treeType),
+            id: q.receive(before.id),
+            parserType: q.receive(before.parserType),
+            exceptionType: q.receive(before.exceptionType),
+            message: q.receive(before.message),
+            treeType: q.receive(before.treeType),
         });
     }
 });

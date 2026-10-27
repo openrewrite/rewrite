@@ -22,6 +22,7 @@ import {
     DependencyTypes,
     Generate,
     GenerateResponse,
+    AbortGetObject,
     GetObject,
     GetMarketplace,
     GetMarketplaceResponseRow,
@@ -30,6 +31,7 @@ import {
     ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
+    MarkerPrinter,
     Print,
     TraceGetObject,
     Visit,
@@ -40,28 +42,25 @@ import {
 import {DataTableStore} from "../data-table";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv, setCacheSizeProvider} from "./request/metrics";
-import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
+import {RpcObjectData, RpcObjectState, RpcReceiveQueue, StringInternTable} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
+import type {WorkerPageChannel} from "./worker-transport";
+
+// Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
+export const DEFAULT_BATCH_SIZE = 5000;
 
 export class RewriteRpc {
     /**
-     * Key for the active {@link RewriteRpc} connection on {@link globalThis}.
-     *
-     * It deliberately lives on `globalThis` rather than as a `static` field:
-     * a recipe package that bundles `@openrewrite/rewrite` (or resolves it from
-     * its own `node_modules`) loads a *separate copy* of this module, with its
-     * own class object and therefore its own statics. A `static` field set by
-     * the host would be invisible to such a copy, so `RewriteRpc.get()` (e.g.
-     * via `prepareJavaRecipe`) would return `undefined` and throw "no active
-     * RewriteRpc connection" — surfacing during `InstallRecipes` as the
-     * misleading "Ensure the constructor can be called without any arguments".
-     * {@link Symbol.for} resolves to the same symbol across every module copy,
-     * so all copies share the one active connection. See gh-7968.
+     * Key for the active {@link RewriteRpc} connection on {@link globalThis}. A recipe package that
+     * bundles `@openrewrite/rewrite` or resolves it from its own `node_modules` loads a separate copy
+     * of this module with its own class object and statics, so a `static` field set by the host would
+     * be invisible to it; {@link Symbol.for} resolves to the same symbol across every module copy, so
+     * all copies share the one active connection. See gh-7968.
      */
     private static readonly GLOBAL_KEY: symbol = Symbol.for("org.openrewrite.rpc.RewriteRpc.global");
 
@@ -75,6 +74,11 @@ export class RewriteRpc {
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
+    // One table for the whole connection so repeated discriminators, enum values and whitespace
+    // decoded across the many getObject calls of a run collapse to a single string instance rather
+    // than one per received object.
+    private readonly internedStrings = new StringInternTable();
+
     // Ref high-water per source file, captured before it is first visited so an Evict rolls
     // back exactly the refs it introduced. `send` = localRefs snapshot, `recvMax` = max remoteRefs key.
     readonly refCheckpoints: Map<string, { send: number, recvMax: number }> = new Map();
@@ -85,6 +89,8 @@ export class RewriteRpc {
 
     private configuredDataTableStore?: DataTableStore;
 
+    private readonly pageChannel?: WorkerPageChannel;
+
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
@@ -94,7 +100,8 @@ export class RewriteRpc {
                     marketplace?: RecipeMarketplace,
                     logger?: rpc.Logger,
                     metricsCsv?: string,
-                    recipeInstallDir?: string
+                    recipeInstallDir?: string,
+                    pageChannel?: WorkerPageChannel
                 }) {
         // Initialize metrics CSV file if configured
         initializeMetricsCsv(options.metricsCsv, options.logger);
@@ -104,6 +111,7 @@ export class RewriteRpc {
             refs: this.remoteRefs.size + this.localRefs.size,
         }));
         this.logger = options.logger;
+        this.pageChannel = options.pageChannel;
 
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -137,14 +145,14 @@ export class RewriteRpc {
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
+            this.localRefs, options?.batchSize || DEFAULT_BATCH_SIZE, traceGetObject, options.metricsCsv, options.pageChannel);
         GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
-        DependencyTypes.handle(this.connection, options?.batchSize || 1000, options.metricsCsv);
-        Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
+        DependencyTypes.handle(this.connection, options?.batchSize || DEFAULT_BATCH_SIZE, options.metricsCsv);
+        Print.handle(this.connection, getObject, getCursor, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
@@ -165,6 +173,7 @@ export class RewriteRpc {
             this.remoteRefs.clear();
             this.localRefs.clear();
             this.refCheckpoints.clear();
+            this.internedStrings.clear();
             preparedRecipes.clear();
             this.remoteLanguages = undefined;
         };
@@ -242,27 +251,51 @@ export class RewriteRpc {
         // (e.g., via a local recipe) since the remote doesn't know about those changes.
         const before = this.remoteObjects.get(id);
 
-        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
-            return this.connection.sendRequest(
-                new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, sourceFileType),
-            );
-        }, this.logger, this.traceGetObject.receive);
-
+        let q: RpcReceiveQueue | undefined;
         let remoteObject: P;
         try {
-            remoteObject = await q.receive<P>(before as P);
+            // The codecs receive synchronously. Over the worker transport each page is pulled when the
+            // previous one runs out. Otherwise the whole transfer is fetched before any of it is read.
+            // A page ending in END_OF_OBJECT has no successor. The remote drops its transfer state
+            // when it sends that marker, so asking again would restart the transfer.
+            let pages: RpcObjectData[][] | (() => readonly RpcObjectData[]);
+            if (this.pageChannel) {
+                pages = this.pageChannel.pages(id, sourceFileType);
+            } else {
+                pages = [];
+                let page: RpcObjectData[];
+                do {
+                    page = await this.connection.sendRequest(
+                        new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+                        new GetObject(id, sourceFileType),
+                    );
+                    pages.push(page);
+                } while (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT);
+            }
+
+            q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, pages, this.logger,
+                this.traceGetObject.receive, this.internedStrings);
+            remoteObject = q.receive<P>(before as P);
+            const eof = q.take();
+            if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+                RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
+                throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            }
         } catch (e) {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             this.remoteObjects.delete(id);
+            this.pageChannel?.settle();
+            // The sender still counts the object and its refs as delivered until it is told otherwise.
+            const rolledBack = await this.connection.sendRequest(
+                new rpc.RequestType<AbortGetObject, boolean, Error>("AbortGetObject"),
+                new AbortGetObject(id)
+            ).catch(() => false);
+            if (rolledBack) {
+                // a peer that could not roll back goes on sending these refs bare, so they are kept for it
+                q?.forgetRefs();
+            }
             throw e;
-        }
-
-        const eof = (await q.take());
-        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
-            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
         this.remoteObjects.set(id, remoteObject);
@@ -294,9 +327,9 @@ export class RewriteRpc {
         return parsed;
     }
 
-    async print(tree: SourceFile): Promise<string>;
-    async print(tree: Tree, cursor: Cursor): Promise<string>;
-    async print(tree: Tree, cursor?: Cursor): Promise<string> {
+    async print(tree: SourceFile, cursor?: undefined, markerPrinter?: MarkerPrinter): Promise<string>;
+    async print(tree: Tree, cursor: Cursor, markerPrinter?: MarkerPrinter): Promise<string>;
+    async print(tree: Tree, cursor?: Cursor, markerPrinter?: MarkerPrinter): Promise<string> {
         if (!cursor && !isSourceFile(tree)) {
             throw new Error("Cursor is required for non-SourceFile trees");
         }
@@ -304,7 +337,7 @@ export class RewriteRpc {
         const sourceFile = isSourceFile(tree) ? tree : cursor!.firstEnclosing(t => isSourceFile(t))!;
         return await this.connection.sendRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
-            new Print(tree.id, sourceFile.kind)
+            new Print(tree.id, sourceFile.kind, markerPrinter, isSourceFile(tree) ? undefined : this.getCursorIds(cursor))
         );
     }
 

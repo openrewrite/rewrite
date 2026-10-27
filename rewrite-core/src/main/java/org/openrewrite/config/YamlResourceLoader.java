@@ -230,8 +230,9 @@ public class YamlResourceLoader implements ResourceLoader {
         }
         try {
             return recipeLoader.apply(recipeName, null);
-        } catch (IllegalArgumentException | NoClassDefFoundError ignored) {
-            // handled by caller
+        } catch (IllegalArgumentException | RecipeNotFoundException | NoClassDefFoundError ignored) {
+            // A recipe this loader cannot supply is reported as absent so that the caller can
+            // consult the remaining resource loaders.
         }
         return null;
     }

@@ -16,17 +16,21 @@
 package org.openrewrite.internal;
 
 import io.quarkus.gizmo.ClassOutput;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class TreeVisitorAdapterClassLoader extends ClassLoader implements ClassOutput {
-    private final Map<String, Class<?>> adaptedClasses = new HashMap<>();
+    private final Map<String, Class<?>> adaptedClasses = new ConcurrentHashMap<>();
+
+    // Held here rather than statically so TreeVisitorAdapter.unload() releases these along with the generated classes
+    private final Map<TreeVisitorAdapter.AdapterKey, TreeVisitorAdapter.Adapter> adapters = new ConcurrentHashMap<>();
 
     /**
      * Caches the result of the {@code META-INF/rewrite/mixins} classpath scan, keyed by
@@ -54,6 +58,15 @@ public class TreeVisitorAdapterClassLoader extends ClassLoader implements ClassO
 
     Optional<Class<?>> mixinClass(Class<?> delegateClass, Class<?> adaptTo) {
         return mixinClasses.get(delegateClass).get(adaptTo);
+    }
+
+    TreeVisitorAdapter.@Nullable Adapter getAdapter(TreeVisitorAdapter.AdapterKey key) {
+        return adapters.get(key);
+    }
+
+    TreeVisitorAdapter.Adapter putAdapterIfAbsent(TreeVisitorAdapter.AdapterKey key, TreeVisitorAdapter.Adapter adapter) {
+        TreeVisitorAdapter.Adapter existing = adapters.putIfAbsent(key, adapter);
+        return existing == null ? adapter : existing;
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")

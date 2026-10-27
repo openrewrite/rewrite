@@ -22,8 +22,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.marker.StarDot;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -77,28 +77,19 @@ public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
                 }
                 List<Statement> stripped = ListUtils.map(statements, RewriteSpreadAllInConfigurationsBlock::stripSpread);
 
-                J.MethodInvocation template = parseConfigurationsAllTemplate(ctx);
-                J.Lambda templateLambda = (J.Lambda) template.getArguments().get(0);
-                J.Block templateBody = (J.Block) templateLambda.getBody();
+                J.MethodInvocation shell = GroovyTemplate.builder("configurations.all {\n}")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                J.Lambda shellLambda = (J.Lambda) shell.getArguments().get(0);
+                J.Block shellBody = (J.Block) shellLambda.getBody();
 
-                return autoFormat(template
-                        .withPrefix(m.getPrefix())
-                        .withArguments(singletonList(templateLambda.withBody(templateBody.withStatements(stripped)))),
+                // The shell arrives placed and formatted; only the statements poured into it are still indented for
+                // where they used to live.
+                return autoIndent(shell
+                        .withArguments(singletonList(shellLambda.withBody(shellBody.withStatements(stripped)))),
                         ctx, getCursor().getParentOrThrow());
             }
         });
-    }
-
-    private static J.MethodInvocation parseConfigurationsAllTemplate(ExecutionContext ctx) {
-        G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
-                .parse(ctx, "configurations.all {\n}\n")
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Unable to parse `configurations.all { }` template"));
-        Statement first = parsed.getStatements().get(0);
-        if (!(first instanceof J.MethodInvocation)) {
-            throw new IllegalStateException("Expected a method invocation, got " + first.getClass().getName());
-        }
-        return (J.MethodInvocation) first;
     }
 
     private static boolean isConfigurationsClosure(J.MethodInvocation m) {

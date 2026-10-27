@@ -105,6 +105,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
+    @Nullable
+    private Throwable reportedException;
+
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava25ParserVisitor(Path sourcePath,
@@ -442,7 +445,8 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
             List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
-            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = ((JCClassDecl) node).sym.getRecordComponents().stream()
+            Symbol.ClassSymbol recordSymbol = ((JCClassDecl) node).sym;
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = recordSymbol == null ? new HashMap<>() : recordSymbol.getRecordComponents().stream()
                     .collect(toMap(
                             Symbol::getSimpleName,
                             rc -> mapAnnotations(extractRecordComponentAnnotations(rc), new HashMap<>())
@@ -1217,12 +1221,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     emptyList(), node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : emptyList());
         }
 
-        boolean isCompactConstructor = nodeSym != null && (nodeSym.flags() & Flags.COMPACT_RECORD_CONSTRUCTOR) != 0;
+        boolean isCompactConstructor = hasFlag(node.getModifiers(), Flags.COMPACT_RECORD_CONSTRUCTOR);
         JContainer<Statement> params = JContainer.empty();
         if (!isCompactConstructor) {
             Space paramFmt = sourceBefore("(");
-            params = !node.getParameters().isEmpty() ?
-                    JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
+            params = !node.getParameters().isEmpty() || node.getReceiverParameter() != null ?
+                    JContainer.build(paramFmt, convertAll(parametersWithReceiver(node), commaDelim, t -> sourceBefore(")")),
                             Markers.EMPTY) :
                     JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                             Markers.EMPTY), EMPTY)), Markers.EMPTY);
@@ -1771,8 +1775,8 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
+            if (!hasLombokGeneratedSymbol(node)) {
+                // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();
@@ -1804,9 +1808,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && (node.declaredUsingVar() ||
-                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
+        // A pattern binding written with `var` is untyped and not declaredUsingVar(), but javac starts it at the keyword
+        if (typeExpr == null && (node.declaredUsingVar() || node.getStartPosition() < node.pos)) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym == null ? null : node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1827,12 +1831,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            String varName = n.getName().isEmpty() ? "_" : n.getName().toString();
+            String varName = n.nameexpr != null ? receiverName(n) : n.getName().isEmpty() ? "_" : n.getName().toString();
             Space namedVarPrefix = sourceBefore(varName);
 
             JavaType.Variable type = typeMapping.variableType(n.sym);
-            if ("_".equals(varName) && type != null) {
-                type = type.withName("_");
+            if (("_".equals(varName) || n.nameexpr != null) && type != null) {
+                type = type.withName(varName);
             }
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
@@ -1852,6 +1856,22 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
+    }
+
+    private List<Tree> parametersWithReceiver(MethodTree node) {
+        List<Tree> params = new ArrayList<>(node.getParameters().size() + 1);
+        if (node.getReceiverParameter() != null) {
+            params.add(node.getReceiverParameter());
+        }
+        params.addAll(node.getParameters());
+        return params;
+    }
+
+    /**
+     * Receiver parameters are named `this` or `Outer.this`, the latter of which is kept verbatim as the identifier name.
+     */
+    private String receiverName(JCVariableDecl receiver) {
+        return source.substring(receiver.nameexpr.getStartPosition(), receiver.nameexpr.getEndPosition(endPosTable));
     }
 
     private List<JLeftPadded<Space>> arrayDimensions() {
@@ -1933,6 +1953,13 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private void reportJavaParsingException(Throwable ex) {
+        // Rethrown through every enclosing convert(), so describe it once. A stack overflow's
+        // path is too deep to describe at all: the line numbers alone take hours to compute.
+        if (ex == reportedException || ex instanceof StackOverflowError) {
+            return;
+        }
+        reportedException = ex;
+
         // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
         StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
         message.append("--- BEGIN PATH ---\n");
@@ -2212,7 +2239,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
         return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
                 sym.getDeclarationAttributes().stream()
-                        .map(a -> a.type.toString())
+                        .map(a -> a.type.tsym.getQualifiedName().toString())
                         .anyMatch(ReloadableJava25ParserVisitor::isLombokAnnotationType);
     }
 

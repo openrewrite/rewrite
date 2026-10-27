@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
 import java.time.ZoneOffset
@@ -52,26 +50,48 @@ val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 val pythonExe = if (isWindows) venvDir.resolve("Scripts/python.exe") else venvDir.resolve("bin/python")
 val pipExe = if (isWindows) venvDir.resolve("Scripts/pip.exe") else venvDir.resolve("bin/pip")
 
-// Find system Python
+// The floor the package's requires-python declares. An interpreter below it still
+// yields a venv, and the rejection surfaces out of the editable install as a
+// requires-python error naming the package rather than the interpreter behind it.
+val minimumPython = 3 to 12
+
+// `major to minor` for an interpreter, or null when it cannot be run or does not say.
+// stderr is kept off the pipe: an interpreter that greets on it (a deprecation notice,
+// sitecustomize output) is still one whose version answer on stdout is good.
+fun pythonVersion(exe: String): Pair<Int, Int>? = try {
+    val process = ProcessBuilder(exe, "-c", "import sys; print('%d.%d' % sys.version_info[:2])")
+        .redirectError(ProcessBuilder.Redirect.DISCARD)
+        .start()
+    val printed = process.inputStream.bufferedReader().readText().trim()
+    if (process.waitFor() != 0) null else printed.split('.').map { it.toInt() }.let { it[0] to it[1] }
+} catch (e: Exception) {
+    null
+}
+
+fun Pair<Int, Int>.meetsMinimum() =
+    first > minimumPython.first || (first == minimumPython.first && second >= minimumPython.second)
+
+fun Pair<Int, Int>.display() = "${first}.${second}"
+
 fun findPython(): String {
     val candidates = if (isWindows) {
         listOf("python", "python3", "py")
     } else {
         listOf("python3", "python")
     }
+    val rejected = mutableListOf<String>()
     for (cmd in candidates) {
-        try {
-            val process = ProcessBuilder(cmd, "--version")
-                .redirectErrorStream(true)
-                .start()
-            if (process.waitFor() == 0) {
-                return cmd
-            }
-        } catch (e: Exception) {
-            // Command not found, try next
+        val version = pythonVersion(cmd) ?: continue
+        if (version.meetsMinimum()) {
+            return cmd
         }
+        rejected.add("$cmd is ${version.display()}")
     }
-    throw GradleException("Python 3 not found. Please install Python 3.10+ and ensure it's on your PATH.")
+    val found = if (rejected.isEmpty()) "" else " (found ${rejected.joinToString(", ")})"
+    throw GradleException(
+        "Python ${minimumPython.display()}+ not found$found. " +
+            "Please install Python ${minimumPython.display()} or newer and ensure it's on your PATH."
+    )
 }
 
 val pythonSetupVenv by tasks.registering(Exec::class) {
@@ -81,9 +101,11 @@ val pythonSetupVenv by tasks.registering(Exec::class) {
     onlyIf { !venvDir.exists() }
 
     workingDir = pythonDir
-    commandLine(findPython(), "-m", "venv", ".venv")
 
     doFirst {
+        // Resolved in the task action, not at configuration time, so a project that
+        // already has a venv configures on any interpreter.
+        commandLine(findPython(), "-m", "venv", ".venv")
         logger.lifecycle("Creating Python virtual environment in ${venvDir}")
     }
 }
@@ -116,6 +138,15 @@ val pythonInstall by tasks.registering(Exec::class) {
     inputs.file(pythonDir.resolve("pyproject.toml"))
 
     doFirst {
+        // An existing venv is reused as-is, so the interpreter inside one is checked
+        // here as well as at creation.
+        val version = pythonVersion(pythonExe.absolutePath)
+        if (version == null || !version.meetsMinimum()) {
+            throw GradleException(
+                "The virtual environment at $venvDir runs ${version?.display() ?: "an unknown Python"}, " +
+                    "below ${minimumPython.display()}. Delete it and re-run to have it rebuilt."
+            )
+        }
         logger.lifecycle("Installing Python package with pip")
     }
 }
@@ -202,8 +233,6 @@ val pytestTest by tasks.registering(Exec::class) {
     outputs.cacheIf { true }
 }
 
-ImportJUnitXmlReports.register(tasks, pytestTest, JUnitXmlDialect.GENERIC)
-
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
     dependsOn(pytestTest)
@@ -241,8 +270,10 @@ tasks.withType<Test> {
 // Generate a PEP 440 compliant version for CI builds
 // Snapshots use .dev suffix: 8.71.0.dev20260112145318
 // Releases use clean version: 8.71.0
-// Read from version.txt on disk if it exists (second Gradle invocation), so the published pip
-// package version matches what was baked into the JAR by the first invocation.
+// The timestamp is the commit's, so the two Gradle invocations of a CI build, `build` and then
+// `snapshot publish`, compute the same version for the JAR and the published pip package. Nothing is
+// read back from version.txt: the file is git-ignored, so a working tree kept from one build to the
+// next, as a CI worker keeps its checkouts, still holds the version an earlier commit wrote there.
 fun gitCommitTimestamp(): String {
     val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
         .directory(rootProject.projectDir)
@@ -255,13 +286,8 @@ fun gitCommitTimestamp(): String {
         .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
 }
 
-val pythonVersionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
 val pythonVersion: String = if (System.getenv("CI") != null) {
-    pythonVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
-        ?: project.version.toString().replace(
-            "-SNAPSHOT",
-            ".dev${gitCommitTimestamp()}"
-        )
+    project.version.toString().replace("-SNAPSHOT", ".dev${gitCommitTimestamp()}")
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
@@ -304,13 +330,22 @@ val pythonUpdateVersion by tasks.registering {
 
     doLast {
         val content = pyprojectFile.readText()
+        // The [project] table's own key alone, at a line's start: unanchored, the pattern also matched the end of
+        // ruff's target-version and ty's python-version, which the release then set to rewrite's version.
         val updated = content.replace(
-            Regex("""version\s*=\s*"[^"]*""""),
+            Regex("""(?m)^version\s*=\s*"[^"]*""""),
             """version = "$pythonVersion""""
         )
         pyprojectFile.writeText(updated)
         logger.lifecycle("Updated pyproject.toml version to $pythonVersion")
     }
+}
+
+// pythonInstall and pytestTest read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a release
+// builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's output
+// in no declared order, and they should see the version it sets.
+listOf(pythonInstall, pytestTest).forEach { reader ->
+    reader.configure { mustRunAfter(pythonUpdateVersion) }
 }
 
 // Task to install build dependencies
@@ -529,4 +564,41 @@ val printTestClasspath by tasks.registering {
 
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
+    // uv's own marker test cases, kept as JSON data
+    exclude("**/marker/uv-*-tree-rows.json")
+}
+
+// The lock regeneration test fixtures (recorded package-manager output) live in
+// openrewrite/rewrite-python-lock-fixtures. The pinned commit is fetched into build/lock-fixtures and joins the test
+// classpath, and a change of pin fetches again. A change that needs new fixtures moves the pin with it.
+val lockFixturesCommit = "c3231458118bb94a0cab845bc39a268b2e93e2a9"
+val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
+val lockFixturesFetched = layout.buildDirectory.file("tmp/lock-fixtures-commit")
+val syncLockFixtures = tasks.register("syncLockFixtures") {
+    inputs.property("commit", lockFixturesCommit)
+    outputs.dir(lockFixturesDir)
+    onlyIf {
+        val fetched = lockFixturesFetched.get().asFile
+        !fetched.exists() || fetched.readText() != lockFixturesCommit
+    }
+    doLast {
+        val archive = layout.buildDirectory.file("tmp/lock-fixtures.tar.gz").get().asFile
+        archive.parentFile.mkdirs()
+        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/$lockFixturesCommit")
+            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        delete(lockFixturesDir)
+        copy {
+            from(tarTree(resources.gzip(archive))) {
+                include("*/lock/**")
+                eachFile { path = path.substringAfter('/') }
+                includeEmptyDirs = false
+            }
+            into(lockFixturesDir)
+        }
+        lockFixturesFetched.get().asFile.writeText(lockFixturesCommit)
+    }
+}
+tasks.named<ProcessResources>("processTestResources") {
+    dependsOn(syncLockFixtures)
+    from(lockFixturesDir)
 }

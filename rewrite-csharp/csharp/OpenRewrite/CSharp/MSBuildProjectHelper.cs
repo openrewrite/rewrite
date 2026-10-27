@@ -21,6 +21,8 @@ using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp;
 
 /// <summary>
@@ -107,11 +109,11 @@ public static class MSBuildProjectHelper
         var sdk = doc.Root.GetAttributeValue("Sdk");
 
         if (rootDir == null)
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         var projectPath = Path.GetFullPath(Path.Combine(rootDir, doc.SourcePath));
         if (!File.Exists(projectPath))
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
 
         try
         {
@@ -119,7 +121,7 @@ public static class MSBuildProjectHelper
                 .ResolveProjectLockFileAsync(projectPath, null, CancellationToken.None)
                 .GetAwaiter().GetResult();
             if (lockFile == null)
-                return new MSBuildProject(Guid.NewGuid(), sdk);
+                return new MSBuildProject(Tree.RandomId(), sdk);
 
             var projectDir = Path.GetDirectoryName(projectPath)!;
             return CreateFromLockFile(sdk, lockFile, projectDir,
@@ -128,7 +130,7 @@ public static class MSBuildProjectHelper
         catch (Exception ex)
         {
             Log.Debug("Failed to resolve lock file for {Path}: {Error}", projectPath, ex.Message);
-            return new MSBuildProject(Guid.NewGuid(), sdk);
+            return new MSBuildProject(Tree.RandomId(), sdk);
         }
     }
 
@@ -165,7 +167,9 @@ public static class MSBuildProjectHelper
     /// <summary>
     ///     Builds the marker from the in-memory NuGet lock file: declared package references
     ///     (from the restore's PackageSpec), the fully-linked resolved package graph with
-    ///     per-package asset information, and project references.
+    ///     per-package asset information, and project references. Graph depth is measured from
+    ///     both the declared packages and the referenced projects, so anything reachable only
+    ///     through a project reference is still reported at its true distance from the project.
     /// </summary>
     public static MSBuildProject CreateFromLockFile(string? sdk, LockFile lockFile, string projectDir,
         bool includeDeclaredPackageReferences = true)
@@ -174,6 +178,7 @@ public static class MSBuildProjectHelper
 
         // Declared dependencies per TFM alias (framework-specific + project-level)
         var declaredByTfm = new Dictionary<string, List<PackageReference>>(StringComparer.OrdinalIgnoreCase);
+        var referencedProjectsByTfm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         if (spec != null)
         {
             foreach (var tfi in spec.TargetFrameworks)
@@ -184,34 +189,34 @@ public static class MSBuildProjectHelper
                     refs.Add(new PackageReference(dep.Name, dep.LibraryRange?.VersionRange?.MinVersion?.ToNormalizedString()));
                 declaredByTfm[tfm] = refs;
             }
+
+            foreach (var restoreTfm in spec.RestoreMetadata?.TargetFrameworks ?? [])
+            {
+                var tfm = ShortTfm(restoreTfm.FrameworkName, restoreTfm.TargetAlias);
+                var names = new List<string>();
+                foreach (var reference in restoreTfm.ProjectReferences)
+                {
+                    var path = reference.ProjectPath ?? reference.ProjectUniqueName;
+                    if (!string.IsNullOrEmpty(path))
+                        names.Add(Path.GetFileNameWithoutExtension(path));
+                }
+                referencedProjectsByTfm[tfm] = names;
+            }
         }
 
-        // Per-package file lists (analyzers, scripts, transforms, legacy content)
+        // Per-package file lists (analyzers, scripts, transforms, legacy content) and the
+        // project-file path of every referenced project, keyed by its restore-graph name.
         var libraryFiles = new Dictionary<string, IList<string>>(StringComparer.OrdinalIgnoreCase);
-        var projectLibraries = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var projectPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var library in lockFile.Libraries)
         {
-            var key = library.Name + "/" + library.Version;
             if (string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase))
-                projectLibraries[key] = library.MSBuildProject;
+            {
+                if (library.Name != null && library.MSBuildProject != null)
+                    projectPaths[library.Name] = RelativeProjectPath(library.MSBuildProject, projectDir);
+            }
             else if (library.Files != null)
-                libraryFiles[key] = library.Files;
-        }
-
-        var projectRefs = new List<ProjectReference>();
-        foreach (var msbuildProject in projectLibraries.Values)
-        {
-            if (msbuildProject == null)
-                continue;
-            try
-            {
-                var absolutePath = Path.GetFullPath(Path.Combine(projectDir, msbuildProject));
-                projectRefs.Add(new ProjectReference(Path.GetRelativePath(projectDir, absolutePath)));
-            }
-            catch
-            {
-                projectRefs.Add(new ProjectReference(msbuildProject));
-            }
+                libraryFiles[library.Name + "/" + library.Version] = library.Files;
         }
 
         var tfmList = new List<TargetFramework>();
@@ -226,14 +231,29 @@ public static class MSBuildProjectHelper
             declaredByTfm.TryGetValue(tfm, out var declared);
             declared ??= declaredByTfm.Values.FirstOrDefault() ?? new List<PackageReference>();
 
-            // First pass: create one node per resolved library with its asset data.
-            var nodes = new Dictionary<string, ResolvedPackage>(StringComparer.OrdinalIgnoreCase);
+            // First pass: one node per resolved library. Packages carry their asset data;
+            // referenced projects are compiled from source and only carry graph position.
+            var packageNodes = new Dictionary<string, ResolvedPackage>(StringComparer.OrdinalIgnoreCase);
+            var projectNodes = new Dictionary<string, ProjectReference>(StringComparer.OrdinalIgnoreCase);
             var dependencyNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var library in target.Libraries)
             {
                 if (library.Name == null || library.Version == null)
                     continue;
-                var isProject = string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase);
+                dependencyNames[library.Name] =
+                    library.Dependencies?.Select(d => d.Id).ToList() ?? new List<string>();
+
+                if (string.Equals(library.Type, "project", StringComparison.OrdinalIgnoreCase))
+                {
+                    projectNodes[library.Name] = new ProjectReference(
+                        projectPaths.TryGetValue(library.Name, out var include) ? include : library.Name,
+                        library.Name,
+                        depth: int.MaxValue,
+                        projectReferences: new List<ProjectReference>(),
+                        resolvedPackages: new List<ResolvedPackage>());
+                    continue;
+                }
+
                 var fileKey = library.Name + "/" + library.Version;
                 libraryFiles.TryGetValue(fileKey, out var files);
 
@@ -261,12 +281,21 @@ public static class MSBuildProjectHelper
                     }
                 }
 
-                var node = new ResolvedPackage(
+                var dependencyRanges = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (library.Dependencies != null)
+                {
+                    foreach (var dependency in library.Dependencies)
+                    {
+                        if (dependency.VersionRange != null)
+                            dependencyRanges[dependency.Id] = dependency.VersionRange.ToNormalizedString();
+                    }
+                }
+
+                packageNodes[library.Name] = new ResolvedPackage(
                     library.Name,
                     library.Version.ToNormalizedString(),
                     dependencies: new List<ResolvedPackage>(),
                     depth: int.MaxValue,
-                    type: isProject ? "project" : "package",
                     compileAssemblies: RealItems(library.CompileTimeAssemblies?.Select(i => i.Path)),
                     runtimeAssemblies: RealItems(library.RuntimeAssemblies?.Select(i => i.Path)),
                     frameworkAssemblies: library.FrameworkAssemblies?.ToList() ?? [],
@@ -278,39 +307,52 @@ public static class MSBuildProjectHelper
                     analyzerAssemblies: analyzers,
                     hasInstallScripts: hasInstallScripts,
                     hasXdtTransforms: hasXdt,
-                    hasLegacyContentFolder: hasLegacyContent);
-                nodes[library.Name] = node;
-                dependencyNames[library.Name] =
-                    library.Dependencies?.Select(d => d.Id).ToList() ?? new List<string>();
+                    hasLegacyContentFolder: hasLegacyContent,
+                    dependencyRanges: dependencyRanges);
             }
 
-            // Second pass: link dependency edges to the actual resolved nodes (shared instances)
-            // and compute depth as the shortest distance from a directly-declared dependency
-            // (direct = 0). Nodes unreachable from declared roots (e.g. the roots themselves in
-            // pathological graphs) keep the maximum observed depth.
+            // Depth is the shortest distance from a directly-declared dependency or a directly
+            // referenced project (direct = 0). Nodes unreachable from those roots fall back to 0.
+            referencedProjectsByTfm.TryGetValue(tfm, out var referencedProjects);
+            referencedProjects ??= referencedProjectsByTfm.Values.FirstOrDefault() ?? [];
+            var libraryNames = new HashSet<string>(packageNodes.Keys, StringComparer.OrdinalIgnoreCase);
+            libraryNames.UnionWith(projectNodes.Keys);
+            var depths = ComputeDepths(
+                declared.Select(d => d.Include).Concat(referencedProjects), libraryNames, dependencyNames);
+
+            var resolved = new List<ResolvedPackage>();
+            foreach (var (name, node) in packageNodes)
+                resolved.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));
+            var projectRefs = new List<ProjectReference>();
+            foreach (var (name, node) in projectNodes)
+                projectRefs.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));
+
+            // Second pass: link dependency edges to the final (shared) instances. A package can
+            // only depend on packages; a referenced project on either kind.
+            var finalNodes = resolved.ToDictionary(n => n.Name, n => n, StringComparer.OrdinalIgnoreCase);
+            var finalProjects = projectRefs.ToDictionary(n => n.Name!, n => n, StringComparer.OrdinalIgnoreCase);
             foreach (var (name, deps) in dependencyNames)
             {
-                var list = (List<ResolvedPackage>)nodes[name].Dependencies;
-                foreach (var depName in deps)
+                if (finalNodes.TryGetValue(name, out var package))
                 {
-                    if (nodes.TryGetValue(depName, out var depNode))
-                        list.Add(depNode);
+                    var edges = (List<ResolvedPackage>)package.Dependencies;
+                    foreach (var depName in deps)
+                    {
+                        if (finalNodes.TryGetValue(depName, out var depNode))
+                            edges.Add(depNode);
+                    }
                 }
-            }
-
-            var depths = ComputeDepths(declared.Select(d => d.Include), nodes, dependencyNames);
-            var resolved = new List<ResolvedPackage>();
-            foreach (var (name, node) in nodes)
-                resolved.Add(node.WithDepth(depths.TryGetValue(name, out var d) ? d : 0));
-            // Re-link after WithDepth created copies: rebuild edges against the final instances.
-            var finalNodes = resolved.ToDictionary(n => n.Name, n => n, StringComparer.OrdinalIgnoreCase);
-            foreach (var node in resolved)
-            {
-                var list = (List<ResolvedPackage>)node.Dependencies;
-                for (var i = 0; i < list.Count; i++)
+                else if (finalProjects.TryGetValue(name, out var project))
                 {
-                    if (finalNodes.TryGetValue(list[i].Name, out var final))
-                        list[i] = final;
+                    var packageEdges = (List<ResolvedPackage>)project.ResolvedPackages;
+                    var projectEdges = (List<ProjectReference>)project.ProjectReferences;
+                    foreach (var depName in deps)
+                    {
+                        if (finalNodes.TryGetValue(depName, out var depNode))
+                            packageEdges.Add(depNode);
+                        else if (finalProjects.TryGetValue(depName, out var depProject))
+                            projectEdges.Add(depProject);
+                    }
                 }
             }
 
@@ -333,7 +375,7 @@ public static class MSBuildProjectHelper
         var packageSources = ReadPackageSourcesFromTree(projectDir);
 
         return new MSBuildProject(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             sdk,
             new Dictionary<string, PropertyValue>(),
             packageSources,
@@ -356,14 +398,14 @@ public static class MSBuildProjectHelper
     /// </summary>
     private static Dictionary<string, int> ComputeDepths(
         IEnumerable<string> roots,
-        Dictionary<string, ResolvedPackage> nodes,
+        HashSet<string> libraryNames,
         Dictionary<string, List<string>> edges)
     {
         var depths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var queue = new Queue<(string Name, int Depth)>();
         foreach (var root in roots)
         {
-            if (nodes.ContainsKey(root) && depths.TryAdd(root, 0))
+            if (libraryNames.Contains(root) && depths.TryAdd(root, 0))
                 queue.Enqueue((root, 0));
         }
 
@@ -374,12 +416,25 @@ public static class MSBuildProjectHelper
                 continue;
             foreach (var dep in deps)
             {
-                if (nodes.ContainsKey(dep) && depths.TryAdd(dep, depth + 1))
+                if (libraryNames.Contains(dep) && depths.TryAdd(dep, depth + 1))
                     queue.Enqueue((dep, depth + 1));
             }
         }
 
         return depths;
+    }
+
+    private static string RelativeProjectPath(string msbuildProject, string projectDir)
+    {
+        try
+        {
+            var absolutePath = Path.GetFullPath(Path.Combine(projectDir, msbuildProject));
+            return Path.GetRelativePath(projectDir, absolutePath);
+        }
+        catch
+        {
+            return msbuildProject;
+        }
     }
 
     private static string ShortTfm(global::NuGet.Frameworks.NuGetFramework? framework, string? alias)
@@ -513,7 +568,7 @@ public static class MSBuildProjectHelper
         string? tempDir = null;
         try
         {
-            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Guid.NewGuid().ToString("N")[..8]);
+            tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-dotnet-" + Tree.RandomId().ToString("N")[..8]);
             Directory.CreateDirectory(tempDir);
 
             // Materialize all captured build files from the repository context

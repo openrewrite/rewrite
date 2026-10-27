@@ -43,6 +43,8 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -61,14 +63,14 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     String displayName = "Update Gradle wrapper";
 
     String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
-        "Queries `downloads.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
+        "Queries `services.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
         "which already exists within the wrapper properties file. " +
-        "If your artifact repository does not contain the same Gradle distributions as `downloads.gradle.org`, " +
+        "If your artifact repository does not contain the same Gradle distributions as `services.gradle.org`, " +
         "then the recipe may suggest a version which is not available in your artifact repository.";
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release available from `downloads.gradle.org` if not specified.",
+                          "Defaults to the latest release available from `services.gradle.org` if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -91,11 +93,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     Boolean addIfMissing;
 
-    @Option(example = "https://downloads.gradle.org/distributions/gradle-8.5-bin.zip",
+    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
-                    "When this option is set, the version and distribution fields must not be specified — only one source of truth is allowed. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
+                    "When this option is set, the version field must not be specified, and the distribution field, if specified, must match the distribution type in the URI. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
                     "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" +
                     "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
@@ -118,8 +120,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
-        if (wrapperUri != null && (version != null || distribution != null)) {
-            return Validated.invalid("wrapperUri", wrapperUri, "WrapperUri cannot be used with version and/or distribution parameter");
+        if (wrapperUri != null && (version != null || (distribution != null && !wrapperUri.contains("-" + distribution.toLowerCase(Locale.ROOT) + ".zip")))) {
+            return Validated.invalid("wrapperUri", wrapperUri, "WrapperUri cannot be used with version parameter, or with a distribution parameter that does not match it");
         }
         if (wrapperUri == null && distributionChecksum != null) {
             return Validated.invalid("distributionChecksum", distributionChecksum, "DistributionChecksum can only be used with wrapperUri");
@@ -134,6 +136,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     transient GradleWrapper gradleWrapper;
 
+    private @Nullable String distributionChecksum(GradleWrapper gradleWrapper) {
+        if (wrapperUri != null) {
+            return distributionChecksum;
+        }
+        return gradleWrapper.getDistributionChecksum() == null ? null : gradleWrapper.getDistributionChecksum().getHexValue();
+    }
+
     private GradleWrapper getGradleWrapper(@Nullable String distributionUrl, ExecutionContext ctx) {
         if (gradleWrapper == null) {
             if (wrapperUri != null) {
@@ -147,8 +156,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Data
     public static class GradleWrapperState {
+        /**
+         * Whether the root of the repository is a Gradle build, and so the place a missing wrapper belongs.
+         */
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
+        /**
+         * The directories that hold a `gradle/wrapper/gradle-wrapper.properties`, which are the only ones
+         * whose `gradlew`, `gradlew.bat` and wrapper jar are part of a wrapper.
+         */
+        Set<Path> wrapperDirectories = new HashSet<>();
 
         @Nullable
         BuildTool currentMarker;
@@ -174,6 +192,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public TreeVisitor<?, ExecutionContext> getScanner(GradleWrapperState acc) {
         return Preconditions.or(
                 new PropertiesVisitor<ExecutionContext>() {
+                    @Nullable
+                    String fileDistributionUrl;
+
+                    @Nullable
+                    String fileDistributionChecksum;
+
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                         if (!super.isAcceptable(sourceFile, ctx)) {
@@ -185,6 +209,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         } else if (!PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                             return false;
                         }
+                        acc.wrapperDirectories.add(wrapperDirectory(sourceFile.getSourcePath(), 3));
 
                         acc.currentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
                                 .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
@@ -193,14 +218,34 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
 
                     @Override
+                    public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                        fileDistributionUrl = null;
+                        fileDistributionChecksum = null;
+                        Properties p = super.visitFile(file, ctx);
+                        // a wrapper already on wrapperUri still needs updating when its checksum differs
+                        if (wrapperUri != null && distributionChecksum != null && !acc.needsWrapperUpdate &&
+                            fileDistributionUrl != null &&
+                            getGradleWrapper(fileDistributionUrl, ctx).getPropertiesFormattedUrl().equals(fileDistributionUrl) &&
+                            !distributionChecksum.equals(fileDistributionChecksum)) {
+                            acc.needsWrapperUpdate = true;
+                        }
+                        return p;
+                    }
+
+                    @Override
                     public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                        if ("distributionSha256Sum".equals(entry.getKey())) {
+                            fileDistributionChecksum = entry.getValue().getText();
+                            return entry;
+                        }
                         if (!"distributionUrl".equals(entry.getKey())) {
                             return entry;
                         }
 
-                        // Typical example: https://downloads.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
+                        // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
+                        fileDistributionUrl = currentDistributionUrl;
 
                         String currentVersion = acc.currentMarker == null ?
                                 GradleWrapper.versionFromDistributionUrl(currentDistributionUrl) :
@@ -236,7 +281,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                        if (new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                        // a Gradle build in a subdirectory, such as a test fixture or an included build with
+                        // its own wrapper, does not make the root a place a wrapper belongs
+                        if (sourceFile.getSourcePath().getParent() == null &&
+                            new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
                             acc.gradleProject = true;
                         }
 
@@ -288,10 +336,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
 
         if (acc.addGradleWrapperProperties) {
-            String checksum = gradleWrapper.getDistributionChecksum() == null ? null : gradleWrapper.getDistributionChecksum().getHexValue();
-            if (wrapperUri != null && distributionChecksum != null && checksum == null) {
-                checksum = distributionChecksum;
-            }
+            String checksum = distributionChecksum(gradleWrapper);
 
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
@@ -305,6 +350,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as properties"))
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
             gradleWrapperFiles.add(gradleWrapperProperties);
+            acc.wrapperDirectories.add(wrapperDirectory(WRAPPER_PROPERTIES_LOCATION, 3));
         }
 
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
@@ -369,7 +415,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 }
 
                 GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
                     if (!gradlewText.equals(gradlew.getText())) {
@@ -377,7 +424,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                     return gradlew;
                 }
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewBatText = batchScript(gradleWrapper, ctx);
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
                     if (!gradlewBatText.equals(gradlewBat.getText())) {
@@ -386,9 +434,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     return gradlewBat;
                 }
                 if (sourceFile instanceof Properties.File && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
-                    return new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
+                    return new WrapperPropertiesVisitor(gradleWrapper, distributionChecksum(gradleWrapper)).visitNonNull(sourceFile, ctx);
                 }
-                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
+                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 3))) {
                     return gradleWrapper.wrapperJar(sourceFile);
                 }
                 if (sourceFile instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
@@ -400,6 +449,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
+    }
+
+    /**
+     * The directory a wrapper file belongs to, the one that holds `gradlew` and `gradle/wrapper`.
+     *
+     * @param depth how many path elements the wrapper file is below that directory
+     */
+    private static Path wrapperDirectory(Path sourcePath, int depth) {
+        Path directory = sourcePath;
+        for (int i = 0; i < depth && directory != null; i++) {
+            directory = directory.getParent();
+        }
+        return directory == null ? Paths.get("") : directory;
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {
@@ -545,26 +607,26 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
         private final GradleWrapper gradleWrapper;
 
-        public WrapperPropertiesVisitor(GradleWrapper gradleWrapper) {
+        @Nullable
+        private final String checksum;
+
+        public WrapperPropertiesVisitor(GradleWrapper gradleWrapper, @Nullable String checksum) {
             this.gradleWrapper = gradleWrapper;
+            this.checksum = checksum;
         }
 
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext ctx) {
             Properties p = super.visitFile(file, ctx);
             Set<Properties.Entry> checksumKey = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
-            if (checksumKey.isEmpty() && gradleWrapper.getDistributionChecksum() != null) {
-                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
+            if (checksumKey.isEmpty() && checksum != null) {
+                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, checksum);
                 Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                 p = ((Properties.File) p).withContent(contentList);
-            } else if (!checksumKey.isEmpty() && gradleWrapper.getDistributionChecksum() == null) {
-                List<Properties.Content> contentList = ListUtils.map(((Properties.File) p).getContent(), c -> {
-                    if (c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())) {
-                        return null;
-                    }
-                    return c;
-                });
+            } else if (!checksumKey.isEmpty() && checksum == null) {
+                List<Properties.Content> contentList = ListUtils.filter(((Properties.File) p).getContent(), c ->
+                  !(c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())));
                 p = ((Properties.File) p).withContent(contentList);
             }
             return p;
@@ -573,13 +635,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         @Override
         public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if ("distributionUrl".equals(entry.getKey())) {
-                Properties.Value value = entry.getValue();
-                return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
+                return withText(entry, gradleWrapper.getPropertiesFormattedUrl());
             }
-            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey()) && gradleWrapper.getDistributionChecksum() != null) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
+            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey()) && checksum != null) {
+                return withText(entry, checksum);
             }
             return entry;
+        }
+
+        private static Properties.Entry withText(Properties.Entry entry, String text) {
+            return text.equals(entry.getValue().getSource()) ? entry : entry.withValue(entry.getValue().withText(text));
         }
     }
 }

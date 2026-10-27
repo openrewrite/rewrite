@@ -169,3 +169,25 @@ def test_a_comprehension_result_takes_an_expression():
         "a = d[p, q]\n",
         "a = [(p, q) for v in vs]\n",
     ))
+
+
+def test_an_associative_operator_lets_its_right_operand_regroup():
+    RecipeSpec(recipe=_rule("both({x})", "x and {x}")).rewrite_run(python(
+        "a = both(not p and not q)\n",
+        "a = x and not p and not q\n",
+    ))
+    RecipeSpec(recipe=_rule("either({x})", "x or {x}")).rewrite_run(python(
+        "a = either(p or q)\n",
+        "a = x or p or q\n",
+    ))
+
+
+def test_an_overloadable_operator_keeps_its_right_operand_parenthesized():
+    RecipeSpec(recipe=_rule("sum2({x})", "n + {x}")).rewrite_run(python(
+        "a = sum2(p + q)\n",
+        "a = n + (p + q)\n",
+    ))
+    RecipeSpec(recipe=_rule("union({x})", "s | {x}")).rewrite_run(python(
+        "a = union(p | q)\n",
+        "a = s | (p | q)\n",
+    ))

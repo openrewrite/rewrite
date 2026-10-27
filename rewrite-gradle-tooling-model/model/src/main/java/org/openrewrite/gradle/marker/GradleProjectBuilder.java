@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.marker;
 
+import lombok.Value;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
@@ -38,6 +39,7 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -84,7 +86,77 @@ public final class GradleProjectBuilder {
                         randomId(),
                         new ArrayList<>(pluginRepositories),
                         GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
-                ));
+                ),
+                springDependencyManagementPlugin(project));
+    }
+
+    // Reflective because OpenRewrite depends on neither plugin, and null when anything is unavailable so that
+    // recipes fall back to what the scripts say.
+    private static @Nullable SpringDependencyManagementPlugin springDependencyManagementPlugin(Project project) {
+        try {
+            Object extension = project.getExtensions().findByName("dependencyManagement");
+            if (extension == null) {
+                return null;
+            }
+            //noinspection unchecked
+            Map<String, String> importedProperties = (Map<String, String>) extension.getClass()
+                    .getMethod("getImportedProperties").invoke(extension);
+            //noinspection unchecked
+            Map<String, String> managedVersions = (Map<String, String>) extension.getClass()
+                    .getMethod("getManagedVersions").invoke(extension);
+            return new SpringDependencyManagementPlugin(
+                    importedBoms(project, extension),
+                    importedProperties == null ? emptyMap() : new LinkedHashMap<>(importedProperties),
+                    managedVersions == null ? emptyMap() : new LinkedHashMap<>(managedVersions));
+        } catch (Exception | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private static List<GroupArtifactVersion> importedBoms(Project project, Object extension) {
+        List<GroupArtifactVersion> boms = new ArrayList<>();
+        // The Boot plugin publishes the coordinates it imports, so prefer that over the other plugin's internals
+        Object bootPlugin = project.getPlugins().findPlugin("org.springframework.boot");
+        if (bootPlugin != null) {
+            try {
+                Object coordinates = bootPlugin.getClass().getField("BOM_COORDINATES").get(null);
+                GroupArtifactVersion gav = parseCoordinates(String.valueOf(coordinates));
+                if (gav != null) {
+                    boms.add(gav);
+                }
+            } catch (Exception | LinkageError ignored) {
+                // Fall through to the dependency management plugin's own view of what it imported
+            }
+        }
+        try {
+            Field containerField = extension.getClass().getDeclaredField("dependencyManagementContainer");
+            containerField.setAccessible(true);
+            Object container = containerField.get(extension);
+            Object globalDependencyManagement = container.getClass().getMethod("getGlobalDependencyManagement").invoke(container);
+            Method getImportedBomReferences = globalDependencyManagement.getClass().getDeclaredMethod("getImportedBomReferences");
+            getImportedBomReferences.setAccessible(true);
+            Object references = getImportedBomReferences.invoke(globalDependencyManagement);
+            if (references instanceof Iterable) {
+                for (Object reference : (Iterable<?>) references) {
+                    Object coordinates = reference.getClass().getMethod("getCoordinates").invoke(reference);
+                    GroupArtifactVersion gav = coordinates == null ? null : new GroupArtifactVersion(
+                            (String) coordinates.getClass().getMethod("getGroupId").invoke(coordinates),
+                            (String) coordinates.getClass().getMethod("getArtifactId").invoke(coordinates),
+                            (String) coordinates.getClass().getMethod("getVersion").invoke(coordinates));
+                    if (gav != null && gav.getArtifactId() != null && !boms.contains(gav)) {
+                        boms.add(gav);
+                    }
+                }
+            }
+        } catch (Exception | LinkageError ignored) {
+            // Plugin internals differ across versions; what the Boot plugin reported, if anything, still stands
+        }
+        return boms;
+    }
+
+    private static @Nullable GroupArtifactVersion parseCoordinates(String coordinates) {
+        String[] gav = coordinates.split(":");
+        return gav.length == 3 ? new GroupArtifactVersion(gav[0], gav[1], gav[2]) : null;
     }
 
     static List<MavenRepository> mapRepositories(List<ArtifactRepository> repositories) {
@@ -333,14 +405,50 @@ public final class GradleProjectBuilder {
         return GradleDependencyConfiguration.merge(inferredConstraints, configuredConstraints);
     }
 
-    private static final Map<GroupArtifactVersion, org.openrewrite.maven.tree.Dependency>
+    /**
+     * Shared by every configuration of every project. Keyed by attributes as well as coordinates: a project or
+     * platform dependency has the coordinates of what Gradle resolves it to, so whichever was seen first would
+     * otherwise give its attributes to all the rest.
+     */
+    private static final Map<RequestedKey, org.openrewrite.maven.tree.Dependency>
             requestedCache = new ConcurrentHashMap<>();
 
-    private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
-        GroupArtifactVersion gav = groupArtifactVersion(dep);
-        return requestedCache.computeIfAbsent(gav, it -> {
-                    Map<String, String> attributes = attributes(dep);
+    @Value
+    private static class RequestedKey {
+        GroupArtifactVersion gav;
+        Map<String, String> attributes;
+    }
 
+    private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
+        org.openrewrite.maven.tree.Dependency requested = cachedDependency(dep, configuration);
+        List<GroupArtifact> exclusions = exclusions(dep);
+        // The cache isn't keyed by excludes, so declarations that differ only in their excludes must not share it
+        return exclusions.isEmpty() ? requested : requested.withExclusions(exclusions);
+    }
+
+    private static List<GroupArtifact> exclusions(Dependency dep) {
+        if (!(dep instanceof ModuleDependency)) {
+            return emptyList();
+        }
+        Set<ExcludeRule> rules = ((ModuleDependency) dep).getExcludeRules();
+        if (rules.isEmpty()) {
+            return emptyList();
+        }
+        List<GroupArtifact> exclusions = new ArrayList<>(rules.size());
+        for (ExcludeRule rule : rules) {
+            exclusions.add(new GroupArtifact(orWildcard(rule.getGroup()), orWildcard(rule.getModule())));
+        }
+        return exclusions;
+    }
+
+    private static String orWildcard(@Nullable String coordinate) {
+        return coordinate == null || coordinate.isEmpty() ? "*" : coordinate;
+    }
+
+    private static org.openrewrite.maven.tree.Dependency cachedDependency(Dependency dep, Configuration configuration) {
+        GroupArtifactVersion gav = groupArtifactVersion(dep);
+        Map<String, String> attributes = attributes(dep);
+        return requestedCache.computeIfAbsent(new RequestedKey(gav, attributes), it -> {
                     String type = "jar";
                     if (Optional.ofNullable(Category.from(attributes.get(Category.key())))
                             .filter(cat -> cat == Category.REGULAR_PLATFORM || cat == Category.ENFORCED_PLATFORM)
@@ -442,25 +550,19 @@ public final class GradleProjectBuilder {
      */
     private static org.openrewrite.maven.tree.Dependency dependency(ResolvedDependency dep) {
         GroupArtifactVersion gav = groupArtifactVersion(dep);
-        return requestedCache.computeIfAbsent(gav, it -> {
-            // Synthesize a Category attribute if this is a BOM
-            String type = "jar";
-            Map<String, String> attributes = emptyMap();
-            // Both enforcedPlatform() and platform() appear the same in this context, so assume platform()
-            if (dep.getConfiguration().startsWith("platform-")) {
-                attributes = singletonMap(Category.key(), "platform");
-                type = "pom";
-            }
-
-            return org.openrewrite.maven.tree.Dependency.builder()
-                    .gav(gav)
-                    // platform() dependencies are effectively BOMs, so their jar isn't actually used
-                    .type(type)
-                    .attributes(attributes)
-                    .scope(dep.getConfiguration())
-                    .exclusions(emptyList())
-                    .build();
-        });
+        // Synthesize a Category attribute if this is a BOM
+        // Both enforcedPlatform() and platform() appear the same in this context, so assume platform()
+        boolean platform = dep.getConfiguration().startsWith("platform-");
+        Map<String, String> attributes = platform ? singletonMap(Category.key(), "platform") : emptyMap();
+        return requestedCache.computeIfAbsent(new RequestedKey(gav, attributes), it ->
+                org.openrewrite.maven.tree.Dependency.builder()
+                        .gav(gav)
+                        // platform() dependencies are effectively BOMs, so their jar isn't actually used
+                        .type(platform ? "pom" : "jar")
+                        .attributes(attributes)
+                        .scope(dep.getConfiguration())
+                        .exclusions(emptyList())
+                        .build());
     }
 
     static org.openrewrite.maven.tree.ResolvedDependency resolved(

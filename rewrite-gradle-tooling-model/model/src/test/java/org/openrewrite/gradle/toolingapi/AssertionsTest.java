@@ -71,8 +71,23 @@ class AssertionsTest implements RewriteTest {
           initscript{
               repositories{
                   mavenLocal()
-                  maven{ url = uri("https://central.sonatype.com/repository/maven-snapshots") }
-                  mavenCentral()
+                  // If MAVEN_CENTRAL_MIRROR_URL, _USERNAME and _PASSWORD are all set, download the plugin from that mirror
+                  // instead of Maven Central and Sonatype's snapshots, as the bundled init.gradle does.
+                  def mirrorUrl = System.getenv("MAVEN_CENTRAL_MIRROR_URL")
+                  def mirrorUsername = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")
+                  def mirrorPassword = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD")
+                  if (mirrorUrl && mirrorUsername && mirrorPassword) {
+                      maven {
+                          url = uri(mirrorUrl)
+                          credentials {
+                              username = mirrorUsername
+                              password = mirrorPassword
+                          }
+                      }
+                  } else {
+                      maven{ url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                      mavenCentral()
+                  }
               }
 
               configurations.all{
@@ -93,7 +108,7 @@ class AssertionsTest implements RewriteTest {
           }
 
           """;
-        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://downloads.gradle.org/distributions/gradle-8.6-bin.zip"), null);
+        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://services.gradle.org/distributions/gradle-8.6-bin.zip"), null);
         rewriteRun(
           spec -> spec.beforeRecipe(Assertions.withToolingApi(gradleWrapper, alternateInit)),
           //language=groovy
@@ -222,7 +237,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleSubprojectGetsItsOwnGradleProjectOnGradle9() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
           //language=groovy
           settingsGradle(
             """
@@ -273,7 +288,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleResolvesAgainstBuildRoot() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
           //language=groovy
           settingsGradle(
             """

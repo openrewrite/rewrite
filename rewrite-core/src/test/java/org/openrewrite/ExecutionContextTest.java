@@ -16,8 +16,8 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -43,7 +43,7 @@ class ExecutionContextTest implements RewriteTest {
                   return text;
               }
           }).withCausesAnotherCycle(true))
-            .typeValidationOptions(TypeValidation.all().immutableExecutionContext(false)),
+            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);

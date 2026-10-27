@@ -64,7 +64,7 @@ func (p *treeCapturingPrinter) PreVisit(t java.Tree, param any) java.Tree {
 	}
 	if j, ok := t.(java.J); ok {
 		node.hasPrefix = true
-		node.prefixWhitespace = j.GetPrefix().Whitespace
+		node.prefixWhitespace = j.GetPrefix().Whitespace()
 	}
 	p.byTree[t] = node
 

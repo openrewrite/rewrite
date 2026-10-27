@@ -1024,6 +1024,25 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classToStringKeyword() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
+          java(
+            """
+              class A {
+                  CharSequence foo = "";
+              }
+              """,
+            """
+              class A {
+                  String foo = "";
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/698")
     @Test
     void importOrdering() {
@@ -1345,6 +1364,99 @@ class ChangeTypeTest implements RewriteTest {
                */
               class Test {
                   int n;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2} here
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocSee() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * @see a.A1
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * @see a.A2
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocMemberLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1#m()} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2#m()} here
+               */
+              class Test {
               }
               """
           )

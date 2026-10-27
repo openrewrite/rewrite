@@ -25,6 +25,8 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.internal.GoExecutor;
+import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markers;
@@ -57,7 +59,9 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -278,6 +282,10 @@ public class GoRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, base, parseOptions(ctx)), ParseProjectResponse.class);
+                    // Module files carry the resolved module graph, so a consumer can read it before the sources.
+                    response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
+                            !GoMod.class.getName().equals(item.getSourceFileType()) &&
+                            !GoSum.class.getName().equals(item.getSourceFileType())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -397,8 +405,10 @@ public class GoRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the path to the Go RPC binary. The supplier is invoked at most
-         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * Supplies the path to the Go RPC binary. The supplier is invoked once per
+         * thread that starts an RPC, since {@link RewriteRpcProcessManager} holds one
+         * RPC per thread; invocations are serialized across threads (see
+         * {@link #resolveGoBinaryPath}). Returning {@code null} uses the built-in
          * fallback discovery (same as not configuring the path at all). Exceptions
          * thrown by the supplier propagate out of the RPC-start call.
          *
@@ -456,7 +466,7 @@ public class GoRewriteRpc extends RewriteRpc {
 
         @Override
         public GoRewriteRpc get() {
-            @Nullable Path goBinaryPath = goBinaryPathSupplier.get();
+            @Nullable Path goBinaryPath = resolveGoBinaryPath(goBinaryPathSupplier);
             String binaryPath;
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();
@@ -479,14 +489,14 @@ public class GoRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-            process.environment().putAll(environment);
-            ensureGoRoot(process.environment());
+            Map<String, String> env = new LinkedHashMap<>(environment);
+            ensureGoRoot(env);
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("go")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {
@@ -498,6 +508,14 @@ public class GoRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        private static final Object BINARY_PATH_LOCK = new Object();
+
+        static @Nullable Path resolveGoBinaryPath(Supplier<@Nullable Path> goBinaryPathSupplier) {
+            synchronized (BINARY_PATH_LOCK) {
+                return goBinaryPathSupplier.get();
             }
         }
     }

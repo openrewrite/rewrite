@@ -14,6 +14,8 @@
 
 """Tests for Template class."""
 
+import copy
+import dataclasses
 from typing import Any, Optional
 from rewrite import random_id
 
@@ -22,14 +24,25 @@ import pytest
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.java import tree as j
 from rewrite.java.tree import Unary
-from rewrite.java.support_types import Space, JRightPadded
+from rewrite.java.support_types import Space, JLeftPadded, JRightPadded
 from rewrite.markers import Markers
 from rewrite.python.template import template, capture, pattern, Template, TemplateBuilder
+from rewrite.python.template.coordinates import PythonCoordinates
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
+from rewrite.python.template.replacement import SubstitutedValue
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+from rewrite.tree import Tree
 from rewrite.visitor import Cursor
+
+
+def _assert_unmarked(tree) -> None:
+    class Check(PythonVisitor[None]):
+        def pre_visit(self, t, p):
+            assert t.markers.find_first(SubstitutedValue) is None, t
+            return t
+    Check().visit(tree, None)
 
 
 class TestTemplate:
@@ -368,7 +381,142 @@ class TestTemplateApply:
         RecipeSpec(recipe=recipe(True)).rewrite_run(python(
             before, "with lock:\n    wrapper(\n        new(v)\n    )\n"))
         RecipeSpec(recipe=recipe(False)).rewrite_run(python(
-            before, "with lock:\n    wrapper(\n    new(v)\n)\n"))
+            before, "with lock:\n    wrapper(\n    new(v)\n)\n", after_recipe=_assert_unmarked))
+
+    def test_apply_never_puts_one_id_in_two_places(self):
+        x = capture('x')
+        pat = pattern("wrap({x})", x=x)
+        tmpl = template("{x} + {x}", x=x)
+        captured_ids: list = []
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.Double"
+
+            @property
+            def display_name(self) -> str:
+                return "Double"
+
+            @property
+            def description(self) -> str:
+                return "Splices one capture into two slots."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if not match:
+                            return method
+                        captured_ids.append(match.get(x).id)
+                        return tmpl.apply(self.cursor, values=match)
+                return Visitor()
+
+        result_ids: list = []
+
+        def collect(cu):
+            # A field walk counts a node the visitor skips
+            seen = set()
+
+            def walk(o):
+                if id(o) in seen:
+                    return
+                seen.add(id(o))
+                if isinstance(o, Tree):
+                    result_ids.append(o.id)
+                if dataclasses.is_dataclass(o) and not isinstance(o, type):
+                    for f in dataclasses.fields(o):
+                        walk(getattr(o, f.name))
+                elif isinstance(o, (list, tuple)):
+                    for e in o:
+                        walk(e)
+            walk(cu)
+
+        RecipeSpec(recipe=Rule()).rewrite_run(python(
+            "y = wrap([v for v in a])\nz = wrap(b)\n",
+            "y = [v for v in a] + [v for v in a]\nz = b + b\n",
+            after_recipe=collect))
+        assert len(result_ids) == len(set(result_ids))
+        # The first slot keeps the id of the node it replaces
+        assert all(i in result_ids for i in captured_ids)
+
+    def test_substituted_value_keeps_its_layout(self):
+        x = capture('x')
+        y = capture('y')
+        tmpl = template("{x} += {y}", x=x, y=y)
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.AugmentedAssign"
+
+            @property
+            def display_name(self) -> str:
+                return "Augmented assign"
+
+            @property
+            def description(self) -> str:
+                return "Rewrites `w = w + v` as `w += v`."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_assignment(self, a, p):
+                        a = super().visit_assignment(a, p)
+                        if not isinstance(a.assignment, j.Binary):
+                            return a
+                        return tmpl.apply(self.cursor, values={'x': a.variable, 'y': a.assignment.right})
+                return Visitor()
+
+        RecipeSpec(recipe=Rule()).rewrite_run(
+            python("w = w + (0,)\n", "w += (0,)\n"),
+            python("w = w + [ 0 ]\n", "w += [ 0 ]\n", after_recipe=_assert_unmarked),
+            python("w = w + (\n    0,\n    1,\n)\n", "w += (\n    0,\n    1,\n)\n"),
+        )
+
+    def test_hand_built_value_gets_the_spacing_it_cannot_print_without(self):
+        v = capture('v')
+        pat = pattern("f({v})", v=v)
+        tmpl = template("print({x})", x=capture('x'))
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.PrintNegated"
+
+            @property
+            def display_name(self) -> str:
+                return "Print negated"
+
+            @property
+            def description(self) -> str:
+                return "Rewrites `f(v)` as `print(not v)`."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if not match:
+                            return method
+                        negated = j.Unary(
+                            random_id(), Space.EMPTY, Markers.EMPTY,
+                            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
+                            match.get(v).replace(prefix=Space.EMPTY), None,
+                        )
+                        return tmpl.apply(self.cursor, values={'x': negated})
+                return Visitor()
+
+        RecipeSpec(recipe=Rule()).rewrite_run(python("f(y)\n", "print(not y)\n"))
+
+    def test_apply_without_cursor_leaves_the_result_unformatted(self):
+        tmpl = template("print({expr})", expr=capture('expr'))
+        ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
+
+        result = tmpl.apply(None, values={'expr': ident}, coordinates=PythonCoordinates.replace(ident))
+
+        _assert_unmarked(result)
+        assert isinstance(result, j.MethodInvocation)
 
     def test_apply_no_captures_returns_tree(self):
         """Test that apply with no captures returns a tree."""
@@ -384,6 +532,7 @@ class TestTemplateApply:
         ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
         result = tmpl.apply(cursor=None, values={'expr': ident})
 
+        _assert_unmarked(result)
         assert isinstance(result, j.MethodInvocation)
         assert len(result.arguments) == 1
         assert isinstance(result.arguments[0], j.Identifier)
@@ -424,7 +573,7 @@ class TestMaybeParenthesize:
     def _binary(left, op, right) -> j.Binary:
         return j.Binary(
             random_id(), Space.EMPTY, Markers.EMPTY, left,
-            JRightPadded(op, Space([], ' '), Markers.EMPTY),
+            JLeftPadded(Space([], ' '), op, Markers.EMPTY),
             right, None,
         )
 
@@ -464,7 +613,7 @@ class TestMaybeParenthesize:
         or_expr = self._binary(self._ident('a'), j.Binary.Type.Or, self._ident('b'))
         not_parent = j.Unary(
             random_id(), Space.EMPTY, Markers.EMPTY,
-            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
             or_expr, None,
         )
         cursor = self._cursor_chain(not_parent, or_expr)
@@ -506,7 +655,7 @@ class TestMaybeParenthesize:
         and_inner = self._binary(x_ident, j.Binary.Type.And, y_ident)
         not_expr = j.Unary(
             random_id(), Space.EMPTY, Markers.EMPTY,
-            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
             j.Parentheses(
                 random_id(), Space.EMPTY, Markers.EMPTY,
                 JRightPadded(and_inner, Space.EMPTY, Markers.EMPTY),
@@ -815,3 +964,82 @@ class TestTypeAttributedPatternMatching:
                 """,
             ),
         )
+
+
+def _kinds(tree) -> list:
+    kinds = []
+
+    class _Collector(PythonVisitor):
+        def visit(self, t, p, parent=None):
+            if t is not None:
+                kinds.append(type(t).__name__)
+            return super().visit(t, p, parent)
+
+    _Collector().visit(tree, None)
+    return kinds
+
+
+def _parse(source: str):
+    import ast
+    from rewrite.python._parser_visitor import ParserVisitor
+    return ParserVisitor(source, "expected.py", None).visit(ast.parse(source))
+
+
+class _ReplaceSize(Recipe):
+    def __init__(self, replacement: str, coordinates_on_a_copy: bool = False):
+        self._replacement = replacement
+        self._coordinates_on_a_copy = coordinates_on_a_copy
+
+    @property
+    def name(self) -> str:
+        return "test.ReplaceSize"
+
+    @property
+    def display_name(self) -> str:
+        return "Replace size()"
+
+    @property
+    def description(self) -> str:
+        return "Replaces `x.size()` with a template over `x`."
+
+    def editor(self):
+        x = capture('x')
+        pat = pattern("{x}.size()", x=x)
+        tmpl = template(self._replacement, x=x)
+        on_a_copy = self._coordinates_on_a_copy
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, method, p):
+                method = super().visit_method_invocation(method, p)
+                match = pat.match(method, self.cursor)
+                if not match:
+                    return method
+                # A visitor that rebuilt the node names it by a new object with the same id.
+                coordinates = PythonCoordinates.replace(copy.copy(method)) if on_a_copy else None
+                return tmpl.apply(self.cursor, values=match, coordinates=coordinates)
+        return Visitor()
+
+
+class TestTemplateApplySlotShape:
+    """The tree `apply` leaves behind has the node kinds a parse of the printed result has."""
+
+    @staticmethod
+    def _run(replacement: str, before: str, after: str, coordinates_on_a_copy: bool = False) -> None:
+        def same_kinds_as_parse(cu):
+            assert _kinds(cu) == _kinds(_parse(after))
+
+        RecipeSpec(recipe=_ReplaceSize(replacement, coordinates_on_a_copy)).rewrite_run(
+            python(before, after, after_recipe=same_kinds_as_parse))
+
+    def test_replaced_call_in_an_expression_slot_stays_bare(self):
+        self._run("len({x})", "b = a.size()", "b = len(a)")
+
+        self._run("len({x})", "f(a.size())", "f(len(a))")
+
+    def test_replaced_statement_level_call_is_wrapped_only_when_not_a_statement(self):
+        self._run("len({x})", "a.size()", "len(a)")
+
+        self._run("{x} + 1", "a.size()", "a + 1")
+
+    def test_coordinates_on_a_rebuilt_node_find_its_slot(self):
+        self._run("{x} + 1", "f(a.size())", "f(a + 1)", coordinates_on_a_copy=True)

@@ -106,4 +106,22 @@ class ChangeExtraPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void escapeSequenceInOldValue() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                  foo = "a\\nb"
+              }
+              """,
+            """
+              ext {
+                  foo = "baz"
+              }
+              """
+          )
+        );
+    }
 }

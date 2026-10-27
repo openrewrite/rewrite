@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker} from "../markers";
+import {Marker, MarkersKind} from "../markers";
 import {J} from "../java";
+import {spaceRef} from "../java/rpc";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
@@ -24,10 +25,12 @@ import {
     StyleKind,
     TabsAndIndentsStyle,
     WrappingAndBracesStyle,
-    WrappingAndBracesStyleDetailKind
+    WrappingAndBracesStyleDetailKind,
+    prettierStyle
 } from "./style";
-import {Autodetect} from "./autodetect";
+import {Autodetect, autodetect} from "./autodetect";
 import {updateIfChanged} from "../util";
+import {NamedStyles, Style} from "../style";
 
 declare module "./tree" {
     namespace JS {
@@ -37,6 +40,7 @@ declare module "./tree" {
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
+            readonly Computed: "org.openrewrite.javascript.marker.Computed";
         };
     }
 }
@@ -48,6 +52,7 @@ declare module "./tree" {
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
+    Computed: "org.openrewrite.javascript.marker.Computed",
 } as const;
 
 /**
@@ -81,22 +86,34 @@ export interface FunctionDeclaration extends Marker {
 }
 
 /**
+ * A name written in brackets where the model has room for an identifier only, as the
+ * member of `enum A { ['b'] }` is. The identifier holds the bracketed literal.
+ */
+export interface Computed extends Marker {
+    readonly kind: typeof JS.Markers.Computed;
+    /**
+     * The space before the closing bracket.
+     */
+    readonly suffix: J.Space;
+}
+
+/**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
     kind: M["kind"]
 ) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+        rpcReceive(before: M, q: RpcReceiveQueue): M {
             return updateIfChanged(before, {
-                id: await q.receive(before.id),
-                prefix: await q.receive(before.prefix)
+                id: q.receive(before.id),
+                prefix: q.receive(before.prefix)
             } as Partial<M>);
         },
 
-        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
-            await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => a.prefix);
+        rpcSend(after: M, q: RpcSendQueue): void {
+            q.getAndSend(after, a => a.id);
+            q.getAndSend(after, a => spaceRef(a.prefix));
         }
     });
 }
@@ -107,39 +124,54 @@ registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
 
-// Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
-// Only serialize the variable fields; constant fields are defined in the interface
-RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
-    async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
+RpcCodecs.registerCodec(JS.Markers.Computed, {
+    rpcReceive(before: Computed, q: RpcReceiveQueue): Computed {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            config: await q.receive(before.config),
-            prettierVersion: await q.receive(before.prettierVersion),
-            ignored: await q.receive(before.ignored),
+            id: q.receive(before.id),
+            suffix: q.receive(before.suffix),
         });
     },
 
-    async rpcSend(after: PrettierStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.config);
-        await q.getAndSend(after, a => a.prettierVersion);
-        await q.getAndSend(after, a => a.ignored);
+    rpcSend(after: Computed, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => spaceRef(a.suffix));
+    }
+});
+
+// Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
+// Only serialize the variable fields; constant fields are defined in the interface
+RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
+    rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): PrettierStyle {
+        // the fields that never vary are not sent, so a marker first met here does not have them yet
+        return updateIfChanged(before.name ? before : {...prettierStyle(before.id, {}), ...before}, {
+            id: q.receive(before.id),
+            config: q.receive(before.config),
+            prettierVersion: q.receive(before.prettierVersion),
+            ignored: q.receive(before.ignored),
+        });
+    },
+
+    rpcSend(after: PrettierStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.config);
+        q.getAndSend(after, a => a.prettierVersion);
+        q.getAndSend(after, a => a.ignored);
     }
 });
 
 // Register codec for Autodetect (auto-detected styles for JavaScript/TypeScript)
 // Only serialize the variable fields (id, styles); constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.Autodetect, {
-    async rpcReceive(before: Autodetect, q: RpcReceiveQueue): Promise<Autodetect> {
-        return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            styles: (await q.receiveList(before.styles))!,
+    rpcReceive(before: Autodetect, q: RpcReceiveQueue): Autodetect {
+        return updateIfChanged(before.name ? before : {...autodetect(before.id, []), ...before}, {
+            id: q.receive(before.id),
+            styles: (q.receiveList(before.styles))!,
         });
     },
 
-    async rpcSend(after: Autodetect, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSendList(after, a => a.styles, s => s.kind);
+    rpcSend(after: Autodetect, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSendList(after, a => a.styles, s => s.kind);
     }
 });
 
@@ -153,17 +185,17 @@ function registerSimpleCodec<T extends { kind: string }>(
     fields: (keyof T)[]
 ) {
     RpcCodecs.registerCodec(kind, {
-        async rpcReceive(before: T, q: RpcReceiveQueue): Promise<T> {
+        rpcReceive(before: T, q: RpcReceiveQueue): T {
             const updates: Partial<T> = {};
             for (const field of fields) {
-                (updates as any)[field] = await q.receive((before as any)[field]);
+                (updates as any)[field] = q.receive((before as any)[field]);
             }
             return updateIfChanged(before, updates);
         },
 
-        async rpcSend(after: T, q: RpcSendQueue): Promise<void> {
+        rpcSend(after: T, q: RpcSendQueue): void {
             for (const field of fields) {
-                await q.getAndSend(after, a => (a as any)[field]);
+                q.getAndSend(after, a => (a as any)[field]);
             }
         }
     });
@@ -219,26 +251,26 @@ registerSimpleCodec<SpacesStyle.Other>(SpacesStyleDetailKind.SpacesStyleOther, [
 
 // SpacesStyle - has nested objects
 RpcCodecs.registerCodec(StyleKind.SpacesStyle, {
-    async rpcReceive(before: SpacesStyle, q: RpcReceiveQueue): Promise<SpacesStyle> {
+    rpcReceive(before: SpacesStyle, q: RpcReceiveQueue): SpacesStyle {
         return updateIfChanged(before, {
-            beforeParentheses: await q.receive(before.beforeParentheses),
-            aroundOperators: await q.receive(before.aroundOperators),
-            beforeLeftBrace: await q.receive(before.beforeLeftBrace),
-            beforeKeywords: await q.receive(before.beforeKeywords),
-            within: await q.receive(before.within),
-            ternaryOperator: await q.receive(before.ternaryOperator),
-            other: await q.receive(before.other),
+            beforeParentheses: q.receive(before.beforeParentheses),
+            aroundOperators: q.receive(before.aroundOperators),
+            beforeLeftBrace: q.receive(before.beforeLeftBrace),
+            beforeKeywords: q.receive(before.beforeKeywords),
+            within: q.receive(before.within),
+            ternaryOperator: q.receive(before.ternaryOperator),
+            other: q.receive(before.other),
         });
     },
 
-    async rpcSend(after: SpacesStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.beforeParentheses);
-        await q.getAndSend(after, a => a.aroundOperators);
-        await q.getAndSend(after, a => a.beforeLeftBrace);
-        await q.getAndSend(after, a => a.beforeKeywords);
-        await q.getAndSend(after, a => a.within);
-        await q.getAndSend(after, a => a.ternaryOperator);
-        await q.getAndSend(after, a => a.other);
+    rpcSend(after: SpacesStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.beforeParentheses);
+        q.getAndSend(after, a => a.aroundOperators);
+        q.getAndSend(after, a => a.beforeLeftBrace);
+        q.getAndSend(after, a => a.beforeKeywords);
+        q.getAndSend(after, a => a.within);
+        q.getAndSend(after, a => a.ternaryOperator);
+        q.getAndSend(after, a => a.other);
     }
 });
 
@@ -254,15 +286,56 @@ registerSimpleCodec<WrappingAndBracesStyle.KeepWhenReformatting>(
 );
 
 RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
-    async rpcReceive(before: WrappingAndBracesStyle, q: RpcReceiveQueue): Promise<WrappingAndBracesStyle> {
+    rpcReceive(before: WrappingAndBracesStyle, q: RpcReceiveQueue): WrappingAndBracesStyle {
         return updateIfChanged(before, {
-            ifStatement: await q.receive(before.ifStatement),
-            keepWhenReformatting: await q.receive(before.keepWhenReformatting),
+            ifStatement: q.receive(before.ifStatement),
+            keepWhenReformatting: q.receive(before.keepWhenReformatting),
         });
     },
 
-    async rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.ifStatement);
-        await q.getAndSend(after, a => a.keepWhenReformatting);
+    rpcSend(after: WrappingAndBracesStyle, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.ifStatement);
+        q.getAndSend(after, a => a.keepWhenReformatting);
     }
+});
+
+const styleDetailKinds = new Set<string>([
+    ...Object.values(SpacesStyleDetailKind),
+    ...Object.values(WrappingAndBracesStyleDetailKind)
+]);
+
+function detailKind(styleKind: string, field: string): string | undefined {
+    const kind = `${styleKind}$${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+    return styleDetailKinds.has(kind) ? kind : undefined;
+}
+
+function styleFromValue(value: any): Style {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    const {"@c": kind, "@ref": _ref, ...fields} = value;
+    for (const [field, detail] of Object.entries(fields)) {
+        const kindOfDetail = detailKind(kind, field);
+        if (kindOfDetail && detail !== null && typeof detail === "object") {
+            fields[field] = {kind: kindOfDetail, ...detail};
+        }
+    }
+    return {kind, ...fields};
+}
+
+function styleToValue({kind, ...fields}: Style & Record<string, any>, ref: number): any {
+    for (const [field, detail] of Object.entries(fields)) {
+        if (detailKind(kind, field) && detail !== null && typeof detail === "object") {
+            const {kind: _kind, ...detailFields} = detail;
+            fields[field] = detailFields;
+        }
+    }
+    return {"@c": kind, "@ref": ref, ...fields};
+}
+
+// A plain NamedStyles has no codec on either side, so it travels in the shape Java's serializer gives it
+RpcCodecs.registerValueCodec(MarkersKind.NamedStyles, {
+    fromValue: (value: NamedStyles): NamedStyles => ({...value, styles: (value.styles ?? []).map(styleFromValue)}),
+    // Java's deserializer wants an object id on each style, and gives the first to the set itself
+    toValue: (after: NamedStyles) => ({...after, styles: after.styles.map((style, i) => styleToValue(style, i + 2))})
 });

@@ -38,6 +38,8 @@ export interface JavaRpcOptions {
      * only. Does NOT configure the Java side — for that, use {@link marketplaceCsv}.
      */
     marketplace?: RecipeMarketplace;
+    /** How many messages the TS-side {@link RewriteRpc} sends per page of an object. */
+    batchSize?: number;
 }
 
 /**
@@ -116,6 +118,7 @@ export class JavaRpcTestServer {
         const rewriteRpc = new RewriteRpc(connection, {
             marketplace: opts.marketplace,
             logger: opts.logger,
+            batchSize: opts.batchSize,
         });
 
         // Hand back control once we know either (a) the JVM is up and the connection is

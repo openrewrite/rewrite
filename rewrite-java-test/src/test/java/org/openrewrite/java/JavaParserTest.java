@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,6 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -209,14 +208,16 @@ class JavaParserTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
     @Test
-    void parseFromByteArray() {
-        try (ScanResult scan = new ClassGraph().scan()) {
-            byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
+    void parseFromByteArray() throws Exception {
+        Path resources = Path.of(getClass().getClassLoader().getResource("javaparser-byte-array-tests").toURI());
+        try (Stream<Path> files = Files.walk(resources)) {
+            byte[][] classes = files
+              .filter(it -> it.toString().endsWith(".class"))
               .map(it -> {
                   try {
-                      return it.read().array();
+                      return Files.readAllBytes(it);
                   } catch (IOException e) {
-                      throw new RuntimeException(e);
+                      throw new UncheckedIOException(e);
                   }
               })
               .toArray(byte[][]::new);

@@ -16,6 +16,7 @@
 package org.openrewrite.python.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
@@ -23,4 +24,7 @@ import java.nio.file.Path;
 @Value
 class InstallRecipesByFile implements RpcRequest {
     Path recipes;
+
+    @Nullable
+    Path venv;
 }

@@ -444,7 +444,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var typeParameters = tpReceived?.ToContainer();
         var returnTypeExpression = q.Receive((J?)method.ReturnTypeExpression, el => (J)VisitNonNull(el!, q));
         var nameAnnotations = q.ReceiveList(method.Name?.Annotations ?? [], el => (Annotation)VisitNonNull(el, q));
-        var name = q.Receive((J?)method.Name ?? new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null), el => (J)VisitNonNull(el, q));
+        var name = q.Receive((J?)method.Name ?? new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], "", null, null), el => (J)VisitNonNull(el, q));
         var parameters = q.Receive(method.Parameters, c => VisitContainer(c, q));
         var dimensionsAfterName = q.ReceiveList(method.DimensionsAfterName, lp => VisitLeftPadded(lp, q));
         var throws_ = q.Receive(method.Throws, c => VisitContainer(c, q));
@@ -530,8 +530,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     private J VisitControlParenthesesUntyped(ControlParentheses<J> shell, RpcReceiveQueue q)
     {
-        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
-        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q))!;
+        // received on its own, only what the parentheses hold says which kind they are
+        if (tree.Element is VariableDeclarations declarations)
+        {
+            return new ControlParentheses<VariableDeclarations>(_pvId, _pvPrefix, _pvMarkers,
+                new JRightPadded<VariableDeclarations>(declarations, tree.After, tree.Markers));
+        }
+        var rp = new JRightPadded<Expression>((Expression)tree.Element, tree.After, tree.Markers);
         return new ControlParentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
@@ -714,9 +720,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             var multiline = q.Receive(c.Multiline);
             var text = q.Receive(c.Text);
             var suffix = q.Receive(c.Suffix);
-            // C# Comment doesn't have Markers; consume and discard
-            q.Receive<Markers>(Markers.Empty);
-            return new TextComment(text!, suffix!, multiline);
+            var markers = q.Receive((c as TextComment)?.Markers);
+            return new TextComment(text!, suffix!, multiline, markers);
         });
         var whitespace = q.Receive(space.Whitespace);
         return space.WithComments(comments!).WithWhitespace(whitespace!);
@@ -811,6 +816,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
                 break;
 
             case JavaType.Variable variable:
+                variable.FlagsBitMap = q.Receive(variable.FlagsBitMap);
                 variable.Name = q.Receive(variable.Name)!;
                 variable.Owner = q.Receive(variable.Owner, t => VisitType(t, q)!);
                 variable.Type = q.Receive(variable.Type, t => VisitType(t, q)!);

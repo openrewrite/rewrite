@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
@@ -80,9 +78,12 @@ val csharpBuild by tasks.registering(Exec::class) {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.LstViewer/bin"))
 
     doFirst {
         commandLine(findDotnet(), "build")
@@ -156,8 +157,6 @@ val csharpTest by tasks.registering(Exec::class) {
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
-
-ImportJUnitXmlReports.register(tasks, csharpTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(csharpTest)

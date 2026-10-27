@@ -22,7 +22,6 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
@@ -91,13 +90,22 @@ public interface Hcl extends Tree {
         @Getter
         Expression name;
 
+        /**
+         * @return The name of this attribute. Quoted object keys like {@code "quoted-key" = 1} yield their
+         * unquoted content. Keys whose value is not statically known, such as {@code "${local.a}b"} or
+         * {@code (local.a)}, yield their source text.
+         */
         @JsonIgnore
         public String getSimpleName() {
-            return getSimpleName(name);
-        }
-
-        private String getSimpleName(Expression e) {
-            return e instanceof Parentheses ? getSimpleName(((Parentheses) e).getExpression()) : ((Identifier) e).getName();
+            Expression e = name;
+            while (e instanceof Parentheses) {
+                e = ((Parentheses) e).getExpression();
+            }
+            if (e instanceof Identifier) {
+                return ((Identifier) e).getName();
+            }
+            String value = HclValues.stringValue(e);
+            return value != null ? value : name.printTrimmed(new HclPrinter<>());
         }
 
         HclLeftPadded<Type> type;
@@ -432,6 +440,25 @@ public interface Hcl extends Tree {
         @With
         List<BodyContent> body;
 
+        /**
+         * @return The block type, such as {@code resource}, or {@code null} for anonymous block expressions.
+         */
+        @Incubating(since = "8.94.0")
+        @JsonIgnore
+        public @Nullable String getSimpleName() {
+            return type == null ? null : type.getName();
+        }
+
+        /**
+         * @param index The zero-based position of the label.
+         * @return The name of the label at the given position, or {@code null} if the block has fewer labels.
+         * @see Label#getSimpleName()
+         */
+        @Incubating(since = "8.94.0")
+        public @Nullable String getLabelName(int index) {
+            return index >= 0 && index < labels.size() ? labels.get(index).getSimpleName() : null;
+        }
+
         @Incubating(since = "7.27.0")
         public @Nullable Attribute getAttribute(String attrName) {
             for (BodyContent t : body) {
@@ -455,7 +482,7 @@ public interface Hcl extends Tree {
         @Incubating(since = "7.27.0")
         public Hcl.Block withAttributeValue(String attrName, Object value) {
             Attribute attr = getAttribute(attrName);
-            if (attr == null || getAttributeValue(attrName).equals(value)) {
+            if (attr == null || value.equals(getAttributeValue(attrName))) {
                 return this;
             }
 
@@ -463,7 +490,9 @@ public interface Hcl extends Tree {
                 if (b == attr) {
                     if (attr.getValue() instanceof Literal) {
                         Literal l = (Literal) attr.getValue();
-                        return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
+                        String valueSource = value instanceof String ? "\"" + value + "\"" : value.toString();
+                        return valueSource.equals(l.getValueSource()) ? attr :
+                                attr.withValue(l.withValue(value).withValueSource(valueSource));
                     } else if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
                         return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
@@ -488,12 +517,9 @@ public interface Hcl extends Tree {
             Object value = attr.getValue() instanceof Literal ?
                     ((Literal) attr.getValue()).getValueSource() : null;
             if (attr.getValue() instanceof QuotedTemplate) {
-                Cursor root = new Cursor(null, HclParser.builder().build().parse("")
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL")));
                 StringBuilder valueBuilder = new StringBuilder();
                 for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
-                    valueBuilder.append(expr.print(root));
+                    valueBuilder.append(expr.print(new HclPrinter<>()));
                 }
                 value = valueBuilder.toString();
             }

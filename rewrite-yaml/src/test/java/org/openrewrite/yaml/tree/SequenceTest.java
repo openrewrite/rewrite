@@ -136,6 +136,35 @@ class SequenceTest implements RewriteTest {
     }
 
     @Test
+    void anchoredInlineSequenceAsBlockSequenceEntry() {
+        rewriteRun(
+          yaml(
+            """
+              pairs:
+                - &first [ 'alpha', 'beta' ]
+                - &second [ 'gamma', 'delta' ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void anchoredBlockSequenceAsBlockSequenceEntry() {
+        rewriteRun(
+          yaml(
+            """
+              groups:
+                - &first
+                  - alpha
+                  - beta
+                - &second
+                  - gamma
+              """
+          )
+        );
+    }
+
+    @Test
     void inlineSequenceWithWhitespaceBeforeCommas() {
         rewriteRun(
           yaml(

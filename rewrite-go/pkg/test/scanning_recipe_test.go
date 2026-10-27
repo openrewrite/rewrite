@@ -77,14 +77,7 @@ func (v *externalImportScanner) VisitCompilationUnit(cu *golang.CompilationUnit,
 }
 
 func importPath(imp *java.Import) string {
-	if imp == nil {
-		return ""
-	}
-	lit, ok := imp.Qualid.(*java.Literal)
-	if !ok || lit == nil {
-		return ""
-	}
-	return strings.Trim(lit.Source, "\"`")
+	return imp.Path()
 }
 
 type goModAnnotator struct {

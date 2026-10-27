@@ -206,16 +206,16 @@ class TestTypeshedResolution:
         try:
             server.handle_dependency_types({"name": "os", "pythonVersion": "3.11"})
             assert captured["python_version"] == "3.11"
-            assert ("os", None, "3.11") in server._dependency_types_pending
+            assert ("os", None, "3.11", None) in server._dependency_types_pending
 
             # A different requested version must not drain 3.11's pending pages.
             server.handle_dependency_types({"name": "os", "pythonVersion": "3.12"})
             assert captured["python_version"] == "3.12"
-            assert ("os", None, "3.12") in server._dependency_types_pending
+            assert ("os", None, "3.12", None) in server._dependency_types_pending
 
             server.handle_dependency_types({"name": "os", "pythonVersion": "not-a-version"})
             assert captured["python_version"] is None  # malformed falls back
-            assert ("os", None, None) in server._dependency_types_pending
+            assert ("os", None, None, None) in server._dependency_types_pending
         finally:
             server._dependency_types_pending.clear()
 
@@ -234,6 +234,32 @@ class TestTypeshedResolution:
         server._dependency_types_pending.clear()
         with pytest.raises(ValueError):
             handle_dependency_types({"name": "greetlib", "version": "1.0.0"})
+
+    def test_package_request_with_path_resolves_there_without_dependency_env(self, tmp_path, monkeypatch):
+        import rewrite.rpc.server as server
+        monkeypatch.setattr(server, "_last_dependency_path", None)
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+        fetched = tmp_path / "greetlib-1.0.0"
+        (fetched / "greetlib").mkdir(parents=True)
+        (fetched / "greetlib" / "__init__.py").write_text("class A: ...\n")
+        di = fetched / "greetlib-1.0.0.dist-info"
+        di.mkdir()
+        (di / "RECORD").write_text("greetlib/__init__.py,sha256=abc,16\n")
+        captured = {}
+
+        def fake_build(own_artifacts, root, virtual_env, stdlib_dir, python_version=None):
+            captured.update(own_artifacts=own_artifacts, root=root, virtual_env=virtual_env)
+            return [{"state": "END_OF_OBJECT"}]
+
+        monkeypatch.setattr(server, "_build_exported_types_data", fake_build)
+        server._dependency_types_pending.clear()
+
+        data = handle_dependency_types({"name": "greetlib", "version": "1.0.0", "path": str(fetched)})
+
+        assert data[-1]["state"] == "END_OF_OBJECT"
+        assert captured["own_artifacts"] == [str(fetched / "greetlib" / "__init__.py")]
+        assert captured["root"] == str(fetched)
+        assert captured["virtual_env"] is None
 
 
 class TestRichness:
@@ -384,12 +410,9 @@ class TestExportedTypes:
         # The class stays under its own FQN, not on the module type.
         assert "Thing" not in {m._name for m in (module_type._methods or [])}
 
-    def test_module_type_includes_reexports_under_binding_names(self, tmp_path):
+    def test_reexports_are_declared_where_they_are_defined(self, tmp_path):
         # click-style layout: the API is defined in a submodule and re-exported by
-        # the package __init__. Parse-time attribution declares `relib.echo(...)`
-        # under the *package* module type, so the enumeration must surface the
-        # re-exported bindings there (under the imported-as name), while a
-        # re-exported class keeps its defining FQN.
+        # the package __init__.
         pkg = tmp_path / "relib"
         pkg.mkdir()
         (pkg / "utils.py").write_text(
@@ -399,17 +422,13 @@ class TestExportedTypes:
             "class Widget:\n"
             "    def draw(self) -> None:\n        ...\n")
         (pkg / "__init__.py").write_text(
-            "from relib.utils import echo, SEP, Widget\n"
-            "from relib.utils import echo as shout\n")
+            "from relib.utils import echo, SEP, Widget\n")
 
         by_fqn = self._enumerate(tmp_path, pkg)
 
         package_type = by_fqn.get("relib")
         assert isinstance(package_type, JavaType.Class)
-        method_names = {m._name for m in (package_type._methods or [])}
-        assert "echo" in method_names
-        assert "shout" in method_names  # aliased re-export binds under its alias
-        assert "Widget" not in method_names
+        assert not (package_type._methods or [])
         assert "SEP" in {v._name for v in (package_type._members or [])}
 
         # The defining submodule gets its own module type; the class its own FQN.
@@ -444,6 +463,56 @@ class TestExportedTypes:
         assert isinstance(withall, JavaType.Class)
         assert {m._name for m in (withall._methods or [])} == {"_special"}
         assert not withall._members  # __all__ itself is not public API
+
+    def test_leaves_out_the_distributions_own_tests(self, tmp_path):
+        # A test suite shipped in the wheel is no API of the distribution.
+        pkg = tmp_path / "suitelib"
+        (pkg / "tests").mkdir(parents=True)
+        (pkg / "core" / "tests").mkdir(parents=True)
+        (pkg / "__init__.py").write_text("class Api:\n    def call(self) -> None:\n        ...\n")
+        (pkg / "core" / "__init__.py").write_text("class Engine:\n    def start(self) -> None:\n        ...\n")
+        (pkg / "tests" / "__init__.py").touch()
+        (pkg / "tests" / "test_api.py").write_text(
+            "class TestApi:\n    def test_call(self) -> None:\n        ...\n")
+        (pkg / "core" / "tests" / "__init__.py").touch()
+        (pkg / "core" / "tests" / "test_engine.py").write_text(
+            "class TestEngine:\n    def test_start(self) -> None:\n        ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        assert "suitelib.Api" in by_fqn
+        assert "suitelib.core.Engine" in by_fqn
+        assert [fqn for fqn in by_fqn if "tests" in fqn.split(".")] == []
+
+    def test_module_level_api_of_a_file_with_crlf_line_endings(self, tmp_path):
+        pkg = tmp_path / "crlflib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_bytes(
+            b"import os\r\n"
+            b"\r\n"
+            b"GREETING = \"hello\"\r\n"
+            b"\r\n"
+            b"def shout(text: str) -> str:\r\n"
+            b"    return text.upper()\r\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        module_type = by_fqn.get("crlflib")
+        assert isinstance(module_type, JavaType.Class)
+        assert {m._name for m in (module_type._methods or [])} == {"shout"}
+        greeting = next(v for v in module_type._members or [] if v._name == "GREETING")
+        assert greeting._type == JavaType.Primitive.String
+
+    def test_a_file_in_another_encoding_costs_only_its_own_types(self, tmp_path):
+        pkg = tmp_path / "latinlib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("class Api:\n    def call(self) -> None:\n        ...\n")
+        (pkg / "legacy.py").write_bytes(
+            b"# -*- coding: latin-1 -*-\nSIGN = '\xb1'\n\nclass Legacy:\n    ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        assert "latinlib.Api" in by_fqn
 
     def test_own_module_filter_excludes_sibling(self):
         # "clickhouse" shares the "click" prefix but not the "click." boundary,
@@ -509,6 +578,7 @@ class TestExportedTypes:
                 f.write("")
             with open(os.path.join(pkg, "thing.py"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
+                        "    def __init__(self):\n        self._url = None\n"
                         "    def api(self):\n        return 0\n")
             with open(os.path.join(pkg, "thing.pyi"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
@@ -523,8 +593,9 @@ class TestExportedTypes:
             things = [k for k in by_fqn if k.endswith("thing.Thing")]
             assert len(things) == 1  # the .py and .pyi collapse to one entry
             thing = by_fqn[things[0]]
-            method_names = {m._name for m in (thing._methods or [])}
-            assert "api" in method_names
+            api = next(m for m in thing._methods or [] if m._name == "api")
+            # The runtime class's self-assigned `_url` makes it richer, yet the stub's signature wins.
+            assert api._return_type == JavaType.Primitive.Int
         finally:
             shutil.rmtree(root, ignore_errors=True)
 
@@ -601,7 +672,7 @@ class TestExportedTypes:
         venv = _fake_dependency_env(tmp_path)
         monkeypatch.setattr(server, "_last_dependency_path", str(venv))
         params = {"name": "greetlib", "version": "1.0.0"}
-        key = ("greetlib", "1.0.0", None)
+        key = ("greetlib", "1.0.0", None, None)
         server._dependency_types_pending.clear()
 
         # A single-shot run: one response carrying the whole answer.

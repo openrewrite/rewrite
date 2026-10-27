@@ -34,10 +34,11 @@ var ignoredMarkers = map[string]bool{
 	"GroupedImport": true, "ImportBlock": true, "StructTagQuote": true,
 	"ChanDirMarker": true, "ImplicitForClauses": true, "TypeSwitchGuard": true,
 	"GoProject": true, "GoResolutionResult": true, "PartialTypeAttribution": true,
+	"BuildConstraint": true,
 	// Recipe bookkeeping the java tree carries: what a run found or changed,
 	// never what the source says.
 	"GenericMarker": true, "RecipesThatMadeChanges": true, "SearchResult": true,
-	"SearchResultMarker": true, "Markup": true, "RecipeThatMadeChanges": true,
+	"Markup": true, "RecipeThatMadeChanges": true,
 	"ParseExceptionResult": true,
 }
 

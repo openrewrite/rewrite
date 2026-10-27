@@ -41,11 +41,75 @@ export {
 } from "typescript/ast";
 export type {Checker as TypeChecker} from "typescript/sync";
 
-import {NodeFlags, skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/ast";
+import {
+    isBinaryExpression,
+    isCallExpression,
+    isClassDeclaration,
+    isClassExpression,
+    isIdentifier,
+    isNoSubstitutionTemplateLiteral,
+    isPropertyAccessExpression,
+    isStringLiteral,
+    NodeFlags,
+    skipTrivia,
+    SyntaxKind,
+    type ClassDeclaration,
+    type ClassExpression,
+    type Node,
+    type NodeArray,
+    type NoSubstitutionTemplateLiteral,
+    type SourceFile,
+    type StringLiteral,
+} from "typescript/ast";
 
 /** Whether a source file is a module, which its export or import marks it as being. */
 export function isExternalModule(sourceFile: SourceFile): boolean {
     return sourceFile.externalModuleIndicator !== undefined;
+}
+
+const commonJsModules = new WeakMap<SourceFile, boolean>();
+
+/**
+ * Whether a JavaScript file is a CommonJS module, which a `require('m')` call or an assignment to
+ * `exports` or `module.exports` marks it as being. The compiler does not report it, so it is read
+ * off the tree.
+ */
+export function isCommonJsModule(sourceFile: SourceFile): boolean {
+    let known = commonJsModules.get(sourceFile);
+    if (known === undefined) {
+        commonJsModules.set(sourceFile, known = /\.[cm]?jsx?$/.test(sourceFile.fileName) &&
+            !!sourceFile.forEachChild(function marks(node): true | undefined {
+                return isRequireCall(node) || isExportsAssignment(node) || node.forEachChild(marks);
+            }));
+    }
+    return known;
+}
+
+function isRequireCall(node: Node): boolean {
+    return isCallExpression(node) && isIdentifier(node.expression) && node.expression.text === "require" &&
+        node.arguments.length === 1 && isStringLiteralLike(node.arguments[0]);
+}
+
+function isExportsAssignment(node: Node): boolean {
+    if (!isBinaryExpression(node) || node.operatorToken.kind !== SyntaxKind.EqualsToken) {
+        return false;
+    }
+    let target: Node = node.left;
+    while (isPropertyAccessExpression(target)) {
+        if (isIdentifier(target.expression) && target.expression.text === "module" && target.name.text === "exports") {
+            return true;
+        }
+        target = target.expression;
+    }
+    return isIdentifier(target) && target.text === "exports" && target !== node.left;
+}
+
+export function isStringLiteralLike(node: Node): node is StringLiteral | NoSubstitutionTemplateLiteral {
+    return isStringLiteral(node) || isNoSubstitutionTemplateLiteral(node);
+}
+
+export function isClassLike(node: Node): node is ClassDeclaration | ClassExpression {
+    return isClassDeclaration(node) || isClassExpression(node);
 }
 
 /**

@@ -156,4 +156,15 @@ class LatestPatchTest {
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25-fred");
     }
 
+    @Test
+    void upgradeToBackpatch() {
+        assertThat(latestPatch.upgrade("2.14.1", List.of("2.14.1", "2.14.1.1-osera-00001", "2.14.1.1-osera-00002", "2.15.0")))
+          .contains("2.14.1.1-osera-00002");
+        assertThat(latestPatch.upgrade("5.2.19.RELEASE", List.of("5.2.19.RELEASE", "5.2.19.RELEASE-backpatch-00002", "5.2.19.RELEASE-backpatch-00001")))
+          .contains("5.2.19.RELEASE-backpatch-00002");
+        assertThat(latestPatch.upgrade("2.14.1.1-osera-00001", List.of("2.14.1.1-osera-00001", "2.14.1.1-osera-00002")))
+          .contains("2.14.1.1-osera-00002");
+        assertThat(latestPatch.upgrade("2.14.1", List.of("2.14.1.1-osera-00001", "2.14.2"))).contains("2.14.2");
+    }
+
 }

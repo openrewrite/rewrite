@@ -5,10 +5,10 @@ from rewrite import Tree, list_map
 from rewrite.java import (J, Assignment, JLeftPadded, AssignmentOperation, MemberReference, MethodInvocation,
                            MethodDeclaration, Empty, ArrayAccess, Space, If, Block, ClassDeclaration,
                            VariableDeclarations, JRightPadded, Import, ParameterizedType, Parentheses, Try,
-                           ControlParentheses, TrailingComma)
+                           ControlParentheses, TrailingComma, TypeParameter)
 from rewrite.python import (PythonVisitor, SpacesStyle, Binary, ChainedAssignment, Slice, CollectionLiteral,
                              DictLiteral, KeyValue, TypeHint, MultiImport, ExpressionTypeTree,
-                             ComprehensionExpression, NamedArgument)
+                             ComprehensionExpression, NamedArgument, TypeAlias)
 from rewrite.visitor import P, Cursor
 
 J2 = TypeVar('J2', bound=J)
@@ -289,6 +289,11 @@ class SpacesVisitor(PythonVisitor):
 
         return b
 
+    def visit_unary(self, unary: j.Unary, p: P) -> J:
+        u: j.Unary = cast(j.Unary, super().visit_unary(unary, p))
+        # `not` is a keyword, so its separator is not style-configurable.
+        return u.replace(expression=space_before(u.expression, u.operator == j.Unary.Type.Not))
+
     def visit_if(self, if_: If, p: P) -> J:
         if_: j.If = cast(If, super().visit_if(if_, p))
 
@@ -348,7 +353,8 @@ class SpacesVisitor(PythonVisitor):
 
             if last:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -383,7 +389,8 @@ class SpacesVisitor(PythonVisitor):
 
             if index == args_size - 1:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -423,7 +430,8 @@ class SpacesVisitor(PythonVisitor):
                 c = space_before_right_padded_element(c, self._style.other.after_comma)
 
             if idx == arg_size - 1:
-                c = c.replace(markers=c.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                c = c.replace(markers=c.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, self._style.within.braces)))
 
             return c
 
@@ -479,9 +487,10 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_expression_type_tree(self, expr_tree: ExpressionTypeTree, p: P) -> J:
         ett = cast(ExpressionTypeTree, super().visit_expression_type_tree(expr_tree, p))
-        # Don't remove space when inside ClassDeclaration (handled by visit_class_declaration)
+        # Under these parents the wrapper's prefix is meaningful source space, so clearing it
+        # would join the type to the punctuation before it.
         parent = self.cursor.parent_tree_cursor()
-        if not (parent and isinstance(parent.value, ClassDeclaration)):
+        if not (parent and isinstance(parent.value, (ClassDeclaration, TypeParameter, TypeAlias))):
             ett = space_before(ett, False)
         return ett
 
@@ -521,8 +530,11 @@ class SpacesVisitor(PythonVisitor):
         cc = cc.padding.replace(iterated_list=space_before_left_padded_element(cc.padding.iterated_list, True))
         return cc
 
-    def _remap_trailing_comma_space(self, tc: TrailingComma) -> TrailingComma:
-        return tc.replace(suffix=update_space(tc.suffix, self._style.other.after_comma))
+
+def _trailing_comma_suffix(tc: TrailingComma, within: bool) -> TrailingComma:
+    # The suffix runs up to the closing bracket, so the space inside the brackets governs it.
+    # A tuple without parentheses has no closing bracket, and the token after it brings its own space.
+    return tc.replace(suffix=update_space(tc.suffix, within))
 
 
 def space_before(j: J2, add_space: bool) -> J2:

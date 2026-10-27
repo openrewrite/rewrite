@@ -35,6 +35,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
+import org.jetbrains.kotlin.fir.unwrapFakeOverrides
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaAnnotation
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
@@ -42,10 +43,13 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaTypePa
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.kotlin.internal.expandedAliasType
+import org.openrewrite.kotlin.internal.facadeFqn
+import org.openrewrite.kotlin.internal.isFromLibrary
+import org.openrewrite.kotlin.internal.namedClassSymbol
 import java.util.*
 
 @Suppress("DuplicatedCode")
@@ -137,7 +141,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirResolvedQualifier -> {
-                if (type.typeArguments.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
+                val aliased = type.expandedAliasType(firSession)
+                when {
+                    aliased != null -> signature(aliased)
+                    type.typeArguments.isNotEmpty() -> parameterizedSignature(type)
+                    else -> classSignature(type)
+                }
             }
 
             is FirStringConcatenationCall -> {
@@ -217,7 +226,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is FirClass -> convertClassIdToFqn(type.classId)
             is FirFile -> fileSignature(type)
             is FirResolvedTypeRef -> classSignature(type.coneType)
-            is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
+            is FirResolvedQualifier -> convertClassIdToFqn(type.namedClassSymbol(firSession)?.classId ?: type.classId)
             else -> {
                 throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
@@ -273,6 +282,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             }
 
+            is ConeIntegerLiteralType -> {
+                // An operator on an integer literal keeps this type until an expected type fixes it as Int or
+                // Long, and an unresolved surrounding call never supplies one.
+                signature(type.getApproximatedType())
+            }
+
             else -> throw UnsupportedOperationException("Unsupported ConeTypeProjection ${type.javaClass.name}")
         }
     }
@@ -315,7 +330,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val s = StringBuilder(classSignature(type))
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {
-            joiner.add(signature(tp, type.symbol?.fir))
+            joiner.add(signature(tp, type.qualifierSymbol?.fir))
         }
         return s.append(joiner).toString()
     }
@@ -326,9 +341,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
     @OptIn(SymbolInternals::class)
     fun methodSignature(
-        function: FirFunction,
+        fir: FirFunction,
         parent: Any?
     ): String {
+        val function = fir.unwrapFakeOverrides()
         val clazz = when {
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
@@ -368,23 +384,18 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol
         ) {
             val resolvedSymbol =
-                (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
+                ((function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol)
+                    .unwrapFakeOverrides()
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
                 declaringSig = signature(resolvedSymbol.dispatchReceiverType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
                 resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
             ) {
                 declaringSig = signature(resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
-            } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
-                if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
-                    val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
-                    if (source != null) {
-                        declaringSig = if (source.facadeClassName != null) {
-                            (source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString()
-                        } else {
-                            source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
-                        }
-                    }
+            } else if (resolvedSymbol.isFromLibrary) {
+                val source = resolvedSymbol.fir.containerSource
+                if (source is JvmPackagePartSource) {
+                    declaringSig = source.facadeFqn
                 } else if (!resolvedSymbol.fir.origin.generated &&
                     !resolvedSymbol.fir.origin.fromSupertypes &&
                     !resolvedSymbol.fir.origin.fromSource
@@ -558,7 +569,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 else -> signature(classifier)
             }
 
-            is BinaryJavaAnnotation -> signature(type.classId.toSymbol(firSession)?.fir)
+            is BinaryJavaAnnotation -> convertClassIdToFqn(type.classId)
             is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(
                 type
             )

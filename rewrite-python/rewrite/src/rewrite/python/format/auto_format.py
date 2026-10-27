@@ -1,6 +1,7 @@
 from typing import Optional
 
 from .blank_lines import BlankLinesVisitor
+from .line_breaks import general_format_style
 from .minimum_viable_spacing import MinimumViableSpacingVisitor
 from .normalize_format import NormalizeFormatVisitor
 from .normalize_line_breaks_visitor import NormalizeLineBreaksVisitor
@@ -13,7 +14,6 @@ from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
 from ... import Recipe, Tree, Cursor
 from ...java import JavaSourceFile
-from ...style import GeneralFormatStyle
 from ...visitor import P, T
 
 
@@ -55,15 +55,31 @@ class AutoFormatVisitor(PythonVisitor[P]):
             self._stop_after
         ).visit(tree, p, self._cursor.fork())
 
-        tree = TabsAndIndentsVisitor(
-            cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
-            cu.get_style(OtherStyle) or IntelliJ.other(),
-            self._stop_after
-        ).visit(tree, p, self._cursor.fork())
+        tree = _tabs_and_indents(cu, self._stop_after).visit(tree, p, self._cursor.fork())
 
-        tree = NormalizeLineBreaksVisitor(cu.get_style(GeneralFormatStyle) or GeneralFormatStyle(False),
-                                          self._stop_after).visit(tree, p, self._cursor.fork())
+        tree = NormalizeLineBreaksVisitor(general_format_style(cu), self._stop_after).visit(
+            tree, p, self._cursor.fork())
 
         tree = RemoveTrailingWhitespaceVisitor(self._stop_after).visit(tree, self._cursor.fork())
 
         return tree
+
+
+def minimally_format(tree: T, p: P, cursor: Optional[Cursor] = None) -> T:
+    """`tree` with the whitespace it needs to be valid and the indentation of the file `cursor` leads to,
+    and its other whitespace as it is."""
+    try:
+        root = cursor if cursor is not None else Cursor(None, Cursor.ROOT_VALUE)
+        cu = tree if isinstance(tree, JavaSourceFile) else root.first_enclosing_or_throw(JavaSourceFile)
+        tree = MinimumViableSpacingVisitor().visit(tree, p, root.fork())
+        return _tabs_and_indents(cu).visit(tree, p, root.fork())
+    except (ValueError, AttributeError):
+        return tree
+
+
+def _tabs_and_indents(cu: JavaSourceFile, stop_after: Optional[Tree] = None) -> TabsAndIndentsVisitor:
+    return TabsAndIndentsVisitor(
+        cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
+        cu.get_style(OtherStyle) or IntelliJ.other(),
+        stop_after
+    )

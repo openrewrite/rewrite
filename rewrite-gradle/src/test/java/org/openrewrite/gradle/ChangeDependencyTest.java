@@ -32,15 +32,365 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryWhenVersionDoesNotChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "1.0.0",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryWhenLatestPatchHasNoUpgrade() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "latest.patch",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "999.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "999.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesTomlVersionCatalogLibraryVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { group = "org.testcontainers", name = "mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { group = "org.testcontainers", name = "testcontainers-mongodb", version = "2.0.5" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesTomlVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "2.0.5"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void addsVersionToTomlVersionlessLibraryWhenOverrideIsEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = "org.testcontainers:mongodb"
+              """,
+            """
+              [libraries]
+              testcontainers = "org.testcontainers:testcontainers-mongodb:2.0.5"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryToVersionLowerThanOldArtifactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.google.code.findbugs",
+            "jsr305",
+            "jakarta.annotation",
+            "jakarta.annotation-api",
+            "2.1.1",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
+              """,
+            """
+              [libraries]
+              jsr305 = "jakarta.annotation:jakarta.annotation-api:2.1.1"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryVersionReferenceWhenNoVersionIsSelected() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "999.x",
+            null,
+            null,
+            true
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          ),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesAndDetachesSharedTomlVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:mongodb", version.ref = "shared" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:testcontainers-mongodb", version = "2.0.5" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesSettingsVersionCatalogLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('testcontainers', 'org.testcontainers', 'mongodb').version('1.0.0')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('testcontainers', 'org.testcontainers', 'testcontainers-mongodb').version('1.0.0')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changesSettingsVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('testcontainers', '1.0.0')
+                          library('testcontainers', 'org.testcontainers', 'mongodb').versionRef('testcontainers')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('testcontainers', '2.0.5')
+                          library('testcontainers', 'org.testcontainers', 'testcontainers-mongodb').versionRef('testcontainers')
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample
@@ -1367,6 +1717,94 @@ class ChangeDependencyTest implements RewriteTest {
                   val version = "2.6"
                   implementation("org.apache.commons:commons-lang3:3.11")
                   implementation("com.google.guava:guava:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedMapNotationVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  testImplementation([group: 'commons-lang', name: 'commons-lang', version: sharedVersion])
+                  compileOnly transitive: false, group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  runtimeOnly group: 'commons-lang', version: sharedVersion, name: 'commons-lang'
+                  testRuntimeOnly group: "commons-lang", name: "commons-lang", version: sharedVersion
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  testImplementation([group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'])
+                  compileOnly transitive: false, group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  runtimeOnly group: 'org.apache.commons', version: '3.11', name: 'commons-lang3'
+                  testRuntimeOnly group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslNamedArgumentsVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "commons-lang", name = "commons-lang", version = sharedVersion)
+                  testImplementation(group = "commons-lang", version = sharedVersion, name = "commons-lang")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
+                  testImplementation(group = "org.apache.commons", version = "3.11", name = "commons-lang3")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
               }
               """
           )

@@ -132,9 +132,7 @@ public class FindTypes extends Recipe {
             }
         };
 
-        Set<NameTree> ts = new HashSet<>();
-        findVisitor.visit(j, ts);
-        return ts;
+        return findVisitor.reduce(j, new HashSet<>());
     }
 
     private static boolean typeMatches(boolean checkAssignability, TypeNameMatcher matcher,

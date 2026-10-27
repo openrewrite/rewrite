@@ -6,30 +6,30 @@ from typing import Optional, List, Dict
 from uuid import UUID
 
 from rewrite import Marker
-from rewrite.utils import replace_if_changed
+from rewrite.utils import lst_dataclass, replace_if_changed
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class KeywordArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'KeywordArguments':
+    def with_id(self, id_: int | UUID) -> 'KeywordArguments':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class KeywordOnlyArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'KeywordOnlyArguments':
+    def with_id(self, id_: int | UUID) -> 'KeywordOnlyArguments':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class Quoted(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> Quoted:
+    def with_id(self, id_: int | UUID) -> Quoted:
         return replace_if_changed(self, _id=id_)
 
     _style: Style
@@ -64,50 +64,29 @@ class Quoted(Marker):
             return ""
 
 
-@dataclass(frozen=True, eq=False, slots=True)
-class CanonicalName(Marker):
-    """The FQN of the symbol an import binds, at the module defining it, when the
-    module the source imported from re-exports it: `from os.path import join` binds
-    `posixpath.join`. Types name the module the source wrote, so this is where an
-    import's identity across spellings lives."""
-    _id: UUID
-
-    def with_id(self, id_: UUID) -> CanonicalName:
-        return replace_if_changed(self, _id=id_)
-
-    _fqn: str
-
-    @property
-    def fqn(self) -> str:
-        return self._fqn
-
-    def with_fqn(self, fqn: str) -> CanonicalName:
-        return replace_if_changed(self, _fqn=fqn)
-
-
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'SuppressNewline':
+    def with_id(self, id_: int | UUID) -> 'SuppressNewline':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class LegacyNotEqual(Marker):
     """Marker for the Python 2 ``<>`` not-equal operator on a :class:`j.Binary`.
 
     The default printer renders ``Binary.Type.NotEqual`` as ``!=``; when
     this marker is present it emits the legacy ``<>`` spelling instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'LegacyNotEqual':
+    def with_id(self, id_: int | UUID) -> 'LegacyNotEqual':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class RaiseTuple(Marker):
     """Marker for the Python 2 three-argument ``raise E, v, tb`` form on a :class:`j.Throw`.
 
@@ -115,26 +94,26 @@ class RaiseTuple(Marker):
     when this marker is present the printer drops the parentheses and renders
     the legacy comma-separated form instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'RaiseTuple':
+    def with_id(self, id_: int | UUID) -> 'RaiseTuple':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class TupleExceptClause(Marker):
     """Marker for the Python 2 ``except E, e:`` (comma) form on a J.Try.Catch.
 
     The default printer renders the catch as ``except E as e:``; when this
     marker is present it should emit the Py2 comma-based syntax instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'TupleExceptClause':
+    def with_id(self, id_: int | UUID) -> 'TupleExceptClause':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class PrintSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 print statement.
 
@@ -143,11 +122,11 @@ class PrintSyntax(Marker):
         print >> stderr, "err"  # print to file (has_destination=True)
         print x,                # trailing comma suppresses newline
     """
-    _id: UUID
+    _id: int | UUID
     _has_destination: bool
     _trailing_comma: bool
 
-    def with_id(self, id_: UUID) -> 'PrintSyntax':
+    def with_id(self, id_: int | UUID) -> 'PrintSyntax':
         return replace_if_changed(self, _id=id_)
 
     @property
@@ -165,7 +144,7 @@ class PrintSyntax(Marker):
         return self if trailing_comma is self._trailing_comma else replace(self, _trailing_comma=trailing_comma)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class ExecSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 exec statement.
 
@@ -174,13 +153,13 @@ class ExecSyntax(Marker):
         exec code in globals         # with globals dict
         exec code in globals, locals # with globals and locals dicts
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'ExecSyntax':
+    def with_id(self, id_: int | UUID) -> 'ExecSyntax':
         return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class PythonResolutionResult(Marker):
     """Contains metadata about a Python project, parsed from pyproject.toml and uv.lock."""
 
@@ -191,7 +170,7 @@ class PythonResolutionResult(Marker):
         Poetry = auto()
         Pdm = auto()
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class SourceIndex:
         _name: str
         _url: str
@@ -218,7 +197,7 @@ class PythonResolutionResult(Marker):
         def with_default_index(self, default_index: bool) -> PythonResolutionResult.SourceIndex:
             return self if default_index is self._default_index else replace(self, _default_index=default_index)
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class ResolvedDependency:
         _name: str
         _version: str
@@ -253,7 +232,7 @@ class PythonResolutionResult(Marker):
         def with_dependencies(self, dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]) -> PythonResolutionResult.ResolvedDependency:
             return self if dependencies is self._dependencies else replace(self, _dependencies=dependencies)
 
-    @dataclass(frozen=True, eq=False, slots=True)
+    @lst_dataclass
     class Dependency:
         _name: str
         _version_constraint: Optional[str]
@@ -296,7 +275,7 @@ class PythonResolutionResult(Marker):
         def with_resolved(self, resolved: Optional[PythonResolutionResult.ResolvedDependency]) -> PythonResolutionResult.Dependency:
             return self if resolved is self._resolved else replace(self, _resolved=resolved)
 
-    _id: UUID
+    _id: int | UUID
     _name: Optional[str]
     _version: Optional[str]
     _description: Optional[str]
@@ -314,7 +293,7 @@ class PythonResolutionResult(Marker):
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
 
-    def with_id(self, id_: UUID) -> PythonResolutionResult:
+    def with_id(self, id_: int | UUID) -> PythonResolutionResult:
         return replace_if_changed(self, _id=id_)
 
     @property

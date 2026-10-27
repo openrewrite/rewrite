@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JS, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
@@ -186,6 +186,32 @@ describe('JavaScript type mapping', () => {
                         const str = /*~~(String)~~>*/"test";
                         const bool = /*~~(boolean)~~>*/true;
                         const nil = /*~~(null)~~>*/null;
+                    `
+                )
+            );
+        });
+        test('should map symbol and unique symbol to the Symbol class', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'for') {
+                    return formatKindAndName((type as Type.Method).returnType);
+                }
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'u') {
+                    return formatKindAndName(type);
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const s = Symbol.for("x");
+                        declare const u: unique symbol;
+                    `,
+                    `
+                        const s = /*~~(Class Symbol)~~>*/Symbol.for("x");
+                        declare const /*~~(Class Symbol)~~>*/u: unique symbol;
                     `
                 )
             );
@@ -615,6 +641,77 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('records the interfaces a type implements or extends, unparameterized, beside its supertype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && ['Base', 'Mid', 'Saver2'].includes((node as J.Identifier).simpleName) &&
+                    Type.isClass(type) && type.fullyQualifiedName === (node as J.Identifier).simpleName) {
+                    const ifaces = type.interfaces.map(i => i.fullyQualifiedName).join(',');
+                    return `${type.supertype?.fullyQualifiedName ?? ''}[${ifaces}]`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Saver2 extends Saver, Box<string> {}
+                        class Base implements Saver2 { save(): void {} get(): string { return ''; } }
+                        class Mid extends Base implements Box<number>, Saver { }
+                    `,
+                    //@formatter:off
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface /*~~([Saver,Box])~~>*/Saver2 extends Saver, Box<string> {}
+                        class /*~~([Saver2])~~>*/Base implements /*~~([Saver,Box])~~>*/Saver2 { save(): void {} get(): string { return ''; } }
+                        class /*~~(Base[Box,Saver])~~>*/Mid extends /*~~([Saver2])~~>*/Base implements Box<number>, Saver { }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('reads a class\'s heritage from its class declaration, among merged ones or as an expression', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.NewClass && Type.isClass(type)) {
+                    const ifaces = type.interfaces.map(i => i.fullyQualifiedName).join(',');
+                    return `${type.supertype?.fullyQualifiedName ?? ''}[${ifaces}]`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Merged extends Saver {}
+                        class Merged implements Box<number>, Saver { save(): void {} get(): number { return 0; } }
+                        const Expr = class implements Saver { save(): void {} };
+                        new Merged();
+                        new Expr();
+                    `,
+                    //@formatter:off
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Merged extends Saver {}
+                        class Merged implements Box<number>, Saver { save(): void {} get(): number { return 0; } }
+                        const Expr = class implements Saver { save(): void {} };
+                        /*~~([Saver,Box])~~>*/new Merged();
+                        /*~~([Saver])~~>*/new Expr();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -838,6 +935,46 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should map a callback parameter of an instantiated generic method as a function type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'map') {
+                    const callback = (type as Type.Method).parameterTypes[0];
+                    const apply = Type.isClass(callback) ? callback.methods.find(m => m.name === 'apply') : undefined;
+                    return `${formatKindAndName(callback)} (${apply?.parameterTypes.map(formatKindAndName).join(', ')})`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `[1].map(x => x + 1);`,
+                    `/*~~(Class ${Type.FUNCTION_TYPE_NAME} (Primitive double, Primitive double, Parameterized Array))~~>*/[1].map(x => x + 1);`
+                )
+            );
+        });
+
+        test('should map a function type that instantiates itself without unbounded recursion', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'r' ? formatKindAndName(type) : null);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const r: Rec<number>;
+                    `,
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const /*~~(Class ${Type.FUNCTION_TYPE_NAME})~~>*/r: Rec<number>;
+                    `
+                )
+            );
+        });
+
         test('should auto-box primitives when methods are called on them', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, _type) => {
@@ -872,6 +1009,224 @@ describe('JavaScript type mapping', () => {
                     `
                 )
             );
+        });
+
+        test('a method of an object literal that is typed as a union has no union for a declaring type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.MethodDeclaration && (node as J.MethodDeclaration).name.simpleName === 'method') {
+                    const declaringType = (node as J.MethodDeclaration).methodType?.declaringType;
+                    return `declared by ${declaringType?.kind.replace(/.*\$/, '')}`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        declare function either(): { a: number } | { b: string };
+                        const spread = {
+                            ...either(),
+                            method(value: string) { return value; }
+                        };
+                    `,
+                    `
+                        declare function either(): { a: number } | { b: string };
+                        const spread = {
+                            ...either(),
+                            /*~~(declared by Unknown)~~>*/method(value: string) { return value; }
+                        };
+                    `
+                )
+            );
+        });
+
+        test('a call is declared on the class that declares the method, not on the receiver\'s class', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    class Numbers extends Array<number> {}
+                    new Numbers().indexOf(1);
+                    function first<T extends string[]>(t: T) { return t.indexOf('a'); }
+                `,
+                //@formatter:off
+                `
+                    class Numbers extends Array<number> {}
+                    /*~~(Array)~~>*/new Numbers().indexOf(1);
+                    function first<T extends string[]>(t: T) { return /*~~(Array)~~>*/t.indexOf('a'); }
+                `
+                //@formatter:on
+            );
+            src.path = 'main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a call on a union is declared on the class every member inherits the method from, if there is one', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    class Shape { area() { return 0; } }
+                    class Square extends Shape {}
+                    class Circle extends Shape {}
+                    declare const shape: Square | Circle;
+                    declare const text: string | string[];
+                    shape.area();
+                    text.indexOf('a');
+                `,
+                //@formatter:off
+                `
+                    class Shape { area() { return 0; } }
+                    class Square extends Shape {}
+                    class Circle extends Shape {}
+                    declare const shape: Square | Circle;
+                    declare const text: string | string[];
+                    /*~~(Shape)~~>*/shape.area();
+                    /*~~(<unknown>)~~>*/text.indexOf('a');
+                `
+                //@formatter:on
+            );
+            src.path = 'main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a class declared in a module is named after the module, whether or not it is exported', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.ClassDeclaration) {
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
+                }
+                if (node?.kind === J.Kind.MethodInvocation && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export class Exported {}
+                    class Array { indexOf(n: number) { return n; } }
+                    namespace NS { export class Inner {} }
+                    function scoped() { class Exported {} }
+                    new Array().indexOf(1);
+                    [1].indexOf(1);
+                `,
+                //@formatter:off
+                `
+                    /*~~(src/main.Exported)~~>*/export class Exported {}
+                    /*~~(src/main.Array)~~>*/class Array { indexOf(n: number) { return n; } }
+                    namespace NS { /*~~(src/main.NS.Inner)~~>*/export class Inner {} }
+                    function scoped() { /*~~(Exported)~~>*/class Exported {} }
+                    /*~~(src/main.Array)~~>*/new Array().indexOf(1);
+                    /*~~(Array)~~>*/[1].indexOf(1);
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a class in a script or a declare global block is a global, but one in a module named global is not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.ClassDeclaration) {
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
+                }
+                if (node?.kind === J.Kind.MethodInvocation && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                return null;
+            });
+
+            const script = typescript(
+                `
+                    class MyList {}
+                `,
+                //@formatter:off
+                `
+                    /*~~(MyList)~~>*/class MyList {}
+                `
+                //@formatter:on
+            );
+            script.path = 'src/script.ts';
+            const augmentation = typescript(
+                `
+                    declare global { interface Shared { m(): void } }
+                    declare const shared: Shared;
+                    shared.m();
+                    export {};
+                `,
+                //@formatter:off
+                `
+                    declare global { /*~~(Shared)~~>*/interface Shared { m(): void } }
+                    declare const shared: Shared;
+                    /*~~(Shared)~~>*/shared.m();
+                    export {};
+                `
+                //@formatter:on
+            );
+            augmentation.path = 'src/augmentation.ts';
+            const moduleNamedGlobal = typescript(
+                `
+                    class Local {}
+                    export {};
+                `,
+                //@formatter:off
+                `
+                    /*~~(global.Local)~~>*/class Local {}
+                    export {};
+                `
+                //@formatter:on
+            );
+            moduleNamedGlobal.path = 'global.ts';
+            await spec.rewriteRun(script, augmentation, moduleNamedGlobal);
+        });
+
+        test('a class in a CommonJS module is named after the module, and one in a script is not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+
+            const module = javascript(
+                `class Exported {}\nmodule.exports = Exported;`,
+                `/*~~(src/lib.Exported)~~>*/class Exported {}\nmodule.exports = Exported;`
+            );
+            module.path = 'src/lib.js';
+            const script = javascript(
+                `class Local {}`,
+                `/*~~(Local)~~>*/class Local {}`
+            );
+            script.path = 'src/script.js';
+            await spec.rewriteRun(module, script);
+        });
+
+        test('a local class in a dependency\'s source is named after its package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+
+            const src = typescript(
+                `
+                    class Local {}
+                    export { Local };
+                `,
+                //@formatter:off
+                `
+                    /*~~(pkg.Local)~~>*/class Local {}
+                    export { Local };
+                `
+                //@formatter:on
+            );
+            src.path = 'node_modules/pkg/index.ts';
+            await spec.rewriteRun(src);
         });
 
         test.skip('should map generic types', async () => {
@@ -1978,6 +2333,49 @@ describe('JavaScript type mapping', () => {
         await spec.rewriteRun(src);
     });
 
+    test('a call to a function declared in a parsed source has the declaration\'s declaringType', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) =>
+            (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type) ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
+
+        const util = typescript(
+            `
+                export function shared(): void {}
+                export default function fallback(): void {}
+            `,
+            //@formatter:off
+            `
+                /*~~(util#shared)~~>*/export function shared(): void {}
+                /*~~(util#fallback)~~>*/export default function fallback(): void {}
+            `
+            //@formatter:on
+        );
+        util.path = 'util.ts';
+        const main = typescript(
+            `
+                import fb, {shared as s} from './util';
+                function helper(): void {}
+                helper();
+                s();
+                fb();
+                parseInt('1');
+            `,
+            //@formatter:off
+            `
+                import fb, {shared as s} from './util';
+                /*~~(main#helper)~~>*/function helper(): void {}
+                /*~~(main#helper)~~>*/helper();
+                /*~~(util#shared)~~>*/s();
+                /*~~(util#fallback)~~>*/fb();
+                /*~~(𝑓#parseInt)~~>*/parseInt('1');
+            `
+            //@formatter:on
+        );
+        main.path = 'main.ts';
+        await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 
@@ -2199,6 +2597,723 @@ describe('JavaScript type mapping', () => {
         }, {unsafeCleanup: true});
     });
 
+    describe('module attribution across import styles', () => {
+        // Every style of binding a module reaches the same package, so a `MethodMatcher` or a
+        // type-based precondition written against the package matches all of them. Previously the
+        // declaring type for a default or namespace import was built from the local name plus the
+        // declaration file's path, split at the first dot of the path — which lands inside a
+        // directory name like `.pnpm` or a hidden parent directory — making it both wrong and
+        // unstable across machines.
+        test('default, namespace, named and require bindings all attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = require('fs-extra');
+
+                                fse.ensureDir('a');
+                                remove('b');
+                                ns.pathExists('c');
+                                required.ensureDirSync('d');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                const required = /*~~(NodeJS)~~>*/require('fs-extra');
+
+                                /*~~(fs-extra)~~>*/fse.ensureDir('a');
+                                /*~~(fs-extra)~~>*/remove('b');
+                                /*~~(fs-extra)~~>*/ns.pathExists('c');
+                                /*~~(fs-extra)~~>*/required.ensureDirSync('d');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                },
+                                "devDependencies": {
+                                  "@types/fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a call directly on a require() result attributes to the required package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) && type.name === 'install' ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `require('source-map-support').install();`,
+                            //@formatter:off
+                            `/*~~(source-map-support)~~>*/require('source-map-support').install();`
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "source-map-support": "^0.5"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        const declaringTypeAndName = (node: any, type: Type | undefined) =>
+            (node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.FunctionCall) && Type.isMethod(type) &&
+            !(node.kind === J.Kind.MethodInvocation && node.name.simpleName === 'require') ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null;
+
+        test('an import from a node: specifier attributes like one from the bare specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'sep') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return owner ? Type.FullyQualified.getFullyQualifiedName(owner) : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        import {sep} from 'node:path';
+                        import {run} from 'node:test';
+                        const required = require('node:url');
+
+                        parse('x');
+                        fmt('x');
+                        nodeUrl.parse('x');
+                        url.parse('x');
+                        required.parse('x');
+                        sep.length;
+                        run();
+                    `,
+                    //@formatter:off
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        import {/*~~(path)~~>*/sep} from 'node:path';
+                        import {run} from 'node:test';
+                        const required = require('node:url');
+
+                        /*~~(url#parse)~~>*/parse('x');
+                        /*~~(url#format)~~>*/fmt('x');
+                        /*~~(url#parse)~~>*/nodeUrl.parse('x');
+                        /*~~(url#parse)~~>*/url.parse('x');
+                        /*~~(url#parse)~~>*/required.parse('x');
+                        /*~~(path)~~>*/sep.length;
+                        /*~~(node:test#run)~~>*/run();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a member bound from a require() attributes like a named import in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && ['delimiter', 'separator'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {delimiter} = require('node:path');
+                        const {sep: separator} = require('path');
+                        const {default: ok} = require('node:assert');
+                        a.truncateSync(1);
+                        truncateSync(1);
+                        renamed(1);
+                        viaProp(1);
+                        delimiter.length;
+                        separator.length;
+                        ok(true);
+                    `,
+                    //@formatter:off
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {/*~~(path#delimiter)~~>*/delimiter} = require('node:path');
+                        const {sep: /*~~(path#sep)~~>*/separator} = require('path');
+                        const {default: ok} = require('node:assert');
+                        /*~~(fs#truncateSync)~~>*/a.truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/renamed(1);
+                        /*~~(fs#truncateSync)~~>*/viaProp(1);
+                        /*~~(path#delimiter)~~>*/delimiter.length;
+                        /*~~(path#sep)~~>*/separator.length;
+                        /*~~(assert#<default>)~~>*/ok(true);
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a rest element or a nested pattern bound from a require() binds no export in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['rest', 'sep'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        const {...rest} = require('node:path');
+                        const {posix: {sep}} = require('node:path');
+                        rest.delimiter;
+                        sep.length;
+                    `
+                )
+            );
+        });
+
+        test.each(
+            ([['javascript', javascript], ['typescript', typescript]] as const).flatMap(([language, source]) =>
+                ['const', 'let', 'var'].map(keyword => [keyword, language, source] as const))
+        )('a whole module and a member bound by a %s require() attribute alike in %s', async (keyword, _, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'delimiter') {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+            const declarations = `
+                        ${keyword} fs = require('node:fs');
+                        ${keyword} {truncateSync} = require('node:fs');
+                        ${keyword} {truncateSync: renamed} = require('node:fs');
+                        ${keyword} viaProp = require('node:fs').truncateSync;
+                        ${keyword} viaElement = require('node:fs')['truncateSync'];
+                        ${keyword} {delimiter} = require('node:path');`;
+
+            await spec.rewriteRun(
+                source(
+                    `${declarations}
+                        fs.truncateSync(1);
+                        truncateSync(1);
+                        renamed(1);
+                        viaProp(1);
+                        viaElement(1);
+                        delimiter.length;
+                    `,
+                    //@formatter:off
+                    `${declarations.replace('{delimiter}', '{/*~~(path#delimiter)~~>*/delimiter}')}
+                        /*~~(fs#truncateSync)~~>*/fs.truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/renamed(1);
+                        /*~~(fs#truncateSync)~~>*/viaProp(1);
+                        /*~~(fs#truncateSync)~~>*/viaElement(1);
+                        /*~~(path#delimiter)~~>*/delimiter.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('a default member of a require() names the default export and a computed member names none', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['dflt', 'computed'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const key = 'delimiter';
+                        const {default: dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        dflt.sep;
+                        computed.length;
+                    `,
+                    //@formatter:off
+                    `
+                        const key = 'delimiter';
+                        const {default: /*~~(path#default)~~>*/dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        /*~~(path#default)~~>*/dflt.sep;
+                        computed.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('an import-equals require() binds the whole module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import assert = require('node:assert');
+                        import fs = require('node:fs');
+                        assert(true);
+                        fs.truncateSync('p');
+                    `,
+                    //@formatter:off
+                    `
+                        import assert = require('node:assert');
+                        import fs = require('node:fs');
+                        /*~~(assert#<default>)~~>*/assert(true);
+                        /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a whole module and a member bound from an awaited import() attribute like a require() in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        async function f() {
+                            const fs = await import('node:fs');
+                            const {truncateSync} = await import('node:fs');
+                            const exists = (await import('node:fs')).existsSync;
+                            fs.truncateSync('p');
+                            truncateSync('p');
+                            exists('p');
+                        }
+                    `,
+                    //@formatter:off
+                    `
+                        async function f() {
+                            const fs = await import('node:fs');
+                            const {truncateSync} = await import('node:fs');
+                            const exists = (await import('node:fs')).existsSync;
+                            /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
+                            /*~~(fs#truncateSync)~~>*/truncateSync('p');
+                            /*~~(fs#existsSync)~~>*/exists('p');
+                        }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                const call = declaringTypeAndName(node, type);
+                return call && (type as Type.Method).flags & Type.Flag.Static ? `${call} static` : call;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import moment from 'moment';
+                                import m from 'moment';
+                                import {utc} from 'moment';
+                                const local = moment.utc;
+
+                                moment.utc('a');
+                                m.utc('b');
+                                utc('c');
+                                local('d');
+                                moment('e');
+                            `,
+                            //@formatter:off
+                            `
+                                import moment from 'moment';
+                                import m from 'moment';
+                                import {utc} from 'moment';
+                                const local = moment.utc;
+
+                                /*~~(moment#utc static)~~>*/moment.utc('a');
+                                /*~~(moment#utc static)~~>*/m.utc('b');
+                                /*~~(moment#utc static)~~>*/utc('c');
+                                /*~~(moment#utc static)~~>*/local('d');
+                                /*~~(moment#<default> static)~~>*/moment('e');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(`{"name": "test-project", "version": "1.0.0", "dependencies": {"moment": "^2.30.0"}}`)
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a parsed namespace\'s function and a class\'s static method are static, an instance method is not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                const call = declaringTypeAndName(node, type);
+                return call && (type as Type.Method).flags & Type.Flag.Static ? `${call} static` : call;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        namespace tz { export function utc() {} utc(); }
+                        tz.utc();
+                        class Calc { static of() { return new Calc(); } add() {} }
+                        Calc.of().add();
+                    `,
+                    //@formatter:off
+                    `
+                        namespace tz { export function utc() {} /*~~(tz#utc static)~~>*/utc(); }
+                        /*~~(tz#utc static)~~>*/tz.utc();
+                        class Calc { static of() { return new Calc(); } add() {} }
+                        /*~~(Calc#add)~~>*//*~~(Calc#of static)~~>*/Calc.of().add();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('a static method on an imported class attributes to the class', async () => {
+            // Previously the import's local name replaced the class's package, giving \`URL.URL\`.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import {URL} from 'node:url';
+
+                                URL.canParse('https://example.com');
+                            `,
+                            //@formatter:off
+                            `
+                                import {URL} from 'node:url';
+
+                                /*~~(url.URL#canParse)~~>*/URL.canParse('https://example.com');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^22"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('calling a namespace import\'s default export attributes like a default import call', async () => {
+            // The namespace object's type used to map to \`{}\`.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import requestId from 'express-request-id';
+                                import * as ns from 'express-request-id';
+
+                                requestId();
+                                ns.default();
+                            `,
+                            //@formatter:off
+                            `
+                                import requestId from 'express-request-id';
+                                import * as ns from 'express-request-id';
+
+                                /*~~(express-request-id#<default>)~~>*/requestId();
+                                /*~~(express-request-id#<default>)~~>*/ns.default();
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "express-request-id": "1.4.1"
+                                },
+                                "devDependencies": {
+                                  "@types/express-request-id": "1.4.3"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('imports of a package without type declarations attribute to the package', async () => {
+            // An untyped package's bindings are \`any\`, so only the import specifier identifies the module.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+
+                                fse.readFile('a');
+                                remove('b');
+                                ns.copy('a', 'b');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import {remove} from 'fs-extra';
+                                import * as ns from 'fs-extra';
+
+                                /*~~(fs-extra#readFile)~~>*/fse.readFile('a');
+                                /*~~(fs-extra#remove)~~>*/remove('b');
+                                /*~~(fs-extra#copy)~~>*/ns.copy('a', 'b');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a member bound from a require() is attributed to the required module only in its own file', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'bar') {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            const local = typescript(
+                `
+                    export const bar = require('node:path').sep;
+                    bar.length;
+                `,
+                //@formatter:off
+                `
+                    export const /*~~(path#sep)~~>*/bar = require('node:path').sep;
+                    /*~~(path#sep)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            local.path = 'local.ts';
+            const main = typescript(
+                `
+                    import * as ns from './local';
+                    ns.bar.length;
+                `,
+                //@formatter:off
+                `
+                    import * as ns from './local';
+                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            main.path = 'main.ts';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, local, main)), {unsafeCleanup: true});
+        });
+
+        test('members bound from a require() of a package without type declarations attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                remove('a');
+                                cp('a', 'b');
+                                ensureDir('c');
+                            `,
+                            //@formatter:off
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                /*~~(fs-extra#remove)~~>*/remove('a');
+                                /*~~(fs-extra#copy)~~>*/cp('a', 'b');
+                                /*~~(fs-extra#ensureDir)~~>*/ensureDir('c');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('calling an untyped module itself attributes to its default export', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                const requestId = require('express-request-id');
+
+                                requestId();
+                                require('express-request-id')();
+                            `,
+                            //@formatter:off
+                            `
+                                const requestId = require('express-request-id');
+
+                                /*~~(express-request-id#<default>)~~>*/requestId();
+                                /*~~(express-request-id#<default>)~~>*/require('express-request-id')();
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "express-request-id": "1.4.1"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+    });
+
     describe('object types', () => {
         test('an object literal is attributed as an object type whose members carry each field name and type', async () => {
             const literals: J.NewClass[] = [];
@@ -2230,6 +3345,34 @@ describe('JavaScript type mapping', () => {
 
             const nested = outer.members[2].type as Type.Class;
             expect(nested.members.map(m => [m.name, Type.signature(m.type)])).toEqual([['deep', 'boolean']]);
+        });
+
+        test('a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`class K {'f\\uD800' = 1}\nconst c = {'o\\uD800': 1, 'm\\uDC00'() {}};`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const c = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    expect((c.variableType!.type as Type.Class).members.map(m => m.name)).toEqual(['o\\uD800']);
+                }
+            });
+        });
+
+        test('a call on a `this` typed as a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`const p = {'\\uDC00'() {}};\nconst g: (this: typeof p['\\uDC00']) => void = function () { this(); };`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const g = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    const f = (g.initializer!.element as JS.StatementExpression).statement as J.MethodDeclaration;
+                    const call = (f.body!.statements[0].element as JS.ExpressionStatement).expression as JS.FunctionCall;
+                    expect(call.methodType?.name).toBe('\\uDC00');
+                }
+            });
         });
 
         test('a reference to a variable bound to an object literal keeps the object type and its owning variable', async () => {
@@ -2346,6 +3489,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                     return visited;
                 }
 
+                async visitFunctionCall(functionCall: JS.FunctionCall, p: ExecutionContext): Promise<JS.FunctionCall> {
+                    const visited = await super.visitFunctionCall(functionCall, p) as JS.FunctionCall;
+                    const description = predicate(visited, visited.methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
                 async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
                     const visited = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
                     const description = predicate(visited, visited.type);
@@ -2368,6 +3520,14 @@ function formatPrimitiveType(type: Type | undefined): string | null {
     return Type.isPrimitive(type) ? type.keyword || 'None' : null;
 }
 
+function formatKindAndName(type: Type | undefined): string {
+    if (Type.isPrimitive(type)) {
+        return `Primitive ${type.keyword}`;
+    }
+    const kind = type?.kind.substring(type.kind.lastIndexOf('$') + 1);
+    return Type.isFullyQualified(type) ? `${kind} ${FullyQualified.getFullyQualifiedName(type)}` : `${kind}`;
+}
+
 function formatObjectType(type: Type | undefined): string | null {
     if (!Type.isObjectType(type)) {
         return null;
@@ -2382,4 +3542,21 @@ function objectTypeOf(literals: J.NewClass[], memberName: string): Type.Class {
     });
     expect(match, `no object literal with a '${memberName}' member`).toBeDefined();
     return match!.constructorType!.returnType as Type.Class;
+}
+
+function loneSurrogateStrings(root: unknown): string[] {
+    const found: string[] = [];
+    const seen = new Set<object>();
+    const visit = (value: unknown) => {
+        if (typeof value === 'string') {
+            if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)) {
+                found.push(value);
+            }
+        } else if (value && typeof value === 'object' && !seen.has(value)) {
+            seen.add(value);
+            Object.values(value).forEach(visit);
+        }
+    };
+    visit(root);
+    return found;
 }

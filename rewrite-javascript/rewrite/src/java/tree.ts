@@ -40,6 +40,21 @@ export interface Expression extends J {
     readonly type?: Type;
 }
 
+export namespace Expression {
+    /**
+     * Returns the first expression inside any number of nested parentheses, or the expression itself
+     * when it is not parenthesized.
+     */
+    export function unwrap(expr: Expression): Expression;
+    export function unwrap(expr: Expression | undefined): Expression | undefined;
+    export function unwrap(expr: Expression | undefined): Expression | undefined {
+        while (expr?.kind === J.Kind.Parentheses) {
+            expr = (expr as J.Parentheses<Expression>).tree.element;
+        }
+        return expr;
+    }
+}
+
 export interface MethodCall extends Expression {
     readonly methodType?: Type.Method;
 }
@@ -789,18 +804,6 @@ export function isSpace(tree: any): tree is J.Space {
         tree.kind === J.Kind.Space;
 }
 
-/**
- * Builds a comment-free Space. Assigning one over an existing prefix silently drops the comments
- * that prefix carried; spread the prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
- */
-export function space(whitespace: string): J.Space {
-    return {
-        kind: J.Kind.Space,
-        comments: [],
-        whitespace: whitespace,
-    };
-}
-
 export const emptySpace: J.Space = {
     kind: J.Kind.Space,
     comments: [],
@@ -812,6 +815,33 @@ export const singleSpace: J.Space = {
     comments: [],
     whitespace: " ",
 };
+
+// Short whitespace repeats throughout a run, so as with Java's Space.shared one instance serves every use.
+const sharedSpaces = new Map<string, J.Space>([["", emptySpace], [" ", singleSpace]]);
+
+/**
+ * A comment-free Space, shared with every other use of short whitespace, so it must never be mutated.
+ * Assigning one over an existing prefix silently drops the comments that prefix carried; spread the
+ * prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
+ */
+export function space(whitespace: string): J.Space {
+    return sharedSpace(whitespace) ?? {kind: J.Kind.Space, comments: [], whitespace};
+}
+
+/**
+ * The one comment-free Space shared for `whitespace`, or undefined when `whitespace` is too long to share.
+ */
+export function sharedSpace(whitespace: string): J.Space | undefined {
+    if (whitespace.length > 50) {
+        return undefined;
+    }
+    let s = sharedSpaces.get(whitespace);
+    if (s === undefined) {
+        s = {kind: J.Kind.Space, comments: [], whitespace};
+        sharedSpaces.set(whitespace, s);
+    }
+    return s;
+}
 
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {
