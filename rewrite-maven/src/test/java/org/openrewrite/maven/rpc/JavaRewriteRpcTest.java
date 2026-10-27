@@ -57,8 +57,7 @@ class JavaRewriteRpcTest {
     }
 
     /**
-     * Runs the server next to a non-daemon thread, like the one a recipe leaves behind when it starts a
-     * RewriteRpcProcess.
+     * Runs the server next to a non-daemon thread, standing in for one that recipe code might leave running.
      */
     public static class WithNonDaemonThread {
         public static void main(String[] args) {

@@ -130,7 +130,7 @@ public class JavaRewriteRpc {
                 logStream.close();
             }
         }
-        // Exit even if a recipe left a non-daemon thread running, such as a RewriteRpcProcess
+        // Exit even if recipe code left a non-daemon thread running, e.g. a Timer or an Executors thread pool
         System.exit(0);
     }
 
