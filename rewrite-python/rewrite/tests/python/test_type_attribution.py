@@ -2945,20 +2945,84 @@ def test_a_class_decorated_into_another_type_is_typed_as_itself(returned):
             pass
 
 
+        class Base:
+            pass
+
+
         def replace(c) -> {returned}:
             ...
 
 
         @replace
-        class Foo:
+        class Foo(Base):
+            def method(self):
+                ...
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['Foo'].type
+        assert type(declared) is JavaType.Class
+        assert declared.fully_qualified_name == 'm.Foo'
+        assert declared.supertype.fully_qualified_name == 'm.Base'
+        assert [method.name for method in declared._methods] == ['method']
+        assert [annotation.fully_qualified_name for annotation in declared._annotations] == ['m.replace']
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+def test_a_class_without_methods_decorated_into_another_type_keeps_its_bases():
+    src = '''
+        class Base:
+            pass
+
+
+        class Mixin:
+            pass
+
+
+        def replace(c) -> int:
+            ...
+
+
+        @replace
+        class Foo(Base, Mixin):
             pass
     '''
     cu, tmpdir, client = _parse_with_types({'m.py': src})
     try:
         declared = _collect_class_declarations(cu)['Foo'].type
-        assert isinstance(declared, JavaType.Class)
         assert declared.fully_qualified_name == 'm.Foo'
-        assert [annotation.fully_qualified_name for annotation in declared._annotations] == ['m.replace']
+        assert declared.supertype.fully_qualified_name == 'm.Base'
+        assert [interface.fully_qualified_name for interface in declared.interfaces] == ['m.Mixin']
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+def test_a_decorated_function_does_not_rename_the_classes_after_it():
+    src = '''
+        import functools
+
+
+        @functools.lru_cache
+        def cached():
+            return 1
+
+
+        class Base:
+            pass
+
+
+        class Foo(Base):
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['Foo'].type
+        assert type(declared) is JavaType.Class
+        assert declared.fully_qualified_name == 'm.Foo'
+        assert declared.supertype.fully_qualified_name == 'm.Base'
     finally:
         _cleanup_parse(tmpdir, client)
 

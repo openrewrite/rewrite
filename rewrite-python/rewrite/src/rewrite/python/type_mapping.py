@@ -103,6 +103,10 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+# The kind ty gives a declaration statement's own binding.
+# A decorator binds its result instead, which can come from any module.
+_DECLARED_KINDS = {'StmtClassDef': 'classLiteral', 'StmtFunctionDef': 'function', 'StmtAsyncFunctionDef': 'function'}
+
 
 def _is_module_function(descriptor: Dict[str, Any]) -> bool:
     """Whether ty describes a function declared outside any class, at module level or nested."""
@@ -365,8 +369,10 @@ class PythonTypeMapping:
         self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
-        # Lazily populated by _module_ast / _import_bindings
+        # Lazily populated by _module_ast / _import_bindings / _source_module_name
         self._module_ast_parsed = False
+        self._source_module_searched = False
+        self._source_module: Optional[str] = None
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
@@ -1090,8 +1096,17 @@ class PythonTypeMapping:
             if isinstance(candidate, JavaType.Class) and candidate.fully_qualified_name == fqn
         ), None)
         if declared is None:
+            declared = self._class_of_methods(node)
+        if declared is None:
             cache_key = fqn if module_name else f"{self._file_path}#{class_path}"
-            declared = self._create_class_type(fqn, cache_key=cache_key)
+            declared = self._create_class_type(fqn, shallow=False, cache_key=cache_key)
+            if declared.supertype is None:
+                bases = [base_type for base_type in map(self.type, node.bases)
+                         if isinstance(base_type, JavaType.FullyQualified)
+                         and not isinstance(base_type, JavaType.Unknown)]
+                if bases:
+                    declared._supertype = bases[0]
+                    declared._interfaces = bases[1:] or None
 
         annotations = []
         for decorator in decorators:
@@ -1101,16 +1116,38 @@ class PythonTypeMapping:
         declared._annotations = annotations or None
         return declared
 
+    def _class_of_methods(self, node: ast.ClassDef) -> Optional[JavaType.Class]:
+        """The class ty declares the methods of ``node``'s body on.
+        ty sends a class's own type only where something else refers to it, as a method does."""
+        for statement in node.body:
+            if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            type_id = self._lookup_type_id(statement)
+            descriptor = self._type_registry.get(type_id) if type_id is not None else None
+            declaring_id = descriptor.get('declaringClassId') if descriptor else None
+            if declaring_id is not None:
+                declaring = self._resolve_type(declaring_id)
+                if isinstance(declaring, JavaType.Class):
+                    return declaring
+        return None
+
     def _source_module_name(self) -> Optional[str]:
         """The module that owns declarations in this source, when ty exposes one."""
-        for _, (type_id, node_kind) in self._node_index.items():
-            if node_kind not in ('StmtClassDef', 'StmtFunctionDef', 'StmtAsyncFunctionDef'):
+        if self._source_module_searched:
+            return self._source_module
+        self._source_module_searched = True
+        for type_id, node_kind in self._node_index.values():
+            declared_kind = _DECLARED_KINDS.get(node_kind)
+            if declared_kind is None:
                 continue
             descriptor = self._type_registry.get(type_id)
-            module_name = descriptor.get('moduleName') if descriptor else None
+            if descriptor is None or descriptor.get('kind') != declared_kind:
+                continue
+            module_name = descriptor.get('moduleName')
             if module_name and module_name != 'builtins':
-                return _ALIASED_MODULES.get(module_name, module_name)
-        return None
+                self._source_module = _ALIASED_MODULES.get(module_name, module_name)
+                break
+        return self._source_module
 
     def is_field_specifier_call(self, node: ast.expr) -> bool:
         """Whether ty typed ``node`` as a dataclass field-specifier call, which it
