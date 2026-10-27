@@ -65,9 +65,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
-    @Nullable
-    private Map<String, List<RecipeExample>> recipeNameToExamples;
-
     private final BiFunction<String, @Nullable Map<String, Object>, Recipe> recipeLoader;
 
     @Getter
@@ -637,10 +634,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
-        if (recipeNameToExamples == null) {
-            recipeNameToExamples = new HashMap<>();
-        }
-
+        Map<String, List<RecipeExample>> recipeNameToExamples = new HashMap<>();
         Collection<Map<String, Object>> rawExamples = loadResources(ResourceType.Example);
 
         for (Map<String, Object> examplesMap : rawExamples) {

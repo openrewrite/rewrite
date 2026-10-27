@@ -85,20 +85,15 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
+        // Loaders cache their descriptors and share example lists with them, so merge into copies
         Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                recipeToExamples.putAll(r.listRecipeExamples());
+                r.listRecipeExamples().forEach((name, examples) ->
+                        recipeToExamples.put(name, new ArrayList<>(examples)));
             } else if (r instanceof ClasspathScanningLoader) {
-                ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
-                Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
-                for (String key : examplesMap.keySet()) {
-                    if (recipeToExamples.containsKey(key)) {
-                        recipeToExamples.get(key).addAll(examplesMap.get(key));
-                    } else {
-                        recipeToExamples.put(key, examplesMap.get(key));
-                    }
-                }
+                r.listRecipeExamples().forEach((name, examples) ->
+                        recipeToExamples.computeIfAbsent(name, k -> new ArrayList<>()).addAll(examples));
             }
         }
 
@@ -107,16 +102,25 @@ public class Environment {
             if (r instanceof YamlResourceLoader) {
                 result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
             } else {
-                Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
-                for (RecipeDescriptor descriptor : descriptors) {
-                    if (recipeToExamples.containsKey(descriptor.getName())) {
-                        descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
-                    }
+                for (RecipeDescriptor descriptor : r.listRecipeDescriptors()) {
+                    List<RecipeExample> examples = recipeToExamples.get(descriptor.getName());
+                    result.add(examples == null ? descriptor :
+                            descriptor.withExamples(mergeExamples(descriptor.getExamples(), examples)));
                 }
-                result.addAll(descriptors);
             }
         }
         return result;
+    }
+
+    private static List<RecipeExample> mergeExamples(List<RecipeExample> examples, List<RecipeExample> more) {
+        List<RecipeExample> merged = new ArrayList<>(examples);
+        for (RecipeExample example : more) {
+            // A declarative recipe's descriptor already holds its own loader's examples
+            if (!merged.contains(example)) {
+                merged.add(example);
+            }
+        }
+        return merged;
     }
 
     public Recipe activateRecipes(Collection<String> activeRecipes) {
