@@ -207,11 +207,8 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private Optional<Xml.Attribute> maybeGetSchemaLocation(Namespaced n) {
-                Map<String, String> namespaces = n.getNamespaces();
-                for (Xml.Attribute attribute : n.getAttributes()) {
-                    String attributeNamespace = namespaces.get(Namespaced.extractNamespacePrefix(attribute.getKeyAsString()));
-                    if(XML_SCHEMA_INSTANCE_URI.equals(attributeNamespace) &&
-                       attribute.getKeyAsString().endsWith("schemaLocation")) {
+                for (Xml.Attribute attribute : n.getSchemaLocations()) {
+                    if ("schemaLocation".equals(Namespaced.extractLocalName(attribute.getKeyAsString()))) {
                         return Optional.of(attribute);
                     }
                 }

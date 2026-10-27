@@ -76,16 +76,21 @@ public class Namespaced implements Trait<Xml> {
 
     /**
      * @return The namespace URI bound to this tag's or attribute's prefix in the current scope. An
-     * unprefixed tag is in the default namespace, while an unprefixed attribute is in no namespace.
+     * unprefixed tag is in the default namespace, and an unprefixed attribute is in no namespace.
+     * Reserved bindings need no declaration. A namespace declaration is in the xmlns namespace, and
+     * the xml prefix is bound to the XML namespace.
      */
     public Optional<String> getNamespaceUri() {
+        Object value = cursor.getValue();
+        if (value instanceof Xml.Attribute && isNamespaceDefinitionAttribute(((Xml.Attribute) value).getKeyAsString())) {
+            return Optional.of(XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
+        }
         String prefix = getNamespacePrefix().orElse("");
-        if (prefix.isEmpty() && !(cursor.getValue() instanceof Xml.Tag)) {
+        if (prefix.isEmpty() && !(value instanceof Xml.Tag)) {
             return Optional.empty();
         }
         String uri = getAllNamespaces().get(prefix);
         if (uri == null && XMLConstants.XML_NS_PREFIX.equals(prefix)) {
-            // The xml prefix is bound by definition and need not be declared
             return Optional.of(XMLConstants.XML_NS_URI);
         }
         // An empty namespace name, as in xmlns="", undeclares the binding
@@ -108,9 +113,10 @@ public class Namespaced implements Trait<Xml> {
             }
         } else if (cursor.getValue() instanceof Xml.Attribute) {
             Xml.Attribute attribute = cursor.getValue();
-            namespaces = singletonMap(
-                    extractPrefixFromNamespaceDefinition(attribute.getKeyAsString()),
-                    attribute.getValueAsString());
+            String prefix = extractPrefixFromNamespaceDefinition(attribute.getKeyAsString());
+            if (prefix != null) {
+                namespaces = singletonMap(prefix, attribute.getValueAsString());
+            }
         }
         return namespaces;
     }
@@ -122,9 +128,8 @@ public class Namespaced implements Trait<Xml> {
                 return emptyList();
             }
             List<Xml.Attribute> schemaLocations = new ArrayList<>();
-            Map<String, String> namespaces = getAllNamespaces();
             for (Xml.Attribute attribute : tag.getAttributes()) {
-                if (XML_SCHEMA_INSTANCE_URI.equals(namespaces.get(extractNamespacePrefix(attribute.getKeyAsString())))) {
+                if (XML_SCHEMA_INSTANCE_URI.equals(new Namespaced(new Cursor(cursor, attribute)).getNamespaceUri().orElse(null))) {
                     schemaLocations.add(attribute);
                 }
             }
@@ -166,7 +171,7 @@ public class Namespaced implements Trait<Xml> {
     }
 
     public static boolean isNamespaceDefinitionAttribute(String name) {
-        return name.startsWith("xmlns");
+        return "xmlns".equals(name) || name.startsWith("xmlns:");
     }
 
     public static String getAttributeNameForPrefix(String namespacePrefix) {

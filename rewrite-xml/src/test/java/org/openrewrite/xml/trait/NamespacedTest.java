@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.xml.XmlParser;
+import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,9 +63,36 @@ class NamespacedTest {
     }
 
     @Test
-    void xmlPrefixIsBoundWithoutDeclaration() {
-        assertThat(namespaced("<root xml:lang=\"en\"/>", "xml:lang").getNamespaceUri())
-          .hasValue("http://www.w3.org/XML/1998/namespace");
+    void plainAttributeDeclaresNoNamespace() {
+        assertThat(namespaced("<root id=\"1\"/>", "id").getNamespaces()).isEmpty();
+    }
+
+    @Test
+    void reservedNamespacesNeedNoDeclaration() {
+        String xml = """
+          <root xml:lang="en" xmlns="urn:default" xmlns:p="urn:p"/>
+          """;
+        assertThat(namespaced(xml, "xml:lang").getNamespaceUri()).hasValue("http://www.w3.org/XML/1998/namespace");
+
+        assertThat(namespaced(xml, "xmlns").getNamespaceUri()).hasValue("http://www.w3.org/2000/xmlns/");
+
+        assertThat(namespaced(xml, "xmlns:p").getNamespaceUri()).hasValue("http://www.w3.org/2000/xmlns/");
+    }
+
+    @Test
+    void schemaLocationsResolveEachAttributesOwnNamespace() {
+        Namespaced root = namespaced(
+          """
+            <root xmlns="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  schemaLocation="urn:a a.xsd"
+                  xsi:schemaLocation="urn:b b.xsd"/>
+            """,
+          "root"
+        );
+        assertThat(root.getSchemaLocations())
+          .extracting(Xml.Attribute::getKeyAsString)
+          .containsExactly("xsi:schemaLocation");
     }
 
     private static Namespaced namespaced(@Language("xml") String xml, String name) {
@@ -79,6 +107,7 @@ class NamespacedTest {
     void isNamespaceDefinitionAttributeTests() {
         assertThat(Namespaced.isNamespaceDefinitionAttribute("xmlns:test")).isTrue();
         assertThat(Namespaced.isNamespaceDefinitionAttribute("test")).isFalse();
+        assertThat(Namespaced.isNamespaceDefinitionAttribute("xmlnsVersion")).isFalse();
     }
 
     @Test
