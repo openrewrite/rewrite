@@ -181,6 +181,11 @@ void myRecipeTest() {
 
 When testing OpenRewrite parsers or recipes use `RewriteTest` and its `rewriteRun()` methods with "before" and "after" state to indicate what changes are expected and not expected to be made to source files.
 
+#### Failing recipe quality checks
+`rewriteRun` checks more than the expected output: whether a recipe settles in the cycles it declares, keeps no state on the `ExecutionContext`, keeps no trees or build models in an accumulator, adds no markers of its own, and more (see `RecipeQualityValidation`). Each such failure is a finding about the recipe, not about the test. Fix the recipe so it does what the check expects.
+
+Never get a check to pass without fixing what it guards: no pinning `cycles(..)` or `expectedCyclesThatMakeChanges(..)`, no moving state to somewhere the check doesn't look, no rebuilding or re-parsing an object from a few of its fields so the recipe no longer holds the real one. If the recipe really needs what the check forbids, either opt out through `RecipeQualityValidation` with the reason, or leave the test failing and explain what is missing. Either way, say so in the pull request description.
+
 ### Parser Extensions
 New language support for grammars that don't have type attribution require:
 1. ANTLR grammar files (`.g4`) in `src/main/antlr/`
