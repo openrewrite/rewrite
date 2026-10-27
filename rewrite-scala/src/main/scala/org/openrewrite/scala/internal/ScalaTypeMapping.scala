@@ -30,6 +30,7 @@ import dotty.tools.dotc.util.Spans
 
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
+import org.openrewrite.scala.tree.Union
 
 import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
@@ -621,7 +622,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
         case at: AndType => mapType(at.tp1)
-        case _: OrType => unknown
+        case ot: OrType => mapUnionType(ot, sig)
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
@@ -634,6 +635,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     } catch {
       case _: Throwable => unknown
     }
+  }
+
+  private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
+    case Nil => mapType(ctx.definitions.NothingType)
+    case (_, only) :: Nil => mapType(only)
+    case members => typeFactory.computeMultiCatch(sig, (union: Union) =>
+      union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */
@@ -677,6 +685,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case "scala.Double" => return JavaType.Primitive.Double
       case "scala.Boolean" => return JavaType.Primitive.Boolean
       case "scala.Unit" => return JavaType.Primitive.Void
+      case "scala.Null" => return JavaType.Primitive.Null
+      case "scala.Matchable" => return mapType(ctx.definitions.ObjectType)
       case _ =>
     }
 

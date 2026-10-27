@@ -275,7 +275,7 @@ public class RewriteRpcServer
         // Remove any global.json SDK pin before running dotnet restore / loading the workspace,
         // so the latest installed SDK is used regardless of the version the repo pins. The
         // file(s) are restored verbatim when the guard is disposed at the end of this method
-        // (after all projects are parsed), and any global.json a prior crashed run left deleted
+        // (after all projects are parsed), and any global.json a prior crashed run left changed
         // is recovered from git at that point too.
         using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
 
