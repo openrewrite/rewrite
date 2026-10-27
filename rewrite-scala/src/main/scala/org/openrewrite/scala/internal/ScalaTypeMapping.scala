@@ -775,10 +775,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
     val sym = javaClassOfStatics(symbol)
     // Members of library types are not populated to avoid deep recursive type
-    // graphs that cause StackOverflowError in recipes like ChangeType.
+    // graphs that cause StackOverflowError in recipes like ChangeType. A class
+    // loaded from TASTy has a source too, so also check what it was loaded from.
     val isSourceDefined = try {
       val src = sym.source
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
+      val file = sym.associatedFile
+      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala") &&
+        file != null && !file.ext.isScalaBinary
     } catch {
       case _: Throwable => false
     }

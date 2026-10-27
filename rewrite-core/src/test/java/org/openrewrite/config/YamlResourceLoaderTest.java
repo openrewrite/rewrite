@@ -158,6 +158,39 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
+    void listRecipeDescriptorsReturnsTheSameExamplesOnEveryCall() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              ---
+              type: specs.openrewrite.org/v1beta/example
+              recipeName: test.ChangeTextToHello
+              examples:
+                - description: "Change World to Hello"
+                  sources:
+                    - before: "World"
+                      after: "Hello!"
+                      language: "text"
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        for (int call = 1; call <= 3; call++) {
+            assertThat(env.listRecipeDescriptors()).as("call %d", call).singleElement()
+              .satisfies(descriptor -> assertThat(descriptor.getExamples())
+                .extracting(RecipeExample::getDescription)
+                .containsExactly("Change World to Hello"));
+        }
+    }
+
+    @Test
     void dataTables() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(

@@ -1698,6 +1698,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void membersOfScalaLibraryClassesAreNotPopulated() {
+        rewriteRun(
+          scala(
+            """
+            class Names {
+              val xs: List[String] = Nil
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified list = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(list.getFullyQualifiedName()).isEqualTo("scala.collection.immutable.List");
+                assertThat(list.getMethods()).isEmpty();
+                J.ClassDeclaration names = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Names"));
+                assertThat(names.getType().getMembers()).extracting(JavaType.Variable::getName).contains("xs");
+            })
+          )
+        );
+    }
+
+    @Test
     void arrayTypesAreJavaArrays() {
         rewriteRun(
           scala(

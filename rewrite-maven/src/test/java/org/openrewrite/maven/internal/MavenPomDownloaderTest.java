@@ -44,7 +44,10 @@ import org.openrewrite.xml.tree.Xml;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
@@ -345,6 +348,36 @@ class MavenPomDownloaderTest implements RewriteTest {
                 var normalizedRepository = downloader.normalizeRepository(httpRepo, MavenExecutionContextView.view(ctx), null);
 
                 assertThat(normalizedRepository).isEqualTo(httpRepo);
+            }
+        }
+
+        @Test
+        void unresponsiveRepositoryRetriesEachProbeOnce() throws Exception {
+            List<String> timedOut = new ArrayList<>();
+            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+                try {
+                    return httpSender.send(request);
+                } catch (UncheckedIOException e) {
+                    if (e.getCause() instanceof SocketTimeoutException) {
+                        timedOut.add(request.getMethod() + " " + request.getUrl());
+                    }
+                    throw e;
+                }
+            });
+            // Connections to this socket are established but never answered, as by a hung server, or by a plain HTTP
+            // server reading the https probe's TLS handshake as the start of a request
+            try (var server = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))) {
+                String http = "http://127.0.0.1:%d/maven/".formatted(server.getLocalPort());
+                String https = "https://127.0.0.1:%d/maven/".formatted(server.getLocalPort());
+                var repository = MavenRepository.builder().id("unresponsive").uri(http).build();
+
+                assertThat(new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null)).isNull();
+                // Each probe is retried once rather than five times, and https is still tried before http
+                assertThat(timedOut).containsExactly(
+                  "OPTIONS " + https, "OPTIONS " + https, "HEAD " + https, "HEAD " + https,
+                  "OPTIONS " + http, "OPTIONS " + http, "HEAD " + http, "HEAD " + http);
             }
         }
 

@@ -183,6 +183,8 @@ type serverConfig struct {
 	recipeInstallDir string
 }
 
+var testActivators []recipe.Activator
+
 func newServer(cfg serverConfig) *server {
 	var logOut io.Writer
 	if cfg.logFile != "" {
@@ -211,6 +213,7 @@ func newServer(cfg serverConfig) *server {
 
 	reg := recipe.NewRegistry()
 	reg.Activate(recipes.Activate)
+	reg.Activate(testActivators...)
 
 	logger := log.New(logOut, "", log.LstdFlags)
 

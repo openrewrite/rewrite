@@ -1,3 +1,5 @@
+import com.hierynomus.gradle.license.LicenseBasePlugin
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.util.Calendar
 
 plugins {
@@ -27,6 +29,33 @@ subprojects {
         }
     }
 
+    tasks.withType<JavaCompile>().configureEach {
+        // javac's closing notes about deprecated or unchecked API use repeat in every module and only point to -Xlint
+        options.compilerArgs.add("-XDsuppressNotes")
+    }
+
+    // Added after module scripts have changed the release, as a plain argument: a task tracks an argument provider's
+    // class, so a provider compiled from this script would make every edit here recompile every module.
+    afterEvaluate {
+        tasks.withType<JavaCompile>().configureEach {
+            // javac 21+ calls `--release 8` obsolete, but Java 8 is the deliberate target
+            if (options.release.orNull == 8) {
+                options.compilerArgs.add("-Xlint:-options")
+            }
+        }
+    }
+
+    // The header check has no comment style for these files and skips them anyway, logging a line for each one
+    plugins.withType<LicenseBasePlugin> {
+        configure<LicenseExtension> {
+            excludePatterns.addAll(listOf(
+                "**/META-INF/services/**", "**/META-INF/rewrite/mixins/**", "**/LICENSE-*", "**/gradlew-*",
+                "**/mvnw", "**/*.class", "**/*.gz", "**/*.ini", "**/*.jsonl", "**/*.jsx", "**/*.lock", "**/*.mjs",
+                "**/*.sha256", "**/*.tgz", "**/*.tsv", "**/*.tsx"
+            ))
+        }
+    }
+
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
             doLast {
@@ -39,7 +68,7 @@ subprojects {
                     .replace("\${year}", year.toString())
                     .lines()
                     .joinToString("\n") { " * $it".trimEnd() } + "\n */\n"
-                project.file(args!![idx + 1]).walk().filter { it.extension == "java" }.forEach { file ->
+                workingDir.resolve(args!![idx + 1]).walk().filter { it.extension == "java" }.forEach { file ->
                     file.writeText(licenseHeader + file.readLines().joinToString("\n") { line ->
                         line.trimEnd().replace("// Generated from $rootPrefix", "// Generated from ")
                     } + "\n")

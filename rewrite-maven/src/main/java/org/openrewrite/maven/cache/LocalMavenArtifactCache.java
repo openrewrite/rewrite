@@ -22,11 +22,12 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 @EqualsAndHashCode
@@ -53,19 +54,37 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
             return null;
         }
         Path path = dependencyPath(dependency);
-        try (InputStream is = artifactInputStream;
-             OutputStream out = Files.newOutputStream(path)) {
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = is.read(buffer, 0, 1024)) >= 0) {
-                out.write(buffer, 0, read);
-            }
+        // Written beside the artifact and moved into place, so that no reader ever sees part of one
+        Path partial = path.resolveSibling(path.getFileName() + "." + UUID.randomUUID() + ".part");
+        try (InputStream is = artifactInputStream) {
+            Files.copy(is, partial);
+            Files.move(partial, path, StandardCopyOption.ATOMIC_MOVE);
         } catch (Throwable t) {
+            try {
+                Files.deleteIfExists(partial);
+            } catch (IOException e) {
+                t.addSuppressed(e);
+            }
+            // Another writer may have put the same jar there first, whole, and on Windows the move fails while that
+            // jar is open. A non-dated SNAPSHOT's jar may be an older build, though, so the failure is reported.
+            if (!isMutable(dependency) && Files.isRegularFile(path)) {
+                return path;
+            }
             onError.accept(t);
             return null;
         }
 
         return path;
+    }
+
+    /**
+     * Whether a newer build can replace the artifact's jar, as {@link MavenArtifactCache#computeArtifact} assumes of
+     * non-dated SNAPSHOTs.
+     */
+    private static boolean isMutable(ResolvedDependency dependency) {
+        String datedSnapshotVersion = dependency.getDatedSnapshotVersion();
+        return dependency.getVersion().endsWith("-SNAPSHOT") &&
+               (datedSnapshotVersion == null || dependency.getVersion().equals(datedSnapshotVersion));
     }
 
     private Path dependencyPath(ResolvedDependency dependency) {
