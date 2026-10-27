@@ -167,15 +167,15 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                boolean source = SOURCE_COMPATIBILITY_DSL.matches(m) || ANDROID_SOURCE_COMPATIBILITY.matches(m);
-                boolean target = TARGET_COMPATIBILITY_DSL.matches(m) || ANDROID_TARGET_COMPATIBILITY.matches(m);
-                if (source || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
+                boolean matchedSourceCompatibility = SOURCE_COMPATIBILITY_DSL.matches(m) || ANDROID_SOURCE_COMPATIBILITY.matches(m);
+                boolean matchedTargetCompatibility = TARGET_COMPATIBILITY_DSL.matches(m) || ANDROID_TARGET_COMPATIBILITY.matches(m);
+                if (matchedSourceCompatibility || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
                     sourceCompatibilityFound = true;
                 }
-                if (target || TARGET_COMPATIBILITY_METHOD.matches(m)) {
+                if (matchedTargetCompatibility || TARGET_COMPATIBILITY_METHOD.matches(m)) {
                     targetCompatibilityFound = true;
                 }
-                return handleMethodInvocation(m, source, target);
+                return handleMethodInvocation(m, matchedSourceCompatibility, matchedTargetCompatibility);
             }
         });
     }
@@ -302,7 +302,7 @@ public class UpdateJavaCompatibility extends Recipe {
         return declarationStyle != null && declarationStyle != currentStyle;
     }
 
-    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, boolean source, boolean target) {
+    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, boolean matchedSourceCompatibility, boolean matchedTargetCompatibility) {
         if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
             List<Expression> args = m.getArguments();
 
@@ -335,10 +335,10 @@ public class UpdateJavaCompatibility extends Recipe {
             return m;
         }
 
-        if (source || target) {
+        if (matchedSourceCompatibility || matchedTargetCompatibility) {
             if (compatibilityType != null && (
-                    (compatibilityType == CompatibilityType.source && !source) ||
-                            (compatibilityType == CompatibilityType.target && !target))) {
+                    (compatibilityType == CompatibilityType.source && !matchedSourceCompatibility) ||
+                            (compatibilityType == CompatibilityType.target && !matchedTargetCompatibility))) {
                 return m;
             }
 
