@@ -69,7 +69,7 @@ func TestMetricsCSVHeaderWritten(t *testing.T) {
 	s.closeMetrics()
 
 	header, rows := readMetricsCSV(t, csvPath)
-	want := []string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs"}
+	want := []string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs", "reverse_remote_objects"}
 	if len(header) != len(want) {
 		t.Fatalf("header columns: want %v, got %v", want, header)
 	}
@@ -97,8 +97,8 @@ func TestMetricsCSVRowPerRequest(t *testing.T) {
 		t.Fatalf("rows: want %d, got %d (%v)", len(calls), len(rows), rows)
 	}
 	for i, row := range rows {
-		if len(row) != 9 {
-			t.Errorf("row[%d] columns: want 9, got %d (%v)", i, len(row), row)
+		if len(row) != 10 {
+			t.Errorf("row[%d] columns: want 10, got %d (%v)", i, len(row), row)
 			continue
 		}
 		if row[1] != calls[i] {
@@ -175,7 +175,7 @@ func TestMetricsCSVConcurrentLoad(t *testing.T) {
 	// produce malformed rows; we re-validate here in case ReadAll silently
 	// padded.
 	for i, row := range rows {
-		require.Lenf(t, row, 9, "row[%d] columns", i)
+		require.Lenf(t, row, 10, "row[%d] columns", i)
 		if row[1] != "GetLanguages" {
 			t.Errorf("row[%d].method: want GetLanguages, got %q", i, row[1])
 		}
