@@ -1638,6 +1638,37 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void targetInDefaultPackageIsNeverImported() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "Target", true)),
+          java(a1),
+          java(
+            """
+              class Test {
+                  a.A1 a;
+              }
+              """,
+            """
+              class Test {
+                  Target a;
+              }
+              """
+          ),
+          java(
+            """
+              import static a.A1.stat;
+
+              class StaticImport {
+                  void m() {
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     void renameInnerClass() {

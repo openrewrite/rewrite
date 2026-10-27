@@ -346,8 +346,14 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    Expression qualified = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    if (!(qualified instanceof J.FieldAccess)) {
+                        // a type in the default package has no qualifier to shorten, and no import can name it
+                        return getCursor().firstEnclosing(J.Import.class) == null ?
+                                qualified.withType(targetType) : fieldAccess;
+                    }
+                    J.FieldAccess fa = (J.FieldAccess) qualified;
                     if (getCursor().firstEnclosing(J.Import.class) == null &&
                             getCursor().firstEnclosing(Javadoc.class) == null) {
                         // don't shorten qualified names in imports or Javadoc, where they need no import
