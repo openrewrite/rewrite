@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package golang
+package testrecipes
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -63,7 +64,7 @@ func (v *wrapErrorWithContextVisitor) VisitReturn(ret *java.Return, p any) java.
 	if !ok || ident.Name != "err" || v.funcName == "" {
 		return ret
 	}
-	MaybeAddImport(v, "fmt", nil, false)
+	golang.MaybeAddImport(v, "fmt", nil, false)
 	c := *ret
 	c.Expression = &java.MethodInvocation{
 		Prefix: java.SingleSpace,

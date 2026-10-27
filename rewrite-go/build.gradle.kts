@@ -143,6 +143,7 @@ val prepareGoRpcSources = tasks.register<Sync>("prepareGoRpcSources") {
         include("vendor/**")
         exclude("**/*_test.go")
         exclude("**/testdata/**")
+        exclude("cmd/rpc/test_recipes.go")
     }
     // rewrite-go is published under the Moderne Source Available License, so the
     // packaged RPC source ships the module's MSAL LICENSE.md (not the repo-root
@@ -163,7 +164,7 @@ listOf("processResources", "sourcesJar", "licenseMain", "assemble").forEach {
 val goBuild = tasks.register<Exec>("goBuild") {
     workingDir = projectDir
     // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)
-    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
+    commandLine("go", "build", "-tags", "rpctest", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
 
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
