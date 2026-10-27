@@ -57,10 +57,24 @@ public abstract class CommentService {
     public abstract List<String> getComments(Cursor cursor);
 
     /**
+     * @return The textual content of each comment at the given {@link Placement}, in source order.
+     */
+    public List<String> getComments(Cursor cursor, Placement placement) {
+        return getComments(cursor);
+    }
+
+    /**
      * @return {@code true} if a comment with exactly this text is already associated with the element.
      */
     public boolean hasComment(Cursor cursor, String text) {
         return getComments(cursor).contains(text);
+    }
+
+    /**
+     * @return {@code true} if a comment with exactly this text is at the given placement.
+     */
+    public boolean hasComment(Cursor cursor, String text, Placement placement) {
+        return getComments(cursor, placement).contains(text);
     }
 
     /**
@@ -142,6 +156,16 @@ public abstract class CommentService {
      * were none.
      */
     public abstract Tree removeComment(Cursor cursor, String text);
+
+    /**
+     * Remove every comment at the given placement whose text exactly matches {@code text}.
+     *
+     * @return The owner with matching comments removed, or the unchanged owner (same instance) if there
+     * were none.
+     */
+    public Tree removeComment(Cursor cursor, String text, Placement placement) {
+        return removeComment(cursor, text);
+    }
 
     /**
      * Replace the text of every associated comment matching {@code existingText} with {@code newText},

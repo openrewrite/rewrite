@@ -59,8 +59,19 @@ public class Comments implements Trait<Tree> {
         return service().getComments(cursor);
     }
 
+    /**
+     * @return The text of each comment at the given placement relative to this element, in source order.
+     */
+    public List<String> getComments(Placement placement) {
+        return service().getComments(cursor, placement);
+    }
+
     public boolean hasComment(String text) {
         return service().hasComment(cursor, text);
+    }
+
+    public boolean hasComment(String text, Placement placement) {
+        return service().hasComment(cursor, text, placement);
     }
 
     /**
@@ -149,6 +160,15 @@ public class Comments implements Trait<Tree> {
     public <T extends Tree> T removeComment(String text) {
         //noinspection unchecked
         return (T) service().removeComment(cursor, text);
+    }
+
+    /**
+     * Remove every comment at the given placement relative to this element whose text exactly matches
+     * {@code text}.
+     */
+    public <T extends Tree> T removeComment(String text, Placement placement) {
+        //noinspection unchecked
+        return (T) service().removeComment(cursor, text, placement);
     }
 
     /**
