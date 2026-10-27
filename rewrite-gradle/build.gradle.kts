@@ -42,7 +42,6 @@ recipeDependencies {
     parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
 
     testParserClasspath("com.android.tools.build:gradle-api:9.4.1")
-    testParserClasspath("com.android.tools.build:gradle-common-api:9.4.1")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
