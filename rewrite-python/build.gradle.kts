@@ -219,41 +219,64 @@ testing {
     }
 }
 
-val pytestTest = tasks.register<Exec>("pytestTest") {
-    group = "verification"
-    description = "Run Python pytest tests"
+// The classpath of the Java RPC peer that the pytest tests marked `requires_java_rpc` spawn, which
+// generateTestClasspath writes to test-classpath.txt
+val javaRpcClasspath = files(
+    configurations["runtimeClasspath"],
+    configurations["testRuntimeClasspath"],
+    sourceSets["main"].output
+)
 
-    dependsOn(pythonInstall)
-    // Tests marked `requires_java_rpc` run only where test-classpath.txt names a Java RPC server to
-    // spawn, so generating it is part of running the suite. Devs invoking pytest directly still
-    // need :generateTestClasspath once.
+// The tests marked `requires_java_rpc` run in a task of their own, the only one whose inputs include the Java side
+fun registerPytest(name: String, description: String, markers: String, junitXml: String) =
+    tasks.register<Exec>(name) {
+        group = "verification"
+        this.description = description
+
+        dependsOn(pythonInstall)
+
+        workingDir = pythonDir
+        // Use relative path for python executable to avoid absolute paths in cache key
+        val relativePythonExe = if (isWindows) ".venv/Scripts/python.exe" else ".venv/bin/python"
+        val pytestArgs = mutableListOf(relativePythonExe, "-m", "pytest", "tests/", "-m", markers,
+            "--junitxml=$junitXml")
+        // -PverboseTests restores per-test output, where otherwise passing tests are only a dot each
+        pytestArgs.add(if (project.hasProperty("verboseTests")) "-v" else "-q")
+        commandLine(pytestArgs)
+
+        inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.files(fileTree(pythonDir.resolve("tests")) { exclude("**/__pycache__/**") })
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        inputs.file(pythonDir.resolve("pyproject.toml"))
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+        outputs.file(pythonDir.resolve(junitXml))
+        outputs.cacheIf { true }
+    }
+
+val pytestTest = registerPytest(
+    "pytestTest", "Run the Python pytest tests that need no Java RPC peer",
+    "not requires_java_rpc", "build/test-results/pytest/junit.xml"
+)
+
+val pytestJavaRpcTest = registerPytest(
+    "pytestJavaRpcTest", "Run the Python pytest tests marked requires_java_rpc, which spawn a Java RPC peer",
+    "requires_java_rpc", "build/test-results/pytestJavaRpc/junit.xml"
+)
+pytestJavaRpcTest.configure {
+    // The tests find the peer's classpath in test-classpath.txt. Devs invoking pytest directly still need
+    // :generateTestClasspath once.
     dependsOn(tasks.named("generateTestClasspath"))
-
-    workingDir = pythonDir
-    // Use relative path for python executable to avoid absolute paths in cache key
-    val relativePythonExe = if (isWindows) ".venv/Scripts/python.exe" else ".venv/bin/python"
-    val pytestArgs = mutableListOf(relativePythonExe, "-m", "pytest", "tests/",
-        "--junitxml=build/test-results/pytest/junit.xml")
-    // -PverboseTests restores per-test output, where otherwise passing tests are only a dot each
-    pytestArgs.add(if (project.hasProperty("verboseTests")) "-v" else "-q")
-    commandLine(pytestArgs)
-
-    inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(pythonDir.resolve("tests")) { exclude("**/__pycache__/**") })
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(pythonDir.resolve("pyproject.toml"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    // Part of the cache key, so a Java-side change re-runs the tests that exercise it.
-    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+    // The jars rather than test-classpath.txt, which lists their paths, so a Java-side change re-runs the tests
+    inputs.files(javaRpcClasspath)
         .withNormalizer(ClasspathNormalizer::class)
-    outputs.file(pythonDir.resolve("build/test-results/pytest/junit.xml"))
-    outputs.cacheIf { true }
+    // pythonUpdateVersion rewrites the pyproject.toml pytest reads, in a publish that runs the tests as well
+    mustRunAfter("pythonUpdateVersion")
 }
 
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
-    dependsOn(pytestTest)
+    dependsOn(pytestTest, pytestJavaRpcTest)
 }
 
 // Each test JVM starts Python RPC processes of its own, so tests in different forks share no RPC state
@@ -265,6 +288,22 @@ tasks.withType<Test> {
     maxParallelForks = maxParallelForks.coerceAtMost(4)
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
+    // The Python RPC processes log to a file of this task's own, which each run starts over. Tracing every RPC
+    // message there, hundreds of MB a run, is for -PverboseTests.
+    val rpcLog = "build/python-rpc-$name.log"
+    systemProperty("rewrite.python.rpcLog", rpcLog)
+    if (project.hasProperty("verboseTests")) {
+        systemProperty("rewrite.python.traceRpcMessages", "true")
+    }
+    // A listener, as a task action from this script would re-run the tests whenever the script's code changes
+    val rpcLogFile = file(rpcLog)
+    addTestListener(object : TestListener {
+        override fun beforeSuite(suite: TestDescriptor) {
+            if (suite.parent == null) {
+                rpcLogFile.delete()
+            }
+        }
+    })
     testLogging {
         // -PverboseTests shows every test plus its stdout/stderr (for diagnosing RPC hangs)
         if (project.hasProperty("verboseTests")) {
@@ -369,10 +408,18 @@ val pythonInstallBuildDeps = tasks.register<Exec>("pythonInstallBuildDeps") {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "build>=1.0.0", "twine>=5.0.0")
+    commandLine(pipExe.absolutePath, "install", "-q", "--disable-pip-version-check", "build>=1.0.0", "twine>=5.0.0")
+
+    // Once per venv and set of requirements, as the marker goes with the venv, or with an install that failed
+    val installed = venvDir.resolve(".build-deps-installed")
+    outputs.file(installed)
 
     doFirst {
-        logger.lifecycle("Installing Python build dependencies (build, twine)")
+        installed.delete()
+        logger.info("Installing Python build dependencies (build, twine)")
+    }
+    doLast {
+        installed.writeText("")
     }
 }
 
@@ -531,27 +578,15 @@ val generateTestClasspath = tasks.register("generateTestClasspath") {
     val outputFile = pythonDir.resolve("test-classpath.txt")
     outputs.file(outputFile)
 
-    inputs.files(configurations["runtimeClasspath"])
+    inputs.files(javaRpcClasspath)
         .withNormalizer(ClasspathNormalizer::class)
-    inputs.files(configurations["testRuntimeClasspath"])
-        .withNormalizer(ClasspathNormalizer::class)
-    inputs.files(tasks.named("compileJava").map { it.outputs.files })
-    inputs.files(tasks.named("processResources").map { it.outputs.files })
 
     // Depend on jar tasks to ensure jars exist
     dependsOn(tasks.named("testClasses"))
     dependsOn(tasks.named("jar"))
 
     doLast {
-        // Combine compile and test runtime classpaths to get all dependencies
-        val classpath = (
-            configurations.getByName("runtimeClasspath").files +
-            configurations.getByName("testRuntimeClasspath").files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
+        outputFile.writeText(javaRpcClasspath.asPath)
         logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
@@ -564,14 +599,7 @@ val printTestClasspath = tasks.register("printTestClasspath") {
     dependsOn(tasks.named("testClasses"))
 
     doLast {
-        val classpath = (
-            configurations.getByName("runtimeClasspath").files +
-            configurations.getByName("testRuntimeClasspath").files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        println(classpath)
+        println(javaRpcClasspath.asPath)
     }
 }
 
@@ -579,6 +607,9 @@ extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
     // uv's own marker test cases, kept as JSON data
     exclude("**/marker/uv-*-tree-rows.json")
+    // A package index's and a package's recorded responses, formats with no comment syntax
+    exclude("**/index/pep691-listing-json")
+    exclude("**/metadata/*-METADATA")
 }
 
 // The lock regeneration test fixtures (recorded package-manager output) live in
