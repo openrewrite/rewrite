@@ -113,6 +113,11 @@ normalization {
     }
 }
 
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
+}
+
 tasks.named("check") {
     dependsOn(testing.suites.named("compatibilityTest"))
 }
