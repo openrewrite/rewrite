@@ -188,6 +188,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
+        private @Nullable Set<String> otherTypeNames;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -306,7 +307,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (hasNoConflictingImport(sf)) {
+                        if (hasNoConflictingName(sf)) {
                             if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(owningClass);
                             }
@@ -430,7 +431,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
-                            if (hasNoConflictingImport(sf)) {
+                            if (hasNoConflictingName(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                             } else if (nameOnly) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
@@ -675,8 +676,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         /**
-         * When the new type is provided by a star import and another star import provides
-         * a type with the same simple name, add an explicit import to disambiguate.
+         * When the new type is provided by a star import and another star import, or {@code java.lang},
+         * provides a type with the same simple name, add an explicit import to disambiguate.
          */
         private JavaSourceFile maybeAddExplicitImportForAmbiguity(JavaSourceFile sf, JavaType.FullyQualified newType, ExecutionContext ctx) {
             String newPkg = newType.getPackageName();
@@ -700,13 +701,13 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
             }
 
-            if (!coveredByStar || otherStarPackages.isEmpty()) {
+            if (!coveredByStar) {
                 return sf;
             }
 
             // Check if any other star-imported package has a type with the same simple name
             boolean ambiguous;
-            if (JavaSourceSet.isDirty(ctx, sf)) {
+            if (!otherStarPackages.isEmpty() && JavaSourceSet.isDirty(ctx, sf)) {
                 // An earlier dependency mutation in this run means the classpath cannot be trusted to
                 // prove non-ambiguity; fall back to the safe path and add the explicit import.
                 ambiguous = true;
@@ -714,6 +715,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
                 if (!sourceSet.isPresent()) {
                     return sf;
+                }
+                // Every compilation unit imports java.lang on demand. No dependency change alters it.
+                if (!"java.lang".equals(newPkg)) {
+                    otherStarPackages.add("java.lang");
                 }
                 ambiguous = false;
                 for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
@@ -752,7 +757,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return sf.getPadding().withImports(imports);
         }
 
-        private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
+        private boolean hasNoConflictingName(@Nullable JavaSourceFile sf) {
             JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
             JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
             if (sf == null || oldType == null || newType == null) {
@@ -767,7 +772,52 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     return false;
                 }
             }
-            return true;
+            return !otherTypeNames(sf, newType).contains(newType.getClassName());
+        }
+
+        /**
+         * The simple names that the file declares for types other than the target, or writes unqualified for types
+         * other than the target and the original. Uses of the original are renamed, while a declaration of it stays.
+         * Shortening the target to one of these names would bind that name to two types.
+         */
+        private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
+            if (otherTypeNames == null) {
+                otherTypeNames = new JavaIsoVisitor<Set<String>>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> names) {
+                        if (!TypeUtils.isOfClassType(classDecl.getType(), newType.getFullyQualifiedName())) {
+                            names.add(classDecl.getSimpleName());
+                        }
+                        return super.visitClassDeclaration(classDecl, names);
+                    }
+
+                    @Override
+                    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, Set<String> names) {
+                        if (typeParam.getName() instanceof J.Identifier) {
+                            names.add(((J.Identifier) typeParam.getName()).getSimpleName());
+                        }
+                        return super.visitTypeParameter(typeParam, names);
+                    }
+
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                        JavaType type = identifier.getType();
+                        if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified &&
+                                !TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) &&
+                                !TypeUtils.isOfClassType(type, originalType.getFullyQualifiedName())) {
+                            names.add(identifier.getSimpleName());
+                        }
+                        return super.visitIdentifier(identifier, names);
+                    }
+
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<String> names) {
+                        visit(fieldAccess.getTarget(), names);
+                        return fieldAccess;
+                    }
+                }.reduce(sf, new HashSet<>());
+            }
+            return otherTypeNames;
         }
     }
 
