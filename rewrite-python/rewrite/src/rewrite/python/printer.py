@@ -361,6 +361,7 @@ class PythonPrinter:
         self._before_syntax(async_, p)
         p.append("async")
         self.visit(async_.statement, p)
+        self._after_syntax(async_, p)
         return async_
 
     def visit_shebang(self, shebang: 'py.Shebang', p: PrintOutputCapture) -> J:
@@ -377,6 +378,7 @@ class PythonPrinter:
         operand_start = len(p._out)
         self.visit(await_.expression, p)
         _separate_keyword_from_operand(p, operand_start)
+        self._after_syntax(await_, p)
         return await_
 
     def visit_python_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
@@ -498,6 +500,7 @@ class PythonPrinter:
         if clause.conditions:
             for condition in clause.conditions:
                 self.visit(condition, p)
+        self._after_syntax(clause, p)
         return clause
 
     def visit_comprehension_condition(self, condition: 'py.ComprehensionExpression.Condition', p: PrintOutputCapture) -> J:
@@ -505,6 +508,7 @@ class PythonPrinter:
         self._before_syntax(condition, p)
         p.append("if")
         self.visit(condition.expression, p)
+        self._after_syntax(condition, p)
         return condition
 
     def visit_del(self, del_: 'py.Del', p: PrintOutputCapture) -> J:
@@ -516,6 +520,7 @@ class PythonPrinter:
             ",",
             p
         )
+        self._after_syntax(del_, p)
         return del_
 
     def visit_dict_literal(self, dict_: 'py.DictLiteral', p: PrintOutputCapture) -> J:
@@ -532,6 +537,7 @@ class PythonPrinter:
         self._visit_space(expr.padding.from_.before, p)
         p.append("from")
         self.visit(expr.from_, p)
+        self._after_syntax(expr, p)
         return expr
 
     def visit_exception_type(self, type_: 'py.ExceptionType', p: PrintOutputCapture) -> J:
@@ -540,6 +546,7 @@ class PythonPrinter:
         if type_.exception_group:
             p.append("*")
         self.visit(type_.expression, p)
+        self._after_syntax(type_, p)
         return type_
 
     def visit_expression_statement(self, stmt: 'py.ExpressionStatement', p: PrintOutputCapture) -> J:
@@ -566,6 +573,7 @@ class PythonPrinter:
             idx = max(fstring.delimiter.find("'"), fstring.delimiter.find('"'))
             if idx >= 0:
                 p.append(fstring.delimiter[idx:])
+        self._after_syntax(fstring, p)
         return fstring
 
     def visit_formatted_string_value(self, value: 'py.FormattedString.Value', p: PrintOutputCapture) -> J:
@@ -592,6 +600,7 @@ class PythonPrinter:
             p.append(':')
             self.visit(value.format, p)
         p.append('}')
+        self._after_syntax(value, p)
         return value
 
     def visit_key_value(self, kv: 'py.KeyValue', p: PrintOutputCapture) -> J:
@@ -618,6 +627,7 @@ class PythonPrinter:
             self._visit_space(match.padding.guard.before, p)
             p.append("if")
             self.visit(match.guard, p)
+        self._after_syntax(match, p)
         return match
 
     def visit_match_case_pattern(self, pattern: 'py.MatchCase.Pattern', p: PrintOutputCapture) -> J:
@@ -661,6 +671,7 @@ class PythonPrinter:
         elif kind == MatchCase.Pattern.Kind.WILDCARD:
             self._visit_container("_", children, "", "", p)
 
+        self._after_syntax(pattern, p)
         return pattern
 
     def visit_multi_import(self, multi: 'py.MultiImport', p: PrintOutputCapture) -> J:
@@ -682,6 +693,7 @@ class PythonPrinter:
         self._before_syntax(arg, p)
         self.visit(arg.name, p)
         self._visit_left_padded("=", arg.padding.value, p)
+        self._after_syntax(arg, p)
         return arg
 
     def visit_pass(self, pass_: 'py.Pass', p: PrintOutputCapture) -> J:
@@ -717,6 +729,7 @@ class PythonPrinter:
             p.append(':')
             self._visit_right_padded(slice_.padding.step, p)
 
+        self._after_syntax(slice_, p)
         return slice_
 
     def visit_special_parameter(self, param: 'py.SpecialParameter', p: PrintOutputCapture) -> J:
@@ -811,6 +824,7 @@ class PythonPrinter:
         elif scope.kind == VariableScope.Kind.NONLOCAL:
             p.append("nonlocal")
         self._visit_right_padded_list(scope.padding.names, ",", p)
+        self._after_syntax(scope, p)
         return scope
 
     def visit_yield_from(self, yield_: 'py.YieldFrom', p: PrintOutputCapture) -> J:
@@ -818,6 +832,7 @@ class PythonPrinter:
         self._before_syntax(yield_, p)
         p.append("from")
         self.visit(yield_.expression, p)
+        self._after_syntax(yield_, p)
         return yield_
 
 

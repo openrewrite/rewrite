@@ -67,6 +67,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -504,6 +506,35 @@ class PythonPrinterParityTest {
                   .isEqualTo(rpc().print(cu, Print.MarkerPrinter.from(markerPrinter)));
             }
         });
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void fencesCloseAroundEveryTree() {
+        SoftAssertions.assertSoftly(softly -> {
+            for (SourceFile parsed : parse(SYNTAX)) {
+                Py.CompilationUnit cu = markEveryTree((Py.CompilationUnit) parsed);
+                String printed = cu.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.FENCED));
+                softly.assertThat(unclosedFences(printed))
+                  .as("Java printer's unclosed fences in %s", parsed.printAll())
+                  .isEmpty();
+                softly.assertThat(unclosedFences(rpc().print(cu, Print.MarkerPrinter.FENCED)))
+                  .as("Python printer's unclosed fences in %s", parsed.printAll())
+                  .isEmpty();
+            }
+        });
+    }
+
+    private static final Pattern FENCE = Pattern.compile("\\{\\{[0-9a-f-]{36}}}");
+
+    private static Set<String> unclosedFences(String printed) {
+        Map<String, Integer> fences = new HashMap<>();
+        Matcher fence = FENCE.matcher(printed);
+        while (fence.find()) {
+            fences.merge(fence.group(), 1, Integer::sum);
+        }
+        fences.values().removeIf(count -> count == 2);
+        return fences.keySet();
     }
 
     static Stream<Arguments> markerPrinters() {
