@@ -129,7 +129,9 @@ public class Namespaced implements Trait<Xml> {
             }
             List<Xml.Attribute> schemaLocations = new ArrayList<>();
             for (Xml.Attribute attribute : tag.getAttributes()) {
-                if (XML_SCHEMA_INSTANCE_URI.equals(new Namespaced(new Cursor(cursor, attribute)).getNamespaceUri().orElse(null))) {
+                String localName = extractLocalName(attribute.getKeyAsString());
+                if (("schemaLocation".equals(localName) || "noNamespaceSchemaLocation".equals(localName)) &&
+                    XML_SCHEMA_INSTANCE_URI.equals(new Namespaced(new Cursor(cursor, attribute)).getNamespaceUri().orElse(null))) {
                     schemaLocations.add(attribute);
                 }
             }

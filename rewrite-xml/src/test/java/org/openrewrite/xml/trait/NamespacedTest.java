@@ -95,6 +95,22 @@ class NamespacedTest {
           .containsExactly("xsi:schemaLocation");
     }
 
+    @Test
+    void schemaLocationsAreTheLocationHintsOnly() {
+        Namespaced root = namespaced(
+          """
+            <root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="urn:a a.xsd"
+                  xsi:noNamespaceSchemaLocation="b.xsd"
+                  xsi:nil="true"/>
+            """,
+          "root"
+        );
+        assertThat(root.getSchemaLocations())
+          .extracting(Xml.Attribute::getKeyAsString)
+          .containsExactly("xsi:schemaLocation", "xsi:noNamespaceSchemaLocation");
+    }
+
     private static Namespaced namespaced(@Language("xml") String xml, String name) {
         return Namespaced.matcher()
           .lower(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), new XmlParser().parse(xml).findFirst().orElseThrow()))
