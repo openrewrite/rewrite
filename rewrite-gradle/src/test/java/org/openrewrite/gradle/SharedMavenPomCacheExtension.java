@@ -51,9 +51,10 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
     }
 
     /**
-     * Only what was found, as first downloaded, so a POM whose Gradle module metadata could not be fetched is shared
-     * without the platforms that metadata adds. A failed download stays with the test that saw it, and so does a
-     * resolved POM, which also depends on that test's repositories and profiles.
+     * Only what was found in a remote repository, as first downloaded, so whatever that download swallowed, such as
+     * Gradle module metadata answered with a 429, stays missing for the rest of the JVM. Failed downloads, resolved POMs
+     * (which depend on a test's repositories and profiles) and anything from a file: repository (where tests publish
+     * POMs of their own) stay with the test that fetched them.
      */
     private static class SuccessfulDownloads implements MavenPomCache {
         private final InMemoryMavenPomCache cache = new InMemoryMavenPomCache();
@@ -74,7 +75,7 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
 
         @Override
         public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
-            if (metadata != null) {
+            if (metadata != null && isRemote(repo.toString())) {
                 cache.putMavenMetadata(repo, gav, metadata);
             }
         }
@@ -86,7 +87,7 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
 
         @Override
         public void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom) {
-            if (pom != null) {
+            if (pom != null && isRemote(gav.getRepository())) {
                 cache.putPom(gav, pom);
             }
         }
@@ -98,9 +99,13 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
 
         @Override
         public void putNormalizedRepository(MavenRepository repository, @Nullable MavenRepository normalized) {
-            if (normalized != null) {
+            if (normalized != null && isRemote(repository.getUri())) {
                 cache.putNormalizedRepository(repository, normalized);
             }
+        }
+
+        private static boolean isRemote(@Nullable String repositoryUri) {
+            return repositoryUri != null && !repositoryUri.regionMatches(true, 0, "file:", 0, 5);
         }
     }
 }
