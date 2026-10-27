@@ -343,9 +343,9 @@ val csharpPack = tasks.register<Exec>("csharpPack") {
 
     doFirst {
         csharpDir.resolve("dist").deleteRecursively()
+        // Building here restores the NuGet packages, which an up-to-date csharpBuildRelease does not
         commandLine(
             findDotnet(), "pack",
-            "--no-build",
             "--configuration", "Release",
             "--output", "dist",
             "/p:Version=$nugetVersion"
