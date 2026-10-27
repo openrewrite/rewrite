@@ -40,8 +40,7 @@ import static org.openrewrite.Tree.randomId;
 public class ChangeNamespaceValue extends Recipe {
     private static final String XMLNS_PREFIX = "xmlns";
     private static final String VERSION_PREFIX = "version";
-    private static final String SCHEMA_LOCATION_MATCH_PATTERN = "(?m)(.*)(%s)(\\s+)(.*)";
-    private static final String SCHEMA_LOCATION_REPLACEMENT_PATTERN = "$1%s$3%s";
+    private static final Pattern SCHEMA_LOCATION_TOKEN = Pattern.compile("\\S+");
 
     String displayName = "Change XML attribute of a specific resource version";
 
@@ -300,17 +299,32 @@ public class ChangeNamespaceValue extends Recipe {
                 if(oldValue == null) {
                     return newRoot;
                 }
+                // The value is a whitespace-separated list of namespace and location pairs
                 String oldSchemaLocation = attribute.getValueAsString();
-                Matcher pattern = Pattern.compile(String.format(SCHEMA_LOCATION_MATCH_PATTERN, Pattern.quote(oldValue)))
-                        .matcher(oldSchemaLocation);
-                if (pattern.find()) {
-                    String newSchemaLocationValue = pattern.replaceFirst(
-                            String.format(SCHEMA_LOCATION_REPLACEMENT_PATTERN, newValue, newSchemaLocation)
-                    );
-                    Xml.Attribute newAttribute = attribute.withValue(attribute.getValue().withValue(newSchemaLocationValue));
-                    newRoot = newRoot.withAttributes(ListUtils.map(newRoot.getAttributes(), a -> a == attribute ? newAttribute : a));
+                Matcher token = SCHEMA_LOCATION_TOKEN.matcher(oldSchemaLocation);
+                StringBuilder newSchemaLocationValue = new StringBuilder();
+                int end = 0;
+                while (token.find()) {
+                    int namespaceStart = token.start();
+                    int namespaceEnd = token.end();
+                    boolean matches = oldValue.equals(token.group());
+                    if (!token.find()) {
+                        break;
+                    }
+                    if (matches) {
+                        newSchemaLocationValue.append(oldSchemaLocation, end, namespaceStart)
+                                .append(newValue)
+                                .append(oldSchemaLocation, namespaceEnd, token.start())
+                                .append(newSchemaLocation);
+                        end = token.end();
+                    }
                 }
-                return newRoot;
+                if (end == 0) {
+                    return newRoot;
+                }
+                newSchemaLocationValue.append(oldSchemaLocation, end, oldSchemaLocation.length());
+                Xml.Attribute newAttribute = attribute.withValue(attribute.getValue().withValue(newSchemaLocationValue.toString()));
+                return newRoot.withAttributes(ListUtils.map(newRoot.getAttributes(), a -> a == attribute ? newAttribute : a));
             }
 
             private Xml.Tag addSchemaLocation(Xml.Tag newRoot) {
