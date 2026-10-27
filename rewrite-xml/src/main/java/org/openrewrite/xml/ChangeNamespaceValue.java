@@ -154,7 +154,7 @@ public class ChangeNamespaceValue extends Recipe {
 
             private boolean isXmlnsAttribute(Xml.Attribute attribute) {
                 boolean searchAll = searchAllNamespaces == null || Boolean.TRUE.equals(searchAllNamespaces);
-                return searchAll && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
+                return searchAll && Namespaced.isNamespaceDefinitionAttribute(attribute.getKeyAsString()) ||
                        !searchAll && XMLNS_PREFIX.equals(attribute.getKeyAsString());
             }
 

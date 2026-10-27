@@ -355,6 +355,21 @@ class ChangeNamespaceValueTest implements RewriteTest {
     }
 
     @Test
+    void attributeNamedLikeADeclarationIsNotOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue(null, "http://old.namespace", "https://new.namespace", null, true, null, null)),
+          xml(
+            """
+              <root xmlns="http://old.namespace" xmlnsLegacy="http://old.namespace"/>
+              """,
+            """
+              <root xmlns="https://new.namespace" xmlnsLegacy="http://old.namespace"/>
+              """
+          )
+        );
+    }
+
+    @Test
     void rebindMisspelledSchemaInstanceNamespace() {
         rewriteRun(
           spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
