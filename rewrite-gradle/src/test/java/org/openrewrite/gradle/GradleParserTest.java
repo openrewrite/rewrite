@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -175,6 +176,33 @@ class GradleParserTest implements RewriteTest {
                   "buildCache: org.gradle.api.initialization.Settings"
                 );
                 assertThat(FindMethods.find(cu, "org.gradle.api.initialization.Settings plugins(..)", true)).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "tasks.register('report')",
+      "tasks.named('report')",
+      "tasks.create('report')",
+      "task('report')",
+      "task(name: 'report')"
+    })
+    void taskConfigurationBlockIsTypeAttributed(String declaration) {
+        rewriteRun(
+          buildGradle(
+            """
+              %s {
+                  dependsOn 'check'
+                  doLast {
+                      println 'done'
+                  }
+              }
+              """.formatted(declaration),
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task dependsOn(..)", true)).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task doLast(..)", true)).isNotEmpty();
             })
           )
         );
