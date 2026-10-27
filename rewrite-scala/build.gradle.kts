@@ -96,3 +96,9 @@ tasks.named<JavaCompile>("compileJava") {
     // Exclude Java files from Java compilation since Scala already compiled them
     exclude("**/*.java")
 }
+
+// A test JVM doesn't live long enough for C2 to pay for compiling the Scala compiler, which cost more CPU
+// than the tests themselves, and its small heap needs no concurrent collector.
+tasks.named<Test>("test") {
+    jvmArgs("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC")
+}
