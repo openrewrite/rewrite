@@ -21,18 +21,42 @@ import org.openrewrite.internal.ReflectionUtils;
 import javax.annotation.processing.Processor;
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 
 import static java.util.Collections.*;
 
 public class LombokSupport {
 
+    /**
+     * Lombok's class loader for each parser class loader, which loads Lombok's classes once for every parser. A soft
+     * value lets a parser class loader that is no longer used be collected, as the value refers back to it.
+     */
+    private static final Map<ClassLoader, SoftReference<Optional<ClassLoader>>> LOMBOK_LOADERS = new WeakHashMap<>();
+
+    /**
+     * @return A new Lombok annotation processor for one parser, or null when the parser's class loader finds no Lombok.
+     */
     public static @Nullable Processor createLombokProcessor(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        ClassLoader lombokShadowLoader = lombokLoader(parserClassLoader);
+        return lombokShadowLoader == null ? null :
+                (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+    }
+
+    private static synchronized @Nullable ClassLoader lombokLoader(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        SoftReference<Optional<ClassLoader>> cached = LOMBOK_LOADERS.get(parserClassLoader);
+        Optional<ClassLoader> loader = cached == null ? null : cached.get();
+        if (loader == null) {
+            loader = Optional.ofNullable(newLombokLoader(parserClassLoader));
+            LOMBOK_LOADERS.put(parserClassLoader, new SoftReference<>(loader));
+        }
+        return loader.orElse(null);
+    }
+
+    private static @Nullable ClassLoader newLombokLoader(ClassLoader parserClassLoader) throws ReflectiveOperationException {
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", parserClassLoader)) {
@@ -89,14 +113,13 @@ public class LombokSupport {
             // Class loading still delegates normally through the parent chain.
             ClassLoader resourceFilteredParent = new ResourceFilteredClassLoader(parserClassLoader);
 
-            ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
+            return (ClassLoader) shadowLoaderConstructor.newInstance(
                     resourceFilteredParent,
                     "lombok",
                     null,
                     emptyList(),
                     singletonList("lombok.patcher.Symbols")
             );
-            return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
         } finally {
             if (oldValue != null) {
                 System.setProperty("shadow.override.lombok", oldValue);
