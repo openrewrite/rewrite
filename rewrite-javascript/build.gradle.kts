@@ -402,6 +402,12 @@ val generateTestClasspath = tasks.register("generateTestClasspath") {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
+    // Test fixtures without a file extension, which the check has no header style for
+    excludes(listOf(
+        "**/npm-arborist/*-cases", "**/npm-arborist/*-dumps", "**/npm-arborist/*-shapes", "**/npm-arborist/*-tables",
+        "**/semver/fixtures-*", "**/semver/release-differences", "**/bun/hosted-git-info-valid", "**/bun/ini-cases",
+        "**/npm-resolver/gh-acme-private", "**/npm-resolver/jsr-*"
+    ))
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )
