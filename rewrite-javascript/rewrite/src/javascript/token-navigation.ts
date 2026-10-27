@@ -15,7 +15,7 @@
  */
 
 // Punctuation and keyword tokens are absent from node fields, and the LST needs their offsets to
-// place whitespace. The compiler leaves them out of the tree it sends, so they are scanned back out
-// of the source text; ts7/token-navigation.ts does that and this is the surface the parser reads.
+// place whitespace. The compiler's `getChildren` materializes them from the source text. This is the
+// surface the parser reads them through, and ts7/token-navigation.ts adapts it.
 
 export {childAt, childCountOf, childrenOf, firstTokenOf, isScanned, lastTokenOf} from "./ts7/token-navigation";
