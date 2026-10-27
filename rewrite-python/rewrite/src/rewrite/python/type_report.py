@@ -659,11 +659,12 @@ def parse_for_types(path: str, *, with_types: bool = True,
     This is a diagnostic entry point: running recipes over a real codebase is
     still orchestrated by the JVM runtime over the RPC bridge.
     """
+    from rewrite.python._parser_visitor import ParserVisitor, read_source
+
     resolved = Path(path).resolve()
-    source = resolved.read_text(encoding="utf-8")
+    source, _ = read_source(str(resolved))
     root = str(Path(project_root).resolve()) if project_root else str(resolved.parent)
 
-    from rewrite.python._parser_visitor import ParserVisitor
     from rewrite.python._version_detect import detect_from_project, ty_python_version
 
     client = None

@@ -7,9 +7,9 @@ import re
 import sys
 import token
 from argparse import ArgumentError
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
-from tokenize import generate_tokens, TokenInfo
+from tokenize import detect_encoding, generate_tokens, TokenInfo
 from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
@@ -137,6 +137,27 @@ def _with_line_breaks_of(source: str, text: str) -> str:
     """``text``, which the tokenizer read with every line break as ``\\n``, with the line breaks ``source`` has."""
     line_breaks = iter(re.findall(r'\r\n|\r|\n', source))
     return re.sub('\n', lambda _: next(line_breaks, '\n'), text)
+
+
+def read_source(path: str) -> Tuple[str, Optional[str]]:
+    """A Python file's text as the interpreter decodes it, with its own line endings and byte order mark.
+
+    The second value names the charset to write the file back in, where its bytes depend on one.
+    """
+    with open(path, 'rb') as f:
+        raw = f.read()
+    try:
+        declared, _ = detect_encoding(BytesIO(raw).readline)
+    except SyntaxError:
+        # A coding line the interpreter rejects leaves the default.
+        declared = 'utf-8'
+    if declared in ('utf-8', 'utf-8-sig'):
+        return raw.decode('utf-8'), None
+    source = raw.decode(declared)
+    try:
+        return source, (declared if raw.decode('utf-8') != source else None)
+    except UnicodeDecodeError:
+        return source, declared
 
 
 class ParserVisitor(ast.NodeVisitor):

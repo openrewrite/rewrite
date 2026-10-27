@@ -30,12 +30,10 @@ import select
 import sys
 import tempfile
 import time
-import tokenize
 import traceback
 import threading
 
 from datetime import datetime, timezone
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
@@ -397,27 +395,8 @@ def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=No
                       project_language_level: Optional[str] = None,
                       check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
-    with open(path, 'rb') as f:
-        raw = f.read()
-    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
-    try:
-        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
-    except SyntaxError:
-        # A coding line the interpreter rejects: read as before one was looked for.
-        declared = 'utf-8'
-    charset_name = None
-    if declared in ('utf-8', 'utf-8-sig'):
-        # A byte order mark is left in the text for the parser, which records it.
-        source = raw.decode('utf-8')
-    else:
-        source = raw.decode(declared)
-        try:
-            # Reported to the host only where the bytes depend on it, as a name it may not know.
-            if raw.decode('utf-8') != source:
-                charset_name = declared
-        except UnicodeDecodeError:
-            charset_name = declared
+    from rewrite.python._parser_visitor import read_source
+    source, charset_name = read_source(path)
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
                                project_language_level=project_language_level,
