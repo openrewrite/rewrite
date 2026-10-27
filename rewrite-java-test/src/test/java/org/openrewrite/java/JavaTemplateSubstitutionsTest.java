@@ -446,6 +446,43 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     }
 
     @Test
+    void anyWithInferredIntersectionType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                      return method;
+                  }
+                  return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
+              }
+          }).withMaxCycles(1)),
+          java(
+            """
+              import java.util.List;
+              import java.util.Objects;
+              class Test {
+                  void test(boolean flag) {
+                      List.of(1, 2.0);
+                      Objects.requireNonNull(flag ? "a" : 1);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.Objects;
+              class Test {
+                  void test(boolean flag) {
+                      System.out.println(List.of(1, 2.0));
+                      System.out.println(Objects.requireNonNull(flag ? "a" : 1));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void throwNewException() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
