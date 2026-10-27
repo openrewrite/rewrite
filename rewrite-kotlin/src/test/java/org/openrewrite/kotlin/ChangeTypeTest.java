@@ -421,6 +421,30 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void constructorReference() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              val f = ::Original
+              """,
+            """
+              import x.y.Target
+
+              val f = ::Target
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changeImportSecondaryConstructor() {
