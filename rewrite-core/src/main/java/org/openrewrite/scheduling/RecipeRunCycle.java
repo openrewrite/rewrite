@@ -98,12 +98,36 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     long sourceFileTimeoutNanos = -1;
 
-    @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     @Getter
     @NonFinal
     boolean causesAnotherCycle;
+
+    /// @deprecated Adding a recipe here doesn't cause another cycle, and fails in tests. A recipe that needs another
+    /// cycle returns true from [Recipe#causesAnotherCycle()].
+    @Deprecated
+    public Set<Recipe> getMadeChangesInThisCycle() {
+        return new AbstractSet<Recipe>() {
+            @Override
+            public Iterator<Recipe> iterator() {
+                return madeChangesInThisCycle.iterator();
+            }
+
+            @Override
+            public int size() {
+                return madeChangesInThisCycle.size();
+            }
+
+            @Override
+            public boolean add(Recipe recipe) {
+                assert false : "Adding " + recipe.getName() + " to the recipes that made changes in this cycle " +
+                               "doesn't cause another cycle. A recipe that needs another cycle returns true from " +
+                               "Recipe#causesAnotherCycle().";
+                return madeChangesInThisCycle.add(recipe);
+            }
+        };
+    }
 
     /**
      * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
