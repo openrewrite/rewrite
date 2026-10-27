@@ -68,7 +68,7 @@ subprojects {
                     .replace("\${year}", year.toString())
                     .lines()
                     .joinToString("\n") { " * $it".trimEnd() } + "\n */\n"
-                project.file(args!![idx + 1]).walk().filter { it.extension == "java" }.forEach { file ->
+                workingDir.resolve(args!![idx + 1]).walk().filter { it.extension == "java" }.forEach { file ->
                     file.writeText(licenseHeader + file.readLines().joinToString("\n") { line ->
                         line.trimEnd().replace("// Generated from $rootPrefix", "// Generated from ")
                     } + "\n")
