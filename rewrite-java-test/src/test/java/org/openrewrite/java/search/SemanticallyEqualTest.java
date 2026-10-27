@@ -50,6 +50,15 @@ class SemanticallyEqualTest {
     }
 
     @Test
+    void nullIsOnlyEqualToNull() {
+        J.CompilationUnit cu = javaParser.parse("class A {}").findFirst().map(J.CompilationUnit.class::cast).orElseThrow();
+
+        assertFalse(SemanticallyEqual.areEqual(null, cu));
+        assertFalse(SemanticallyEqual.areEqual(cu, null));
+        assertTrue(SemanticallyEqual.areEqual(null, null));
+    }
+
+    @Test
     void classModifierLists() {
         assertEqual(
           """
@@ -344,6 +353,59 @@ class SemanticallyEqualTest {
             class T {
                 Comparator<Integer> a = (x1, y1) -> x1 - y1;
                 Comparator<Integer> b = (x2, y2) -> y2 - x2;
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDeconstructionPatternBindingNames() {
+        assertExpressionsEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s1);
+                boolean b = o instanceof R(String s2);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDifferentDeconstructionPatterns() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                record Q(int n) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof Q(int n);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDeconstructionPatternAndTypePattern() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof R r;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R r;
+                boolean b = o instanceof R(String s);
             }
             """
         );

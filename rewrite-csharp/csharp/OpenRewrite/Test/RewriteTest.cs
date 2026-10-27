@@ -177,6 +177,8 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
+            // Marker placements the inputs already carry were not added by the recipe
+            var inputMarkers = validations.ReportingMarkersOnly ? AddedMarkersCheck.Placements(sources) : null;
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             List<Result> results;
@@ -188,6 +190,11 @@ public abstract class RewriteTest
             finally
             {
                 WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
+            }
+
+            if (inputMarkers != null)
+            {
+                AddedMarkersCheck.Verify(inputMarkers, results);
             }
 
             foreach (var afterRecipe in recipeSpec.AfterRecipe)

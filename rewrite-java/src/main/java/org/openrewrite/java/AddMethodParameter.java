@@ -125,6 +125,16 @@ public class AddMethodParameter extends Recipe {
                 method = method.withParameters(ListUtils.insert(originalParameters, parameter, parameterIndex));
             }
 
+            JavaType.Method methodType = method.getMethodType();
+            if (methodType != null) {
+                int index = parameterIndex == null ? methodType.getParameterNames().size() : parameterIndex;
+                JavaType type = parameter.getType() == null ? JavaType.Unknown.getInstance() : parameter.getType();
+                methodType = methodType
+                        .withParameterNames(ListUtils.insert(methodType.getParameterNames(), parameterName, index))
+                        .withParameterTypes(ListUtils.insert(methodType.getParameterTypes(), type, index));
+                method = method.withMethodType(methodType).withName(method.getName().withType(methodType));
+            }
+
             if (parameter.getTypeExpression() != null && !(parameter.getTypeExpression() instanceof J.Identifier || parameter.getTypeExpression() instanceof J.Primitive)) {
                 doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(parameter.getTypeExpression()));
             }
@@ -206,7 +216,8 @@ public class AddMethodParameter extends Recipe {
                 );
             }
             JavaType.Primitive type = JavaType.Primitive.fromKeyword(typeName);
-            if (type != null) {
+            // the parser makes String a name of the class, not a primitive
+            if (type != null && type != JavaType.Primitive.String) {
                 return new J.Primitive(
                         randomId(),
                         Space.EMPTY,

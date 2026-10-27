@@ -1310,7 +1310,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package com.Source.mine;
@@ -1689,7 +1688,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeMultipleImportsWhileUnfoldingWildcard() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.Set;
@@ -1713,6 +1711,33 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardWhoseUnfoldedImportsAreAllDuplicatesPassesItsCommentOn() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              // collections
+              import java.util.*;
+              import java.io.File;
+
+              class A {
+                 List<File> l;
+              }
+              """,
+            """
+              import java.util.List;
+              // collections
+              import java.io.File;
+
+              class A {
+                 List<File> l;
               }
               """
           )

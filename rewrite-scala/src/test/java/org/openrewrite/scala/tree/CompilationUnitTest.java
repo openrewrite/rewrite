@@ -593,4 +593,84 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void semicolonSeparatedTopLevelValues() {
+        rewriteRun(
+            scala(
+                """
+                val a = 1; val b = 2
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelDefinitions() {
+        rewriteRun(
+            scala(
+                """
+                trait T; class A; object O extends T
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelImports() {
+        rewriteRun(
+            scala(
+                """
+                import scala.util.Try; import scala.util.Success; class A
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTopLevelStatementsAfterPackage() {
+        rewriteRun(
+            scala(
+                """
+                package p
+
+                class A; class B
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonOnOwnLineBetweenTopLevelStatements() {
+        rewriteRun(
+            scala(
+                """
+                object O
+                ;
+                object P
+                """
+            )
+        );
+    }
+
+    @Test
+    void leadingSemicolonInFile() {
+        rewriteRun(
+            scala(
+                """
+                ; class A
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInBracedPackage() {
+        rewriteRun(
+            scala(
+                """
+                package p { ; class A;; class B; }
+                """
+            )
+        );
+    }
 }

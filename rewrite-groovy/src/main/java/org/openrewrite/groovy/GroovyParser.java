@@ -295,8 +295,8 @@ public class GroovyParser implements Parser {
         private JavaTypeFactory typeFactory;
 
         private boolean logCompilationWarningsAndErrors = false;
-        private final List<NamedStyles> styles = new ArrayList<>();
-        private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
+        private List<NamedStyles> styles = new ArrayList<>();
+        private List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
 
         public Builder() {
             super(G.CompilationUnit.class);
@@ -413,6 +413,8 @@ public class GroovyParser implements Parser {
         public GroovyParser.Builder clone() {
             GroovyParser.Builder clone = (GroovyParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
+            clone.compilerCustomizers = new ArrayList<>(this.compilerCustomizers);
             return clone;
         }
     }

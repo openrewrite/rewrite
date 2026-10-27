@@ -585,6 +585,7 @@ public interface JS extends J {
     final class ExpressionStatement implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -744,8 +745,7 @@ public interface JS extends J {
         JContainer<Expression> typeParameters;
 
         public FunctionCall withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return new FunctionCall(this.id, this.prefix, this.markers, this.function,
-                    JContainer.withElementsNullable(this.typeParameters, typeParameters), this.arguments, this.functionType);
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
         }
 
         public @Nullable List<Expression> getTypeParameters() {
@@ -2687,6 +2687,7 @@ public interface JS extends J {
     final class StatementExpression implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With

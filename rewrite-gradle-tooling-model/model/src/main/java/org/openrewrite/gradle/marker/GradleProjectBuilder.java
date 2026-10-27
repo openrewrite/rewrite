@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.marker;
 
+import lombok.Value;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
@@ -404,14 +405,50 @@ public final class GradleProjectBuilder {
         return GradleDependencyConfiguration.merge(inferredConstraints, configuredConstraints);
     }
 
-    private static final Map<GroupArtifactVersion, org.openrewrite.maven.tree.Dependency>
+    /**
+     * Shared by every configuration of every project. Keyed by attributes as well as coordinates: a project or
+     * platform dependency has the coordinates of what Gradle resolves it to, so whichever was seen first would
+     * otherwise give its attributes to all the rest.
+     */
+    private static final Map<RequestedKey, org.openrewrite.maven.tree.Dependency>
             requestedCache = new ConcurrentHashMap<>();
 
-    private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
-        GroupArtifactVersion gav = groupArtifactVersion(dep);
-        return requestedCache.computeIfAbsent(gav, it -> {
-                    Map<String, String> attributes = attributes(dep);
+    @Value
+    private static class RequestedKey {
+        GroupArtifactVersion gav;
+        Map<String, String> attributes;
+    }
 
+    private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
+        org.openrewrite.maven.tree.Dependency requested = cachedDependency(dep, configuration);
+        List<GroupArtifact> exclusions = exclusions(dep);
+        // The cache isn't keyed by excludes, so declarations that differ only in their excludes must not share it
+        return exclusions.isEmpty() ? requested : requested.withExclusions(exclusions);
+    }
+
+    private static List<GroupArtifact> exclusions(Dependency dep) {
+        if (!(dep instanceof ModuleDependency)) {
+            return emptyList();
+        }
+        Set<ExcludeRule> rules = ((ModuleDependency) dep).getExcludeRules();
+        if (rules.isEmpty()) {
+            return emptyList();
+        }
+        List<GroupArtifact> exclusions = new ArrayList<>(rules.size());
+        for (ExcludeRule rule : rules) {
+            exclusions.add(new GroupArtifact(orWildcard(rule.getGroup()), orWildcard(rule.getModule())));
+        }
+        return exclusions;
+    }
+
+    private static String orWildcard(@Nullable String coordinate) {
+        return coordinate == null || coordinate.isEmpty() ? "*" : coordinate;
+    }
+
+    private static org.openrewrite.maven.tree.Dependency cachedDependency(Dependency dep, Configuration configuration) {
+        GroupArtifactVersion gav = groupArtifactVersion(dep);
+        Map<String, String> attributes = attributes(dep);
+        return requestedCache.computeIfAbsent(new RequestedKey(gav, attributes), it -> {
                     String type = "jar";
                     if (Optional.ofNullable(Category.from(attributes.get(Category.key())))
                             .filter(cat -> cat == Category.REGULAR_PLATFORM || cat == Category.ENFORCED_PLATFORM)
@@ -513,25 +550,19 @@ public final class GradleProjectBuilder {
      */
     private static org.openrewrite.maven.tree.Dependency dependency(ResolvedDependency dep) {
         GroupArtifactVersion gav = groupArtifactVersion(dep);
-        return requestedCache.computeIfAbsent(gav, it -> {
-            // Synthesize a Category attribute if this is a BOM
-            String type = "jar";
-            Map<String, String> attributes = emptyMap();
-            // Both enforcedPlatform() and platform() appear the same in this context, so assume platform()
-            if (dep.getConfiguration().startsWith("platform-")) {
-                attributes = singletonMap(Category.key(), "platform");
-                type = "pom";
-            }
-
-            return org.openrewrite.maven.tree.Dependency.builder()
-                    .gav(gav)
-                    // platform() dependencies are effectively BOMs, so their jar isn't actually used
-                    .type(type)
-                    .attributes(attributes)
-                    .scope(dep.getConfiguration())
-                    .exclusions(emptyList())
-                    .build();
-        });
+        // Synthesize a Category attribute if this is a BOM
+        // Both enforcedPlatform() and platform() appear the same in this context, so assume platform()
+        boolean platform = dep.getConfiguration().startsWith("platform-");
+        Map<String, String> attributes = platform ? singletonMap(Category.key(), "platform") : emptyMap();
+        return requestedCache.computeIfAbsent(new RequestedKey(gav, attributes), it ->
+                org.openrewrite.maven.tree.Dependency.builder()
+                        .gav(gav)
+                        // platform() dependencies are effectively BOMs, so their jar isn't actually used
+                        .type(platform ? "pom" : "jar")
+                        .attributes(attributes)
+                        .scope(dep.getConfiguration())
+                        .exclusions(emptyList())
+                        .build());
     }
 
     static org.openrewrite.maven.tree.ResolvedDependency resolved(

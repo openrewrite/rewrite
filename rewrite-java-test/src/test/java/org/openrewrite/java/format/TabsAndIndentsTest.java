@@ -29,6 +29,7 @@ import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -1071,7 +1072,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
+            .types(TypeValidation.none())
+            .build()),
           java(
             """
               import lombok.EqualsAndHashCode;

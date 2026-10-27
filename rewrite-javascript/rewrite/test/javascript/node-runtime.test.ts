@@ -185,9 +185,11 @@ describe("NodeRuntime", () => {
         await withDir(async dir => {
             const pkg = write(dir.path, "package.json", "null");
             write(dir.path, "package-lock.json", lock("a"));
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
             const [doc] = await parse(new PackageJsonParser({relativeTo: dir.path}), pkg);
 
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("Failed to create NodeResolutionResult marker"));
             expect(findNodeResolutionResult(doc)).toBeUndefined();
             const runtime = findNodeRuntime(doc)!;
             expect(runtime.nodeVersion).toBe(process.version);
@@ -224,8 +226,8 @@ describe("NodeRuntime", () => {
 
     describe("RPC", () => {
         async function roundTrip(after: NodeRuntime, before?: NodeRuntime): Promise<NodeRuntime> {
-            const batch = await new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
-            return new RpcReceiveQueue(new Map(), Json.Kind.Document, async () => batch, undefined, false)
+            const batch = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
+            return new RpcReceiveQueue(new Map(), Json.Kind.Document, [batch], undefined, false)
                 .receive<NodeRuntime>(before);
         }
 

@@ -306,13 +306,23 @@ public final class LockDirectory {
     }
 
     private static String normalize(Path file) {
-        String normalized = file.normalize().toString().replace('\\', '/');
+        String normalized = rootRelative(file).toString().replace('\\', '/');
         return ".".equals(normalized) ? "" : normalized;
     }
 
     private static String directory(Path file) {
-        Path dir = file.normalize().getParent();
+        Path dir = rootRelative(file).getParent();
         return dir == null ? "" : dir.toString().replace('\\', '/');
+    }
+
+    /**
+     * An absolute source path, as a test's temporary directory gives, is seen from the file system's root, which then
+     * stands in for the repository's.
+     */
+    private static Path rootRelative(Path file) {
+        Path normalized = file.normalize();
+        Path root = normalized.getRoot();
+        return root == null ? normalized : root.relativize(normalized);
     }
 
     private static boolean contains(String dir, String other) {

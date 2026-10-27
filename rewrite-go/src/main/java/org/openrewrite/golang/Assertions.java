@@ -30,12 +30,14 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
 
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
+@CheckReturnValue
 public final class Assertions {
     private Assertions() {
     }

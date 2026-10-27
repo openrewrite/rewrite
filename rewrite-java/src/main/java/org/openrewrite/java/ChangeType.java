@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.PackageNameUtils;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.service.ImportService;
@@ -29,16 +30,23 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeType extends Recipe {
+public class ChangeType extends Recipe implements RenamingRecipe {
+
+    /**
+     * The kind of name ChangeType and ChangePackage rename, which shares one namespace of dotted names.
+     */
+    static final String JAVA_TYPES_AND_PACKAGES = "Java type or package";
 
     @Option(displayName = "Old fully-qualified type name",
             description = "Fully-qualified class name of the original type.",
@@ -58,6 +66,29 @@ public class ChangeType extends Recipe {
     Boolean ignoreDefinition;
 
     String displayName = "Change type";
+
+    @Override
+    public String kindOfName() {
+        return JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldFullyQualifiedTypeName;
+    }
+
+    @Override
+    public String rename(String name) {
+        // the types nested in the old type move with it
+        String oldName = oldFullyQualifiedTypeName.replace('$', '.');
+        String dotted = name.replace('$', '.');
+        if (dotted.equals(oldName)) {
+            return newFullyQualifiedTypeName;
+        } else if (dotted.startsWith(oldName + ".")) {
+            return newFullyQualifiedTypeName.replace('$', '.') + dotted.substring(oldName.length());
+        }
+        return name;
+    }
 
     @Override
     public String getInstanceNameSuffix() {
@@ -99,6 +130,11 @@ public class ChangeType extends Recipe {
                     Tree used = new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                     if (used != cu) {
                         return used;
+                    }
+                    // Fully qualified documentation-comment references are excluded from UsesType's
+                    // import-retention view, but they still need to be retargeted.
+                    if (hasDocReference(cu.getTypesInUse(), oldFullyQualifiedTypeName)) {
+                        return SearchResult.found(cu);
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
                             mayContainDefinition(cu, normalizedOldName) &&
@@ -152,6 +188,7 @@ public class ChangeType extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
+        private @Nullable Set<String> otherTypeNames;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -270,7 +307,7 @@ public class ChangeType extends Recipe {
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (hasNoConflictingImport(sf)) {
+                        if (hasNoConflictingName(sf)) {
                             if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(owningClass);
                             }
@@ -310,10 +347,17 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    Expression qualified = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
-                    if (getCursor().firstEnclosing(J.Import.class) == null) {
-                        // don't shorten qualified names in imports
+                    if (!(qualified instanceof J.FieldAccess)) {
+                        // a type in the default package has no qualifier to shorten, and no import can name it
+                        return getCursor().firstEnclosing(J.Import.class) == null ?
+                                qualified.withType(targetType) : fieldAccess;
+                    }
+                    J.FieldAccess fa = (J.FieldAccess) qualified;
+                    if (getCursor().firstEnclosing(J.Import.class) == null &&
+                            getCursor().firstEnclosing(Javadoc.class) == null) {
+                        // don't shorten qualified names in imports or Javadoc, where they need no import
                         fa = fa.withName(fa.getName().withType(targetType));
                         doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
                     }
@@ -378,6 +422,14 @@ public class ChangeType extends Recipe {
                 }
 
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
+                // a declaration's own name stays an identifier, while elsewhere the parser makes a qualified name
+                // into field accesses and a keyword into a primitive type
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                boolean nameOnly = !ident.getAnnotations().isEmpty() ||
+                                   parent instanceof J.ClassDeclaration &&
+                                   ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
+                                   parent instanceof J.MethodDeclaration &&
+                                   ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
@@ -385,13 +437,21 @@ public class ChangeType extends Recipe {
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
                         } else {
-                            if (hasNoConflictingImport(sf)) {
+                            if (hasNoConflictingName(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
-                            } else {
+                            } else if (nameOnly) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
+                            } else {
+                                return FullyQualifyTypeReference.qualifiedName((JavaType.FullyQualified) targetType,
+                                        ident.getPrefix(), emptyList());
                             }
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
+                        // the parser makes `String` an identifier, not a primitive
+                        if (!nameOnly && targetType != JavaType.Primitive.String) {
+                            return new J.Primitive(ident.getId(), ident.getPrefix(), ident.getMarkers(),
+                                    (JavaType.Primitive) targetType);
+                        }
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }
@@ -575,6 +635,8 @@ public class ChangeType extends Recipe {
                 oldNameToChangedType.put(oldType, array);
                 oldNameToChangedType.put(array, array);
                 return array;
+            } else if (oldType instanceof JavaType.Method) {
+                return updateType((JavaType.Method) oldType);
             }
 
             return oldType;
@@ -622,8 +684,8 @@ public class ChangeType extends Recipe {
         }
 
         /**
-         * When the new type is provided by a star import and another star import provides
-         * a type with the same simple name, add an explicit import to disambiguate.
+         * When the new type is provided by a star import and another star import, or {@code java.lang},
+         * provides a type with the same simple name, add an explicit import to disambiguate.
          */
         private JavaSourceFile maybeAddExplicitImportForAmbiguity(JavaSourceFile sf, JavaType.FullyQualified newType, ExecutionContext ctx) {
             String newPkg = newType.getPackageName();
@@ -647,13 +709,13 @@ public class ChangeType extends Recipe {
                 }
             }
 
-            if (!coveredByStar || otherStarPackages.isEmpty()) {
+            if (!coveredByStar) {
                 return sf;
             }
 
             // Check if any other star-imported package has a type with the same simple name
             boolean ambiguous;
-            if (JavaSourceSet.isDirty(ctx, sf)) {
+            if (!otherStarPackages.isEmpty() && JavaSourceSet.isDirty(ctx, sf)) {
                 // An earlier dependency mutation in this run means the classpath cannot be trusted to
                 // prove non-ambiguity; fall back to the safe path and add the explicit import.
                 ambiguous = true;
@@ -661,6 +723,10 @@ public class ChangeType extends Recipe {
                 Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
                 if (!sourceSet.isPresent()) {
                     return sf;
+                }
+                // Every compilation unit imports java.lang on demand. No dependency change alters it.
+                if (!"java.lang".equals(newPkg)) {
+                    otherStarPackages.add("java.lang");
                 }
                 ambiguous = false;
                 for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
@@ -699,7 +765,7 @@ public class ChangeType extends Recipe {
             return sf.getPadding().withImports(imports);
         }
 
-        private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
+        private boolean hasNoConflictingName(@Nullable JavaSourceFile sf) {
             JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
             JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
             if (sf == null || oldType == null || newType == null) {
@@ -714,7 +780,52 @@ public class ChangeType extends Recipe {
                     return false;
                 }
             }
-            return true;
+            return !otherTypeNames(sf, newType).contains(newType.getClassName());
+        }
+
+        /**
+         * The simple names that the file declares for types other than the target, or writes unqualified for types
+         * other than the target and the original. Uses of the original are renamed, while a declaration of it stays.
+         * Shortening the target to one of these names would bind that name to two types.
+         */
+        private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
+            if (otherTypeNames == null) {
+                otherTypeNames = new JavaIsoVisitor<Set<String>>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> names) {
+                        if (!TypeUtils.isOfClassType(classDecl.getType(), newType.getFullyQualifiedName())) {
+                            names.add(classDecl.getSimpleName());
+                        }
+                        return super.visitClassDeclaration(classDecl, names);
+                    }
+
+                    @Override
+                    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, Set<String> names) {
+                        if (typeParam.getName() instanceof J.Identifier) {
+                            names.add(((J.Identifier) typeParam.getName()).getSimpleName());
+                        }
+                        return super.visitTypeParameter(typeParam, names);
+                    }
+
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                        JavaType type = identifier.getType();
+                        if (identifier.getFieldType() == null && type instanceof JavaType.FullyQualified &&
+                                !TypeUtils.isOfClassType(type, newType.getFullyQualifiedName()) &&
+                                !TypeUtils.isOfClassType(type, originalType.getFullyQualifiedName())) {
+                            names.add(identifier.getSimpleName());
+                        }
+                        return super.visitIdentifier(identifier, names);
+                    }
+
+                    @Override
+                    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<String> names) {
+                        visit(fieldAccess.getTarget(), names);
+                        return fieldAccess;
+                    }
+                }.reduce(sf, new HashSet<>());
+            }
+            return otherTypeNames;
         }
     }
 
@@ -913,6 +1024,29 @@ public class ChangeType extends Recipe {
      *
      * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
      */
+    // Looked up reflectively because recipe modules built against this ChangeType may run alongside an
+    // older TypesInUse that predates the method, which would otherwise fail with NoSuchMethodError.
+    private static final @Nullable Method HAS_DOC_REFERENCE = findHasDocReference();
+
+    private static @Nullable Method findHasDocReference() {
+        try {
+            return TypesInUse.class.getMethod("hasDocReference", String.class);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    private static boolean hasDocReference(TypesInUse typesInUse, String fullyQualifiedTypeName) {
+        if (HAS_DOC_REFERENCE == null) {
+            return false;
+        }
+        try {
+            return (Boolean) HAS_DOC_REFERENCE.invoke(typesInUse, fullyQualifiedTypeName);
+        } catch (ReflectiveOperationException e) {
+            return false;
+        }
+    }
+
     private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;

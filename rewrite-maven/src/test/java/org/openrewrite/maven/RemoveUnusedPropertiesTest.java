@@ -167,9 +167,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void requiresCyclesForCascadingRemovals() {
+    void removesCascadingUnusedPropertiesInOneCycle() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           pomXml(
             """
               <project>
@@ -177,10 +176,14 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
+                <description>${release}</description>
 
                 <properties>
-                  <foo>xyz</foo>
-                  <bar>${foo}</bar>
+                  <a>xyz</a>
+                  <b>${a}</b>
+                  <c>${b}</c>
+                  <major>1</major>
+                  <release>${major}.0</release>
                 </properties>
 
               </project>
@@ -191,9 +194,85 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
+                <description>${release}</description>
+
+                <properties>
+                  <major>1</major>
+                  <release>${major}.0</release>
+                </properties>
 
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void removesCascadeAcrossParentAndChild() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <foo>x</foo>
+                  <used>y</used>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <used>y</used>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <description>${baz}</description>
+                  <properties>
+                    <bar>${foo}</bar>
+                    <baz>${used}</baz>
+                  </properties>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <description>${baz}</description>
+                  <properties>
+                    <baz>${used}</baz>
+                  </properties>
+                </project>
+                """
+            )
           )
         );
     }
@@ -321,7 +400,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 </parent>
 
                 <properties>
-                  <gson.version>2.11.0</gson.version>
+                  <gson.version>${gson.release}</gson.version>
+                  <gson.release>2.11.0</gson.release>
                 </properties>
 
               </project>

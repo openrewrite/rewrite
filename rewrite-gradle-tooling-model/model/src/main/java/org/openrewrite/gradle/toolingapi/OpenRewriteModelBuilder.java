@@ -39,7 +39,9 @@ public class OpenRewriteModelBuilder {
     /**
      * Build an OpenRewriteModel for a project directory, using the default Gradle init script bundled within this jar.
      * The included init script accesses public artifact repositories (Maven Central, Nexus Snapshots) to be able to
-     * download rewrite dependencies, so public repositories must be accessible for this to work.
+     * download rewrite dependencies, so public repositories must be accessible for this to work. If
+     * {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME} and
+     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, it downloads them from that mirror instead.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
@@ -156,16 +158,17 @@ public class OpenRewriteModelBuilder {
     }
 
     /**
-     * When the env vars {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME}, and
-     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
-     * routes plugin and dependency resolution for the embedded Gradle build through that repository.
-     * If any var is missing, returns the empty string and the embedded Gradle resolves repositories
-     * exactly as the build files declare.
+     * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
+     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
+     * points the embedded Gradle build's Maven Central, Sonatype snapshot and Gradle plugin portal
+     * repositories at that mirror instead, with its credentials, including the portal Gradle adds on
+     * its own when a build names no plugin repository. Other repositories stay as the build files
+     * declare them. If any var is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
-        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
-        String user = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
-        String pass = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        String user = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
+        String pass = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
         if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
             return "";
         }
@@ -173,30 +176,36 @@ public class OpenRewriteModelBuilder {
                 "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
                 "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
                 "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
-                // Prepend Artifactory as a Maven Central proxy by adding it through Gradle lifecycle
-                // hooks that fire BEFORE the user's settings.gradle / build.gradle is evaluated.
-                // Doing it this way avoids clearing the repository container (which doesn't survive
-                // re-add) and avoids touching pluginManagement.repositories (where Gradle's default
-                // gradlePluginPortal() injection happens lazily after our settingsEvaluated hook
-                // would run). Gradle tries repositories in order and falls through on 404, so Central
-                // artifacts come from Artifactory while Plugin Portal markers still resolve normally.
-                "def __rewriteAddMirror = { container ->\n" +
-                "    container.maven {\n" +
-                "        url = __rewriteMirrorUrl\n" +
-                "        credentials {\n" +
-                "            username = __rewriteMirrorUser\n" +
-                "            password = __rewriteMirrorPass\n" +
+                // configureEach also reaches the repositories the build files add after these hooks run
+                "def __rewriteUseMirror = { repositories ->\n" +
+                "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
+                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org',\n" +
+                "                'central.sonatype.com', 'oss.sonatype.org', 's01.oss.sonatype.org']) {\n" +
+                "            repo.url = __rewriteMirrorUrl\n" +
+                "            repo.credentials {\n" +
+                "                it.username = __rewriteMirrorUser\n" +
+                "                it.password = __rewriteMirrorPass\n" +
+                "            }\n" +
                 "        }\n" +
                 "    }\n" +
                 "}\n" +
                 "try {\n" +
                 "    gradle.beforeSettings { settings ->\n" +
-                "        try { __rewriteAddMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
+                "        __rewriteUseMirror(settings.pluginManagement.repositories)\n" +
+                "        try { __rewriteUseMirror(settings.buildscript.repositories) } catch (Throwable ignored) {}\n" +
+                "        try { __rewriteUseMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
+                "    }\n" +
+                // When a build names no plugin repository, Gradle adds the portal itself, where the hook above
+                // can't see it; naming it here lets the hook point it at the mirror
+                "    gradle.settingsEvaluated { settings ->\n" +
+                "        if (settings.pluginManagement.repositories.isEmpty()) {\n" +
+                "            settings.pluginManagement.repositories.gradlePluginPortal()\n" +
+                "        }\n" +
                 "    }\n" +
                 "} catch (Throwable ignored) {}\n" +
                 "gradle.beforeProject { project ->\n" +
-                "    __rewriteAddMirror(project.buildscript.repositories)\n" +
-                "    __rewriteAddMirror(project.repositories)\n" +
+                "    __rewriteUseMirror(project.buildscript.repositories)\n" +
+                "    __rewriteUseMirror(project.repositories)\n" +
                 "}\n";
     }
 

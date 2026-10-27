@@ -406,6 +406,71 @@ class GradleProjectTest {
         }
     }
 
+    /**
+     * Configurations are read in name order, so c's annotationProcessor reaches a through b, with no attribute
+     * to say a is a project, before c's compileClasspath declares a.
+     */
+    @Nested
+    class projectReachedTransitivelyFirst {
+        @TempDir
+        static Path dir;
+
+        static GradleProject cGradleProject;
+
+        //language=groovy
+        static String bBuildGradle = """
+          plugins{
+              id 'java'
+          }
+
+          dependencies{
+              implementation project(":a")
+          }
+          """;
+
+        //language=groovy
+        static String cBuildGradle = """
+          plugins{
+              id 'java'
+          }
+
+          dependencies{
+              annotationProcessor project(":b")
+              implementation project(":a")
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "reached-transitively-first"
+          include("a")
+          include("b")
+          include("c")
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            Files.write(dir.resolve("build.gradle"), "\n".getBytes(StandardCharsets.UTF_8));
+            Files.write(dir.resolve("settings.gradle"), settingsGradle.getBytes(StandardCharsets.UTF_8));
+            Files.createDirectory(dir.resolve("a"));
+            Files.write(dir.resolve("a/build.gradle"), "plugins { id 'java' }\n".getBytes(StandardCharsets.UTF_8));
+            Files.createDirectory(dir.resolve("b"));
+            Files.write(dir.resolve("b/build.gradle"), bBuildGradle.getBytes(StandardCharsets.UTF_8));
+            Path cDir = dir.resolve("c");
+            Files.createDirectory(cDir);
+            Files.write(cDir.resolve("build.gradle"), cBuildGradle.getBytes(StandardCharsets.UTF_8));
+
+            cGradleProject = OpenRewriteModelBuilder.forProjectDirectory(cDir.toFile(), cDir.resolve("build.gradle").toFile())
+              .getGradleProject();
+        }
+
+        @Test
+        void projectDependencyKeepsItsAttribute() {
+            assertThat(requireNonNull(cGradleProject.getConfiguration("compileClasspath")).getRequested())
+              .anyMatch(dep -> dep.findAttribute(ProjectAttribute.class).isPresent() && "a".equals(dep.getGav().getArtifactId()));
+        }
+    }
+
     @Nested
     @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
     class SpringDependencyManagement {

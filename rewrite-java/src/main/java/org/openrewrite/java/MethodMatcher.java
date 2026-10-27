@@ -35,14 +35,17 @@ import static java.util.stream.Collectors.toList;
  * #declaring class# #method name#(#argument list#)
  * </B><P>
  * <li>The declaring class must be fully qualified.</li>
- * <li>A wildcard character, "*", may be used in either the declaring class or method name.</li>
+ * <li>A wildcard character, "*", may be used in either the declaring class or method name. In the declaring class it
+ * does not match across a "." separator.</li>
+ * <li>".." can be used in the declaring class to match any number of package segments, e.g. "java.util..*".</li>
  * <li>The argument list is expressed as a comma-separated list of the argument types</li>
  * <li>".." can be used in the argument list to match zero or more arguments of any type.</li>
  * <P><PRE>
  * EXAMPLES:
  * <p>
  * *..* *(..)                              - All method invocations
- * java.util.* *(..)                       - All method invocations to classes belonging to java.util (including sub-packages)
+ * java.util.* *(..)                       - All method invocations to classes belonging to java.util (excluding sub-packages)
+ * java.util..* *(..)                      - All method invocations to classes belonging to java.util (including sub-packages)
  * java.util.Collections *(..)             - All method invocations on java.util.Collections class
  * java.util.Collections unmodifiable*(..) - All method invocations starting with "unmodifiable" on java.util.Collections
  * java.util.Collections min(..)           - All method invocations for all overloads of "min"
@@ -438,10 +441,28 @@ public class MethodMatcher {
             if (!typeMatcher.matchesSimpleName(select.getSimpleName())) {
                 return false;
             }
+        } else if (method.getSelect() instanceof J.FieldAccess) {
+            J.FieldAccess select = (J.FieldAccess) method.getSelect();
+            // A fully qualified type name, as in `java.util.Collections.emptyList()`, is checked like a simple one
+            if (select.getType() instanceof JavaType.Class &&
+                ((JavaType.Class) select.getType()).getFullyQualifiedName().replace('$', '.').equals(dottedName(select)) &&
+                !typeMatcher.matchesSimpleName(select.getSimpleName())) {
+                return false;
+            }
         }
 
         // For unknown types, we need to be more lenient with argument matching
         return matchesArgumentsAllowingUnknownTypes(method);
+    }
+
+    private static @Nullable String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        } else if (expression instanceof J.FieldAccess) {
+            String target = dottedName(((J.FieldAccess) expression).getTarget());
+            return target == null ? null : target + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        return null;
     }
 
     private boolean matchesArgumentsAllowingUnknownTypes(J.MethodInvocation method) {

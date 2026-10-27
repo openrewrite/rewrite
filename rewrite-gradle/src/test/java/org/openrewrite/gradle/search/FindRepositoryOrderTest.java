@@ -16,7 +16,6 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.MavenRepositoryOrder;
 import org.openrewrite.test.RecipeSpec;
@@ -27,6 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.mavenCentral;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class FindRepositoryOrderTest implements RewriteTest {
@@ -65,8 +65,6 @@ class FindRepositoryOrderTest implements RewriteTest {
     }
 
     @Test
-    @DisabledIfEnvironmentVariable(named = "REWRITE_GRADLE_MIRROR_URL", matches = ".+",
-            disabledReason = "An injected mirror adds a repository, defeating the empty-repositories scenario.")
     void emptyRepositories() {
         rewriteRun(
           buildGradle(
@@ -94,7 +92,7 @@ class FindRepositoryOrderTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://repo.maven.apache.org/maven2/"), """
+              List.of("https://repo.spring.io/milestone", mavenCentral()), """
               plugins {
                   id 'java'
               }
@@ -167,7 +165,7 @@ class FindRepositoryOrderTest implements RewriteTest {
           spec -> spec
             .dataTable(MavenRepositoryOrder.Row.class, rows -> {
                 int springIdx = indexOfUri(rows, "https://repo.spring.io/milestone");
-                int centralIdx = indexOfUri(rows, "https://repo.maven.apache.org/maven2/");
+                int centralIdx = indexOfUri(rows, mavenCentral());
                 assertThat(springIdx).as("spring milestone repo present").isNotNegative();
                 assertThat(centralIdx).as("maven central repo present").isNotNegative();
                 assertThat(springIdx)
@@ -189,7 +187,7 @@ class FindRepositoryOrderTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://repo.maven.apache.org/maven2/"), """
+              List.of("https://repo.spring.io/milestone", mavenCentral()), """
               plugins {
                   id 'java'
               }

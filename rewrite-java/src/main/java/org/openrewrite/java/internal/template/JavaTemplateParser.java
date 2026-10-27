@@ -96,6 +96,7 @@ public class JavaTemplateParser {
         return cache(cursor, stub, () -> {
             JavaSourceFile cu = compileTemplate(cursor, stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+            UndeclaredTemplateReferences.check(cu, m.getParameters(), imports);
             return m.getParameters();
         });
     }
@@ -120,7 +121,9 @@ public class JavaTemplateParser {
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(cursor, stub);
-                    return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
+                    List<Expression> templated = statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
+                    UndeclaredTemplateReferences.check(cu, templated, imports);
+                    return templated;
                 });
         if (result.isEmpty()) {
             throw new IllegalArgumentException(
@@ -187,7 +190,9 @@ public class JavaTemplateParser {
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(cursor, stub);
-                    return statementTemplateGenerator.listTemplatedTrees(cu, expected);
+                    List<J2> templated = statementTemplateGenerator.listTemplatedTrees(cu, expected);
+                    UndeclaredTemplateReferences.check(cu, templated, imports);
+                    return templated;
                 });
     }
 
@@ -205,8 +210,15 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(cursor, stub);
-        return (J.MethodInvocation) statementTemplateGenerator
+        J.MethodInvocation templated = (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
+        // the select comes from the code the template is applied to
+        List<J> fromTemplate = new ArrayList<>(templated.getArguments());
+        if (templated.getTypeParameters() != null) {
+            fromTemplate.addAll(templated.getTypeParameters());
+        }
+        UndeclaredTemplateReferences.check(cu, fromTemplate, imports);
+        return templated;
     }
 
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
@@ -219,8 +231,11 @@ public class JavaTemplateParser {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(cursor, stub);
-        return (J.MethodInvocation) statementTemplateGenerator
+        J.MethodInvocation templated = (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
+        // only the arguments come from the template
+        UndeclaredTemplateReferences.check(cu, templated.getArguments(), imports);
+        return templated;
     }
 
     private boolean isStatement(Cursor cursor) {
@@ -242,7 +257,9 @@ public class JavaTemplateParser {
             @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
             onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(cursor, stub);
-            return annotationTemplateGenerator.listAnnotations(cu);
+            List<J.Annotation> templated = annotationTemplateGenerator.listAnnotations(cu);
+            UndeclaredTemplateReferences.check(cu, templated, imports);
+            return templated;
         });
     }
 

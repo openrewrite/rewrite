@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.License
@@ -87,12 +85,12 @@ fun License.configureForFirstPartyGo() {
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
 }
 
-val licenseGo by tasks.registering(LicenseCheck::class) {
+val licenseGo = tasks.register<LicenseCheck>("licenseGo") {
     description = "Check license headers on first-party Go files"
     configureForFirstPartyGo()
 }
 
-val licenseFormatGo by tasks.registering(LicenseFormat::class) {
+val licenseFormatGo = tasks.register<LicenseFormat>("licenseFormatGo") {
     description = "Apply license headers to first-party Go files"
     configureForFirstPartyGo()
 }
@@ -208,7 +206,7 @@ testing {
 // ============================================
 
 // Configuration to collect classpath for the Java RPC server
-val javaRpcClasspath by configurations.creating {
+val javaRpcClasspath = configurations.create("javaRpcClasspath") {
     isCanBeConsumed = false
     isCanBeResolved = true
     extendsFrom(configurations.getByName("runtimeClasspath"))
@@ -219,7 +217,7 @@ dependencies {
 }
 
 // Task to generate classpath file for Java RPC server testing from Go
-val generateTestClasspath by tasks.registering {
+val generateTestClasspath = tasks.register("generateTestClasspath") {
     group = "golang"
     description = "Generate classpath file for Java RPC server (used by Go tests)"
 
@@ -236,7 +234,7 @@ val generateTestClasspath by tasks.registering {
         ).distinctBy { it.absolutePath }
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+        logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
 
@@ -267,8 +265,6 @@ val goTest = tasks.register<Exec>("goTest") {
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }
-
-ImportJUnitXmlReports.register(tasks, goTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(goTest)

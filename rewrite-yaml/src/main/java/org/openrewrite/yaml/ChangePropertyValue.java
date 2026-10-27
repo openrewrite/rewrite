@@ -224,7 +224,19 @@ public class ChangePropertyValue extends Recipe {
         if (body.equals(updatedBody)) {
             return null;
         }
-        return block != null ? block.withBody(updatedBody) : scalar.withValue(updatedBody);
+        if (block != null) {
+            return block.withBody(updatedBody);
+        }
+        Yaml.Scalar.Style style = scalar.getStyle();
+        String value = updatedBody;
+        // a quoted value is a quoted scalar, as the parser reads it
+        char quote = value.length() > 1 ? value.charAt(0) : ' ';
+        if ((quote == '"' || quote == '\'') && value.charAt(value.length() - 1) == quote) {
+            style = quote == '"' ? Yaml.Scalar.Style.DOUBLE_QUOTED : Yaml.Scalar.Style.SINGLE_QUOTED;
+            value = value.substring(1, value.length() - 1);
+        }
+        return style == scalar.getStyle() && value.equals(scalar.getValue()) ? null :
+                scalar.withStyle(style).withValue(value);
     }
 
     private boolean matchesOldValue(Yaml.Scalar scalar) {

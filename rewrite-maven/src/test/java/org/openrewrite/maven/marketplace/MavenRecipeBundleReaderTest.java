@@ -33,7 +33,7 @@ import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.marketplace.ThrowingRecipeBundleReader;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
-import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.SharedMavenPomCacheExtension;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.nio.file.Files;
@@ -55,15 +55,15 @@ class MavenRecipeBundleReaderTest {
 
     @BeforeEach
     void setUp() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        InMemoryExecutionContext ctx = SharedMavenPomCacheExtension.shareDownloads(
+                new InMemoryExecutionContext(Throwable::printStackTrace));
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
         MavenExecutionContextView.view(ctx)
                 .setAddCentralRepository(true)
                 .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
 
-        LocalMavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir.resolve("artifacts"));
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-                artifactCache,
+                SharedArtifactCache.get(),
                 null,
                 new HttpUrlConnectionSender(),
                 Throwable::printStackTrace,

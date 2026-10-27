@@ -69,9 +69,10 @@ public class PackageJsonHelper {
     public interface FileEditor {
 
         /**
-         * {@code file}, as the recipes before this one in the cycle left it, with this recipe's edits.
+         * The text of the file at {@code path}, {@code text} as the recipes before this one in the cycle left it, with
+         * this recipe's edits.
          */
-        SourceFile edit(ExecutionContext ctx, SourceFile file);
+        String edit(ExecutionContext ctx, Path path, String text);
     }
 
     private static final String FILE_EDITORS = "org.openrewrite.javascript.packageManagerFileEditors";
@@ -94,17 +95,18 @@ public class PackageJsonHelper {
     }
 
     /**
-     * {@code scanned} as the editors added this cycle before {@code editor} leave it, in the order they were added.
+     * {@code scanned}, the text of the file at {@code path}, as the editors added this cycle before {@code editor}
+     * leave it, in the order they were added.
      */
-    public static SourceFile editedBefore(ExecutionContext ctx, FileEditor editor, SourceFile scanned) {
-        SourceFile file = scanned;
+    public static String editedBefore(ExecutionContext ctx, FileEditor editor, Path path, String scanned) {
+        String text = scanned;
         for (FileEditor earlier : new ArrayList<>(fileEditors(ctx))) {
             if (earlier == editor) {
                 break;
             }
-            file = earlier.edit(ctx, file);
+            text = earlier.edit(ctx, path, text);
         }
-        return file;
+        return text;
     }
 
     private static List<FileEditor> fileEditors(ExecutionContext ctx) {
@@ -122,6 +124,24 @@ public class PackageJsonHelper {
      */
     public static String printed(SourceFile file) {
         return file.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+    }
+
+    /**
+     * {@code text} parsed as the JSON file at {@code path}; null when it does not parse.
+     */
+    public static Json.@Nullable Document parseJson(Path path, String text) {
+        SourceFile parsed = new JsonParser().parseInputs(singletonList(Parser.Input.fromString(path, text)), null,
+                new InMemoryExecutionContext()).findFirst().orElse(null);
+        return parsed instanceof Json.Document ? (Json.Document) parsed : null;
+    }
+
+    /**
+     * {@code text} parsed as the YAML file at {@code path}; null when it does not parse.
+     */
+    public static Yaml.@Nullable Documents parseYaml(Path path, String text) {
+        SourceFile parsed = new YamlParser().parseInputs(singletonList(Parser.Input.fromString(path, text)), null,
+                new InMemoryExecutionContext()).findFirst().orElse(null);
+        return parsed instanceof Yaml.Documents ? (Yaml.Documents) parsed : null;
     }
 
     public static Json.Document reparseJson(Json.Document original, String newContent) {
@@ -943,8 +963,8 @@ public class PackageJsonHelper {
                 withResolvedDeps(refreshed, regen, projectFiles.getPackageManager()), regen, changed);
     }
 
-    private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
-                                                  NodeDependencyScan.ProjectFiles projectFiles) {
+    static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
+                                          NodeDependencyScan.ProjectFiles projectFiles) {
         Map<Path, String> changed = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : editedFiles.entrySet()) {
             String captured = projectFiles.getPackageManagerFiles().get(file.getKey());
@@ -959,8 +979,8 @@ public class PackageJsonHelper {
     }
 
     // installs: the package manager that installs the manifest where its marker names another; null for the marker's
-    private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen,
-                                               NodeResolutionResult.@Nullable PackageManager installs) {
+    static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen,
+                                       NodeResolutionResult.@Nullable PackageManager installs) {
         if (regen == null || !regen.isSuccess()) {
             return refreshed;
         }

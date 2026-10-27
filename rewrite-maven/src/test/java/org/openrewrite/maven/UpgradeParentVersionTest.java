@@ -42,13 +42,13 @@ class UpgradeParentVersionTest implements RewriteTest {
               "1.125",
               null,
               null))
-            .executionContext(
+            .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
                 .setRepositories(List.of(
                   MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
                 ))
-            ),
+            )),
           pomXml(
             """
               <project>

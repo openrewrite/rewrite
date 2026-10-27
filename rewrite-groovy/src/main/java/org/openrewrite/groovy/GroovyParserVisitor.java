@@ -1275,7 +1275,11 @@ public class GroovyParserVisitor {
         }
 
         private <T> T doVisit(ASTNode node) {
-            nodeCursor = new Cursor(nodeCursor, node);
+            Cursor parent = nodeCursor;
+            // a visitor created for a node starts with its cursor on that node
+            if (parent.getValue() != node) {
+                nodeCursor = new Cursor(parent, node);
+            }
             if (node instanceof AnnotationConstantExpression) {
                 // AnnotationConstantExpression.visit() walks the inner annotation's members itself,
                 // which would re-visit them at the wrong cursor position. Dispatch directly instead.
@@ -1283,7 +1287,7 @@ public class GroovyParserVisitor {
             } else {
                 node.visit(this);
             }
-            nodeCursor = nodeCursor.getParentOrThrow();
+            nodeCursor = parent;
             return pollQueue();
         }
 
@@ -1813,7 +1817,8 @@ public class GroovyParserVisitor {
             Space fmt = EMPTY;
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
-            Object parent = nodeCursor.getParentOrThrow().getValue();
+            Cursor parentCursor = nodeCursor.getParent();
+            Object parent = parentCursor == null ? null : parentCursor.getValue();
             boolean withinClosure = !isLambda(parent) && parent instanceof ClosureExpression ||
                     (parent instanceof ExpressionStatement &&
                             !isLambda(((ExpressionStatement) parent).getExpression()) &&

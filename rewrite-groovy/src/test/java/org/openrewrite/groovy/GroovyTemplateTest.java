@@ -575,4 +575,30 @@ class GroovyTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void insertDeclarationBeforeNonVoidExpressionStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                  G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
+                  if (c.getStatements().size() != 1) {
+                      return c;
+                  }
+                  return GroovyTemplate.builder("def y = 2")
+                    .build()
+                    .apply(updateCursor(c), c.getStatements().get(0).getCoordinates().before());
+              }
+          })),
+          groovy(
+            """
+              'abc'.toUpperCase()
+              """,
+            """
+              def y = 2
+              'abc'.toUpperCase()
+              """
+          ));
+    }
 }

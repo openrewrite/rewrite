@@ -16,11 +16,13 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 
@@ -85,5 +87,28 @@ class LockDirectoryTest {
         assertThat(held.file("../../.npmrc")).isEqualTo("registry=https://example.com/\n");
         assertThat(NpmInputs.from(held, HostRegistries.NONE).getNpmrc())
           .isEqualTo("registry=https://own.example/\n");
+    }
+
+    @Test
+    void absoluteSourcePathsAreSeenFromTheFileSystemsRoot(@TempDir Path tempDir) {
+        // given
+        Path project = tempDir.toAbsolutePath();
+        String root = project.getRoot().relativize(project).toString().replace('\\', '/');
+        Request request = inMidApp(PackageManager.Npm)
+          .packageJsonPath(project.resolve("packages/a/package.json"))
+          .manifest(project.resolve("package.json"), "{}")
+          .packageManagerFile(project.resolve(".npmrc"), "x=y")
+          .projectPaths(Collections.singleton(project.resolve("packages/a/index.js")))
+          .build();
+
+        // when
+        LockDirectory dir = LockDirectory.of(request);
+
+        // then
+        assertThat(dir.getPath()).isEqualTo(root);
+        assertThat(dir.getManifests()).containsOnlyKeys("", "packages/a");
+        assertThat(dir.getFiles()).containsKey(".npmrc");
+        assertThat(dir.getPaths()).containsExactly("packages/a/index.js");
+        assertThat(dir.getRunsIn()).isEqualTo("packages/a");
     }
 }

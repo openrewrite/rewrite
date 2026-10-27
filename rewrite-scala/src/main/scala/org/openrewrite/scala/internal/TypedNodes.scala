@@ -38,6 +38,26 @@ final case class TypedNode(own: tpd.Tree, adapted: tpd.Tree)
  */
 final class TypedNodes private (nodes: IdentityHashMap[untpd.Tree, TypedNode]) {
   def get(tree: untpd.Tree): Option[TypedNode] = Option(nodes.get(tree))
+
+  // The innermost node each typed tree is the typing or adaptation of
+  private lazy val owners: IdentityHashMap[tpd.Tree, untpd.Tree] = {
+    val owners = new IdentityHashMap[tpd.Tree, untpd.Tree]()
+    def claim(typed: tpd.Tree, tree: untpd.Tree): Unit = {
+      val current = owners.get(typed)
+      if (current == null || encloses(current, tree)) owners.put(typed, tree)
+    }
+    nodes.forEach { (tree, node) =>
+      claim(node.adapted, tree)
+      claim(node.own, tree)
+    }
+    owners
+  }
+
+  private def encloses(outer: untpd.Tree, inner: untpd.Tree): Boolean =
+    outer.span.contains(inner.span) && outer.span != inner.span
+
+  /** The node of the untyped tree that the typed tree is the typing or adaptation of, if any. */
+  def ownerOf(tree: tpd.Tree): Option[untpd.Tree] = Option(owners.get(tree))
 }
 
 object TypedNodes {
@@ -55,7 +75,10 @@ object TypedNodes {
   }
 }
 
-/** The nodes of an untyped tree that have a source range, by range and kind, in pre-order. */
+/**
+ * The nodes of an untyped tree that have a source range, by range and kind, in pre-order. The
+ * annotations of definitions are included, though the trees' own traversal leaves them out.
+ */
 private[internal] final class UntypedNodeIndex private (nodes: mutable.Map[UntypedNodeIndex.Key, mutable.ArrayBuffer[untpd.Tree]]) {
   def at(key: UntypedNodeIndex.Key): collection.Seq[untpd.Tree] = nodes.getOrElse(key, Nil)
 
@@ -72,6 +95,10 @@ private[internal] object UntypedNodeIndex {
         override def traverse(tree: untpd.Tree)(using Context): Unit = {
           if (tree.span.exists) {
             nodes.getOrElseUpdate((tree.span.start, tree.span.end, tree.getClass), mutable.ArrayBuffer.empty) += tree
+          }
+          tree match {
+            case member: untpd.MemberDef => member.mods.annotations.foreach(traverse)
+            case _ =>
           }
           traverseChildren(tree)
         }
@@ -103,7 +130,7 @@ private[internal] final class TyperRecorder {
   def track(index: UntypedNodeIndex): Unit = index.foreach((_, trees) => trees.foreach(sources.add))
 
   def recordTyped(tree: untpd.Tree, result: tpd.Tree): Unit =
-    if (sources.contains(tree)) {
+    if (sources.contains(tree) && !isCachedAdaptation(tree, result)) {
       val previous = typed.put(tree, result)
       if (previous ne result) {
         if (previous != null) release(previous)
@@ -111,6 +138,15 @@ private[internal] final class TyperRecorder {
         typings.put(result, if (count == null) 1 else count + 1)
       }
     }
+
+  /**
+   * A tree typed ahead, such as the right-hand side of a definition whose type is inferred,
+   * is typed again as the adapted tree the typer cached the first time around.
+   */
+  private def isCachedAdaptation(tree: untpd.Tree, result: tpd.Tree): Boolean = {
+    val previous = typed.get(tree)
+    previous != null && (previous ne result) && (adapted.get(previous) eq result)
+  }
 
   private def release(typing: tpd.Tree): Unit = {
     val count = typings.get(typing)

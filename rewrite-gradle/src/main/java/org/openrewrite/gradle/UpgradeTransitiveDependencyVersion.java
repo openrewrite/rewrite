@@ -50,6 +50,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 
 import java.io.ByteArrayInputStream;
@@ -164,7 +165,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     }
 
     public static class DependencyVersionState {
-        Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
+        /**
+         * Per project, the version each transitive dependency is upgraded to, by the name of the configuration that
+         * constrains it.
+         */
+        Map<String, Map<GroupArtifact, Map<String, String>>> updatesPerProject = new LinkedHashMap<>();
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
 
         /**
@@ -192,7 +197,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
          * Projects using the Spring dependency management plugin, whose updates are matched against the imported
          * BOMs once the whole build has been scanned.
          */
-        Map<String, GradleProject> projectsUsingDependencyManagement = new LinkedHashMap<>();
+        Map<String, SpringBomProperty.Project> projectsUsingDependencyManagement = new LinkedHashMap<>();
 
         boolean bomPropertiesResolved;
         private boolean dependenciesToUpdateCalculated = false;
@@ -207,13 +212,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
          */
         private Map<GroupArtifact, String> dependenciesToUpdate(DependencyMatcher dependencyMatcher) {
             if (!dependenciesToUpdateCalculated) {
-                for (Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> entry : updatesPerProject.values()) {
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : entry.entrySet()) {
+                for (Map<GroupArtifact, Map<String, String>> entry : updatesPerProject.values()) {
+                    for (Map.Entry<GroupArtifact, Map<String, String>> update : entry.entrySet()) {
                         if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
                             continue;
                         }
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                        Map<String, String> configs = update.getValue();
+                        for (Map.Entry<String, String> config : configs.entrySet()) {
                             dependenciesToUpdate.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
                         }
                     }
@@ -282,31 +287,33 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         continue;
                                     }
 
+                                    GradleProject project = gradleProject;
                                     acc.updatesPerProject.get(getGradleProjectKey(gradleProject)).merge(
                                             new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
-                                            singletonMap(constraintConfig, selected),
+                                            singletonMap(constraintConfig.getName(), selected),
                                             (existing, update) -> {
-                                                Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
+                                                Map<String, String> all = new LinkedHashMap<>(existing);
                                                 all.putAll(update);
-                                                all.keySet().removeIf(c -> {
+                                                all.keySet().removeIf(name -> {
+                                                    GradleDependencyConfiguration c = project.getConfiguration(name);
                                                     if (c == null) {
                                                         return true; // TODO ?? how does this happen
                                                     }
 
-                                                    for (GradleDependencyConfiguration config : all.keySet()) {
+                                                    for (String config : all.keySet()) {
                                                         for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
-                                                            if (gc.getName().equals(config.getName())) {
+                                                            if (gc.getName().equals(config)) {
                                                                 return true;
                                                             }
                                                         }
 
                                                         // TODO there has to be a better way!
-                                                        if ("runtimeOnly".equals(c.getName())) {
-                                                            if ("implementation".equals(config.getName())) {
+                                                        if ("runtimeOnly".equals(name)) {
+                                                            if ("implementation".equals(config)) {
                                                                 return true;
                                                             }
-                                                        } else if ("testRuntimeOnly".equals(c.getName())) {
-                                                            if ("testImplementation".equals(config.getName()) || "implementation".equals(config.getName())) {
+                                                        } else if ("testRuntimeOnly".equals(name)) {
+                                                            if ("testImplementation".equals(config) || "implementation".equals(config)) {
                                                                 return true;
                                                             }
                                                         }
@@ -324,7 +331,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     }
 
                     if (SpringBomProperty.isPluginApplied(gradleProject)) {
-                        acc.projectsUsingDependencyManagement.put(getGradleProjectKey(gradleProject), gradleProject);
+                        acc.projectsUsingDependencyManagement.put(getGradleProjectKey(gradleProject),
+                                SpringBomProperty.Project.of(gradleProject));
                     }
                     for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
                         if (!acc.scriptImportedBoms.contains(bom)) {
@@ -552,17 +560,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return t;
             }
 
-            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<String, String>> toUpdate, ExecutionContext ctx) {
                 Map<String, Set<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
-                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                SpringBomProperty.Project managed = acc.projectsUsingDependencyManagement.get(getGradleProjectKey(gp));
+                for (Map.Entry<GroupArtifact, Map<String, String>> update : toUpdate.entrySet()) {
+                    Map<String, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
                     String artifactId = update.getKey().getArtifactId();
-                    for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
-                        String configName = configToVersion.getKey().getName();
+                    for (Map.Entry<String, String> configToVersion : configs.entrySet()) {
+                        String configName = configToVersion.getKey();
                         String newVersion = configToVersion.getValue();
                         configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
                                 .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                    }
+                    // The model records each version the dependency management plugin changes as a strict constraint on
+                    // every configuration that resolves it, so the upgrade constrains those configurations too.
+                    // One rule cannot carry a different version per configuration.
+                    Set<String> versions = new HashSet<>(configs.values());
+                    if (managed != null && versions.size() == 1) {
+                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, versions.iterator().next());
+                        for (String resolving : managed.getResolvingConfigurations().getOrDefault(update.getKey(), emptySet())) {
+                            configsToUpdate.computeIfAbsent(resolving, it -> new HashSet<>()).add(gav);
+                        }
                     }
                 }
                 return gp.addOrUpdateConstraints(configsToUpdate, ctx);
@@ -576,9 +595,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return;
         }
         acc.bomPropertiesResolved = true;
-        for (Map.Entry<String, GradleProject> project : acc.projectsUsingDependencyManagement.entrySet()) {
-            GradleProject gradleProject = project.getValue();
-            for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update :
+        for (Map.Entry<String, SpringBomProperty.Project> project : acc.projectsUsingDependencyManagement.entrySet()) {
+            SpringBomProperty.Project bomProject = project.getValue();
+            for (Map.Entry<GroupArtifact, Map<String, String>> update :
                     acc.updatesPerProject.getOrDefault(project.getKey(), emptyMap()).entrySet()) {
                 GroupArtifact ga = update.getKey();
                 if (!dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
@@ -589,9 +608,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (versions.size() != 1) {
                     continue;
                 }
-                SpringBomProperty property = SpringBomProperty.find(gradleProject, acc.scriptImportedBoms, ga, ctx);
+                SpringBomProperty property = SpringBomProperty.find(bomProject, acc.scriptImportedBoms, ga, ctx);
                 if (property != null && SpringBomProperty.isPublished(versions.iterator().next(),
-                        property.governedOnClasspath(gradleProject, ga).keySet(), gradleProject.getMavenRepositories(), ctx)) {
+                        property.governedOnClasspath(bomProject, ga).keySet(),
+                        bomProject.getRepositories().getRepositories(), ctx)) {
                     acc.bomPropertiesPerProject.computeIfAbsent(project.getKey(), k -> new HashMap<>()).put(property.getName(), ga);
                     acc.versionPropNameToGA.put(property.getName(), ga);
                 }
@@ -609,7 +629,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
+                Map<GroupArtifact, Map<String, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
                 Map<String, GroupArtifact> bomProperties = gradleProject != null ? acc.bomPropertiesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
                 if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()) && !bomProperties.containsValue(ga))) {
                     cu = (JavaSourceFile) Preconditions.check(
@@ -635,13 +655,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             new AddConstraintsBlock(cu instanceof K.CompilationUnit)
                     ).visitNonNull(cu, ctx);
 
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
+                    for (Map.Entry<GroupArtifact, Map<String, String>> update : projectRequiredUpdates.entrySet()) {
                         if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId()) || bomProperties.containsValue(update.getKey())) {
                             continue;
                         }
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                        Map<String, String> configs = update.getValue();
+                        for (Map.Entry<String, String> config : configs.entrySet()) {
+                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey(), new GroupArtifactVersion(update.getKey().getGroupId(),
                                     update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
                         }
                     }
@@ -659,17 +679,20 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return super.visit(tree, ctx);
         }
 
-        // Skips properties gradle.properties defines, which UpdateProperties handles instead.
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script itself is read
+        // too, since the scan misses a declaration an earlier recipe made this cycle. A declaration is only ever raised.
         private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
+            Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
             for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
                 String name = bomProperty.getKey();
                 String version = acc.dependenciesToUpdate(dependencyMatcher).get(bomProperty.getValue());
                 if (version == null || acc.gradlePropertiesKeys.contains(name)) {
                     continue;
                 }
-                if (acc.declaredExtProperties.contains(name)) {
+                if (acc.declaredExtProperties.contains(name) || declaredInScript.contains(name)) {
                     cu = (JavaSourceFile) new ExtraProperty.Matcher().propertyName(name).matchVariableDeclarations(false)
-                            .<ExecutionContext>asVisitor((property, c) -> property.withValue(version).getTree())
+                            .<ExecutionContext>asVisitor((property, c) -> new LatestRelease(null).compare(null, property.getValue(), version) < 0 ?
+                                    property.withValue(version).getTree() : property.getTree())
                             .visitNonNull(cu, ctx);
                 } else {
                     cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), name, version);

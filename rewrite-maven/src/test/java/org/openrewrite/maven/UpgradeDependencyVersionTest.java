@@ -2208,14 +2208,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     /**
      * Some old artifacts have no maven-metadata.xml on Maven Central, only its HTML directory listing.
      * Pinning Central keeps a ~/.m2/settings.xml mirror, which may serve no listings, out of resolution.
+     * The MAVEN_CENTRAL_MIRROR_* mirror still stands in for Central when it is set.
      */
     private static MavenExecutionContextView centralWithDirectoryListings() {
-        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+        return MavenSettingsAutoLoadingExtension.withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
           .setRepositories(singletonList(MavenRepository.builder()
             .id("central")
             .uri("https://repo.maven.apache.org/maven2")
             .knownToExist(true)
-            .build()));
+            .build())));
     }
 
     @Test
@@ -3816,13 +3817,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             Files.createDirectories(parentDir);
             Files.writeString(parentDir.resolve("remote-parent-1.0.0.pom"), REMOTE_PARENT_POM);
 
-            return MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
-              .setLocalRepository(MavenRepository.builder()
-                .id("local")
-                .uri(localRepository.toUri().toString())
-                .snapshots(false)
-                .knownToExist(true)
-                .build());
+            return MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+              MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+                .setLocalRepository(MavenRepository.builder()
+                  .id("local")
+                  .uri(localRepository.toUri().toString())
+                  .snapshots(false)
+                  .knownToExist(true)
+                  .build()));
         }
 
         @Test

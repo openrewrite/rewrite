@@ -288,10 +288,9 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              @SuppressWarnings("DataFlowIssue")
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if ("m1".equals(method.getSimpleName())) {
-                      return (J.MethodDeclaration) ShortenFullyQualifiedTypeReferences.modifyOnly(method).visit(method, ctx, getCursor().getParent());
+                      doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(method));
                   }
                   return super.visitMethodDeclaration(method, ctx);
               }
@@ -302,15 +301,17 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               class T {
                   void m1(java.util.List<String> list) {
                   }
-                  void m2(java.util.List<String> list) {
+                  void m2(java.util.Map<String, String> map) {
                   }
               }
               """,
             """
+              import java.util.List;
+
               class T {
                   void m1(List<String> list) {
                   }
-                  void m2(java.util.List<String> list) {
+                  void m2(java.util.Map<String, String> map) {
                   }
               }
               """
@@ -400,6 +401,52 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               class T {
                   String s1;
                   String s2;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importJavaLangSubpackageTypes() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class T {
+                  java.lang.ref.WeakReference<Object> reference;
+                  java.lang.reflect.Method method;
+              }
+              """,
+            """
+              import java.lang.ref.WeakReference;
+              import java.lang.reflect.Method;
+
+              class T {
+                  WeakReference<Object> reference;
+                  Method method;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importJavaLangSubpackageAnnotation() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+              @interface A {
+              }
+              """,
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface A {
               }
               """
           )

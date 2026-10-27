@@ -42,6 +42,9 @@ import java.util.function.Supplier;
  *         <li>{@link #computeGenericTypeVariable} &mdash; type variable
  *             bounds can reference the variable itself
  *             ({@code <T extends Comparable<T>>}).</li>
+ *         <li>{@link #computeMultiCatch} &mdash; a union's alternative can
+ *             declare a member of that same union
+ *             ({@code class Node { def next: Node | Null }}).</li>
  *       </ul></li>
  *   <li><b>{@code *For} &mdash; atomic build.</b> The caller supplies a
  *       {@link Supplier} that returns a fully-constructed instance; the
@@ -105,9 +108,11 @@ public interface JavaTypeFactory {
      * <p>
      * If a Class is already cached for {@code fqn}, the cached instance is
      * returned and {@code initializer} does not run. Otherwise a stub is
-     * constructed with {@code flags} and {@code kind} populated, registered in
-     * the cache, and the initializer runs to populate the remaining fields
+     * constructed with {@code flags} and {@code kind}, registered in the
+     * cache, and the initializer runs to populate the remaining fields
      * (typically via {@link JavaType.Class#unsafeSet}).
+     * {@code flags} and {@code kind} are the caller's best knowledge before
+     * loading the class, and the initializer may overwrite them.
      *
      * @param fqn the fully-qualified name of the class, in the form
      *            {@link JavaType.FullyQualified#getFullyQualifiedName()} returns.
@@ -153,6 +158,17 @@ public interface JavaTypeFactory {
             String signature, String name,
             JavaType.GenericTypeVariable.Variance variance,
             Consumer<JavaType.GenericTypeVariable> initializer);
+
+    /**
+     * Cache-or-build for {@link JavaType.MultiCatch}, which also describes a union type.
+     * Mapping an alternative can reach the same union again, as a member of the
+     * alternative's class, so the stub is registered before the initializer runs.
+     *
+     * @param signature an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
+     *                  built from the union's alternatives.
+     */
+    JavaType.MultiCatch computeMultiCatch(String signature,
+                                          Consumer<JavaType.MultiCatch> initializer);
 
     /**
      * Build for {@link JavaType.Method} with cycle-breaking on the same key.

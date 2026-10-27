@@ -19,10 +19,14 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -37,8 +41,8 @@ class ParenthesizeVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .recipe(toRecipe(Reparenthesize::new))
-          .cycles(1)
-          .expectedCyclesThatMakeChanges(1);
+          // the visitor reparenthesizes trees with their parentheses stripped, which no parser makes
+          .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build());
     }
 
     @DocumentExample
@@ -508,7 +512,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<ExecutionContext>() {
               @Override
               public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-                  return ParenthesizeVisitor.maybeParenthesize((Expression) parens.getTree(), getCursor()).withPrefix(parens.getPrefix());
+                  J j = ParenthesizeVisitor.maybeParenthesize((Expression) parens.getTree(), getCursor()).withPrefix(parens.getPrefix());
+                  Cursor parent = getCursor().getParentOrThrow();
+                  return j.print(parent).equals(parens.print(parent)) ? parens : j;
               }
           })),
           java(
@@ -584,6 +590,14 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     static class Reparenthesize extends JavaVisitor<ExecutionContext> {
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            J j = super.visit(tree, ctx);
+            // restoring parentheses that were all needed rebuilds a tree that prints the same
+            return tree instanceof SourceFile sf && j instanceof SourceFile after && after.printAll().equals(sf.printAll()) ?
+              (J) tree : j;
+        }
+
         @Override
         public @Nullable J postVisit(J tree, ExecutionContext ctx) {
             return tree instanceof JavaSourceFile ? new ParenthesizeVisitor<>().visit(tree, ctx) : super.postVisit(tree, ctx);

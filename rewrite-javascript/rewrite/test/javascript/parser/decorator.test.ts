@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {JavaScriptParser, JS, typescript} from "../../../src/javascript";
+import {JavaScriptParser, JS, sourceFileCache, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {ExecutionContext} from "../../../src/execution";
 import {findMarker, MarkersKind, ParseExceptionResult} from "../../../src/markers";
@@ -265,6 +265,12 @@ describe('decorators and modifiers before a declaration', () => {
             typescript(code)
         ));
 
+    // Held across the tests below, so each builds on the program and lib files the last one left behind.
+    const parsers = [true, false].map(requirePrintEqualsInput => new JavaScriptParser({
+        ctx: new ExecutionContext({[ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT]: requirePrintEqualsInput}),
+        sourceFileCache
+    }));
+
     // What the compiler rejects and the model has no place for must not come back as a tree that has lost it.
     test.for([
         ["@dec type T = string;", "Decorators are not valid here."],
@@ -297,10 +303,9 @@ describe('decorators and modifiers before a declaration', () => {
         ["class A { m(export @dec ...x) {} }", "Decorators are not valid here."],
         ["interface I { m(export @dec [x]): void }", "Decorators are not valid here."],
     ] as const)('rejects %s', async ([code, reason]) => {
-        for (const requirePrintEqualsInput of [true, false]) {
-            const ctx = new ExecutionContext({[ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT]: requirePrintEqualsInput});
+        for (const parser of parsers) {
             const parsed: SourceFile[] = [];
-            for await (const sourceFile of new JavaScriptParser({ctx}).parse(
+            for await (const sourceFile of parser.parse(
                 {text: code, sourcePath: "rejected.ts"},
                 {text: "const valid = 1;", sourcePath: "valid.ts"})) {
                 parsed.push(sourceFile);

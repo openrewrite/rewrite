@@ -23,6 +23,7 @@ import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 
+import javax.annotation.CheckReturnValue;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -53,6 +54,7 @@ public class GroovyTemplate extends JavaTemplate {
         return new GroovySubstitutions(getCode(), parameters);
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

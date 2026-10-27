@@ -33,6 +33,7 @@ class KotlinRecipeTest : RewriteTest {
     fun `replaces all text with provided replacement argument text`() =
         rewriteRun(
             { spec ->
+                // the two steps each replace all text, so they undo each other in every cycle
                 spec.cycles(1)
                     .expectedCyclesThatMakeChanges(1)
                     .recipeFromYaml(

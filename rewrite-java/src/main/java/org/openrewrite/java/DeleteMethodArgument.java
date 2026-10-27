@@ -18,16 +18,13 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
@@ -108,35 +105,7 @@ public class DeleteMethodArgument extends Recipe {
                     args.set(0, args.get(0).withPrefix(removed.getPrefix()));
                 }
                 m = m.withArguments(args);
-
-                // Remove imports of types used in the removed argument
-                new JavaIsoVisitor<Set<String>>() {
-                    @Override
-                    public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> types) {
-                        if (javaType instanceof JavaType.Class) {
-                            JavaType.Class type = (JavaType.Class) javaType;
-                            if (!"java.lang".equals(type.getPackageName())) {
-                                types.add(type.getFullyQualifiedName());
-                            }
-                        } else if (javaType instanceof JavaType.Variable) {
-                            JavaType.Variable variable = (JavaType.Variable) javaType;
-                            if (variable.hasFlags(Flag.Static) && variable.getOwner() instanceof JavaType.Class) {
-                                JavaType.Class owner = (JavaType.Class) variable.getOwner();
-                                types.add(owner.getFullyQualifiedName() + "." + variable.getName());
-                            }
-                        }
-                        return super.visitType(javaType, types);
-                    }
-
-                    @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, Set<String> strings) {
-                        if (mi.getMethodType() != null && mi.getMethodType().hasFlags(Flag.Static) && mi.getSelect() == null) {
-                            JavaType.FullyQualified receiverType = mi.getMethodType().getDeclaringType();
-                            strings.add(receiverType.getFullyQualifiedName() + "." + mi.getSimpleName());
-                        }
-                        return super.visitMethodInvocation(mi, strings);
-                    }
-                }.reduce(removed, new HashSet<>()).forEach(this::maybeRemoveImport);
+                RemoveImport.namesReferencedBy(removed).forEach(this::maybeRemoveImport);
 
                 // Update the method types
                 JavaType.Method methodType = m.getMethodType();

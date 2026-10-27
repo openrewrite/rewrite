@@ -311,7 +311,6 @@ class MergeYamlTest implements RewriteTest {
     void insertYaml() {
         rewriteRun(
           spec -> spec
-            .cycles(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
@@ -1680,6 +1679,64 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void addSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name",
+              null,
+              null,
+              null,
+              null
+            )),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          ),
+          yaml(
+            "",
+            """
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          )
+        );
+    }
+
+    @Test
+    void addFlowSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups", "[a, b]", false, null, null, null, null, null)),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups: [a, b]
+              """
+          )
+        );
+    }
+
+    @Test
     // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
@@ -1699,7 +1756,7 @@ class MergeYamlTest implements RewriteTest {
                 null
               ),
               new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
-            .expectedCyclesThatMakeChanges(2),
+            .expectedCyclesThatMakeChanges(2).cycles(2), // MergeYaml blanks `initially` again each cycle and CopyValue refills it
           yaml(
             """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -3768,7 +3825,7 @@ class MergeYamlTest implements RewriteTest {
     void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2)
+            .expectedCyclesThatMakeChanges(2).cycles(2) // DeleteKey removes what MergeYaml added in the previous cycle
             .recipe(
               new CompositeRecipe(
                 List.of(

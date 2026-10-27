@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -37,7 +38,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @With
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
-public class ResolvedDependency implements Serializable {
+public class ResolvedDependency implements Heavyweight, Serializable {
 
     /**
      * This will be {@code null} when this is a project dependency.
