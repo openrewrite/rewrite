@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.search.FindPlugins;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -32,6 +33,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -52,6 +54,39 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
     @Nullable
     Boolean inlineSharedScripts;
 
+    @Option(displayName = "Applied by plugin",
+            description = "The ID of a plugin that applies a script from the project directory itself, so that no " +
+                          "`apply from` appears in the build file. Build files applying this plugin have that script " +
+                          "inlined too.",
+            example = "com.example.dependencies",
+            required = false)
+    @Nullable
+    String appliedByPlugin;
+
+    @Option(displayName = "Plugin applied script",
+            description = "The path, relative to the project directory, of the script applied by `appliedByPlugin`. " +
+                          "Defaults to `dependencies.gradle`, or `dependencies.gradle.kts` for a Kotlin build file.",
+            example = "dependencies.gradle",
+            required = false)
+    @Nullable
+    String pluginAppliedScript;
+
+    @Option(displayName = "Plugin applied script position",
+            description = "Where to inline the script applied by `appliedByPlugin`, which has no `apply from` statement " +
+                          "to replace. `AFTER_PLUGINS`, the default, places it right after the statement applying the " +
+                          "plugin, or after the `buildscript` and `plugins` blocks, matching a plugin that applies the " +
+                          "script as soon as it is applied. `END` places it at the end of the build file, matching a " +
+                          "plugin that applies the script in `afterEvaluate`.",
+            valid = {"AFTER_PLUGINS", "END"},
+            required = false)
+    @Nullable
+    Position pluginAppliedScriptPosition;
+
+    public enum Position {
+        AFTER_PLUGINS,
+        END
+    }
+
     String displayName = "Inline applied Gradle scripts";
 
     String description = "Replaces `apply from: 'dependencies.gradle'` (or `apply(from = \"dependencies.gradle.kts\")`) " +
@@ -61,7 +96,8 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                          "edit them. A script is left alone when inlining could change behavior: when its path cannot " +
                          "be resolved statically, it is applied inside a closure or with `to:`, it has a top-level " +
                          "`return` or its own `buildscript` or `plugins` block, it declares names that collide with " +
-                         "the build file's, or it is written in a different DSL than the build file.";
+                         "the build file's, or it is written in a different DSL than the build file. A script applied by a plugin, " +
+                         "rather than with `apply from`, can be inlined too by naming the plugin in `appliedByPlugin`.";
 
     public static class Accumulator {
         final Map<Path, GradleFile> files = new HashMap<>();
@@ -114,6 +150,11 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
         ScriptLocation location;
 
         boolean inlinable;
+
+        /**
+         * Applied by {@link #appliedByPlugin} rather than by a statement.
+         */
+        boolean implicit;
     }
 
     @Value
@@ -160,6 +201,11 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 }
                 ScriptAnalysis analysis = new ScriptAnalysis();
                 analysis.visit(cu, ctx);
+                if (kind == Kind.BUILD && appliedByPlugin != null && appliesPlugin(cu, ctx)) {
+                    String script = pluginAppliedScript != null ? pluginAppliedScript :
+                            cu instanceof K.CompilationUnit ? "dependencies.gradle.kts" : "dependencies.gradle";
+                    analysis.applySites.add(new ApplySite(location(Base.PROJECT_DIR, script), true, true));
+                }
                 for (ApplySite site : analysis.applySites) {
                     if (!site.isInlinable() && site.getLocation() != null && site.getLocation().getBase() == Base.PROJECT_DIR) {
                         acc.ambiguousApplyPaths.add(Paths.get(site.getLocation().getPath()).normalize());
@@ -177,6 +223,53 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 return tree;
             }
         };
+    }
+
+    private boolean appliesPlugin(JavaSourceFile cu, ExecutionContext ctx) {
+        if (new FindPlugins(requireNonNull(appliedByPlugin), null).getVisitor().visit(cu, ctx) != cu) {
+            return true;
+        }
+        for (Statement statement : topLevel(cu)) {
+            if (isApplyPlugin(statement, requireNonNull(appliedByPlugin))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<Statement> topLevel(JavaSourceFile cu) {
+        if (cu instanceof G.CompilationUnit) {
+            return ((G.CompilationUnit) cu).getStatements();
+        }
+        List<Statement> statements = new ArrayList<>();
+        for (Statement s : ((K.CompilationUnit) cu).getStatements()) {
+            if (s instanceof J.Block) {
+                statements.addAll(((J.Block) s).getStatements());
+            }
+        }
+        return statements;
+    }
+
+    /**
+     * Recognizes {@code apply plugin: 'id'} and {@code apply(plugin = "id")}.
+     */
+    private static boolean isApplyPlugin(Statement statement, String pluginId) {
+        if (!(statement instanceof J.MethodInvocation) || !"apply".equals(((J.MethodInvocation) statement).getSimpleName())) {
+            return false;
+        }
+        for (Expression argument : ((J.MethodInvocation) statement).getArguments()) {
+            Expression value = null;
+            if (argument instanceof G.MapEntry && ((G.MapEntry) argument).getKey() instanceof J.Literal &&
+                "plugin".equals(((J.Literal) ((G.MapEntry) argument).getKey()).getValue())) {
+                value = ((G.MapEntry) argument).getValue();
+            } else if (argument instanceof J.Assignment && isIdentifier(((J.Assignment) argument).getVariable(), "plugin")) {
+                value = ((J.Assignment) argument).getAssignment();
+            }
+            if (value instanceof J.Literal && pluginId.equals(((J.Literal) value).getValue())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Kind kind(JavaSourceFile cu, String fileName) {
@@ -212,15 +305,15 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 if (targets == null || buildFile == null) {
                     return tree;
                 }
-                Inliner inliner = new Inliner(acc, targets, buildFile.projectDir(), rootDir(acc, path), ctx);
+                Inliner inliner = new Inliner(acc, targets, buildFile, rootDir(acc, path), ctx);
                 if (cu instanceof G.CompilationUnit) {
                     G.CompilationUnit g = (G.CompilationUnit) cu;
-                    g = g.getPadding().withStatements(inliner.expand(g.getPadding().getStatements()));
+                    g = g.getPadding().withStatements(inliner.inline(g.getPadding().getStatements()));
                     return g.withStatements(withImports(g.getStatements(), inliner.imports));
                 } else if (cu instanceof K.CompilationUnit) {
                     K.CompilationUnit k = (K.CompilationUnit) cu;
                     k = k.withStatements(ListUtils.mapFirst(k.getStatements(), s -> s instanceof J.Block ?
-                            ((J.Block) s).getPadding().withStatements(inliner.expand(((J.Block) s).getPadding().getStatements())) : s));
+                            ((J.Block) s).getPadding().withStatements(inliner.inline(((J.Block) s).getPadding().getStatements())) : s));
                     return k.withImports(withImports(k.getImports(), inliner.imports));
                 }
                 return tree;
@@ -236,17 +329,66 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
             class Inliner {
                 final Accumulator acc;
                 final Set<Path> targets;
+                final GradleFile buildFile;
                 final Path projectDir;
                 final Path rootDir;
                 final ExecutionContext ctx;
                 final List<J.Import> imports = new ArrayList<>();
 
-                Inliner(Accumulator acc, Set<Path> targets, Path projectDir, Path rootDir, ExecutionContext ctx) {
+                Inliner(Accumulator acc, Set<Path> targets, GradleFile buildFile, Path rootDir, ExecutionContext ctx) {
                     this.acc = acc;
                     this.targets = targets;
-                    this.projectDir = projectDir;
+                    this.buildFile = buildFile;
+                    this.projectDir = buildFile.projectDir();
                     this.rootDir = rootDir;
                     this.ctx = ctx;
+                }
+
+                List<JRightPadded<Statement>> inline(List<JRightPadded<Statement>> statements) {
+                    List<JRightPadded<Statement>> result = expand(statements);
+                    for (ApplySite site : buildFile.getApplySites()) {
+                        if (site.isImplicit() && site.getLocation() != null) {
+                            Path target = site.getLocation().resolve(projectDir, rootDir);
+                            if (targets.contains(target)) {
+                                result = insert(result, expand(scriptBody(parse(target), imports)));
+                            }
+                        }
+                    }
+                    return result;
+                }
+
+                private List<JRightPadded<Statement>> insert(List<JRightPadded<Statement>> statements,
+                                                             List<JRightPadded<Statement>> body) {
+                    if (body.isEmpty()) {
+                        return statements;
+                    }
+                    int at = statements.size();
+                    if (pluginAppliedScriptPosition != Position.END) {
+                        at = 0;
+                        for (int i = 0; i < statements.size(); i++) {
+                            Statement s = statements.get(i).getElement();
+                            if (isApplyPlugin(s, requireNonNull(appliedByPlugin))) {
+                                at = i + 1;
+                                break;
+                            } else if (s instanceof J.Import || (s instanceof J.MethodInvocation &&
+                                       ("buildscript".equals(((J.MethodInvocation) s).getSimpleName()) ||
+                                        "plugins".equals(((J.MethodInvocation) s).getSimpleName())))) {
+                                at = i + 1;
+                            }
+                        }
+                    }
+                    List<JRightPadded<Statement>> result = new ArrayList<>(statements);
+                    Space separator = Space.format("\n\n");
+                    if (at == 0 && !statements.isEmpty()) {
+                        Space leading = statements.get(0).getElement().getPrefix();
+                        result.set(0, statements.get(0).map(s -> s.withPrefix(separator)));
+                        body = ListUtils.mapFirst(body, first -> first.map(s -> s.withPrefix(merge(leading, s.getPrefix()))));
+                    } else {
+                        Space leading = statements.isEmpty() ? Space.EMPTY : separator;
+                        body = ListUtils.mapFirst(body, first -> first.map(s -> s.withPrefix(merge(leading, s.getPrefix()))));
+                    }
+                    result.addAll(at, body);
+                    return result;
                 }
 
                 List<JRightPadded<Statement>> expand(List<JRightPadded<Statement>> statements) {
@@ -493,7 +635,7 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
             boolean topLevel = isTopLevel(getCursor());
             ApplySite site = applySite(method);
             if (site != null) {
-                applySites.add(topLevel ? site : new ApplySite(site.getLocation(), false));
+                applySites.add(topLevel ? site : new ApplySite(site.getLocation(), false, false));
             } else if (topLevel && ("buildscript".equals(method.getSimpleName()) ||
                                     "plugins".equals(method.getSimpleName()) ||
                                     "pluginManagement".equals(method.getSimpleName()))) {
@@ -587,7 +729,7 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
             return null;
         }
         ScriptLocation location = location(from);
-        return new ApplySite(location, onlyFrom && location != null);
+        return new ApplySite(location, onlyFrom && location != null, false);
     }
 
     private static @Nullable ScriptLocation location(Expression expression) {
