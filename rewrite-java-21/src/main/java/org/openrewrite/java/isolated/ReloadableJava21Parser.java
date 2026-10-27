@@ -39,6 +39,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.parser.ClasspathJarIndex;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
@@ -77,7 +78,7 @@ public class ReloadableJava21Parser implements JavaParser {
     @Nullable
     private final Collection<Input> dependsOn;
 
-    private final JavacFileManager pfm;
+    private final ByteArrayCapableJavacFileManager pfm;
     private final Context context;
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
@@ -214,7 +215,7 @@ public class ReloadableJava21Parser implements JavaParser {
             }
 
             try {
-                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
+                pfm.setClasspath(new ArrayList<>(classpath));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -362,15 +363,23 @@ public class ReloadableJava21Parser implements JavaParser {
 
     private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
+        private final Charset charset;
+        private List<ClasspathJarIndex> indexedJars = emptyList();
 
         public ByteArrayCapableJavacFileManager(Context context,
                                                 boolean register,
-                                                Charset charset,
+                                                @Nullable Charset charset,
                                                 Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
+            this.charset = charset == null ? Charset.defaultCharset() : charset;
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)
                     .collect(toList());
+        }
+
+        void setClasspath(List<Path> classpath) throws IOException {
+            indexedJars = ClasspathJarIndex.indexTrailingJars(classpath);
+            setLocationFromPaths(StandardLocation.CLASS_PATH, classpath.subList(0, classpath.size() - indexedJars.size()));
         }
 
         @Override
@@ -378,13 +387,39 @@ public class ReloadableJava21Parser implements JavaParser {
             if (file instanceof PackageAwareJavaFileObject) {
                 return ((PackageAwareJavaFileObject) file).getClassName();
             }
+            String indexed = ClasspathJarIndex.binaryName(file);
+            if (indexed != null) {
+                return indexed;
+            }
             return super.inferBinaryName(location, file);
+        }
+
+        @Override
+        public @Nullable JavaFileObject getJavaFileForInput(Location location, String className, JavaFileObject.Kind kind) throws IOException {
+            JavaFileObject file = super.getJavaFileForInput(location, className, kind);
+            if (file == null && StandardLocation.CLASS_PATH == location) {
+                for (ClasspathJarIndex jar : indexedJars) {
+                    file = jar.find(className, kind, charset);
+                    if (file != null) {
+                        break;
+                    }
+                }
+            }
+            return file;
         }
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH == location) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
+                if (!indexedJars.isEmpty()) {
+                    List<JavaFileObject> withJars = new ArrayList<>();
+                    listed.forEach(withJars::add);
+                    for (ClasspathJarIndex jar : indexedJars) {
+                        jar.list(packageName, kinds, recurse, charset, withJars);
+                    }
+                    listed = withJars;
+                }
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
                                         .filter(jfo -> jfo.getPackage().equals(packageName)),
