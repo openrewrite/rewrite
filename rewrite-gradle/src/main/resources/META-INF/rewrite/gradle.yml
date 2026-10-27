@@ -27,9 +27,13 @@ recipeList:
   - org.openrewrite.gradle.RemoveRedundantSecurityResolutionRules
   - org.openrewrite.gradle.SortDependencies
   - org.openrewrite.gradle.security.UseHttpsForRepositories
+  - org.openrewrite.gradle.security.AddGradleWrapperChecksum
+  - org.openrewrite.gradle.UseUtf8FileEncoding
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
       propertyName: distributionUrl
   - org.openrewrite.gradle.RemoveEmptyBuildscriptBlock
+#  - org.openrewrite.gradle.EnableGradleConfigurationCache  # the catalog's own fix is "add it, then run
+#    the build and fix what it surfaces"; a recipe can only do the first half
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
@@ -48,5 +52,40 @@ description: Most builds consist of more than one project and some of those proj
 recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.parallel
+      value: true
+      filePattern: gradle.properties
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.UseUtf8FileEncoding
+displayName: Use UTF-8 file encoding
+description: >-
+  Append `-Dfile.encoding=UTF-8` to `org.gradle.jvmargs` so the build reads and writes text the same way wherever it
+  runs, rather than inheriting whatever default encoding the machine happens to have. Only an existing
+  `org.gradle.jvmargs` is appended to: setting that property replaces Gradle's default daemon arguments rather than
+  adding to them, so creating it to hold only an encoding would drop the default heap and metaspace settings. An
+  encoding already set, UTF-8 or otherwise, is left as it is. See the
+  [Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_performance.html#use_utf8_encoding).
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: '**/gradle.properties'
+recipeList:
+  - org.openrewrite.properties.ChangePropertyValue:
+      propertyKey: org.gradle.jvmargs
+      oldValue: '^(?!.*-Dfile\.encoding).+$'
+      newValue: '$0 -Dfile.encoding=UTF-8'
+      regex: true
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.EnableGradleConfigurationCache
+displayName: Enable the Gradle configuration cache
+description: >-
+  Set `org.gradle.configuration-cache=true` so Gradle can skip the configuration phase when nothing it depends on has
+  changed. Deliberately not part of `org.openrewrite.gradle.GradleBestPractices`: enabling it surfaces configuration
+  cache violations in build logic that have to be fixed by hand before the build will run, so this is the first half of
+  a change whose second half a recipe cannot make. See the
+  [Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_performance.html#use_configuration_cache).
+recipeList:
+  - org.openrewrite.gradle.AddProperty:
+      key: org.gradle.configuration-cache
       value: true
       filePattern: gradle.properties
