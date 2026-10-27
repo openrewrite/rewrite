@@ -17,30 +17,22 @@ package org.openrewrite.csharp;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.stream.Stream;
 
 /**
  * The RPC server the {@code csharpBuild} task builds. Tests start its assembly rather than its
  * project, which {@code dotnet run} would evaluate again for every process it starts.
  */
-public class CSharpServer {
+public final class CSharpServer {
 
     private CSharpServer() {
     }
 
-    /**
-     * The module is the working directory under Gradle and the repository root when a run is
-     * launched from there.
-     */
     public static Path entry() {
-        Path base = Paths.get(System.getProperty("user.dir"));
-        return Stream.of(base.resolve("csharp"), base.resolve("rewrite-csharp/csharp"))
-          .map(dir -> dir.resolve("OpenRewrite.Tool/bin/Debug/net10.0/OpenRewrite.Tool.dll"))
-          .filter(Files::exists)
-          .findFirst()
-          .map(dll -> dll.toAbsolutePath().normalize())
-          .orElseThrow(() -> new IllegalStateException(
-            "Could not find the C# RPC server; build it with ./gradlew :rewrite-csharp:csharpBuild"));
+        Path assembly = CSharpPrinterParityTest.csharpDir().resolve("OpenRewrite.Tool/bin/Debug/net10.0/OpenRewrite.Tool.dll");
+        if (!Files.exists(assembly)) {
+            throw new IllegalStateException("No C# RPC server at " + assembly +
+                                            "; build it with ./gradlew :rewrite-csharp:csharpBuild");
+        }
+        return assembly;
     }
 }
