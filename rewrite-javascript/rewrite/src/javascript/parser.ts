@@ -55,7 +55,7 @@ import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
-import {Compiler, type MemoizedProject} from "./ts7/program";
+import {Compiler, type MemoizedProject, type ParseSession} from "./ts7/program";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -208,6 +208,7 @@ export class JavaScriptParser extends Parser {
                 return this.error(input, new SyntaxError(`Compiler error(s): ${errorMessages}`));
             }
         } finally {
+            session.release(absolutePath);
             session.close();
         }
 
@@ -283,57 +284,76 @@ export class JavaScriptParser extends Parser {
         // A JavaScriptTypeMapping deduplicates by `Type.id`, which is only unique within the
         // checker that issued it, so each project needs its own.
         const typeMappings = new Map<string, JavaScriptTypeMapping>();
-        const typeMappingFor = (project: MemoizedProject, projectKey: string) => {
+        const inputsLeft = new Map<string, number>();
+        for (const projectKey of projectOf.values()) {
+            inputsLeft.set(projectKey, (inputsLeft.get(projectKey) ?? 0) + 1);
+        }
+
+        try {
+            for (const [sourcePath, input] of inputFiles) {
+                // Mapped by a call rather than inline: what a generator holds at a `yield` stays reachable
+                // until it is resumed, and here that would be the project of an input already mapped.
+                yield await this.parseInput(input, sourcePath, projectOf.get(sourcePath)!, session, typeMappings, inputsLeft);
+            }
+        } finally {
+            session.close();
+        }
+    }
+
+    /** Maps one input, letting its project go when it is the project's last. */
+    private async parseInput(input: ParserInput, sourcePath: SourcePath, projectKey: string, session: ParseSession,
+                             typeMappings: Map<string, JavaScriptTypeMapping>,
+                             inputsLeft: Map<string, number>): Promise<SourceFile> {
+        try {
+            const project = session.projectFor(projectKey);
             let typeMapping = typeMappings.get(projectKey);
             if (!typeMapping) {
                 typeMappings.set(projectKey, typeMapping =
                     new JavaScriptTypeMapping(project.checker, this.relativeTo ?? process.cwd()));
             }
-            return typeMapping;
-        };
+            return await this.mapInput(input, sourcePath, project, typeMapping);
+        } finally {
+            const left = inputsLeft.get(projectKey)! - 1;
+            inputsLeft.set(projectKey, left);
+            if (left === 0) {
+                typeMappings.delete(projectKey);
+                session.release(projectKey);
+            }
+        }
+    }
+
+    private async mapInput(input: ParserInput, sourcePath: SourcePath, project: MemoizedProject,
+                           typeMapping: JavaScriptTypeMapping): Promise<SourceFile> {
+        const sourceFile = project.program.getSourceFile(sourcePath);
+        if (!sourceFile) {
+            return this.error(input, new Error('Parser returned undefined'));
+        }
+
+        if (hasFlowAnnotation(sourceFile)) {
+            return this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+        }
+
+        typeMapping.prefetch(sourceFile);
+
+        const syntaxErrors = checkSyntaxErrors(project.program, sourceFile);
+        if (syntaxErrors.length > 0) {
+            let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+            return this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+        }
 
         try {
-            for (const [sourcePath, input] of inputFiles) {
-                const projectKey = projectOf.get(sourcePath)!;
-                const project = session.projectFor(projectKey);
-                const sourceFile = project.program.getSourceFile(sourcePath);
-                if (!sourceFile) {
-                    yield this.error(input, new Error('Parser returned undefined'));
-                    continue;
-                }
-
-                if (hasFlowAnnotation(sourceFile)) {
-                    yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                    continue;
-                }
-
-                typeMappingFor(project, projectKey).prefetch(sourceFile);
-
-                const syntaxErrors = checkSyntaxErrors(project.program, sourceFile);
-                if (syntaxErrors.length > 0) {
-                    let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                    yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                    continue;
-                }
-
-                try {
-                    const typeMapping = typeMappingFor(project, projectKey);
-                    const compilationUnit = new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
-                        typeMapping).visit(sourceFile) as SourceFile;
-                    typeMapping.populate();
-                    yield await this.requirePrintEqualsInput(produce(
-                        compilationUnit,
-                        draft => {
-                            if (this.styles) {
-                                draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                            }
-                        }), input, escapeLoneSurrogates(sourceFile.getFullText()));
-                } catch (error) {
-                    yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
-                }
-            }
-        } finally {
-            session.close();
+            const compilationUnit = new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
+                typeMapping).visit(sourceFile) as SourceFile;
+            typeMapping.populate();
+            return await this.requirePrintEqualsInput(produce(
+                compilationUnit,
+                draft => {
+                    if (this.styles) {
+                        draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                    }
+                }), input, escapeLoneSurrogates(sourceFile.getFullText()));
+        } catch (error) {
+            return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
         }
     }
 }

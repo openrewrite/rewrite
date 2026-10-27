@@ -34,6 +34,9 @@ export type MemoizedProject = Project & {readonly checker: MemoizingChecker};
 export interface ParseSession {
     projectFor(key: string): MemoizedProject;
 
+    /** Lets a project go once none of its inputs is left to parse. */
+    release(key: string): void;
+
     close(): void;
 }
 
@@ -45,8 +48,8 @@ export interface ParseSession {
 export class Compiler {
     private readonly files = new Map<string, string>();
     private api: API | undefined;
-    private snapshot: Snapshot | undefined;
-    private openConfigs: string[] = [];
+    // The project of a parse that had only one, kept so that the next parse builds on it.
+    private carried: {snapshot: Snapshot, config: string} | undefined;
     private projectCount = 0;
 
     constructor(private readonly root: string) {
@@ -83,38 +86,62 @@ export class Compiler {
                 : {compilerOptions: options, include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]}));
         }
         const configPaths = [...configOf.values()];
-
-        const previous = {snapshot: this.snapshot, configs: this.openConfigs};
         const fileSystem = {kind: "layer", files: Object.fromEntries(this.files)} as const;
-        // Building on the previous snapshot lets the compiler keep what it already loaded.
-        const snapshot = this.snapshot = previous.snapshot
-            ? previous.snapshot.update({openProjects: configPaths, closeProjects: previous.configs, fileSystem})
-            : this.compilerApi().createSnapshot({openProjects: configPaths, fileSystem});
-        this.openConfigs = configPaths;
-        if (previous.snapshot !== snapshot) {
-            previous.snapshot?.dispose();
-        }
 
-        const opened = new Map<string, MemoizedProject>();
+        // Each project has a snapshot of its own, so that one can be disposed while others are in use.
+        const opened = new Map<string, {snapshot: Snapshot, project: MemoizedProject}>();
+        const openSnapshot = (configPath: string): Snapshot => {
+            const carried = this.carried;
+            this.carried = undefined;
+            if (!carried) {
+                return this.compilerApi().createSnapshot({openProjects: [configPath], fileSystem});
+            }
+            // Building on the snapshot a parse left behind lets the compiler keep what it already loaded.
+            const snapshot = carried.snapshot.update({openProjects: [configPath], closeProjects: [carried.config], fileSystem});
+            if (snapshot !== carried.snapshot) {
+                carried.snapshot.dispose();
+            }
+            return snapshot;
+        };
         return {
             projectFor: key => {
-                let project = opened.get(key);
-                if (!project) {
+                let entry = opened.get(key);
+                if (!entry) {
                     const configPath = configOf.get(key);
-                    const found = configPath === undefined ? undefined : snapshot.getConfiguredProject(configPath);
-                    if (!found) {
+                    const snapshot = configPath === undefined ? undefined : openSnapshot(configPath);
+                    const found = snapshot?.getConfiguredProject(configPath!);
+                    if (!snapshot || !found) {
+                        snapshot?.dispose();
                         throw new Error(`TypeScript did not open a project at ${configPath ?? key}`);
                     }
                     restoreInputText(found, sources, restore);
                     const checker = memoizing(found.checker, this.compilerApi());
-                    opened.set(key, project = new Proxy(found, {
-                        get: (target, property: string, receiver) =>
-                            property === "checker" ? checker : Reflect.get(target, property, receiver),
-                    }) as MemoizedProject);
+                    opened.set(key, entry = {
+                        snapshot, project: new Proxy(found, {
+                            get: (target, property: string, receiver) =>
+                                property === "checker" ? checker : Reflect.get(target, property, receiver),
+                        }) as MemoizedProject
+                    });
                 }
-                return project;
+                return entry.project;
             },
-            close: () => this.forget(sources.keys(), configPaths),
+            release: key => {
+                const entry = opened.get(key);
+                opened.delete(key);
+                if (entry && projects.length === 1) {
+                    this.carried?.snapshot.dispose();
+                    this.carried = {snapshot: entry.snapshot, config: configOf.get(key)!};
+                } else {
+                    entry?.snapshot.dispose();
+                }
+            },
+            close: () => {
+                for (const {snapshot} of opened.values()) {
+                    snapshot.dispose();
+                }
+                opened.clear();
+                this.forget(sources.keys(), configPaths);
+            },
         };
     }
 
@@ -125,9 +152,8 @@ export class Compiler {
 
     /** Shuts the compiler down. A later `open` starts a new one. */
     close(): void {
-        this.snapshot?.dispose();
-        this.snapshot = undefined;
-        this.openConfigs = [];
+        this.carried?.snapshot.dispose();
+        this.carried = undefined;
         this.api?.close();
         this.api = undefined;
         this.files.clear();

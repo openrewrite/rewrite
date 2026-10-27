@@ -22,6 +22,7 @@ import {RecipeSpec} from "../../src/test";
 import {JavaScriptParser, JavaScriptVisitor, JS, npm, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, Recipe} from "../../src";
+import {Compiler} from "../../src/javascript/ts7/program";
 
 // Postdates the `lib` this project compiles against.
 declare class WeakRef<T extends object> {
@@ -420,19 +421,29 @@ type TextInput = { text: string, sourcePath: string };
 
 /**
  * Parses the inputs with a parser of its own and notes, as each source file comes out, how many
- * programs that parser has built and how many of those are still reachable. A program is built
- * over a compiler host of its own and refers to it for as long as it lives, so a host that has been
- * collected stands for a program that has been.
+ * programs that parser has built and how many of those are still reachable. A program lives in the
+ * compiler snapshot that opened its project, so a program that has been collected stands for a
+ * snapshot that has been let go.
  */
 function programsDuringParsesOf(repo: string): (...inputs: TextInput[]) => Promise<string[]> {
     const parser = new JavaScriptParser({relativeTo: repo});
     const hosts: WeakRef<object>[] = [];
-    const internals = parser as unknown as { createCompilerHost(...args: unknown[]): object };
-    const createCompilerHost = internals.createCompilerHost;
-    internals.createCompilerHost = function (this: unknown, ...args: unknown[]) {
-        const host = createCompilerHost.apply(this, args);
-        hosts.push(new WeakRef(host));
-        return host;
+    const compiler = (parser as unknown as { sharedCompiler(): Compiler }).sharedCompiler();
+    const open = compiler.open.bind(compiler);
+    compiler.open = (...args) => {
+        const session = open(...args);
+        const opened = new WeakSet<object>();
+        return {
+            ...session,
+            projectFor: key => {
+                const project = session.projectFor(key);
+                if (!opened.has(project)) {
+                    opened.add(project);
+                    hosts.push(new WeakRef(project.program));
+                }
+                return project;
+            }
+        };
     };
 
     return async (...inputs) => {
