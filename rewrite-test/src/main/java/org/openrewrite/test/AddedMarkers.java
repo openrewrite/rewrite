@@ -34,6 +34,8 @@ import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -43,16 +45,26 @@ import static org.assertj.core.api.Assertions.fail;
  */
 final class AddedMarkers {
 
-    /**
-     * Markers that recipes in rewrite add on purpose: to apply a change only once, to steer the formatting of a
-     * merged YAML scalar, or to say which method a search matched.
-     */
-    private static final Set<String> REWRITE_RECIPE_MARKERS = new HashSet<>(Arrays.asList(
-            "org.openrewrite.marker.AlreadyReplaced",
-            "org.openrewrite.maven.marker.AlreadyIncremented",
-            "org.openrewrite.yaml.MultilineScalarChanged",
-            "org.openrewrite.java.search.UsesMethod$MethodMatch"
-    ));
+    /// Markers that recipes in rewrite add on purpose, to apply a change only once, to steer the formatting of a
+    /// merged YAML scalar, or to say which method a search matched, by the elements they add them to. Anywhere else,
+    /// such a marker is a recipe keeping information of its own in a marker this check would otherwise let through.
+    /// XsltTransformation marks the XML document it transformed with an AlreadyReplaced that finds nothing, so a
+    /// document's AlreadyReplaced is accepted only in that shape.
+    private static final Map<String, Set<String>> REWRITE_RECIPE_MARKERS = new HashMap<>();
+
+    static {
+        REWRITE_RECIPE_MARKERS.put("org.openrewrite.marker.AlreadyReplaced", new HashSet<>(Arrays.asList(
+                "org.openrewrite.text.PlainText",
+                "org.openrewrite.yaml.tree.Yaml$Sequence",
+                "org.openrewrite.hcl.tree.Hcl$Literal",
+                "org.openrewrite.xml.tree.Xml$CharData",
+                "org.openrewrite.xml.tree.Xml$Document")));
+        REWRITE_RECIPE_MARKERS.put("org.openrewrite.maven.marker.AlreadyIncremented",
+                singleton("org.openrewrite.xml.tree.Xml$Tag"));
+        REWRITE_RECIPE_MARKERS.put("org.openrewrite.yaml.MultilineScalarChanged",
+                singleton("org.openrewrite.yaml.tree.Yaml$Scalar"));
+        REWRITE_RECIPE_MARKERS.put("org.openrewrite.java.search.UsesMethod$MethodMatch", emptySet());
+    }
 
     private static final int SNIPPET_LENGTH = 60;
 
@@ -144,7 +156,17 @@ final class AddedMarkers {
                marker instanceof RecipesThatMadeChanges ||
                // a recipe that formats with a style it was given passes the style on to later formatting
                marker instanceof NamedStyles && occurrence.getPlacement().isOnSourceFile() ||
-               REWRITE_RECIPE_MARKERS.contains(marker.getClass().getName());
+               addedByRewriteRecipe(occurrence);
+    }
+
+    private static boolean addedByRewriteRecipe(Occurrence occurrence) {
+        Marker marker = occurrence.getMarker();
+        String holder = occurrence.getHolder().getClass().getName();
+        if (marker instanceof AlreadyReplaced && "org.openrewrite.xml.tree.Xml$Document".equals(holder)) {
+            return ((AlreadyReplaced) marker).getFind() == null;
+        }
+        Set<String> holders = REWRITE_RECIPE_MARKERS.get(marker.getClass().getName());
+        return holders != null && (holders.isEmpty() || holders.contains(holder));
     }
 
     /**

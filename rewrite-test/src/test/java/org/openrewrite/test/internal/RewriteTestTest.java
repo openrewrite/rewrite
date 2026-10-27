@@ -47,6 +47,7 @@ import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -298,6 +299,40 @@ class RewriteTestTest implements RewriteTest {
             ));
             assertThat(e).hasMessageContaining("The recipe added markers to the LST")
               .hasMessageContaining("org.openrewrite.test.internal.Visited on J.MethodInvocation `bar()`");
+        }
+
+        @Test
+        void rejectRewriteMarkerAddedWhereRewriteDoesNotAddIt() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      if (!"foo".equals(m.getSimpleName())) {
+                          return m;
+                      }
+                      return m.withName(m.getName().withSimpleName("bar"))
+                        .withMarkers(m.getMarkers().add(new AlreadyReplaced(Tree.randomId(), "plan", "sha256")));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { bar(); }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("AlreadyReplaced on J.MethodInvocation `bar()`");
         }
 
         @Test
