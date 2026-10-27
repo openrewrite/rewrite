@@ -51,9 +51,9 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
     }
 
     /**
-     * Only what was found, which depends on nothing but the repository and coordinates asked for. A failed download
-     * stays with the test that saw it, and so does a resolved POM, which also depends on that test's repositories and
-     * profiles.
+     * Only what was found, as first downloaded, so a POM whose Gradle module metadata could not be fetched is shared
+     * without the platforms that metadata adds. A failed download stays with the test that saw it, and so does a
+     * resolved POM, which also depends on that test's repositories and profiles.
      */
     private static class SuccessfulDownloads implements MavenPomCache {
         private final InMemoryMavenPomCache cache = new InMemoryMavenPomCache();
