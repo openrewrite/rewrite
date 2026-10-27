@@ -31,6 +31,7 @@ recipeList:
       propertyName: distributionUrl
   - org.openrewrite.gradle.RemoveEmptyBuildscriptBlock
   - org.openrewrite.gradle.AddRootProjectName
+  - org.openrewrite.gradle.MoveRepositoriesToSettings
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
