@@ -23,6 +23,7 @@ import {
     declaredNameOf,
     fullyQualifiedNameOf,
     type MemoizingChecker,
+    type Question,
     signatureKeyOf,
     typeAtLocation,
     valueDeclarationOf
@@ -60,11 +61,38 @@ function isVariableSymbol(symbol: ts.Symbol): boolean {
     return !(symbol.flags & excluded) && !!(symbol.flags & variable);
 }
 
+/** The symbols whose types getType maps as classes rather than by their call signatures. */
+const NOMINAL = ts.SymbolFlags.Class |
+    ts.SymbolFlags.Interface |
+    ts.SymbolFlags.Enum |
+    ts.SymbolFlags.TypeAlias |
+    ts.SymbolFlags.ValueModule;
+
+function isReference(type: ts.Type): boolean {
+    return !!(type.flags & ts.TypeFlags.Object) && !!((type as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference);
+}
+
+function isClassOrInterface(type: ts.Type): boolean {
+    return !!(type.flags & ts.TypeFlags.Object) &&
+        !!((type as ts.ObjectType).objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface));
+}
+
+/** A symbol's value declaration, or its first declaration where it has no value. */
+function declarationOf(symbol: ts.Symbol): ts.Node | undefined {
+    return valueDeclarationOf(symbol) || declarationsOf(symbol)?.[0];
+}
+
+/** A class or function type returned before its contents were filled in. */
+type Unpopulated =
+    | {readonly shell: Type.Class, readonly type: ts.Type}
+    | {readonly shell: Type.Class, readonly signature: ts.Signature};
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
     private readonly typeCache: Map<string | number, Type> = new Map();
     private readonly methodCache: Map<string, Type.Method> = new Map();
+    private readonly unpopulated: Unpopulated[] = [];
 
     private readonly regExpSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
@@ -99,15 +127,130 @@ export class JavaScriptTypeMapping {
 
     /** Asks about a file's names, and the types of the variables they refer to, before the file is mapped. */
     prefetch(sourceFile: ts.SourceFile): void {
+        const names = this.checker.prefetch(sourceFile);
         const variables: (readonly [ts.Symbol, ts.Node])[] = [];
-        for (const name of this.checker.prefetch(sourceFile)) {
+        for (const name of names) {
             const symbol = this.checker.getSymbolAtLocation(name);
             // An alias is left to variableType, since resolving it is a request of its own.
             if (symbol && !(symbol.flags & ts.SymbolFlags.Alias) && isVariableSymbol(symbol)) {
                 variables.push([symbol, name]);
             }
         }
-        this.checker.prefetchTypesOfSymbols(variables);
+        this.checker.ask(variables.map(([symbol, name]) => ["getTypeOfSymbolAtLocation", symbol, name]));
+        this.askKinds([
+            ...names.map(name => this.checker.getTypeAtLocation(name)),
+            ...variables.map(([symbol, name]) => this.checker.getTypeOfSymbolAtLocation(symbol, name))
+        ]);
+    }
+
+    /**
+     * Fills in the class and function types returned since the last call. A type is returned once its
+     * name is known, and its members, supertypes and signature are filled in here. That goes a level
+     * of the type graph at a time, so each level's questions reach the checker in a few batches.
+     * Every type is filled in even when one throws, and the first error is rethrown at the end.
+     */
+    populate(): void {
+        let error: unknown;
+        while (this.unpopulated.length > 0) {
+            const level = this.unpopulated.splice(0);
+            this.askAhead(level);
+            for (const unpopulated of level) {
+                try {
+                    if ("signature" in unpopulated) {
+                        this.populateFunctionType(unpopulated.shell, unpopulated.signature);
+                    } else {
+                        this.populateClassType(unpopulated.shell, unpopulated.type);
+                    }
+                } catch (e) {
+                    error ??= e;
+                }
+            }
+        }
+        if (error !== undefined) {
+            throw error;
+        }
+    }
+
+    /** Asks, in a few batches, what populating `level` will ask. */
+    private askAhead(level: readonly Unpopulated[]): void {
+        try {
+            const own: Question[] = [];
+            for (const unpopulated of level) {
+                if ("signature" in unpopulated) {
+                    own.push(["getReturnTypeOfSignature", unpopulated.signature],
+                        unpopulated.signature.getParameters.gen());
+                } else {
+                    own.push(["getPropertiesOfType", unpopulated.type]);
+                    if (isClassOrInterface(unpopulated.type)) {
+                        own.push(["getBaseTypes", unpopulated.type]);
+                    }
+                }
+            }
+            this.checker.ask(own);
+
+            const reached: ts.Type[] = [];
+            const typed: (readonly [ts.Symbol, ts.Node])[] = [];
+            for (const unpopulated of level) {
+                if ("signature" in unpopulated) {
+                    reached.push(this.checker.getReturnTypeOfSignature(unpopulated.signature)!);
+                    for (const parameter of unpopulated.signature.getParameters()) {
+                        const declaration = declarationOf(parameter);
+                        if (declaration) {
+                            typed.push([parameter, declaration]);
+                        }
+                    }
+                } else {
+                    typed.push(...this.fieldsOf(unpopulated.type));
+                    if (isClassOrInterface(unpopulated.type)) {
+                        reached.push(...this.checker.getBaseTypes(unpopulated.type as ts.InterfaceType));
+                    }
+                }
+            }
+            this.checker.ask(typed.map(([symbol, declaration]) => ["getTypeOfSymbolAtLocation", symbol, declaration]));
+            reached.push(...typed.map(([symbol, declaration]) =>
+                this.checker.getTypeOfSymbolAtLocation(symbol, declaration)));
+            this.askKinds(reached);
+        } catch {
+            // A question unanswered here is asked again by populating, which deals with the failure.
+        }
+    }
+
+    /**
+     * Asks, in a few batches, what getType asks to tell what kind of type each of `types` is, and the
+     * same for the type arguments and constituents that mapping them reaches.
+     */
+    private askKinds(types: readonly ts.Type[]): void {
+        const seen = new Set<string | number>();
+        let next = types;
+        for (let depth = 0; depth < 3 && next.length > 0; depth++) {
+            const unmapped = next.filter(type => {
+                const signature = this.getSignature(type);
+                return !seen.has(signature) && !this.typeCache.has(signature) && seen.add(signature);
+            });
+            this.checker.ask(unmapped.map(type => type.getSymbol.gen()));
+            const kinds: Question[] = [];
+            for (const type of unmapped) {
+                const symbol = type.getSymbol();
+                if (isReference(type)) {
+                    kinds.push(["getTypeArguments", type]);
+                }
+                if (type.flags & ts.TypeFlags.UnionOrIntersection) {
+                    kinds.push((type as ts.UnionOrIntersectionType).getTypes.gen());
+                } else if (!(type.flags & ts.TypeFlags.Boolean) && !(symbol && symbol.flags & NOMINAL)) {
+                    kinds.push(["getSignaturesOfType", type, ts.SignatureKind.Call]);
+                }
+                if (symbol && symbol.flags & NOMINAL) {
+                    kinds.push(["getDeclaredTypeOfSymbol", symbol]);
+                }
+            }
+            this.checker.ask(kinds);
+            next = unmapped.flatMap(type => [
+                ...(isReference(type) ? this.checker.getTypeArguments(type as ts.TypeReference) : []),
+                ...(type.flags & ts.TypeFlags.UnionOrIntersection
+                    ? (type as ts.UnionOrIntersectionType).getTypes()
+                    : [])
+            ]);
+        }
     }
 
     type(node: ts.Node): Type | undefined {
@@ -391,7 +534,7 @@ export class JavaScriptTypeMapping {
                             if (!classType) {
                                 classType = this.createEmptyClassType(declaredType);
                                 this.typeCache.set(declaredSig, classType);
-                                this.populateClassType(classType, declaredType);
+                                this.unpopulated.push({shell: classType, type: declaredType});
                             }
 
                             // Shell-cache: Create parameterized type wrapper with empty typeParameters
@@ -435,7 +578,7 @@ export class JavaScriptTypeMapping {
                     // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
-                    this.populateFunctionType(functionType, callSignatures[0]);
+                    this.unpopulated.push({shell: functionType, signature: callSignatures[0]});
                     return functionType;
                 }
             }
@@ -447,7 +590,7 @@ export class JavaScriptTypeMapping {
                     // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     const functionType = this.createEmptyFunctionType();
                     this.typeCache.set(signature, functionType);
-                    this.populateFunctionType(functionType, callSignatures[0]);
+                    this.unpopulated.push({shell: functionType, signature: callSignatures[0]});
                     return functionType;
                 }
             }
@@ -455,7 +598,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & ts.SymbolFlags.ValueModule) {
                 const classType = this.createEmptyClassType(type);
                 this.typeCache.set(signature, classType);
-                this.populateClassType(classType, type);
+                this.unpopulated.push({shell: classType, type});
                 return classType;
             }
             if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.ValueModule)) {
@@ -470,7 +613,7 @@ export class JavaScriptTypeMapping {
                     // Shell-cache: Create stub, cache it, then populate (prevents cycles)
                     classType = this.createEmptyClassType(declaredType);
                     this.typeCache.set(declaredSig, classType);
-                    this.populateClassType(classType, declaredType);
+                    this.unpopulated.push({shell: classType, type: declaredType});
                 }
 
                 // Return the base class type (parameterized types are handled at the beginning of getType)
@@ -507,7 +650,7 @@ export class JavaScriptTypeMapping {
             // Shell-cache: Create stub, cache it, then populate (prevents cycles)
             const functionType = this.createEmptyFunctionType();
             this.typeCache.set(signature, functionType);
-            this.populateFunctionType(functionType, callSignatures[0]);
+            this.unpopulated.push({shell: functionType, signature: callSignatures[0]});
             return functionType;
         }
 
@@ -518,7 +661,7 @@ export class JavaScriptTypeMapping {
             if (objectFlags & ts.ObjectFlags.Anonymous) {
                 const objectType = this.createEmptyObjectType();
                 this.typeCache.set(signature, objectType);
-                this.populateClassType(objectType, type);
+                this.unpopulated.push({shell: objectType, type});
                 return objectType;
             }
         }
@@ -1448,8 +1591,7 @@ export class JavaScriptTypeMapping {
             let baseTypes: ts.Type[] | undefined;
 
             // Check if this is a class or interface type that supports getBaseTypes
-            const objectType = type as ts.ObjectType;
-            if (objectType.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
+            if (isClassOrInterface(type)) {
                 try {
                     baseTypes = [...this.checker.getBaseTypes(type as ts.InterfaceType)];
                 } catch (e) {
@@ -1532,17 +1674,7 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // Fields become members. Properties without a declaration (synthetic/built-in ones) and methods do not.
-        // TODO: Create Type.Method when method support is added
-        const fields: (readonly [ts.Symbol, ts.Node])[] = [];
-        for (const prop of this.checker.getPropertiesOfType(type)) {
-            const declaration = valueDeclarationOf(prop) || declarationsOf(prop)?.[0];
-            if (declaration && !(prop.flags & ts.SymbolFlags.Method)) {
-                fields.push([prop, declaration]);
-            }
-        }
-        this.checker.prefetchTypesOfSymbols(fields);
-        for (const [prop, declaration] of fields) {
+        for (const [prop, declaration] of this.fieldsOf(type)) {
             const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
             const variable: Type.Variable = {
                 kind: Type.Kind.Variable,
@@ -1558,6 +1690,22 @@ export class JavaScriptTypeMapping {
         }
     }
 
+
+    /**
+     * The properties of `type` that become its members, each with the declaration its type is read at.
+     * Properties without a declaration (synthetic/built-in ones) and methods are not members.
+     */
+    private fieldsOf(type: ts.Type): (readonly [ts.Symbol, ts.Node])[] {
+        // TODO: Create Type.Method when method support is added
+        const fields: (readonly [ts.Symbol, ts.Node])[] = [];
+        for (const prop of this.checker.getPropertiesOfType(type)) {
+            const declaration = declarationOf(prop);
+            if (declaration && !(prop.flags & ts.SymbolFlags.Method)) {
+                fields.push([prop, declaration]);
+            }
+        }
+        return fields;
+    }
 
     /**
      * Note: Object/Class/Interface types are handled in getType() to properly manage circular references
@@ -1750,7 +1898,7 @@ export class JavaScriptTypeMapping {
 
         // Get parameter types
         for (const param of parameters) {
-            const declaration = valueDeclarationOf(param) || declarationsOf(param)?.[0];
+            const declaration = declarationOf(param);
             if (declaration) {
                 const paramType = this.checker.getTypeOfSymbolAtLocation(param, declaration);
                 parameterTypes.push(this.getType(paramType));

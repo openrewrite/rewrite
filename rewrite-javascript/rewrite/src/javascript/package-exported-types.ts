@@ -91,6 +91,7 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
     // Lowest arity wins for a given FQN, mirroring the C# byFqn dedup.
     const byFqn = new Map<string, Type.Class>();
     const collect = (cls: Type.Class): void => {
+        typeMapping.populate();
         const fqn = cls.fullyQualifiedName;
         if (!fqn || fqn === "unknown" || fqn === "<unknown>" || fqn === Type.FUNCTION_TYPE_NAME) {
             return;

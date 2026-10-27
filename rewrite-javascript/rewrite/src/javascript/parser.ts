@@ -295,9 +295,12 @@ export class JavaScriptParser extends Parser {
                 }
 
                 try {
+                    const typeMapping = typeMappingFor(project, projectKey);
+                    const compilationUnit = new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
+                        typeMapping).visit(sourceFile) as SourceFile;
+                    typeMapping.populate();
                     yield await this.requirePrintEqualsInput(produce(
-                        new JavaScriptParserVisitor(sourceFile, this.relativePath(input),
-                            typeMappingFor(project, projectKey)).visit(sourceFile) as SourceFile,
+                        compilationUnit,
                         draft => {
                             if (this.styles) {
                                 draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);

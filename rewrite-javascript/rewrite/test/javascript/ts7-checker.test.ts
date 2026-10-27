@@ -22,20 +22,52 @@ describe("memoizing checker", () => {
     const location = {} as Node;
     const type = {id: 3} as unknown as Type;
 
-    test("a prefetched type of a symbol at a location is answered from one batch", () => {
-        let asked = 0;
-        const batches: unknown[][] = [];
+    // A checker that counts the questions it answers one at a time, and a batch that drives each
+    // question as the client does, settling its one request with `settle`.
+    const counting = () => {
         const checker = {
-            getTypeOfSymbolAtLocation: Object.assign(() => (asked++, type), {gen: () => ({})}),
-        } as unknown as Checker;
-        const memo = memoizing(checker, {batch: (...questions: unknown[]) => (batches.push(questions), questions.map(() => type))} as never);
+            asked: 0,
+            getTypeOfSymbolAtLocation: Object.assign(() => (checker.asked++, type), {
+                gen: function* (): Generator<string, Type, Type> {
+                    return yield "request";
+                }
+            }),
+        };
+        return checker;
+    };
+    const batching = (settle: (question: Generator) => unknown) => {
+        const batches: number[] = [];
+        const batch = (...questions: Generator[]) => {
+            batches.push(questions.length);
+            return questions.map(question => {
+                question.next();
+                return settle(question);
+            });
+        };
+        return {batches, api: {batch} as never};
+    };
 
-        memo.prefetchTypesOfSymbols([[symbol, location]]);
+    test("an asked question is answered from its batch, and is asked once", () => {
+        const checker = counting();
+        const {batches, api} = batching(question => question.next(type).value);
+        const memo = memoizing(checker as unknown as Checker, api);
+
+        memo.ask([["getTypeOfSymbolAtLocation", symbol, location], ["getTypeOfSymbolAtLocation", symbol, location]]);
         expect(memo.getTypeOfSymbolAtLocation(symbol, location)).toBe(type);
-        expect(asked).toBe(0);
+        expect(checker.asked).toBe(0);
 
-        memo.prefetchTypesOfSymbols([[symbol, location]]);
-        expect(batches.length).toBe(1);
+        memo.ask([["getTypeOfSymbolAtLocation", symbol, location]]);
+        expect(batches).toEqual([1]);
+    });
+
+    test("a question that fails in a batch is asked again on its own", () => {
+        const checker = counting();
+        const {api} = batching(question => question.throw(new Error("no answer")).value);
+        const memo = memoizing(checker as unknown as Checker, api);
+
+        memo.ask([["getTypeOfSymbolAtLocation", symbol, location]]);
+        expect(memo.getTypeOfSymbolAtLocation(symbol, location)).toBe(type);
+        expect(checker.asked).toBe(1);
     });
 
     test("a type renders once, unless it is rendered in context", () => {

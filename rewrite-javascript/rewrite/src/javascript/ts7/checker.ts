@@ -26,7 +26,7 @@ import {
     type SourceFile,
     type TypeNode,
 } from "typescript/ast";
-import type {API, Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync";
+import type {API, APIRequestGenerator, Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync";
 
 // The checker runs in the Go process and answers over IPC, which shapes three things the parser has
 // to account for: a type-position identifier resolves through its enclosing type node, a symbol's
@@ -153,29 +153,80 @@ export interface MemoizingChecker extends Checker {
      */
     prefetch(sourceFile: SourceFile): readonly Node[];
 
-    /** Asks for each symbol's type at its location in one round trip. */
-    prefetchTypesOfSymbols(questions: readonly (readonly [Symbol7, Node])[]): void;
+    /**
+     * Asks every question in one round trip, and the answers are there when the questions are asked
+     * again one at a time. A question that fails is not remembered, so asking it again reaches the checker.
+     */
+    ask(questions: readonly Question[]): void;
+}
+
+/**
+ * A question to the checker, or to one of its objects such as `type.getSymbol.gen()`. An object
+ * keeps the answers it was given, so only the checker's own need remembering.
+ */
+export type Question = readonly [method: string & keyof Checker, ...args: unknown[]] | APIRequestGenerator;
+
+const failed = Symbol("failed");
+
+/** Answers `failed` for a question the checker could not answer, so the rest of its batch survives. */
+function* settled(question: APIRequestGenerator): APIRequestGenerator {
+    try {
+        return yield* question;
+    } catch {
+        return failed;
+    }
 }
 
 export function memoizing(checker: Checker, api: Pick<API, "batch">): MemoizingChecker {
     const perNode = new WeakMap<object, Map<string, unknown>>();
     const perId = new Map<string, unknown>();
-
-    const byNode = <T>(method: string, node: object, compute: () => T): T => {
-        let slots = perNode.get(node);
+    const idOf = (o: unknown) => (o as {id?: number} | undefined)?.id;
+    const withNode = (node: unknown, key: string): readonly [Map<string, unknown>, string] => {
+        let slots = perNode.get(node as object);
         if (!slots) {
-            perNode.set(node, slots = new Map());
+            perNode.set(node as object, slots = new Map());
         }
-        if (!slots.has(method)) {
-            slots.set(method, compute());
-        }
-        return slots.get(method) as T;
+        return [slots, key];
     };
-    const byId = <T>(key: string, compute: () => T): T => {
-        if (!perId.has(key)) {
-            perId.set(key, compute());
+
+    // Only the questions whose answer depends on nothing but the arguments are remembered, keyed by
+    // the method and the arguments. The answer about a node is held with the node.
+    const slotOf = (method: string, args: readonly unknown[]): readonly [Map<string, unknown>, string] | undefined => {
+        const [first, second] = args;
+        switch (method) {
+            case "getTypeAtLocation":
+            case "getSymbolAtLocation":
+            case "getTypeFromTypeNode":
+            case "getResolvedSignature":
+                return Array.isArray(first) ? undefined : withNode(first, method);
+            case "getTypeOfSymbolAtLocation":
+                return withNode(second, `${method}:${idOf(first)}`);
+            case "getDeclaredTypeOfSymbol":
+            case "getAliasedSymbol":
+            case "getTypeOfSymbol":
+            case "getTypeArguments":
+            case "getPropertiesOfType":
+            case "getBaseTypes":
+            case "getReturnTypeOfSignature":
+                return Array.isArray(first) ? undefined : [perId, `${method}:${idOf(first)}`];
+            case "typeToString":
+                return args.length === 1 ? [perId, `${method}:${idOf(first)}`] : undefined;
+            case "getSignaturesOfType":
+                return [perId, `${method}:${idOf(first)}:${String(second)}`];
+            default:
+                return undefined;
         }
-        return perId.get(key) as T;
+    };
+    const remembered = (method: string, args: readonly unknown[], answer: (...args: unknown[]) => unknown): unknown => {
+        const slot = slotOf(method, args);
+        if (!slot) {
+            return answer(...args);
+        }
+        const [slots, key] = slot;
+        if (!slots.has(key)) {
+            slots.set(key, answer(...args));
+        }
+        return slots.get(key);
     };
 
     // A name is what the parser asks about, and asking for all of them in one request costs a single
@@ -198,71 +249,61 @@ export function memoizing(checker: Checker, api: Pick<API, "batch">): MemoizingC
         const symbols = checker.getSymbolAtLocation(names);
         const types = checker.getTypeAtLocation(names);
         names.forEach((name, i) => {
-            byNode("getSymbolAtLocation", name, () => symbols[i]);
-            byNode("getTypeAtLocation", name, () => types[i]);
+            remembered("getSymbolAtLocation", [name], () => symbols[i]);
+            remembered("getTypeAtLocation", [name], () => types[i]);
         });
         return names;
     };
 
-    const typeOfSymbolKey = (symbol: {id: number}) => `getTypeOfSymbolAtLocation:${symbol?.id}`;
-    const prefetchTypesOfSymbols = (questions: readonly (readonly [Symbol7, Node])[]): void => {
-        const unasked = questions.filter(([symbol, location]) =>
-            !perNode.get(location)?.has(typeOfSymbolKey(symbol)));
-        if (unasked.length === 0) {
-            return;
+    const ask = (questions: readonly Question[]): void => {
+        const store: ((answer: unknown) => void)[] = [];
+        const generators: APIRequestGenerator[] = [];
+        const asking = new Map<Map<string, unknown>, Set<string>>();
+        for (const question of questions) {
+            if (!Array.isArray(question)) {
+                generators.push(settled(question as APIRequestGenerator));
+                store.push(() => undefined);
+                continue;
+            }
+            const [method, ...args] = question as readonly [string, ...unknown[]];
+            const slot = slotOf(method, args);
+            if (!slot || slot[0].has(slot[1])) {
+                continue;
+            }
+            let keys = asking.get(slot[0]);
+            if (!keys) {
+                asking.set(slot[0], keys = new Set());
+            }
+            if (keys.has(slot[1])) {
+                continue;
+            }
+            keys.add(slot[1]);
+            const gen = (checker as unknown as Record<string, {gen(...a: unknown[]): APIRequestGenerator}>)[method].gen;
+            generators.push(settled(gen(...args)));
+            store.push(answer => {
+                if (answer !== failed) {
+                    slot[0].set(slot[1], answer);
+                }
+            });
         }
-        const types = api.batch(...unasked.map(([symbol, location]) =>
-            checker.getTypeOfSymbolAtLocation.gen(symbol, location)));
-        unasked.forEach(([symbol, location], i) => byNode(typeOfSymbolKey(symbol), location, () => types[i]));
+        if (generators.length > 0) {
+            api.batch(...generators).forEach((answer, i) => store[i](answer));
+        }
     };
 
-    // Only the questions whose answer depends on nothing but the arguments are remembered; the rest
-    // reach the checker as they are.
+    const methods = new Map<string, unknown>([["prefetch", prefetch], ["ask", ask]]);
     return new Proxy(checker, {
         get(target, property: string, receiver) {
-            if (property === "prefetch") {
-                return prefetch;
+            let method = methods.get(property);
+            if (method === undefined) {
+                const value = Reflect.get(target, property, receiver);
+                if (typeof value !== "function") {
+                    return value;
+                }
+                const call = (value as (...a: unknown[]) => unknown).bind(target);
+                methods.set(property, method = (...args: unknown[]) => remembered(property, args, call));
             }
-            if (property === "prefetchTypesOfSymbols") {
-                return prefetchTypesOfSymbols;
-            }
-            const value = Reflect.get(target, property, receiver);
-            if (typeof value !== "function") {
-                return value;
-            }
-            const call = (value as (...a: unknown[]) => unknown).bind(target);
-            switch (property) {
-                case "getTypeAtLocation":
-                case "getSymbolAtLocation":
-                case "getTypeFromTypeNode":
-                case "getResolvedSignature":
-                    return (node: object) => Array.isArray(node)
-                        ? call(node)
-                        : byNode(property, node, () => call(node));
-                case "getTypeOfSymbolAtLocation":
-                    return (symbol: {id: number}, location: object) =>
-                        byNode(typeOfSymbolKey(symbol), location, () => call(symbol, location));
-                case "getDeclaredTypeOfSymbol":
-                case "getAliasedSymbol":
-                case "getTypeOfSymbol":
-                    return (symbol: {id: number} | unknown[]) => Array.isArray(symbol)
-                        ? call(symbol)
-                        : byId(`${property}:${(symbol as {id: number})?.id}`, () => call(symbol));
-                case "getTypeArguments":
-                case "getPropertiesOfType":
-                case "getBaseTypes":
-                case "getReturnTypeOfSignature":
-                    return (type: {id: number}) => byId(`${property}:${type?.id}`, () => call(type));
-                case "typeToString":
-                    return (type: {id: number}, ...context: unknown[]) => context.length === 0
-                        ? byId(`${property}:${type?.id}`, () => call(type))
-                        : call(type, ...context);
-                case "getSignaturesOfType":
-                    return (type: {id: number}, kind: unknown) =>
-                        byId(`${property}:${type?.id}:${String(kind)}`, () => call(type, kind));
-                default:
-                    return call;
-            }
+            return method;
         },
     }) as MemoizingChecker;
 }
