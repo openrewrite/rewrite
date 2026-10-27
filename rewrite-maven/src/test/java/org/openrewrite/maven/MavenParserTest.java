@@ -2813,7 +2813,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void notInheritedPluginFromParent() {
+    void notInheritedPluginsApplyOnlyToTheDeclaringPom() {
         rewriteRun(
           mavenProject("a",
             pomXml(
@@ -2828,10 +2828,11 @@ class MavenParserTest implements RewriteTest {
                       <artifactId>a</artifactId>
                   </project>
                 """,
-              spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins())
-                  .isEmpty()
-              )
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).isEmpty();
+                  assertThat(pom.getPluginManagement()).isEmpty();
+              })
             )
           ),
           mavenProject("b",
@@ -2845,6 +2846,15 @@ class MavenParserTest implements RewriteTest {
                         <packaging>pom</packaging>
 
                         <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <inherited>false</inherited>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <version>3.2.5</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
                           <plugins>
                               <plugin>
                                   <inherited>false</inherited>
@@ -2857,7 +2867,12 @@ class MavenParserTest implements RewriteTest {
                           </plugins>
                         </build>
                     </project>
-                """
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).extracting(Plugin::getArtifactId).containsExactly("maven-compiler-plugin");
+                  assertThat(pom.getPluginManagement()).extracting(Plugin::getArtifactId).containsExactly("maven-surefire-plugin");
+              })
             )
           )
         );
