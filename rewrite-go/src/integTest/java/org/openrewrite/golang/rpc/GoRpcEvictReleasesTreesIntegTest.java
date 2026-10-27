@@ -84,17 +84,14 @@ class GoRpcEvictReleasesTreesIntegTest {
 
         Row early = evicts.get(FILES / 10);
         Row late = evicts.get(FILES - 1);
-        String trend = String.format("Go after Evict #%d: heap=%,d B local=%d remote=%d reverse=%d; " +
-                                     "after Evict #%d: heap=%,d B local=%d remote=%d reverse=%d",
-          FILES / 10, early.heap, early.local, early.remote, early.reverse,
-          FILES - 1, late.heap, late.local, late.remote, late.reverse);
+        String trend = String.format("Go after Evict #%d: heap=%,d B local=%d remote=%d; " +
+                                     "after Evict #%d: heap=%,d B local=%d remote=%d",
+          FILES / 10, early.heap, early.local, early.remote,
+          FILES - 1, late.heap, late.local, late.remote);
 
-        assertThat(evicts).as("control: Evict drops the file from local/remote objects. " + trend)
-          .allSatisfy(r -> {
-              assertThat(r.local).isEqualTo(early.local);
-              assertThat(r.remote).isEqualTo(early.remote);
-          });
-        assertThat(late.reverse).as("Evict releases the tree Go received from Java. " + trend).isEqualTo(early.reverse);
+        assertThat(evicts).as("control: Evict drops the file from local objects. " + trend)
+          .allSatisfy(r -> assertThat(r.local).isEqualTo(early.local));
+        assertThat(late.remote).as("Evict releases the tree Go received from Java. " + trend).isEqualTo(early.remote);
         assertThat(late.heap).as("Go heap stays flat across evicted files. " + trend).isLessThan(early.heap * 2);
     }
 
@@ -108,13 +105,12 @@ class GoRpcEvictReleasesTreesIntegTest {
               c[header.indexOf("method")],
               Long.parseLong(c[header.indexOf("memory_used_bytes")]),
               Integer.parseInt(c[header.indexOf("local_objects")]),
-              Integer.parseInt(c[header.indexOf("remote_objects")]),
-              Integer.parseInt(c[header.indexOf("reverse_remote_objects")])));
+              Integer.parseInt(c[header.indexOf("remote_objects")])));
         }
         return rows;
     }
 
-    private record Row(String method, long heap, int local, int remote, int reverse) {
+    private record Row(String method, long heap, int local, int remote) {
     }
 
     private static String source(int i) {

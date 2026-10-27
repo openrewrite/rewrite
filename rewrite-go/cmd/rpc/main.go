@@ -273,7 +273,7 @@ func newServer(cfg serverConfig) *server {
 		} else {
 			s.metricsFile = f
 			s.metricsWriter = csv.NewWriter(f)
-			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs", "reverse_remote_objects"}); err != nil {
+			if err := s.metricsWriter.Write([]string{"timestamp", "method", "duration_ms", "error", "memory_used_bytes", "memory_max_bytes", "local_objects", "remote_objects", "refs"}); err != nil {
 				logger.Printf("metrics-csv: cannot write header: %v", err)
 			}
 			s.metricsWriter.Flush()
@@ -307,6 +307,18 @@ func (s *server) closeMetrics() {
 	}
 }
 
+// remoteObjectCount counts the ids in both directions, as the single remoteObjects map of the
+// Java, JS, Python and C# peers does.
+func (s *server) remoteObjectCount() int {
+	n := len(s.remoteObjects)
+	for id := range s.reverseRemoteObjects {
+		if _, ok := s.remoteObjects[id]; !ok {
+			n++
+		}
+	}
+	return n
+}
+
 // recordMetric appends one row to the metrics CSV. Safe to call from
 // concurrent goroutines; rows are written under metricsMu so they don't
 // interleave. Errors are logged and dropped — metrics emission must never
@@ -335,9 +347,8 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
 		strconv.Itoa(len(s.localObjects)),
-		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.remoteObjectCount()),
 		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
-		strconv.Itoa(len(s.reverseRemoteObjects)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
 		s.logger.Printf("metrics-csv: write row failed: %v", err)
