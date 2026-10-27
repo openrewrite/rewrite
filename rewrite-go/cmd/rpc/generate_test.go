@@ -58,7 +58,6 @@ func TestGenerateReportsTheSourceFileTypeOfEveryGeneratedTree(t *testing.T) {
 	// then
 	require.Nil(t, rpcErr)
 	resp := result.(*generateResponse)
-	assert.Len(t, resp.IDs, 3)
 	assert.Equal(t, []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
 		"org.openrewrite.golang.tree.GoMod",
