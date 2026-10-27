@@ -288,6 +288,22 @@ tasks.withType<Test> {
     maxParallelForks = maxParallelForks.coerceAtMost(4)
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
+    // The Python RPC processes log to a file of this task's own, which each run starts over. Tracing every RPC
+    // message there, hundreds of MB a run, is for -PverboseTests.
+    val rpcLog = "build/python-rpc-$name.log"
+    systemProperty("rewrite.python.rpcLog", rpcLog)
+    if (project.hasProperty("verboseTests")) {
+        systemProperty("rewrite.python.traceRpcMessages", "true")
+    }
+    // A listener, as a task action from this script would re-run the tests whenever the script's code changes
+    val rpcLogFile = file(rpcLog)
+    addTestListener(object : TestListener {
+        override fun beforeSuite(suite: TestDescriptor) {
+            if (suite.parent == null) {
+                rpcLogFile.delete()
+            }
+        }
+    })
     testLogging {
         // -PverboseTests shows every test plus its stdout/stderr (for diagnosing RPC hangs)
         if (project.hasProperty("verboseTests")) {
