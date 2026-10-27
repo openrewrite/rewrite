@@ -358,7 +358,7 @@ public class ReloadableJava17Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
         public ReloadableJava17Parser build() {
-            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory);
         }
     }
 
