@@ -7,8 +7,9 @@ group = "org.openrewrite.gradle.tooling"
 description = "A model for extracting semantic information out of Gradle build files necessary for refactoring them."
 
 val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath") {
-    // The model builders never load the Groovy or Kotlin parsers, git, JNA or bytecode generation, and each embedded
-    // Gradle version otherwise instruments these jars, almost half the classpath, before it compiles the init script.
+    // Each embedded Gradle version instruments the jars it hasn't seen before compiling the init script. The model
+    // builders never load the Groovy or Kotlin parsers, git, JNA or bytecode generation, though production's
+    // init.gradle still puts them on the init-script classpath.
     exclude(group = "org.openrewrite", module = "rewrite-groovy")
     exclude(group = "org.openrewrite", module = "rewrite-kotlin")
     exclude(group = "org.apache.groovy")
