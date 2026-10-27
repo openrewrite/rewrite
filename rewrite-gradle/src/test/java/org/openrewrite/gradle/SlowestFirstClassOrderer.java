@@ -24,8 +24,9 @@ import static java.util.Arrays.asList;
 import static java.util.Comparator.comparingInt;
 
 /**
- * Starts the slowest test classes first, so that a test JVM running several classes at once doesn't end with one of
- * them still running alone. Configured in junit-platform.properties.
+ * Orders the slowest test classes first, so that a test JVM running several classes at once doesn't end with one of
+ * them still running alone. JUnit's idle threads take classes from the front of this order, while the thread that hands
+ * them out runs classes from the back. Configured in build.gradle.kts.
  */
 public class SlowestFirstClassOrderer implements ClassOrderer {
 
