@@ -17,8 +17,12 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class AddMethodParameterTest implements RewriteTest {
@@ -392,4 +396,39 @@ class AddMethodParameterTest implements RewriteTest {
         );
     }
 
+    @Test
+    void updatesMethodType() {
+        rewriteRun(
+          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.regex.Pattern", "p", null)),
+          java(
+            """
+              package foo;
+
+              public class Foo {
+                  public void bar(int i) {
+                  }
+              }
+              """,
+            """
+              package foo;
+
+              import java.util.regex.Pattern;
+
+              public class Foo {
+                  public void bar(int i, Pattern p) {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration bar = (J.MethodDeclaration) cu.getClasses().getFirst().getBody()
+                  .getStatements().getFirst();
+                JavaType.Method methodType = bar.getMethodType();
+                assertThat(methodType.getParameterNames()).containsExactly("i", "p");
+                assertThat(methodType.getParameterTypes()).extracting(TypeUtils::toString)
+                  .containsExactly("int", "java.util.regex.Pattern");
+                assertThat(bar.getName().getType()).isSameAs(methodType);
+            })
+          )
+        );
+    }
 }
