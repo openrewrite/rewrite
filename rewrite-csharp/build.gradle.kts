@@ -183,19 +183,25 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        // These tests spawn the freshly built C# tool. dependsOn(csharpBuild) is
-                        // also applied by the tasks.withType<Test> block below, but a plain
-                        // dependsOn only orders the build — it does NOT make a C# source change
-                        // invalidate this task's up-to-date/cache state. Declaring the C# sources
-                        // as inputs does: without it a C# regression can slip through a cached test
-                        // run (e.g. the System.Text.Json `IConvertible` break that reached main).
+                        // These tests spawn the freshly built C# tool, which the unit tests do not, so
+                        // this task depends on csharpBuild. A plain dependsOn only orders the build — it
+                        // does NOT make a C# source change invalidate this task's up-to-date/cache state.
+                        // Declaring the C# sources as inputs does: without it a C# regression can slip
+                        // through a cached test run (e.g. the System.Text.Json `IConvertible` break that
+                        // reached main). CSharpPrinterParityTest parses the sources of all four projects.
                         dependsOn(csharpBuild)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
-                        // Avoid two tasks driving C# RPC processes at the same time.
-                        shouldRunAfter(tasks.named("test"))
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        // Tiered PGO first runs hot code instrumented, which the short-lived C# processes
+                        // these tests start pay for without living long enough to profit from: without it
+                        // they parse CSharpPrinterParityTest's own sources in less than half the time.
+                        environment("DOTNET_TieredPGO", "0")
                     }
                 }
             }
@@ -210,11 +216,9 @@ tasks.named("check") {
     dependsOn(testing.suites.named("integTest"))
 }
 
-// Run tests serially to avoid issues with concurrent C# RPC processes
+// One test JVM, running a class at a time: CSharpPrinterParityTest compares on several C# processes
+// at once, and a second fork was measured to add CPU without reliably saving time.
 tasks.withType<Test> {
-    // Ensure C# is built before running tests
-    dependsOn(csharpBuild)
-
     maxParallelForks = 1
     maxHeapSize = "8g"
     // Exclude working-set tests by default:
@@ -239,7 +243,7 @@ tasks.withType<Test> {
             events("started", "passed", "failed", "skipped")
             showStandardStreams = true
         } else {
-            events("failed", "skipped")
+            events("failed")
         }
     }
 }
