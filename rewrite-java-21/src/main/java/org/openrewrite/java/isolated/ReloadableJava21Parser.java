@@ -358,7 +358,7 @@ public class ReloadableJava21Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava21Parser, Builder> {
         @Override
         public ReloadableJava21Parser build() {
-            return new ReloadableJava21Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava21Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory);
         }
     }
 

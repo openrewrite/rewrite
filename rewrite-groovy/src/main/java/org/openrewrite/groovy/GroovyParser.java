@@ -32,6 +32,7 @@ import org.openrewrite.groovy.internal.NegativeCachingGroovyClassLoader;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.marker.Markers;
@@ -290,6 +291,7 @@ public class GroovyParser implements Parser {
         protected Collection<String> artifactNames = emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
 
         @Nullable
         private JavaTypeFactory typeFactory;
@@ -307,6 +309,7 @@ public class GroovyParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
@@ -358,6 +361,7 @@ public class GroovyParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
             return this;
         }
 
@@ -397,6 +401,7 @@ public class GroovyParser implements Parser {
         @Override
         public GroovyParser build() {
             Collection<Path> cp = resolvedClasspath();
+            typeCache = HashMapJavaTypeCache.forParser(typeCache, typeCacheConfigured || typeFactory != null);
             JavaTypeFactory factory = typeFactory;
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);

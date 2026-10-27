@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
@@ -242,6 +243,7 @@ public interface JavaParser extends Parser {
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -282,6 +284,7 @@ public interface JavaParser extends Parser {
         @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            this.typeCacheConfigured = true;
             return (B) this;
         }
 
@@ -391,6 +394,11 @@ public interface JavaParser extends Parser {
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
             return javaTypeFactory;
+        }
+
+        protected JavaTypeCache resolvedTypeCache() {
+            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            return javaTypeCache;
         }
 
         @Override

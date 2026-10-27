@@ -22,6 +22,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -52,6 +53,10 @@ import static org.openrewrite.test.SourceSpecs.dir;
 @SuppressWarnings("unused")
 @CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();

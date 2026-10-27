@@ -43,4 +43,15 @@ class JavaTypeCacheTest {
             assertThat(cache.<String>get(new String(key.toCharArray()))).isEqualTo(key);
         }
     }
+
+    @Test
+    void aHashMapCacheGivesEachCloneAMapOfItsOwn() {
+        JavaTypeCache cache = new HashMapJavaTypeCache();
+        cache.put("base", "base");
+
+        JavaTypeCache overlay = cache.clone();
+        overlay.put("overlay", "overlay");
+        assertThat(overlay.<String>get("base")).isEqualTo("base");
+        assertThat(cache.<String>get("overlay")).isNull();
+    }
 }

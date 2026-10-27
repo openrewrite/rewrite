@@ -90,7 +90,7 @@ public class Java25Parser implements JavaParser {
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {
