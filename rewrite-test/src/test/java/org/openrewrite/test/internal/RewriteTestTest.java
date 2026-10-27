@@ -173,6 +173,25 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void runVerificationCycleEvenWhenTheTestPinsTheCycles() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(new AppendExclamationMark()),
+          text("a", "a!")
+        ));
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 1 cycle, but took at least one more cycle");
+    }
+
+    @Test
+    void pinTheCyclesOfARecipeMeantNotToSettle() {
+        rewriteRun(
+          spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(new AppendExclamationMark())
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("the recipe appends in every cycle").build()),
+          text("a", "a!")
+        );
+    }
+
+    @Test
     void cursorValidation() {
         AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(

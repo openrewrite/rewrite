@@ -25,6 +25,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -1756,7 +1757,9 @@ class MergeYamlTest implements RewriteTest {
                 null
               ),
               new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
-            .expectedCyclesThatMakeChanges(2).cycles(2), // MergeYaml blanks `initially` again each cycle and CopyValue refills it
+            .expectedCyclesThatMakeChanges(2).cycles(2)
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("MergeYaml blanks `initially` again each cycle and CopyValue refills it").build()),
           yaml(
             """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
@@ -3825,7 +3828,9 @@ class MergeYamlTest implements RewriteTest {
     void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(2).cycles(2) // DeleteKey removes what MergeYaml added in the previous cycle
+            .expectedCyclesThatMakeChanges(2).cycles(2)
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("DeleteKey removes what MergeYaml added in the previous cycle").build())
             .recipe(
               new CompositeRecipe(
                 List.of(

@@ -112,6 +112,11 @@ public class RecipeQualityValidation {
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
 
+    /// Controls whether the recipe is validated to settle in the cycles the test expects it to make changes in, with
+    /// one more cycle run to show that it changes nothing more, even when the test sets the cycles to run.
+    @Builder.Default
+    private boolean settles = true;
+
     /// Why the checks this turns off don't apply, which a test must give when it turns any off, so that a reviewer
     /// reads the reason next to the opt-out.
     private @Nullable String because;
@@ -171,6 +176,9 @@ public class RecipeQualityValidation {
         if (!orderStepsForEarlierChanges) {
             off.add("orderStepsForEarlierChanges");
         }
+        if (!settles) {
+            off.add("settles");
+        }
         if (!off.isEmpty()) {
             throw new AssertionError("RecipeQualityValidation turns off " + String.join(", ", off) +
                                      " without saying why. Add .because(\"..\") with the reason the check doesn't " +
@@ -204,6 +212,7 @@ public class RecipeQualityValidation {
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .settles(quality.settles())
                 .because(quality.because())
                 .build();
     }

@@ -22,6 +22,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -265,8 +266,9 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new AddDependency("right-pad", "^1.0.0", null), new RemoveDependency("left-pad", null))
-            // the addition restores what the removal of the previous cycle took away
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .cycles(1).expectedCyclesThatMakeChanges(1)
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("the addition restores what the removal of the previous cycle took away").build()),
           packageJson("""
             {
               "name": "consumer",

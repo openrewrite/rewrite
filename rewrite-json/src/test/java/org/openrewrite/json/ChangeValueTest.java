@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -349,7 +350,9 @@ class ChangeValueTest implements RewriteTest {
           spec -> spec.recipes(
             new ChangeValue("$.node", "18"),
             new ChangeValue("$.node", "20")
-          ).expectedCyclesThatMakeChanges(2).cycles(2), // each ChangeValue overwrites the other in every cycle
+          ).expectedCyclesThatMakeChanges(2).cycles(2)
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("each ChangeValue overwrites the other in every cycle").build()),
           json(
             """
             { "node": 14 }

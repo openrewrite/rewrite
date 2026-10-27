@@ -117,9 +117,10 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
             }))
-            // the visitor rebuilds the parentheses it replaces in every cycle
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .expectedCyclesThatMakeChanges(1)
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false)
+              .because("the visitor rebuilds the parentheses it replaces in every cycle").build()),
           java(
             """
               public class A {
