@@ -121,7 +121,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 isinstance(self.cursor.parent_tree_cursor().value, JavaSourceFile)):
             space_context = "compilation_unit_prefix"
 
-        indent = cast(int, self.cursor.get_nearest_message("last_indent")) or 0
+        indent = cast(int, self._indent_origin().get_nearest_message("last_indent")) or 0
         indent_type = self.cursor.parent_or_throw.get_nearest_message("indent_type") or self.IndentType.ALIGN
 
         if not space.comments and '\n' not in space.last_whitespace or parent is None:
@@ -153,6 +153,19 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             self.cursor.put_message("last_indent", indent)
 
         return s
+
+    def _indent_origin(self) -> Cursor:
+        """The cursor that the cursor's tree takes its indent from.
+        The literals of an implicit concatenation all indent from its outermost node, however the parser nests them."""
+        origin = self.cursor
+        cursor = origin.parent
+        while cursor is not None:
+            if isinstance(cursor.value, PyBinary) and cursor.value.operator == PyBinary.Type.StringConcatenation:
+                origin = cursor
+            elif isinstance(cursor.value, Tree):
+                break
+            cursor = cursor.parent
+        return origin
 
     def visit_right_padded(self, right: Optional[JRightPadded], p: P) -> Optional[JRightPadded]:
         if right is None:
