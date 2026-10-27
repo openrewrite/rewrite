@@ -126,34 +126,40 @@ val npmInstall = tasks.named<NpmInstallTask>("npmInstall") {
 // What npmInstall installed, without the caches vitest and vite keep in node_modules and rewrite on every test run
 val nodeModules = fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") }
 
-val npmTest = tasks.register<NpmTask>("npmTest") {
+// What tsc type-checks and vitest runs, none of it from the Java side
+fun Task.typeScriptInputs() {
     dependsOn(npmInstall)
-    // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
-    // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
-    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
-    dependsOn(tasks.named("generateTestClasspath"))
-    // test/rpc/server.test.ts starts the built server
-    dependsOn("npmBuild")
     inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
         include("vitest.config.mts")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("rewrite/src"))
+    inputs.files(fileTree("rewrite/src"), fileTree("rewrite/test"), fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("rewrite/test"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
-        .withNormalizer(ClasspathNormalizer::class)
-    // the tests under test/rpc run against the Java classes that file lists, not only the list itself
-    inputs.files(tasks.named("compileJava").map { it.outputs.files })
-        .withNormalizer(ClasspathNormalizer::class)
-    inputs.files(configurations["runtimeClasspath"])
-        .withNormalizer(ClasspathNormalizer::class)
+}
+
+val npmTypecheck = tasks.register<NpmTask>("npmTypecheck") {
+    typeScriptInputs()
+    // tsc emits nothing, so this file records that the inputs type-checked
+    val passed = layout.buildDirectory.file("npmTypecheck/passed")
+    outputs.file(passed)
+    outputs.cacheIf { true }
+    args = listOf("run", "--silent", "typecheck")
+    doLast {
+        passed.get().asFile.writeText("")
+    }
+}
+
+// Runs one of the projects vitest.config.mts divides the tests into
+fun NpmTask.vitest(vitestProject: String, junitXml: String) {
+    typeScriptInputs()
+    mustRunAfter(npmTypecheck)
+    // test/rpc/server.test.ts, for one, starts the built server
+    dependsOn("npmBuild")
     inputs.files(fileTree("src/integTest/resources/printer-parity"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.files("rewrite/build/test-results/vitest/junit.xml")
+    outputs.file("rewrite/$junitXml")
     outputs.cacheIf { true }
 
     // vitest prints only failing tests and the summary, or with -PverboseTests every test (see vitest.config.mts)
@@ -163,8 +169,37 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         environment.put("QUIET_TESTS", "1")
     }
 
-    // Not --silent: npm exports it as npm_config_loglevel, which would silence the errors of every npm a test runs
-    args = listOf("run", "ci:test")
+    // npm exec prints no banner, and unlike `npm run --silent` leaves the loglevel of every npm a test runs alone
+    args = listOf("exec", "--", "vitest", "run", "--project", vitestProject, "--outputFile.junit=$junitXml")
+}
+
+val npmTestTypeScript = tasks.register<NpmTask>("npmTestTypeScript") {
+    vitest("typescript", "build/test-results/vitest/junit.xml")
+}
+
+// The classpath the tests of the java project start org.openrewrite.maven.rpc.JavaRewriteRpc on, which
+// generateTestClasspath writes to test-classpath.txt
+val javaRpcClasspath = files(configurations.named("runtimeClasspath"), configurations.named("testRuntimeClasspath"),
+    tasks.named("compileJava"), tasks.named("processResources"))
+
+val npmTestJava = tasks.register<NpmTask>("npmTestJava") {
+    vitest("java", "build/test-results/vitest-java/junit.xml")
+    // Generating the server's classpath here means devs running `./gradlew :rewrite-javascript:npmTest` get these
+    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
+    dependsOn(tasks.named("generateTestClasspath"))
+    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
+    // the tests run against the Java classes that file lists, not only the list itself
+    inputs.files(javaRpcClasspath)
+        .withNormalizer(ClasspathNormalizer::class)
+    // test/javascript/completeness.test.ts compares the TypeScript trees and visitors with the Java ones
+    inputs.files(fileTree("src/main/java"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+val npmTest = tasks.register("npmTest") {
+    description = "Type-checks the TypeScript and runs its tests."
+    dependsOn(npmTypecheck, npmTestTypeScript, npmTestJava)
 }
 
 tasks.named("check") {
@@ -401,14 +436,7 @@ val generateTestClasspath = tasks.register("generateTestClasspath") {
     dependsOn(tasks.named("jar"))
 
     doLast {
-        val classpath = (
-            configurations.getByName("runtimeClasspath").files +
-            configurations.getByName("testRuntimeClasspath").files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
+        outputFile.writeText(javaRpcClasspath.joinToString(File.pathSeparator) { it.absolutePath })
         logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
