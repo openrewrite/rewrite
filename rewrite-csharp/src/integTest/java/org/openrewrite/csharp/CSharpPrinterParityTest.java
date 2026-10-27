@@ -66,9 +66,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -93,11 +99,30 @@ class CSharpPrinterParityTest {
 
     private static final Pattern FENCE = Pattern.compile("\\{\\{[0-9a-f-]{36}}}");
 
+    /**
+     * Native processes, besides this thread's, that the trees of a large set of sources are compared
+     * on, as a native process receives and prints trees on one thread.
+     */
+    static final int PROCESSES = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+
+    /**
+     * A thread for each of those processes, kept for the class, as starting a process and warming
+     * it up takes about as long as comparing its share of the trees.
+     */
+    private static final List<ExecutorService> WORKERS = new ArrayList<>();
+
     @BeforeAll
     static void setUpFactory() {
+        setUpFactory("csharp-printer-parity.log");
+    }
+
+    /**
+     * @param log The file in the temporary directory that the native process logs to.
+     */
+    private static void setUpFactory(String log) {
         CSharpRewriteRpc.setFactory(CSharpRewriteRpc.builder()
-          .csharpServerEntry(csharpDir().resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj"))
-          .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-printer-parity.log")));
+          .csharpServerEntry(CSharpServer.entry())
+          .log(Paths.get(System.getProperty("java.io.tmpdir"), log)));
     }
 
     @AfterEach
@@ -106,8 +131,12 @@ class CSharpPrinterParityTest {
     }
 
     @AfterAll
-    static void shutDown() {
-        CSharpRewriteRpc.shutdownCurrent();
+    static void shutDown() throws InterruptedException {
+        try {
+            CSharpRewriteRpc.shutdownCurrent();
+        } finally {
+            stopWorkers();
+        }
     }
 
     /**
@@ -128,7 +157,7 @@ class CSharpPrinterParityTest {
      */
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    void ownSources() throws IOException {
+    void ownSources() throws Exception {
         Path root = csharpDir();
         Map<Path, String> sources = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(root)) {
@@ -138,9 +167,134 @@ class CSharpPrinterParityTest {
         }
         assertThat(sources).hasSizeGreaterThan(200);
 
-        List<String> failures = new ArrayList<>();
-        assertParity(sources).forEach((path, cu) -> compareMarkerPrinters(path, mark(cu), failures));
+        List<String> failures = inParallel(sources, CSharpPrinterParityTest::assertParity,
+          (path, cu, treeFailures) -> compareMarkerPrinters(path, mark(cu), treeFailures));
         assertThat(failures).isEmpty();
+    }
+
+    /**
+     * Compares the two printers on a tree, adding what differs to the failures.
+     */
+    @FunctionalInterface
+    interface Comparison {
+        void compare(Path path, Cs.CompilationUnit cu, List<String> failures);
+    }
+
+    /**
+     * Parses the sources on this thread's process and compares the trees on the workers'
+     * processes, which are each sent the trees they compare whole. How many workers there are
+     * changes only how long that takes.
+     *
+     * @return The failures, in the order of the sources.
+     */
+    static List<String> inParallel(Map<Path, String> sources,
+                                   Function<Map<Path, String>, Map<Path, Cs.CompilationUnit>> parse,
+                                   Comparison comparison) throws Exception {
+        // the workers start their processes while this one parses
+        while (WORKERS.size() < PROCESSES) {
+            ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
+                Thread thread = new Thread(task, "csharp-printer-parity-" + WORKERS.size());
+                thread.setDaemon(true);
+                return thread;
+            });
+            // each process logs to a file of its own, named after its thread
+            worker.submit(() -> {
+                setUpFactory(Thread.currentThread().getName() + ".log");
+                return CSharpRewriteRpc.getOrStart();
+            });
+            WORKERS.add(worker);
+        }
+        Map<Path, Cs.CompilationUnit> trees = parse.apply(sources);
+
+        List<Future<Map<Path, List<String>>>> compared = new ArrayList<>();
+        for (Map<Path, String> share : shares(sources, WORKERS.size())) {
+            compared.add(WORKERS.get(compared.size()).submit(() -> {
+                setUpFactory(Thread.currentThread().getName() + ".log");
+                Map<Path, List<String>> failures = new HashMap<>();
+                for (Path path : share.keySet()) {
+                    List<String> treeFailures = new ArrayList<>();
+                    comparison.compare(path, trees.get(path), treeFailures);
+                    failures.put(path, treeFailures);
+                }
+                CSharpRewriteRpc.resetCurrent();
+                return failures;
+            }));
+        }
+
+        Map<Path, List<String>> failures = new HashMap<>();
+        Throwable thrown = null;
+        try {
+            for (Future<Map<Path, List<String>>> share : compared) {
+                try {
+                    failures.putAll(share.get());
+                } catch (ExecutionException e) {
+                    if (thrown == null) {
+                        thrown = e.getCause();
+                    } else {
+                        thrown.addSuppressed(e.getCause());
+                    }
+                }
+            }
+        } catch (InterruptedException e) {
+            compared.forEach(share -> share.cancel(true));
+            if (thrown != null) {
+                e.addSuppressed(thrown);
+            }
+            thrown = e;
+        }
+        if (thrown != null) {
+            // a process that a comparison failed or was interrupted in is not used again
+            stopWorkers();
+            if (thrown instanceof Exception exception) {
+                throw exception;
+            }
+            throw (Error) thrown;
+        }
+
+        List<String> ordered = new ArrayList<>();
+        for (Path path : sources.keySet()) {
+            ordered.addAll(failures.get(path));
+        }
+        return ordered;
+    }
+
+    private static void stopWorkers() throws InterruptedException {
+        for (ExecutorService worker : WORKERS) {
+            worker.execute(CSharpRewriteRpc::shutdownCurrent);
+            worker.shutdown();
+        }
+        for (ExecutorService worker : WORKERS) {
+            worker.awaitTermination(1, TimeUnit.MINUTES);
+        }
+        WORKERS.clear();
+    }
+
+    /**
+     * Splits the sources into shares of about the same size, each in the order of the sources.
+     */
+    static List<Map<Path, String>> shares(Map<Path, String> sources, int count) {
+        List<Map.Entry<Path, String>> largestFirst = new ArrayList<>(sources.entrySet());
+        largestFirst.sort(Map.Entry.comparingByValue(Comparator.comparingInt(String::length).reversed()));
+        long[] sizes = new long[count];
+        Map<Path, Integer> shareOf = new HashMap<>();
+        for (Map.Entry<Path, String> source : largestFirst) {
+            int smallest = 0;
+            for (int i = 1; i < count; i++) {
+                if (sizes[i] < sizes[smallest]) {
+                    smallest = i;
+                }
+            }
+            sizes[smallest] += source.getValue().length();
+            shareOf.put(source.getKey(), smallest);
+        }
+
+        List<Map<Path, String>> shares = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            shares.add(new LinkedHashMap<>());
+        }
+        sources.forEach((path, source) -> shares.get(shareOf.get(path)).put(path, source));
+        shares.removeIf(Map::isEmpty);
+        return shares;
     }
 
     private static boolean isSource(Path file) {
@@ -338,10 +492,10 @@ class CSharpPrinterParityTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    void subtrees() {
-        List<String> failures = new ArrayList<>();
-        Set<String> ancestorDependent = new TreeSet<>();
-        parse(sources(SYNTAX, DIRECTIVES)).forEach((path, cu) -> compareSubtrees(path, cu, failures, ancestorDependent));
+    void subtrees() throws Exception {
+        Set<String> ancestorDependent = new ConcurrentSkipListSet<>();
+        List<String> failures = inParallel(sources(SYNTAX, DIRECTIVES), CSharpPrinterParityTest::parse,
+          (path, cu, treeFailures) -> compareSubtrees(path, cu, treeFailures, ancestorDependent));
         assertThat(failures).isEmpty();
         assertThat(ancestorDependent).as("subtrees that were also compared without their ancestors").isNotEmpty();
     }

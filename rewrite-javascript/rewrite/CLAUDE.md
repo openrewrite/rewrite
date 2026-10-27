@@ -40,7 +40,7 @@ npm run typecheck
 npm run testhelper -- test/javascript/recipes/order-imports.test.ts
 ```
 
-Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
+Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `start`.
 
 ### Java RPC Integration Tests
 
@@ -52,6 +52,10 @@ Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.m
 ```
 
 This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
+
+Name such a test `test/rpc/java-*.test.ts`, or add it to `javaTests` in `vitest.config.mts`. That puts it in the `java` vitest project, which Gradle runs as `npmTestJava` and reruns when the Java side changes. Gradle runs the `typescript` project as `npmTestTypeScript`, without the Java classpath.
+
+`./gradlew :rewrite-javascript:npmTest` runs `npmTypecheck`, `npmTestTypeScript` and `npmTestJava` but does no work itself, so `npmTest --rerun` reruns nothing. To force a rerun, pass `--rerun` to `npmTestTypeScript` or `npmTestJava`.
 
 ## Directory Structure
 
