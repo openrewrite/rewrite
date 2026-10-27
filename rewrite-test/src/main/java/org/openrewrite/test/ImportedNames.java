@@ -116,8 +116,7 @@ final class ImportedNames {
         }
         if (!failures.isEmpty()) {
             failures.set(failures.size() - 1, failures.get(failures.size() - 1) + "\nIf the recipe names them " +
-                         "this way on purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
-                         ".importReferencedTypes(false).build()).");
+                         "this way on purpose, add " + RecipeQualityValidation.optOut("importReferencedTypes") + ".");
         }
         if (unused.length() > 0) {
             failures.add("Remove the imports the recipe leaves unused, with maybeRemoveImport(\"java.util.List\") " +
@@ -126,11 +125,10 @@ final class ImportedNames {
                          "nothing in them uses:\n" + unused +
                          "If the code still names it, the recipe wrote that code without its type, and a later " +
                          "RemoveUnusedImports would delete an import the code needs. If the recipe keeps them on " +
-                         "purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
-                         ".removeUnusedImports(false).build()).");
+                         "purpose, add " + RecipeQualityValidation.optOut("removeUnusedImports") + ".");
         }
         if (!failures.isEmpty()) {
-            fail(String.join("\n\n", failures));
+            fail(String.join("\n\n", failures) + "\n\n" + RecipeQualityValidation.WHEN_STUCK);
         }
     }
 

@@ -111,7 +111,7 @@ final class TreeShapes {
                  "same text:\n" + found +
                  "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
                  "parsed code never holds. If the output is meant to differ from parsed code, add " +
-                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()).");
+                 RecipeQualityValidation.optOut("parserShapedTrees") + ". " + RecipeQualityValidation.WHEN_STUCK);
         }
     }
 

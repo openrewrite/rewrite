@@ -83,6 +83,10 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source " +
                "file in Cursor messages, with getCursor().putMessage(..) or putMessageOnFirstEnclosing(..). A recipe " +
                "that must change the ExecutionContext opts out with " +
-               "RecipeQualityValidation.builder().executionContextUnchanged(false).";
+               "RecipeQualityValidation.builder().executionContextUnchanged(false), with a comment next to it that " +
+               "says why. " +
+               "If you can neither fix the recipe nor explain why it must opt out, leave this test failing and " +
+               "explain what the recipe needs: there may not be a supported way to do it yet, and a failing test " +
+               "tells the next person more than a workaround.";
     }
 }

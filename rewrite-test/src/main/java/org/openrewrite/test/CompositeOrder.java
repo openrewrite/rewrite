@@ -55,8 +55,9 @@ final class CompositeOrder {
                  "In " + recipe.getName() + ", these steps look for names that steps before them already renamed, " +
                  "so they never change what they were written for:\n" + found +
                  "Move each step above the step that renames what it looks for, or remove it if that step already " +
-                 "does what it should. If the order is meant, add spec.recipeQualityValidation(" +
-                 "RecipeQualityValidation.builder().orderStepsForEarlierChanges(false).build()).");
+                 "does what it should. If the order is meant, add " +
+                 RecipeQualityValidation.optOut("orderStepsForEarlierChanges") + ". " +
+                 RecipeQualityValidation.WHEN_STUCK);
         }
     }
 
