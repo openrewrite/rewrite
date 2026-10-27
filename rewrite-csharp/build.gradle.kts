@@ -139,6 +139,9 @@ val csharpTest = tasks.register<Exec>("csharpTest") {
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
+    // -PverboseTests restores the per-passing-test console output. It is read here, while configuring, because
+    // Gradle 10 fails a build that calls Task.project at execution time.
+    val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
     doFirst {
         // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
         // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
@@ -146,8 +149,6 @@ val csharpTest = tasks.register<Exec>("csharpTest") {
         // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
         // TargetDir, so pin the absolute path and pass --results-directory to match.
         junitXmlFile.parentFile.mkdirs()
-        // -PverboseTests restores the per-passing-test console output
-        val dotnetVerbosity = if (project.hasProperty("verboseTests")) "normal" else "minimal"
         commandLine(
             findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
             "--no-build", "--verbosity", dotnetVerbosity,
