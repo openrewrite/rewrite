@@ -1452,6 +1452,7 @@ func (s *server) handleEvict(params json.RawMessage) bool {
 	}
 	delete(s.localObjects, req.ID)
 	delete(s.remoteObjects, req.ID)
+	delete(s.reverseRemoteObjects, req.ID)
 	if cp, ok := s.refCheckpoints[req.ID]; ok {
 		s.localRefs.RollbackTo(cp.localRefsNext)
 		for k := range s.reverseRemoteRefs {
