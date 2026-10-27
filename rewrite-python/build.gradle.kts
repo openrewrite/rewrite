@@ -408,10 +408,18 @@ val pythonInstallBuildDeps = tasks.register<Exec>("pythonInstallBuildDeps") {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "build>=1.0.0", "twine>=5.0.0")
+    commandLine(pipExe.absolutePath, "install", "-q", "--disable-pip-version-check", "build>=1.0.0", "twine>=5.0.0")
+
+    // Once per venv and set of requirements, as the marker goes with the venv, or with an install that failed
+    val installed = venvDir.resolve(".build-deps-installed")
+    outputs.file(installed)
 
     doFirst {
-        logger.lifecycle("Installing Python build dependencies (build, twine)")
+        installed.delete()
+        logger.info("Installing Python build dependencies (build, twine)")
+    }
+    doLast {
+        installed.writeText("")
     }
 }
 
