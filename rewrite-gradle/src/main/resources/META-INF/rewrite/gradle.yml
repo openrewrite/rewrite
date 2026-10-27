@@ -34,6 +34,7 @@ recipeList:
   - org.openrewrite.gradle.MoveRepositoriesToSettings
   - org.openrewrite.gradle.RemoveInheritedDependencies
   - org.openrewrite.gradle.RemoveNonReproducibleArchiveSettings
+  - org.openrewrite.gradle.UseLoggingGetLogger
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
