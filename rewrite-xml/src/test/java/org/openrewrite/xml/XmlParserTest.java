@@ -21,6 +21,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
@@ -438,13 +439,14 @@ class XmlParserTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-      "<root><a></b></root>",
-      "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>",
-      "<root><a>",
-      "<root><a></a>",
+    @CsvSource(delimiter = '|', value = {
+      "<root><a></b></root> | Mismatched closing tag </b>",
+      "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table> | Mismatched closing tag </label>",
+      "<Root></root> | Mismatched closing tag </root>",
+      "<root><a> | Unclosed element <a>",
+      "<root><a></a> | Unclosed element <root>",
     })
-    void unbalancedTagsAreNotSilentlyAccepted(String source) {
+    void unbalancedTagsAreNotSilentlyAccepted(String source, String expectedMessage) {
         SourceFile parsed = XmlParser.builder().build()
           .parse(new InMemoryExecutionContext(t -> {
           }), source)
@@ -452,7 +454,7 @@ class XmlParserTest implements RewriteTest {
         assertThat(parsed).isInstanceOf(ParseError.class);
         assertThat(parsed.printAll()).isEqualTo(source);
         assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
-          .containsAnyOf("Mismatched closing tag", "Unclosed element");
+          .contains(expectedMessage);
     }
 
     @Test
@@ -488,15 +490,6 @@ class XmlParserTest implements RewriteTest {
             spec -> spec.path("legacy.jsp")
           )
         );
-    }
-
-    @Test
-    void xmlClosingTagsMatchCaseSensitively() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parse(new InMemoryExecutionContext(t -> {
-          }), "<Root></root>")
-          .findFirst().orElseThrow();
-        assertThat(parsed).isInstanceOf(ParseError.class);
     }
 
     @Test
