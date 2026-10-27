@@ -94,7 +94,7 @@ fun findPython(): String {
     )
 }
 
-val pythonSetupVenv by tasks.registering(Exec::class) {
+val pythonSetupVenv = tasks.register<Exec>("pythonSetupVenv") {
     group = "python"
     description = "Create Python virtual environment"
 
@@ -110,7 +110,7 @@ val pythonSetupVenv by tasks.registering(Exec::class) {
     }
 }
 
-val pythonUpgradePip by tasks.registering(Exec::class) {
+val pythonUpgradePip = tasks.register<Exec>("pythonUpgradePip") {
     group = "python"
     description = "Upgrade pip in virtual environment"
 
@@ -118,26 +118,38 @@ val pythonUpgradePip by tasks.registering(Exec::class) {
     onlyIf { venvDir.exists() }
 
     workingDir = pythonDir
-    commandLine(pythonExe.absolutePath, "-m", "pip", "install", "--upgrade", "pip")
+    commandLine(pythonExe.absolutePath, "-m", "pip", "install", "-q", "--disable-pip-version-check", "--upgrade", "pip")
+
+    // Once per venv, as the marker goes with the venv, or with an upgrade that failed
+    val upgraded = venvDir.resolve(".pip-upgraded")
+    outputs.file(upgraded)
 
     doFirst {
-        logger.lifecycle("Upgrading pip in virtual environment")
+        upgraded.delete()
+        logger.info("Upgrading pip in virtual environment")
+    }
+    doLast {
+        upgraded.writeText("")
     }
 }
 
-val pythonInstall by tasks.registering(Exec::class) {
+val pythonInstall = tasks.register<Exec>("pythonInstall") {
     group = "python"
     description = "Install Python package in development mode"
 
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "-e", ".[dev]")
+    commandLine(pipExe.absolutePath, "install", "-q", "--disable-pip-version-check", "-e", ".[dev]")
 
-    // Re-run if pyproject.toml changes
+    // The editable install reads the sources in place, so only a change to pyproject.toml, or a missing marker
+    // (a new venv, or an install that failed), redoes it
     inputs.file(pythonDir.resolve("pyproject.toml"))
+    val installed = venvDir.resolve(".openrewrite-installed")
+    outputs.file(installed)
 
     doFirst {
+        installed.delete()
         // An existing venv is reused as-is, so the interpreter inside one is checked
         // here as well as at creation.
         val version = pythonVersion(pythonExe.absolutePath)
@@ -147,7 +159,10 @@ val pythonInstall by tasks.registering(Exec::class) {
                     "below ${minimumPython.display()}. Delete it and re-run to have it rebuilt."
             )
         }
-        logger.lifecycle("Installing Python package with pip")
+        logger.info("Installing Python package with pip")
+    }
+    doLast {
+        installed.writeText("")
     }
 }
 
@@ -184,6 +199,11 @@ testing {
                         // Include the main test classes so common tests run with the Python 2 parser
                         testClassesDirs += sourceSets["test"].output.classesDirs
                         classpath += sourceSets["test"].runtimeClasspath
+                        // The dependency and lock file machinery tested under internal never starts a parser,
+                        // so here its tests would only repeat the test task's run of them
+                        filter {
+                            excludeTestsMatching("org.openrewrite.python.internal.*")
+                        }
 
                         systemProperty("rewrite.python.version", "2")
 
@@ -199,7 +219,7 @@ testing {
     }
 }
 
-val pytestTest by tasks.registering(Exec::class) {
+val pytestTest = tasks.register<Exec>("pytestTest") {
     group = "verification"
     description = "Run Python pytest tests"
 
@@ -214,10 +234,8 @@ val pytestTest by tasks.registering(Exec::class) {
     val relativePythonExe = if (isWindows) ".venv/Scripts/python.exe" else ".venv/bin/python"
     val pytestArgs = mutableListOf(relativePythonExe, "-m", "pytest", "tests/",
         "--junitxml=build/test-results/pytest/junit.xml")
-    // -PverboseTests restores per-test output
-    if (project.hasProperty("verboseTests")) {
-        pytestArgs.add("-v")
-    }
+    // -PverboseTests restores per-test output, where otherwise passing tests are only a dot each
+    pytestArgs.add(if (project.hasProperty("verboseTests")) "-v" else "-q")
     commandLine(pytestArgs)
 
     inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
@@ -238,14 +256,13 @@ tasks.named("check") {
     dependsOn(pytestTest)
 }
 
-// Run tests serially to avoid issues with concurrent Python RPC processes
-// The Python RPC server uses ThreadLocal, but test state can interfere
-// when multiple tests run rapidly on the same thread
+// Each test JVM starts Python RPC processes of its own, so tests in different forks share no RPC state
 tasks.withType<Test> {
     // Ensure Python venv is set up before running tests
     dependsOn(pythonInstall)
 
-    maxParallelForks = 1
+    // A fork costs a Python process besides its JVM, so there are at most four
+    maxParallelForks = maxParallelForks.coerceAtMost(4)
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
     testLogging {
@@ -254,9 +271,14 @@ tasks.withType<Test> {
             events("started", "passed", "failed", "skipped")
             showStandardStreams = true
         } else {
-            events("failed", "skipped")
+            events("failed")
         }
     }
+}
+
+// integTest includes a throughput measurement, which tests in other forks would disturb
+tasks.named<Test>("integTest") {
+    maxParallelForks = 1
 }
 
 // Note: Python IDE support is configured via the standalone module at:
@@ -293,7 +315,7 @@ val pythonVersion: String = if (System.getenv("CI") != null) {
 }
 
 // Write rewrite-python-version.txt resource so PythonRewriteRpc can pin the pip package version
-val generateVersionTxt by tasks.registering {
+val generateVersionTxt = tasks.register("generateVersionTxt") {
     group = "python"
     description = "Generate META-INF/rewrite-python-version.txt for RPC version pinning"
 
@@ -318,7 +340,7 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 // ============================================
 
 // Task to update version in pyproject.toml
-val pythonUpdateVersion by tasks.registering {
+val pythonUpdateVersion = tasks.register("pythonUpdateVersion") {
     group = "python"
     description = "Update version in pyproject.toml"
 
@@ -340,7 +362,7 @@ val pythonUpdateVersion by tasks.registering {
 }
 
 // Task to install build dependencies
-val pythonInstallBuildDeps by tasks.registering(Exec::class) {
+val pythonInstallBuildDeps = tasks.register<Exec>("pythonInstallBuildDeps") {
     group = "python"
     description = "Install Python build and publish dependencies"
 
@@ -355,7 +377,7 @@ val pythonInstallBuildDeps by tasks.registering(Exec::class) {
 }
 
 // Task to build Python distribution (wheel + sdist)
-val pythonBuild by tasks.registering(Exec::class) {
+val pythonBuild = tasks.register<Exec>("pythonBuild") {
     group = "python"
     description = "Build Python distribution packages"
 
@@ -381,7 +403,7 @@ val pythonBuild by tasks.registering(Exec::class) {
 fun pypiToken(): String? = project.findProperty("pypiToken")?.toString()?.takeIf { it.isNotBlank() }
 
 // Task to create .pypirc for authentication
-val setupPypirc by tasks.registering {
+val setupPypirc = tasks.register("setupPypirc") {
     group = "python"
     description = "Create .pypirc file for PyPI authentication"
 
@@ -402,7 +424,7 @@ val setupPypirc by tasks.registering {
 }
 
 // Task to publish to PyPI
-val pythonPublish by tasks.registering(Exec::class) {
+val pythonPublish = tasks.register<Exec>("pythonPublish") {
     group = "python"
     description = "Publish Python package to PyPI"
 
@@ -426,7 +448,7 @@ fun cgpPublishToken(): String? =
     project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
 
 // Task to publish to the Code Genome Project
-val pythonPublishCgp by tasks.registering {
+val pythonPublishCgp = tasks.register("pythonPublishCgp") {
     group = "python"
     description = "Publish Python package to the Code Genome Project"
 
@@ -502,7 +524,7 @@ if (cgpPublishToken() != null) {
 // ============================================
 
 // Task to generate classpath file for Java RPC server testing
-val generateTestClasspath by tasks.registering {
+val generateTestClasspath = tasks.register("generateTestClasspath") {
     group = "python"
     description = "Generate classpath file for Java RPC server (used by Python tests)"
 
@@ -530,12 +552,12 @@ val generateTestClasspath by tasks.registering {
         ).distinctBy { it.absolutePath }
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+        logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
 
 // Task to print test classpath to stdout (useful for setting env vars)
-val printTestClasspath by tasks.registering {
+val printTestClasspath = tasks.register("printTestClasspath") {
     group = "python"
     description = "Print the test classpath (for use with REWRITE_PYTHON_CLASSPATH env var)"
 
