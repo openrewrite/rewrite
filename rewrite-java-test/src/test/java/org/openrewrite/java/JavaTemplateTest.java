@@ -117,6 +117,7 @@ class JavaTemplateTest implements RewriteTest {
                     return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
             }))
+            // the visitor rebuilds the parentheses it replaces in every cycle
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
           java(
@@ -140,11 +141,12 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    if (binary.getOperator() != J.Binary.Type.Addition) {
+                        return binary;
+                    }
                     return JavaTemplate.apply("#{any(int)} * 3", getCursor(), binary.getCoordinates().replace(), binary);
                 }
-            }))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            })),
           java(
             """
               public class A {
@@ -581,14 +583,13 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       var mi = (J.MethodInvocation) binary.getLeft();
-                      return JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
-                  } else if (binary.getLeft() instanceof J.Unary) {
-                      return binary.getLeft();
+                      J.Binary b = JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
+                      return b.getLeft();
                   }
                   return binary;
               }
@@ -1463,10 +1464,13 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+          spec -> spec
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    if (!(lambda.getBody() instanceof J.Block)) {
+                        return lambda;
+                    }
                     var param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
                     J.VariableDeclarations.NamedVariable variable = param.getVariables().getFirst();
 

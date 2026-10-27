@@ -30,6 +30,7 @@ import dotty.tools.dotc.util.Spans
 
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
+import org.openrewrite.scala.tree.Union
 
 import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
@@ -227,10 +228,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _: Trees.TypeApply[?] | _: Trees.Select[?] | _: Trees.Ident[?] if tree.symbol == sym =>
       tree.tpe.widenSingleton match {
         case info: (MethodType | ExprType) if !info.isError => Some(info)
+        case value: ValueType if !value.isError && isParameterless(sym) => Some(ExprType(value))
         case _ => None
       }
     case _ => None
   }
+
+  private def isParameterless(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && !takesParameters(sym.info)
+
+  private def takesParameters(info: Type): Boolean = info.stripPoly.isInstanceOf[MethodType]
 
   /**
    * Whether the node refers to a method taking parameters, so that applying it calls the method
@@ -241,7 +248,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       try node.own.tpe match {
         case ref: TermRef =>
           val alternatives = ref.denot.alternatives
-          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && d.info.stripPoly.isInstanceOf[MethodType])
+          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && takesParameters(d.info))
         case _ => false
       } catch {
         case _: Throwable => false
@@ -604,21 +611,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case tmr: TermRef => mapTermRef(tmr, sig)
         case tt: ThisType => mapType(tt.tref)
         case et: ExprType => mapType(et.resultType)
+        case at: AppliedType if at.isRepeatedParam => mapType(at.translateFromRepeated(toArray = false))
         case at: AppliedType => mapAppliedType(at, sig)
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
         case at: AndType => mapType(at.tp1)
-        case _: OrType => unknown
+        case ot: OrType => mapUnionType(ot, sig)
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
-          val rawFqn = ci.cls.fullName.toString
-          val fqn = if (rawFqn.endsWith("$")) rawFqn.dropRight(1) else rawFqn
-          val normalizedFqn = fqn match {
-            case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-            case other => other
-          }
-          mapClassType(ci.cls, normalizedFqn, normalizedFqn)
+          val fqn = signatureBuilder.classFqn(ci.cls)
+          mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         case _ => unknown
@@ -626,6 +629,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     } catch {
       case _: Throwable => unknown
     }
+  }
+
+  private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
+    case Nil => mapType(ctx.definitions.NothingType)
+    case (_, only) :: Nil => mapType(only)
+    case members => typeFactory.computeMultiCatch(sig, (union: Union) =>
+      union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */
@@ -669,17 +679,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case "scala.Double" => return JavaType.Primitive.Double
       case "scala.Boolean" => return JavaType.Primitive.Boolean
       case "scala.Unit" => return JavaType.Primitive.Void
+      case "scala.Null" => return JavaType.Primitive.Null
+      case "scala.Matchable" => return mapType(ctx.definitions.ObjectType)
       case _ =>
     }
 
-    // Strip trailing $ from Scala companion object names (e.g., Collections$ → Collections)
-    val baseFqn = if (fqn.endsWith("$")) fqn.dropRight(1) else fqn
-    val javaFqn = baseFqn match {
-      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-      case other => other
-    }
-
-    mapClassType(sym, javaFqn, sig)
+    mapClassType(sym, signatureBuilder.classFqn(sym), sig)
   }
 
   private def mapTermRef(tmr: TermRef, sig: String): JavaType = {
@@ -696,6 +701,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val baseType = mapType(at.tycon) match {
       case p: JavaType.Parameterized => p.getType
       case fq: JavaType.FullyQualified => fq
+      case typeConstructor: JavaType.GenericTypeVariable => return typeConstructor
       case _ => return unknown
     }
 
@@ -726,9 +732,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         underlying match {
           case tb: TypeBounds =>
-            if (!(tb.hi =:= ctx.definitions.AnyType)) {
+            val hi = upperBoundOfKind(tb.hi)
+            if (!(hi =:= ctx.definitions.AnyType)) {
               bounds = new ArrayList[JavaType]()
-              val mapped = mapType(tb.hi)
+              val mapped = mapType(hi)
               if (mapped != null) bounds.add(mapped)
               resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
@@ -737,6 +744,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         gtv.unsafeSet(name, resolvedVariance, bounds)
       })
+  }
+
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  private def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
@@ -759,7 +772,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       })
   }
 
-  def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+  def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+    val sym = javaClassOfStatics(symbol)
     // Members of library types are not populated to avoid deep recursive type
     // graphs that cause StackOverflowError in recipes like ChangeType.
     val isSourceDefined = try {
@@ -844,6 +858,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     })
   }
 
+  /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
+  private def javaClassOfStatics(sym: Symbol): Symbol =
+    if (sym.is(Flags.JavaDefined) && sym.is(Flags.ModuleClass) && sym.companionClass.exists) sym.companionClass
+    else sym
+
   // --- Method and Variable type mapping ---
 
   def mapMethodType(sym: Symbol): JavaType.Method =
@@ -867,7 +886,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         val paramTypes: util.List[JavaType] = info.stripPoly match {
           case mt: MethodType =>
             val pts = new ArrayList[JavaType]()
-            mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
+            mt.paramInfos.foreach(pt => pts.add(mapType(signatureBuilder.parameterType(sym, pt))))
             pts
           case _ => null
         }
@@ -891,7 +910,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typeFactory.variableFor(sig, () => {
       val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
       val ownerType = try { variableOwner(sym) } catch { case _: Throwable => unknown }
-      val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
+      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case _: Throwable => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
       variable
     })
@@ -932,6 +951,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     if (sym.is(Flags.Abstract)) bits |= Flag.Abstract.getBitMask
     if (sym.is(Flags.Final) || sym.is(Flags.Module)) bits |= Flag.Final.getBitMask
     if (sym.isStatic) bits |= Flag.Static.getBitMask
+    if (sym.isTerm && isVarargs(sym.info)) bits |= Flag.Varargs.getBitMask
     bits
+  }
+
+  /**
+   * Whether this is the type of a method whose last parameter is repeated, or of a repeated parameter.
+   * A method's type gives a repeated parameter as `<repeated>[T]`; the parameter itself is a `Seq[T] @Repeated`.
+   */
+  private def isVarargs(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => mt.paramInfos.lastOption.exists(_.isRepeatedParam)
+    case tpe => tpe.isRepeatedParam || tpe.hasAnnotation(ctx.definitions.RepeatedAnnot)
   }
 }

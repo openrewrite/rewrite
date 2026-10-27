@@ -52,6 +52,8 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.isFork = true
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    options.isWarnings = false
+    options.compilerArgs.add("-XDsuppressNotes")
 }
 
 tasks.withType<Test>().configureEach {

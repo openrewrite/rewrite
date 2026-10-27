@@ -15,9 +15,12 @@
 """AddImport visitor for Python import handling."""
 
 import builtins
+import re
+import sys
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional
+from enum import Enum, IntEnum
+from pathlib import Path
+from typing import NamedTuple, Optional
 
 from rewrite import random_id
 from rewrite.java import J
@@ -25,6 +28,7 @@ from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
+from rewrite.python.format.line_breaks import line_break
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, module_binding_name, pad_right,
                                          referenced_names)
@@ -268,49 +272,182 @@ class AddImport(PythonVisitor):
     def _add_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Add a new import statement to the compilation unit."""
         new_import = create_import_statement(self.module, self.name, self.alias)
+        newline = line_break(cu)
 
         # Insert after the module docstring (which must stay first) and any existing imports.
         padded_stmts = list(cu.padding.statements)
         header = 1 if _is_module_docstring(padded_stmts) else 0
+        first_import = None
         insert_idx = header
         for i in range(header, len(padded_stmts)):
             if isinstance(padded_stmts[i].element, (Import, MultiImport)):
+                if first_import is None:
+                    first_import = i
                 insert_idx = i + 1
             elif insert_idx > header:
                 break  # Stop after we've passed the import section
 
         # Insert the new import at the padding level
-        if not padded_stmts:
-            # Empty file (e.g., a prior remove-import emptied the statement
-            # list). The new import becomes the sole statement with empty
-            # prefix; any trailing newline lives in cu.eof.
+        if not padded_stmts or (len(padded_stmts) == 1 and isinstance(padded_stmts[0].element, Empty)):
+            # An empty module holds one Empty statement, which the new import replaces.
+            # Any trailing newline lives in cu.eof, which must open with a line break for a comment in
+            # it to stay off the import's line.
             new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
-            padded_stmts.append(new_padded)
+            padded_stmts = [new_padded]
+            eof = cu.eof
+            if eof.comments and '\n' not in eof.whitespace:
+                cu = cu.replace(eof=eof.replace(whitespace=newline + eof.whitespace))
         elif insert_idx == 0:
             first = padded_stmts[0]
             first_prefix = first.element.prefix
-            if first_prefix.whitespace and first_prefix.whitespace.startswith('\n'):
+            if first_prefix.whitespace and first_prefix.whitespace.startswith(('\n', '\r\n')):
                 # First statement has a leading newline (e.g., a prior import was
                 # removed). The new import becomes the true first statement with
-                # empty prefix; the existing statement keeps its '\n'.
+                # empty prefix; the existing statement keeps its line break.
                 new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
             else:
                 # Normal case: new import takes the first statement's prefix,
-                # and the first statement gets '\n' as separator.
+                # and the first statement gets a line break as separator.
                 new_padded = JRightPadded(new_import.replace(prefix=first_prefix), Space.EMPTY, Markers.EMPTY)
                 padded_stmts[0] = JRightPadded(
-                    first.element.replace(prefix=Space([], '\n')),
+                    first.element.replace(prefix=Space([], newline)),
                     first.after, first.markers
                 )
             padded_stmts.insert(insert_idx, new_padded)
         else:
-            # Inserting after existing imports. The new import needs '\n' as
-            # its prefix since each statement's prefix carries the newline
-            # that separates it from the preceding statement.
-            new_padded = JRightPadded(new_import.replace(prefix=Space([], '\n')), Space.EMPTY, Markers.EMPTY)
-            padded_stmts.insert(insert_idx, new_padded)
+            placement = None
+            if first_import is not None:
+                placement = self._place_in_sections(cu, padded_stmts[first_import:insert_idx], first_import)
+            if placement is None:
+                placement = _Placement(insert_idx - 1, after=True, new_group=False)
+            cu, padded_stmts = _insert(cu, padded_stmts, new_import, newline, placement)
 
         return cu.padding.replace(_statements=padded_stmts)
+
+    def _place_in_sections(self, cu: CompilationUnit, block: list, offset: int) -> Optional['_Placement']:
+        """Where the new import goes when `block` is laid out in isort's sections: future, standard
+        library, third party and local, each a run of imports separated from the next by a blank line,
+        in that order. None where the imports are laid out otherwise, or are one run that shows no layout."""
+        local_roots = set(Path(str(cu.source_path)).parts[:-1])
+        groups: list[list[int]] = []
+        for i, padded in enumerate(block):
+            if not groups or _BLANK_LINE.search(_text_of(padded.element.prefix)):
+                groups.append([])
+            groups[-1].append(offset + i)
+        if len(groups) < 2:
+            return None
+        sections = []
+        for group in groups:
+            in_group = {_section(_module_of(block[i - offset].element), local_roots) for i in group}
+            if len(in_group) != 1:
+                return None
+            sections.append(in_group.pop())
+        if sections != sorted(sections):
+            return None
+
+        section = _section(self.module, local_roots)
+        key = (self.name is not None, self.module.lower())
+        for group, group_section in zip(groups, sections):
+            if group_section == section:
+                for i in group:
+                    if key < _isort_key(block[i - offset].element):
+                        return _Placement(i, after=False, new_group=False)
+                return _Placement(group[-1], after=True, new_group=False)
+        earlier = [group for group, group_section in zip(groups, sections) if group_section < section]
+        if earlier:
+            return _Placement(earlier[-1][-1], after=True, new_group=True)
+        return _Placement(groups[0][0], after=False, new_group=True)
+
+
+_BLANK_LINE = re.compile(r'\n[ \t\r\f]*\n')
+
+
+class _Section(IntEnum):
+    FUTURE = 0
+    STANDARD_LIBRARY = 1
+    THIRD_PARTY = 2
+    LOCAL = 3
+
+
+def _section(module: str, local_roots: set[str]) -> _Section:
+    if module.startswith('.'):
+        return _Section.LOCAL
+    root = module.split('.')[0]
+    if root == '__future__':
+        return _Section.FUTURE
+    if root in sys.stdlib_module_names:
+        return _Section.STANDARD_LIBRARY
+    if root in local_roots:
+        return _Section.LOCAL
+    return _Section.THIRD_PARTY
+
+
+def _module_of(statement: Import | MultiImport) -> str:
+    """The module an import statement reads, with a leading dot where it is relative."""
+    if isinstance(statement, MultiImport):
+        if statement.from_ is None:
+            return get_qualid_name(statement.names[0].qualid)
+        leftmost = statement.from_
+        while isinstance(leftmost, FieldAccess):
+            leftmost = leftmost.target
+        relative = isinstance(leftmost, Identifier) and leftmost.simple_name == ''
+        return ('.' if relative else '') + get_name_string(statement.from_)
+    return get_qualid_name(statement.qualid)
+
+
+def _isort_key(statement: Import | MultiImport) -> tuple[bool, str]:
+    """isort's order within a section: `import m` before `from m import n`, then by module."""
+    is_from = isinstance(statement, MultiImport) and statement.from_ is not None
+    return is_from, _module_of(statement).lower()
+
+
+def _text_of(space: Space) -> str:
+    return space.whitespace + ''.join(comment.suffix for comment in space.comments)
+
+
+class _Placement(NamedTuple):
+    index: int
+    after: bool
+    new_group: bool
+
+
+def _insert(cu: CompilationUnit, padded_stmts: list, new_import: J, newline: str,
+            placement: _Placement) -> tuple[CompilationUnit, list]:
+    separator = newline * 2 if placement.new_group else newline
+    if not placement.after:
+        # The new import takes over the separation, and any comment, ahead of the statement it precedes.
+        anchor = padded_stmts[placement.index]
+        padded_stmts[placement.index] = anchor.replace(_element=anchor.element.replace(prefix=Space([], separator)))
+        padded_stmts.insert(placement.index, JRightPadded(new_import.replace(prefix=anchor.element.prefix),
+                                                          Space.EMPTY, Markers.EMPTY))
+        return cu, padded_stmts
+
+    at = placement.index + 1
+    following = padded_stmts[at].element.prefix if at < len(padded_stmts) else cu.eof
+    prefix, following = _split_trailing_comment(following, separator, newline)
+    if at < len(padded_stmts):
+        anchor = padded_stmts[at]
+        padded_stmts[at] = anchor.replace(_element=anchor.element.replace(prefix=following))
+    else:
+        cu = cu.replace(eof=following)
+    padded_stmts.insert(at, JRightPadded(new_import.replace(prefix=prefix), Space.EMPTY, Markers.EMPTY))
+    return cu, padded_stmts
+
+
+def _split_trailing_comment(space: Space, separator: str, newline: str) -> tuple[Space, Space]:
+    """The prefix of a statement inserted where `space` was, and what remains of `space` after it.
+
+    A comment `space` opens without a line break ends the line of the statement before, and stays on it.
+    """
+    if not space.comments or '\n' in space.whitespace or '\r' in space.whitespace:
+        return Space([], separator), space
+    comment = space.comments[0]
+    line_break = re.match(r'\r\n|\n|\r', comment.suffix)
+    if line_break is None:
+        return Space([], separator), space
+    end = line_break.end()
+    return (Space([comment.replace(suffix=comment.suffix[:end] + separator[len(newline):])], space.whitespace),
+            Space(space.comments[1:], newline + comment.suffix[end:]))
 
 
 def insert_member(elements: list, new_import: Import) -> list:
@@ -371,23 +508,14 @@ def _sort_key(imp: Import) -> str:
 
 
 def create_import_statement(module: str, name: Optional[str] = None,
-                            alias: Optional[str] = None) -> MultiImport:
+                            alias: Optional[str] = None) -> Import | MultiImport:
     """Build ``import module [as alias]`` or ``from module import name [as alias]``."""
     if name is None:
-        # Direct import: import module [as alias]
+        # A parse gives a lone ``import module`` as a bare Import, its qualid prefixed by the
+        # space after the keyword.
         import_elem = create_import_element(module, alias)
-        return MultiImport(
-            random_id(),
-            Space([], '\n'),
-            Markers.EMPTY,
-            None,  # No 'from'
-            False,  # Not parenthesized
-            JContainer(
-                Space.SINGLE_SPACE,
-                [pad_right(import_elem)],
-                Markers.EMPTY
-            )
-        )
+        return import_elem.replace(prefix=Space([], '\n'),
+                                   qualid=import_elem.qualid.replace(prefix=Space.SINGLE_SPACE))
     else:
         # From import: from module import name [as alias]
         from_name = _create_module_name(module)

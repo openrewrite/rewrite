@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.GradlePlugin;
@@ -102,8 +103,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     public static class DependencyVersionState {
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
         Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
-        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
-        AtomicReference<@Nullable GradleSettings> gradleSettings = new AtomicReference<>();
+
+        /**
+         * The root project's repositories if it was scanned, otherwise the first one's, which a catalog resolves
+         * against when no settings script was scanned.
+         */
+        AtomicReference<@Nullable ProjectRepositories> projectRepositories = new AtomicReference<>();
+        AtomicReference<@Nullable ProjectRepositories> settingsRepositories = new AtomicReference<>();
     }
 
     @Override
@@ -128,11 +134,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
-                    if (gradleProject != null && (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath()))) {
-                        acc.gradleProject.set(gradleProject);
+                    if (gradleProject != null && (acc.projectRepositories.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.projectRepositories.set(ProjectRepositories.of(gradleProject));
                     }
                     if (gradleSettings != null) {
-                        acc.gradleSettings.set(gradleSettings);
+                        acc.settingsRepositories.set(ProjectRepositories.of(gradleSettings));
                     }
                     localVariableValues.clear();
                 }
@@ -213,9 +219,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
-                upgradeVersionCatalog(catalog,
-                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), acc.gradleSettings.get()), ctx));
+        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+            // A selector given settings resolves from the settings' repositories alone
+            ProjectRepositories settingsRepositories = acc.settingsRepositories.get();
+            ProjectRepositories repositories = settingsRepositories != null ? settingsRepositories :
+                    acc.projectRepositories.get();
+            return upgradeVersionCatalog(catalog, repositories == null ?
+                    new DependencyVersionSelector(metadataFailures, null, null) :
+                    repositories.selector(metadataFailures), ctx);
+        });
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {

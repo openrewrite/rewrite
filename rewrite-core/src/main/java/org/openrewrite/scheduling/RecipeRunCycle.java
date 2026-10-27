@@ -101,6 +101,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
+    @Getter
+    @NonFinal
+    boolean causesAnotherCycle;
+
     /**
      * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
      */
@@ -108,6 +112,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();
+    }
+
+    /**
+     * The recipe currently scanning, generating, or editing in this cycle, or {@code null} when no single recipe is responsible.
+     */
+    @Incubating(since = "8.94.0")
+    public @Nullable Recipe getCurrentRecipe() {
+        return allRecipeStack.getCurrentRecipe();
     }
 
     /**
@@ -281,7 +293,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             batch.rpc.batchVisit(source, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(leaf(batch.recipeStacks.get(0)), source, source, t);
+                allRecipeStack.attributedTo(soleRecipe(batch), () ->
+                        handleError(leaf(batch.recipeStacks.get(0)), source, source, t));
             }
         }
 
@@ -377,7 +390,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
-                            madeChangesInThisCycle.add(recipe);
+                            recordChange(recipeStack);
                         }
                     } catch (Throwable t) {
                         handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
@@ -528,7 +541,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 });
 
                 if (after != src) {
-                    madeChangesInThisCycle.add(recipe);
+                    recordChange(recipeStack);
                     recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
                     if (src.getMarkers().findFirst(Generated.class).isPresent()) {
                         // skip edits made to generated source files so that they don't show up in a diff
@@ -536,8 +549,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         return src;
                     }
                 } else if (ctx.hasNewMessages()) {
-                    // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                    madeChangesInThisCycle.add(recipe);
+                    // new messages count as a change, but only the writing recipe's causesAnotherCycle() applies
+                    recordChange(singletonList(recipe));
                     ctx.resetHasNewMessages();
                 }
             } catch (Throwable t) {
@@ -583,23 +596,28 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         Map<UUID, String> attributionMap = new HashMap<>();
         boolean anyModified = false;
         boolean deleted = false;
+        @Nullable Recipe soleModifier = null;
+        int modifiedCount = 0;
 
         for (int i = 0; i < response.getResults().size(); i++) {
             BatchVisitResponse.BatchVisitResult r = response.getResults().get(i);
             List<Recipe> recipeStack = batch.recipeStacks.get(i);
             Recipe recipe = leaf(recipeStack);
 
-            if (r.isModified() || r.isHasNewMessages()) {
-                madeChangesInThisCycle.add(recipe);
+            if (r.isModified() || r.isDeleted()) {
+                recordChange(recipeStack);
+            } else if (r.isHasNewMessages()) {
+                recordChange(singletonList(recipe));
             }
 
             if (r.isModified()) {
                 anyModified = true;
+                soleModifier = recipe;
+                modifiedCount++;
             }
 
             if (r.isDeleted()) {
                 deleted = true;
-                madeChangesInThisCycle.add(recipe);
                 break;
             }
 
@@ -609,6 +627,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
 
         if (deleted) {
+            for (int i = 0; i < response.getResults().size(); i++) {
+                BatchVisitResponse.BatchVisitResult r = response.getResults().get(i);
+                if (r.isModified() || r.isDeleted()) {
+                    recordSourceFileResultAndSearchResults(originalBefore, null, batch.recipeStacks.get(i), emptyList(), ctx);
+                }
+            }
             batch.clear();
             return null;
         }
@@ -616,7 +640,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         SourceFile fetched = source;
         if (anyModified) {
             try {
-                fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
+                // Markup received here is attributed in Markup.rpcReceive, which only knows the modifier when it's unique
+                fetched = allRecipeStack.attributedTo(modifiedCount == 1 ? soleModifier : null, () ->
+                        rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass())));
                 if (fetched == null) {
                     // A batch reports its deletions in its results, so a missing tree here is one the remote lost.
                     throw new IllegalStateException("Remote reported " + originalBefore.getSourcePath() + " as modified but no longer holds it");
@@ -650,6 +676,17 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile batchFailed(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
+        return allRecipeStack.attributedTo(soleRecipe(batch), () -> recordBatchFailure(batch, originalBefore, source, t));
+    }
+
+    /**
+     * A failed batch can't tell which of its recipes failed, so only a single-recipe batch is attributed.
+     */
+    private static @Nullable Recipe soleRecipe(BatchState batch) {
+        return batch.recipeStacks.size() == 1 ? leaf(batch.recipeStacks.get(0)) : null;
+    }
+
+    private @Nullable SourceFile recordBatchFailure(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
         if (!batch.recipeStacks.isEmpty()) {
             SourceFile beforeError = source;
             if (!(t instanceof RecipeRunException)) {
@@ -888,6 +925,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      */
     private static Recipe leaf(List<Recipe> recipeStack) {
         return recipeStack.get(recipeStack.size() - 1);
+    }
+
+    private void recordChange(List<Recipe> recipeStack) {
+        madeChangesInThisCycle.add(leaf(recipeStack));
+        for (Recipe recipe : recipeStack) {
+            if (recipe.causesAnotherCycle()) {
+                causesAnotherCycle = true;
+                break;
+            }
+        }
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {

@@ -75,9 +75,7 @@ public class RemoveUnusedImports extends Recipe {
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
 
-            // Collect all identifier simple names from source (excluding imports) to detect
-            // types that only appear in type attribution but not in actual source references
-            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
+            Set<String> sourceIdentifierNames = RemoveImport.namesInSource(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -175,13 +173,10 @@ public class RemoveUnusedImports extends Recipe {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
-                            // replacing the star with a series of unfolded imports
-                            anImport.imports.clear();
-
-                            // add each unfolded import
+                            List<JRightPadded<J.Import>> unfolded = new ArrayList<>();
                             if (unfoldedMethodsAndFields != null) {
                                 for (String method : unfoldedMethodsAndFields) {
-                                    anImport.imports.add(new JRightPadded<>(elem
+                                    unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
@@ -190,20 +185,14 @@ public class RemoveUnusedImports extends Recipe {
 
                             if (staticClasses != null) {
                                 for (JavaType.FullyQualified fqn : staticClasses) {
-                                    anImport.imports.add(new JRightPadded<>(elem
+                                    unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
                             }
 
-                            // move whatever the original prefix of the star import was to the first unfolded import
-                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                    .getElement().withPrefix(elem.getPrefix())));
-
-                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                            ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-
+                            replaceWithUnfolded(anImport, unfolded, checkedImports);
                             changed = true;
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
@@ -241,33 +230,21 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.used = true;
                             usedWildcardImports.add(elem.getPackageName());
                         } else if (combinedTypes.size() < layoutStyle.getClassCountToUseStarImport()) {
-                            // replacing the star with a series of unfolded imports
-                            anImport.imports.clear();
-
-                            // add each unfolded import, but only for types that are used unqualified
+                            // unfold only the types that are used unqualified
+                            List<JRightPadded<J.Import>> unfolded = new ArrayList<>();
                             combinedTypes.stream()
                                     .filter(fqType -> unqualifiedTypeNames.contains(fqType.getFullyQualifiedName()))
                                     .map(JavaType.FullyQualified::getClassName)
                                     .sorted()
                                     .distinct()
-                                    .forEach(type -> anImport.imports.add(new JRightPadded<>(elem
+                                    .forEach(type -> unfolded.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                                     );
 
-                            // move whatever the original prefix of the star import was to the first unfolded import
-                            if (!anImport.imports.isEmpty()) {
-                                anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                        .getElement().withPrefix(elem.getPrefix())));
-                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                                ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-                                changed = true;
-                            } else {
-                                // No types are used unqualified, so remove the wildcard import entirely
-                                anImport.used = false;
-                                changed = true;
-                            }
+                            replaceWithUnfolded(anImport, unfolded, checkedImports);
+                            changed = true;
                         } else {
                             usedWildcardImports.add(target);
                         }
@@ -338,6 +315,23 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             return cu;
+        }
+
+        /**
+         * Replaces a star import with its unfolded imports, less those repeating an import above them.
+         * When none remain, the star import stays in place as unused, so its prefix passes to the next import.
+         */
+        private void replaceWithUnfolded(ImportUsage starImport, List<JRightPadded<J.Import>> unfolded, Set<String> checkedImports) {
+            unfolded.removeIf(i -> !checkedImports.add(i.getElement().toString()));
+            if (unfolded.isEmpty()) {
+                starImport.used = false;
+                return;
+            }
+            J.Import star = starImport.imports.get(0).getElement();
+            unfolded.set(0, unfolded.get(0).withElement(unfolded.get(0).getElement().withPrefix(star.getPrefix())));
+            ImportComments.unfoldComments(getCursor(), star, unfolded);
+            starImport.imports.clear();
+            starImport.imports.addAll(unfolded);
         }
 
         private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
@@ -524,25 +518,6 @@ public class RemoveUnusedImports extends Recipe {
                         cursor = cursor.getParent();
                     }
                     return false;
-                }
-            }.reduce(cu, new HashSet<>());
-        }
-
-        /**
-         * Collect all identifier simple names appearing in source code, excluding import statements.
-         * Used to detect imports whose type name doesn't actually appear in the source.
-         */
-        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
-            return new JavaIsoVisitor<Set<String>>() {
-                @Override
-                public J.Import visitImport(J.Import import_, Set<String> names) {
-                    return import_;
-                }
-
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
-                    names.add(identifier.getSimpleName());
-                    return super.visitIdentifier(identifier, names);
                 }
             }.reduce(cu, new HashSet<>());
         }

@@ -40,7 +40,7 @@ import static org.openrewrite.python.Assertions.uvLock;
 
 /**
  * End-to-end recipe test of native uv.lock regeneration against recorded pypi.org
- * responses (fixtures under {@code /uvlock/}); the expected lock is byte-identical
+ * responses (fixtures under {@code /lock/uv/}); the expected lock is byte-identical
  * to what uv 0.10.11 wrote for the same edit.
  */
 class UpgradeDependencyVersionUvLockTest implements RewriteTest {
@@ -159,7 +159,7 @@ class UpgradeDependencyVersionUvLockTest implements RewriteTest {
     }
 
     private static String resource(String name) {
-        try (InputStream is = UpgradeDependencyVersionUvLockTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = UpgradeDependencyVersionUvLockTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

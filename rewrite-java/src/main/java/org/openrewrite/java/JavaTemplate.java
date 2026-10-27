@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -106,6 +107,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     @Override
+    @CheckReturnValue
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return doApply(scope, coordinates, true, parameters);
     }
@@ -192,6 +194,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

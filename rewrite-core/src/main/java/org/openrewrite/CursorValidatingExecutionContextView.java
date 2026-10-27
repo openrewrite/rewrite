@@ -42,7 +42,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     }
 
     /**
-     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
     @Deprecated
     public boolean getValidateCursorAcyclic() {
@@ -50,7 +50,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     }
 
     /**
-     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
     @Deprecated
     @SuppressWarnings("UnusedReturnValue")
@@ -96,7 +96,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
                 ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
                 key.startsWith(Singleton.class.getName()) ||
-                "org.openrewrite.python.liveDepsTrees".equals(key) ||
+                "org.openrewrite.python.liveDeps".equals(key) ||
                 "org.openrewrite.javascript.packageManagerFileEditors".equals(key) ||
                 "org.openrewrite.javascript.registryClient".equals(key) ||
                 key.startsWith("org.openrewrite.remote.") ||

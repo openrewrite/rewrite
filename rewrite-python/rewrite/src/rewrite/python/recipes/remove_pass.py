@@ -14,7 +14,7 @@
 
 """Recipe to remove redundant pass statements from Python code."""
 
-from typing import Any, List, Optional
+from typing import Any, List
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.category import CategoryDescriptor
@@ -59,7 +59,7 @@ class RemovePass(Recipe):
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         class Visitor(PythonVisitor[ExecutionContext]):
-            def visit_pass(self, pass_: Pass, p: ExecutionContext) -> Optional[J]:
+            def visit_pass(self, pass_: Pass, p: ExecutionContext) -> J | None:
                 # Find the enclosing block or compilation unit
                 block = self.cursor.first_enclosing(Block)
                 if block is not None:

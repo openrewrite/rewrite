@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
 import java.time.ZoneOffset
@@ -235,8 +233,6 @@ val pytestTest by tasks.registering(Exec::class) {
     outputs.cacheIf { true }
 }
 
-ImportJUnitXmlReports.register(tasks, pytestTest, JUnitXmlDialect.GENERIC)
-
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
     dependsOn(pytestTest)
@@ -274,8 +270,10 @@ tasks.withType<Test> {
 // Generate a PEP 440 compliant version for CI builds
 // Snapshots use .dev suffix: 8.71.0.dev20260112145318
 // Releases use clean version: 8.71.0
-// Read from version.txt on disk if it exists (second Gradle invocation), so the published pip
-// package version matches what was baked into the JAR by the first invocation.
+// The timestamp is the commit's, so the two Gradle invocations of a CI build, `build` and then
+// `snapshot publish`, compute the same version for the JAR and the published pip package. Nothing is
+// read back from version.txt: the file is git-ignored, so a working tree kept from one build to the
+// next, as a CI worker keeps its checkouts, still holds the version an earlier commit wrote there.
 fun gitCommitTimestamp(): String {
     val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
         .directory(rootProject.projectDir)
@@ -288,13 +286,8 @@ fun gitCommitTimestamp(): String {
         .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
 }
 
-val pythonVersionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
 val pythonVersion: String = if (System.getenv("CI") != null) {
-    pythonVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
-        ?: project.version.toString().replace(
-            "-SNAPSHOT",
-            ".dev${gitCommitTimestamp()}"
-        )
+    project.version.toString().replace("-SNAPSHOT", ".dev${gitCommitTimestamp()}")
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
@@ -337,13 +330,22 @@ val pythonUpdateVersion by tasks.registering {
 
     doLast {
         val content = pyprojectFile.readText()
+        // The [project] table's own key alone, at a line's start: unanchored, the pattern also matched the end of
+        // ruff's target-version and ty's python-version, which the release then set to rewrite's version.
         val updated = content.replace(
-            Regex("""version\s*=\s*"[^"]*""""),
+            Regex("""(?m)^version\s*=\s*"[^"]*""""),
             """version = "$pythonVersion""""
         )
         pyprojectFile.writeText(updated)
         logger.lifecycle("Updated pyproject.toml version to $pythonVersion")
     }
+}
+
+// pythonInstall and pytestTest read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a release
+// builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's output
+// in no declared order, and they should see the version it sets.
+listOf(pythonInstall, pytestTest).forEach { reader ->
+    reader.configure { mustRunAfter(pythonUpdateVersion) }
 }
 
 // Task to install build dependencies
@@ -562,4 +564,41 @@ val printTestClasspath by tasks.registering {
 
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
+    // uv's own marker test cases, kept as JSON data
+    exclude("**/marker/uv-*-tree-rows.json")
+}
+
+// The lock regeneration test fixtures (recorded package-manager output) live in
+// openrewrite/rewrite-python-lock-fixtures. The pinned commit is fetched into build/lock-fixtures and joins the test
+// classpath, and a change of pin fetches again. A change that needs new fixtures moves the pin with it.
+val lockFixturesCommit = "c3231458118bb94a0cab845bc39a268b2e93e2a9"
+val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
+val lockFixturesFetched = layout.buildDirectory.file("tmp/lock-fixtures-commit")
+val syncLockFixtures = tasks.register("syncLockFixtures") {
+    inputs.property("commit", lockFixturesCommit)
+    outputs.dir(lockFixturesDir)
+    onlyIf {
+        val fetched = lockFixturesFetched.get().asFile
+        !fetched.exists() || fetched.readText() != lockFixturesCommit
+    }
+    doLast {
+        val archive = layout.buildDirectory.file("tmp/lock-fixtures.tar.gz").get().asFile
+        archive.parentFile.mkdirs()
+        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/$lockFixturesCommit")
+            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        delete(lockFixturesDir)
+        copy {
+            from(tarTree(resources.gzip(archive))) {
+                include("*/lock/**")
+                eachFile { path = path.substringAfter('/') }
+                includeEmptyDirs = false
+            }
+            into(lockFixturesDir)
+        }
+        lockFixturesFetched.get().asFile.writeText(lockFixturesCommit)
+    }
+}
+tasks.named<ProcessResources>("processTestResources") {
+    dependsOn(syncLockFixtures)
+    from(lockFixturesDir)
 }

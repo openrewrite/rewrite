@@ -886,7 +886,7 @@ def _register_marker_codecs():
 
     def _send_trailing_comma(marker: TrailingComma, q: RpcSendQueue) -> None:
         q.get_and_send(marker, lambda x: id_to_str(x._id))
-        q.get_and_send(marker, lambda x: x.suffix, lambda s: _get_sender()._visit_space(s, q))
+        _get_sender()._send_space(marker, lambda x: x.suffix, q)
 
     def _send_omit_parentheses(marker: OmitParentheses, q: RpcSendQueue) -> None:
         q.get_and_send(marker, lambda x: id_to_str(x._id))

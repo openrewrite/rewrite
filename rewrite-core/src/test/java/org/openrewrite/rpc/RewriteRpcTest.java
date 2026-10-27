@@ -20,9 +20,11 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
+import lombok.EqualsAndHashCode;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -37,23 +39,29 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +70,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -593,15 +603,15 @@ class RewriteRpcTest implements RewriteTest {
           .describedAs("Each prepared child must be its own instance, not a shared/collapsed one")
           .isEqualTo(3);
 
-        List<String> toTexts = children.stream()
+        List<String> replacements = children.stream()
           .map(child -> child.getDescriptor().getOptions().stream()
-            .filter(o -> "toText".equals(o.getName()))
+            .filter(o -> "replace".equals(o.getName()))
             .map(OptionDescriptor::getValue)
             .map(String::valueOf)
             .findFirst()
-            .orElseThrow(() -> new AssertionError("Child is missing its toText option")))
+            .orElseThrow(() -> new AssertionError("Child is missing its replace option")))
           .toList();
-        assertThat(toTexts)
+        assertThat(replacements)
           .describedAs("Each same-type child must retain its own distinct option value")
           .containsExactly("a", "b", "c");
     }
@@ -617,8 +627,7 @@ class RewriteRpcTest implements RewriteTest {
           spec -> spec
             .recipe(client.prepareRecipe(
               "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of()))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "c",
@@ -627,17 +636,17 @@ class RewriteRpcTest implements RewriteTest {
                   .findFirst(RecipesThatMadeChanges.class)
                   .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
 
-                List<String> executedToTexts = marker.getRecipes().stream()
+                List<String> executedReplacements = marker.getRecipes().stream()
                   .map(stack -> stack.get(stack.size() - 1))
-                  .filter(leaf -> "org.openrewrite.text.ChangeText".equals(leaf.getName()))
+                  .filter(leaf -> "org.openrewrite.text.FindAndReplace".equals(leaf.getName()))
                   .map(leaf -> leaf.getDescriptor().getOptions().stream()
-                    .filter(o -> "toText".equals(o.getName()))
+                    .filter(o -> "replace".equals(o.getName()))
                     .map(OptionDescriptor::getValue)
                     .map(String::valueOf)
                     .findFirst()
-                    .orElseThrow(() -> new AssertionError("Executed ChangeText is missing its toText option")))
+                    .orElseThrow(() -> new AssertionError("Executed FindAndReplace is missing its replace option")))
                   .toList();
-                assertThat(executedToTexts)
+                assertThat(executedReplacements)
                   .describedAs("All three same-type children must execute, each with its own distinct option")
                   .containsExactlyInAnyOrder("a", "b", "c");
             })
@@ -650,25 +659,37 @@ class RewriteRpcTest implements RewriteTest {
      * bound to the same RewriteRpc instance, the scheduler batches them into a
      * single BatchVisit RPC call. The remote runs all visitors in sequence and
      * the host fetches the final result at the end. This test verifies that
-     * two consecutive same-RPC ChangeText recipes produce the correct final output.
+     * two consecutive same-RPC FindAndReplace recipes produce the correct final output.
      */
     @Test
     void consecutiveSameRpcRecipesAreBatchedAndProduceCorrectResult() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
-        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "step1"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "step1", "replace", "step2"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2)))
-            .validateRecipeSerialization(false)
-            // Consecutive ChangeText recipes aren't idempotent (r1 re-applies in cycle 2).
-            // We only need 1 cycle to verify deferral correctness.
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "step2"
           )
         );
+    }
+
+    @Test
+    void batchedChildChangesHonourCompositeCausesAnotherCycle() {
+        var composite = new DeclarativeRecipe("composite", "Composite", "Composite.", emptySet(), null,
+          URI.create("dummy:recipe.yml"), true, emptyList());
+        composite.addUninitialized(client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1")));
+        composite.addUninitialized(client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2")));
+        composite.initialize(List.of());
+
+        var ctx = new InMemoryExecutionContext();
+        List<SourceFile> sources = List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build());
+        composite.run(new InMemoryLargeSourceSet(sources), ctx, 2, 1);
+
+        assertThat(ctx.getCycle()).isEqualTo(2);
     }
 
     /**
@@ -677,15 +698,14 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void threeConsecutiveSameRpcRecipes() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
-        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
-        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "C"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "B", "replace", "C"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "C"
@@ -701,15 +721,14 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void batchOnlyAttributesRecipesThatActuallyMadeChanges() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A"));
         Recipe r2 = client.prepareRecipe("org.openrewrite.text.Find", Map.of("find", "NOMATCH_PATTERN"));
-        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "B",
@@ -722,7 +741,7 @@ class RewriteRpcTest implements RewriteTest {
                   .toList();
                 assertThat(recipeNames)
                   .describedAs("Only recipes that modified the tree should be attributed")
-                  .contains("org.openrewrite.text.ChangeText")
+                  .contains("org.openrewrite.text.FindAndReplace")
                   .doesNotContain("org.openrewrite.text.Find");
             })
           )
@@ -736,14 +755,13 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void sameRpcBatchFollowedByNonRpcRecipe() {
-        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "from-rpc"));
-        Recipe local = new org.openrewrite.text.ChangeText("from-local");
+        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "from-rpc"));
+        Recipe local = new FindAndReplace("from-rpc", "from-local", null, null, null, null, null, null);
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
-            .validateRecipeSerialization(false)
-            .expectedCyclesThatMakeChanges(2),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "from-local"
@@ -799,6 +817,113 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(results.getFirst().getAfter().getMarkers().findFirst(Markup.Error.class))
           .describedAs("Source should carry Markup.Error so the failure is visible")
           .isPresent();
+    }
+
+    @Test
+    void batchedDeletionIsRecordedAsSourceFileResult() {
+        // given
+        Recipe delete = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$DeletingRpcRecipe", Map.of());
+        Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
+        var source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(delete, noChange)),
+          new InMemoryLargeSourceSet(List.of(source)), new InMemoryExecutionContext(), 1, 1);
+
+        // then
+        assertThat(run.getChangeset().getAllResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.getAfter()).isNull());
+        List<SourcesFileResults.Row> rows = run.getDataTableRows(SourcesFileResults.class);
+        assertThat(rows)
+          .singleElement()
+          .satisfies(row -> {
+              assertThat(row.getSourcePath()).isEqualTo("test.txt");
+              assertThat(row.getAfterSourcePath()).isEmpty();
+              assertThat(row.getRecipe()).isEqualTo(DeletingRpcRecipe.class.getName());
+          });
+    }
+
+    @Test
+    void treeDeletedInBatchVisitIsNotServedAfterwards() {
+        // given
+        RpcRecipe delete = (RpcRecipe) client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$DeletingRpcRecipe", Map.of());
+        var source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+
+        // when
+        BatchVisitResponse response = client.batchVisit(source, new InMemoryExecutionContext(), null,
+          List.of(new BatchVisit.BatchVisitItem(delete.getEditVisitor(), null)));
+
+        // then
+        assertThat(response.getResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.isDeleted()).isTrue());
+        assertThat((Object) client.getObject(source.getId().toString(), PlainText.class.getName())).isNull();
+    }
+
+    @Test
+    void markupAddedByRpcRecipeIsAttributed() {
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(warn, Recipe.noop())),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> {
+              assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName());
+              assertThat(w.getRecipeInstanceName()).isEqualTo("Warning RPC recipe `careful`");
+          });
+    }
+
+    @Test
+    void attributionSurvivesALaterRpcRecipeEditingTheFile() {
+        Recipe changeText = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "goodbye"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarningRpcRecipe("careful"), changeText)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        PlainText after = (PlainText) run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after.getText()).isEqualTo("goodbye");
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> {
+              assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName());
+              assertThat(w.getRecipeInstanceName()).isEqualTo("Warning RPC recipe `careful`");
+          });
+    }
+
+    @Test
+    void markupAddedInBatchIsAttributedWhenOneRecipeMadeChanges() {
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
+        Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(warn, noChange)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName()));
+    }
+
+    @Test
+    void batchFailureFlushedDuringALaterRecipeIsAttributedToTheBatchedRecipe() {
+        // the second recipe's precondition keeps it out of the batch, so the batch is flushed during its turn
+        Recipe throwing = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$ThrowingRpcRecipe", Map.of());
+        Recipe gatedOut = new RpcRecipe(client, "gated-out", Recipe.noop().getDescriptor(), "edit:gated-out",
+          TreeVisitor.noop(), null, null, List.of(), false);
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(throwing, gatedOut)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Error.class))
+          .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo(ThrowingRpcRecipe.class.getName()));
     }
 
     /**
@@ -889,6 +1014,27 @@ class RewriteRpcTest implements RewriteTest {
         }
     }
 
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    public static class WarningRpcRecipe extends Recipe {
+        @Option(displayName = "Message", description = "The warning message.", example = "careful")
+        String message;
+
+        String displayName = "Warning RPC recipe";
+
+        String description = "Test recipe that adds a warning during visit.";
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return Markup.warn(text, new IllegalStateException(message));
+                }
+            };
+        }
+    }
+
     @SuppressWarnings("unused")
     public static class ThrowingRpcRecipe extends Recipe {
         @Override
@@ -907,6 +1053,29 @@ class RewriteRpcTest implements RewriteTest {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     throw new RuntimeException("boom from RPC");
+                }
+            };
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public static class DeletingRpcRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Deleting RPC recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Test recipe that deletes every plain text file.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public @Nullable PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return null;
                 }
             };
         }
@@ -966,9 +1135,9 @@ class RewriteRpcTest implements RewriteTest {
 
         @Override
         public void buildRecipeList(RecipeList recipes) {
-            recipes.recipe(new org.openrewrite.text.ChangeText("a"));
-            recipes.recipe(new org.openrewrite.text.ChangeText("b"));
-            recipes.recipe(new org.openrewrite.text.ChangeText("c"));
+            recipes.recipe(new FindAndReplace("hello", "a", null, null, null, null, null, null));
+            recipes.recipe(new FindAndReplace("a", "b", null, null, null, null, null, null));
+            recipes.recipe(new FindAndReplace("b", "c", null, null, null, null, null, null));
         }
     }
 

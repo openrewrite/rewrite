@@ -51,6 +51,7 @@ from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
 from rewrite.python.printer import PythonPrinter
 from rewrite.result import Result
+from rewrite.rpc import json_codec
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -151,7 +152,7 @@ def _issue_request(method: str, params: dict) -> Any:
     }
 
     if _trace_rpc:
-        logger.debug(f"Sending request to Java: {json.dumps(request)}")
+        logger.debug(f"Sending request to Java: {json_codec.dumps(request).decode()}")
 
     # Send the request to Java via stdout
     write_message(request)
@@ -189,7 +190,7 @@ def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0)
                 continue
 
             if _trace_rpc:
-                logger.debug(f"Received response from Java: {json.dumps(response)}")
+                logger.debug(f"Received response from Java: {json_codec.dumps(response).decode()}")
 
             if 'error' in response:
                 error = response['error']
@@ -956,10 +957,17 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         # classes are ones no consumer can reference.
         if fp.endswith('.py') and os.path.exists(fp + 'i'):
             continue
+        # A distribution's own test suite is no API of it, and inferring its test
+        # bodies is most of what some packages cost: numpy's took 54 of 56 seconds.
+        if 'tests' in own_module.split('.'):
+            continue
         try:
-            with open(fp, 'r', encoding='utf-8') as fh:
+            # Line endings as ty reads them: translated, every line of a CRLF file would put
+            # the module-level bindings below one byte further from ty's nodes.
+            with open(fp, 'r', encoding='utf-8', newline='') as fh:
                 source = fh.read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # A file in another encoding costs its own types, not the package's.
             continue
         try:
             mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
@@ -1330,7 +1338,7 @@ def handle_reset(params: dict) -> bool:
     remote_refs.clear()
     _prepared_recipes.clear()
     _delegating_recipes.clear()
-    _prepared_editor_overrides.clear()
+    _prepared_unwrapped_editors.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1849,13 +1857,10 @@ _prepared_recipes: Dict[str, Any] = {}
 # resolves it here and answers with a delegatesTo response so the JVM runs the
 # real recipe natively.
 _delegating_recipes: Dict[str, Any] = {}
-# Cached bare-editor visitors keyed by prepared recipe id. Populated at
-# PrepareRecipe time when recipe.editor() returns a Preconditions.check
-# wrapper: we strip the wrapper, register the precondition's wire identity
-# in editPreconditions (so the host evaluates it Java-side), and store the
-# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
-# return this bare editor so the precondition does not double-run.
-_prepared_editor_overrides: Dict[str, Any] = {}
+# Prepared recipe ids whose recipe.editor() is a Preconditions.check wrapper
+# with every precondition sent in editPreconditions. The host evaluates those,
+# so dispatching edit:<id> unwraps the editor to keep them from running twice.
+_prepared_unwrapped_editors: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1961,11 +1966,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # Introspect recipe.editor() once at prepare time. If the recipe wrapped its editor in
-    # Preconditions.check(...), we extract the precondition's wire identity (so the Java host can
-    # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
-    # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
-    # the precondition would also run Python-side and double the cost).
+    # A Preconditions.check(...) wrapper around the editor is sent as editPreconditions, so the
+    # host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1975,9 +1977,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         if editor_visitor is not None:
             extracted = _extract_preconditions_from_editor(editor_visitor)
             if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
+                _prepared_unwrapped_editors.add(prepared_id)
+                edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
 
     response = {
@@ -2478,14 +2479,14 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
-        # If the recipe wrapped its editor in Preconditions.check(...) and we
-        # captured the bare editor at PrepareRecipe time, return it here so
-        # the precondition does not double-run on the Python side. The host
-        # has already evaluated it via the editPreconditions wire slot.
-        override = _prepared_editor_overrides.get(recipe_id)
-        if override is not None:
-            return override
-        return recipe.editor()
+        # A fresh editor per dispatch, as in Recipe.run, so state an editor
+        # keeps on self does not carry over to the next file.
+        editor = recipe.editor()
+        if recipe_id in _prepared_unwrapped_editors:
+            from rewrite.preconditions import Check
+            while isinstance(editor, Check):
+                editor = editor.wrapped
+        return editor
 
     elif visitor_name.startswith('scan:'):
         recipe_id = visitor_name[5:]
@@ -3041,7 +3042,7 @@ def _read_body(header_line: bytes) -> Optional[dict]:
         raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
     try:
-        return json.loads(content_bytes.decode('utf-8'))
+        return json_codec.loads(content_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise _ProtocolError(f"invalid message body: {e}")
 
@@ -3086,7 +3087,7 @@ def write_message(response: dict):
     short header, a cost that scales with the message where the extra syscall does not.
     ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
-    content_bytes = json.dumps(response).encode('utf-8')
+    content_bytes = json_codec.dumps(response)
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     fd = sys.stdout.fileno()
     os.write(fd, header)
@@ -3114,7 +3115,7 @@ def _write_response(response: dict) -> None:
     """
     try:
         if _trace_rpc:
-            logger.debug(f"Sending: {json.dumps(response)}")
+            logger.debug(f"Sending: {json_codec.dumps(response).decode()}")
         write_message(response)
     except (TypeError, ValueError) as e:
         request_id = response.get('id')
@@ -3133,7 +3134,7 @@ def _serve(message: dict) -> None:
         return
 
     if _trace_rpc:
-        logger.debug(f"Received: {json.dumps(message)}")
+        logger.debug(f"Received: {json_codec.dumps(message).decode()}")
 
     metric_start = time.monotonic()
     metric_error = ''

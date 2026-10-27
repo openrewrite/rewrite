@@ -204,12 +204,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return jsImport;
         }
 
-        const importClause = jsImport.importClause;
+        let importClause = jsImport.importClause;
         if (!importClause) {
-            // Side-effect import like: import 'module'
-            if (this.member === '*') {
-                return undefined; // Remove the entire import
-            }
             return jsImport;
         }
 
@@ -236,26 +232,27 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         return undefined;
                     }
                     // Otherwise, just remove the default import and fix spacing
-                    return this.updateImportClause(jsImport, importClause, async draft => {
+                    jsImport = await this.updateImportClause(jsImport, importClause, async draft => {
                         draft.name = undefined;
                         // When removing the default import, we need to fix up spacing on the
                         // namedBindings. The space between "import" and the clause content is
                         // already in importClause.prefix, so we clear both namedBindings.prefix
                         // and elements.before (the space before "{") to avoid a double space.
-                        if (draft.namedBindings && importClause.name?.element) {
+                        if (draft.namedBindings) {
                             draft.namedBindings = await this.produceJava(
                                 draft.namedBindings, p, async bindingsDraft => {
-                                    bindingsDraft.prefix = importClause.name!.element!.prefix;
+                                    bindingsDraft.prefix = identifier.prefix;
                                     if (bindingsDraft.elements) {
                                         bindingsDraft.elements = {
                                             ...bindingsDraft.elements,
-                                            before: importClause.name!.element!.prefix
+                                            before: identifier.prefix
                                         };
                                     }
                                 }
                             );
                         }
                     }, p);
+                    importClause = jsImport.importClause!;
                 }
             }
         }
@@ -435,7 +432,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         return true; // Keep imports that don't match the member
                     } else {
                         // We're removing based on the import name itself
-                        return !this.shouldRemoveImport(importName, usedNames, importName);
+                        return !this.shouldRemoveImport(nameToCheck, usedNames, importName);
                     }
                 }
                 return true; // Keep non-ImportSpecifier elements

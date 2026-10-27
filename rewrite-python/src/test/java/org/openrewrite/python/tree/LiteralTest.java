@@ -16,9 +16,11 @@
 package org.openrewrite.python.tree;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.python.Assertions.python;
 
@@ -34,5 +36,19 @@ class LiteralTest implements RewriteTest {
     })
     void literals(@Language("py") String lit) {
         rewriteRun(python(lit));
+    }
+
+    @Test
+    void longParenthesizedImplicitConcatenation() {
+        rewriteRun(python("X = (\n" + "    'a'\n".repeat(10_000) + ")\n"));
+    }
+
+    @Test
+    void longBackslashContinuedImplicitConcatenation() {
+        rewriteRun(
+          // a line continuation's backslash is part of the whitespace
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          python("X = \\\n" + "b'00' \\\n".repeat(9_999) + "b'00'\n")
+        );
     }
 }

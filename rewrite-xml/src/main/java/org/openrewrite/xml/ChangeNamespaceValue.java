@@ -266,8 +266,8 @@ public class ChangeNamespaceValue extends Recipe {
                         if (attributeByKey.containsKey(key)) {
                             Xml.Attribute attribute = attributeByKey.get(key);
                             if (!ns.getValue().equals(attribute.getValueAsString())) {
-                                ListUtils.map(attributes, a -> a.getKeyAsString().equals(key) ?
-                                        attribute.withValue(new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, ns.getValue())) :
+                                attributes = ListUtils.map(attributes, a -> a == attribute ?
+                                        a.withValue(a.getValue().withValue(ns.getValue())) :
                                         a
                                 );
                             }

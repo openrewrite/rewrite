@@ -490,6 +490,25 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             parens = parens.padding.replace(tree=tree_rp.replace(element=elem, after=after))
         return parens
 
+    def visit_comprehension_expression(self, comp: ComprehensionExpression, p: P) -> J:
+        comp = comp.replace(prefix=self.visit_space(comp.prefix, p))
+        temp_expr = self.visit_expression(comp, p)
+        if not isinstance(temp_expr, ComprehensionExpression):
+            return temp_expr
+        comp = temp_expr
+        comp = comp.replace(markers=self.visit_markers(comp.markers, p))
+        comp = comp.replace(result=self.visit_and_cast(comp.result, j.Expression, p))
+        comp = comp.replace(clauses=list_map(lambda c: self.visit(c, p), comp.clauses))
+        if '\n' in comp.suffix.last_whitespace:
+            # The closing bracket aligns with the line that opened it, as for a parenthesis.
+            indent = cast(int, self.cursor.parent_or_throw.get_nearest_message("last_indent")) or 0
+            comp = comp.replace(suffix=self._indent_to(comp.suffix, indent))
+        else:
+            comp = comp.replace(suffix=self.visit_space(comp.suffix, p))
+        if self._visits_types:
+            comp = comp.replace(_type=self.visit_type(comp.type, p))
+        return comp
+
     def visit_binary(self, binary: Binary, p: P) -> J:
         if self.cursor.first_enclosing(j.Parentheses) is not None:
             # Inside parentheses: operator before spaces align to same indent as first line

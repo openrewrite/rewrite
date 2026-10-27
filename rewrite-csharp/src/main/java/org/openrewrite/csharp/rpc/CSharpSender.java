@@ -25,6 +25,7 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -47,7 +48,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.getAndSend(j, x -> spaceRef(x.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
@@ -64,7 +65,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSendList(cu, c -> c.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(cu, Cs.CompilationUnit::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSendList(cu, c -> c.getPadding().getMembers(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Cs.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, x -> spaceRef(x.getEof()), space -> visitSpace(getValueNonNull(space), q));
         return cu;
     }
 
@@ -141,7 +142,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
-        q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getKeywordSpacing, space -> visitSpace(space, q));
+        q.getAndSend(pragmaChecksumDirective, x -> spaceRef(x.getKeywordSpacing()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
         return pragmaChecksumDirective;
     }
@@ -187,8 +188,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcSendQueue q) {
         q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getAction);
-        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getKeywordSpacing, space -> visitSpace(space, q));
-        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getActionSpacing, space -> visitSpace(space, q));
+        q.getAndSend(pragmaWarningDirective, x -> spaceRef(x.getKeywordSpacing()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(pragmaWarningDirective, x -> spaceRef(x.getActionSpacing()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(pragmaWarningDirective, p -> p.getPadding().getWarningCodes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return pragmaWarningDirective;
     }
@@ -306,7 +307,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getExterns(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getMembers(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        q.getAndSend(namespaceDeclaration, Cs.NamespaceDeclaration::getEnd, space -> visitSpace(space, q));
+        q.getAndSend(namespaceDeclaration, x -> spaceRef(x.getEnd()), space -> visitSpace(getValueNonNull(space), q));
         return namespaceDeclaration;
     }
 
@@ -341,9 +342,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitInterpolation(Cs.Interpolation interpolation, RpcSendQueue q) {
         q.getAndSend(interpolation, i -> i.getPadding().getExpression(), el -> visitRightPadded(el, q));
-        q.getAndSend(interpolation, Cs.Interpolation::getAlignmentBefore, space -> visitSpace(space, q));
+        q.getAndSend(interpolation, x -> spaceRef(x.getAlignmentBefore()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(interpolation, i -> i.getPadding().getAlignment(), el -> visitRightPadded(el, q));
-        q.getAndSend(interpolation, Cs.Interpolation::getFormatBefore, space -> visitSpace(space, q));
+        q.getAndSend(interpolation, x -> spaceRef(x.getFormatBefore()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(interpolation, i -> i.getPadding().getFormat(), el -> visitRightPadded(el, q));
         return interpolation;
     }

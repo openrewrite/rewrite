@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.NodeDependencyScan.Manifest;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.JsonParser;
@@ -100,7 +101,7 @@ class NodeDependencyScanTest {
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
         Path manifest = Paths.get("repo/app/package.json");
         NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
-        ps.capturedPackageJson = PlainText.builder().sourcePath(manifest).text("{\"name\":\"p\"}").build();
+        ps.capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(manifest).text("{\"name\":\"p\"}").build());
         acc.projects.put(manifest, ps);
         acc.lockToPackage.put(Paths.get("repo/app/yarn.lock"), manifest);
         Path parentYarnrc = Paths.get("repo/.yarnrc");
@@ -135,8 +136,8 @@ class NodeDependencyScanTest {
         Path[] paths = {manifest, parent, top, other, nested};
         for (int i = 0; i < paths.length; i++) {
             NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
-            ps.capturedPackageJson = PlainText.builder().sourcePath(paths[i]).text("{\"name\":\"" + names[i] + "\"}")
-              .build();
+            ps.capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(paths[i])
+              .text("{\"name\":\"" + names[i] + "\"}").build());
             acc.projects.put(paths[i], ps);
             acc.paths.add(paths[i]);
         }
@@ -170,8 +171,8 @@ class NodeDependencyScanTest {
         Path[] paths = {manifest, lib, theme, linked, unrelated};
         for (int i = 0; i < paths.length; i++) {
             NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
-            ps.capturedPackageJson = new JsonParser().parse(texts[i]).findFirst().orElseThrow()
-              .withSourcePath(paths[i]);
+            ps.capturedPackageJson = Manifest.of(new JsonParser().parse(texts[i]).findFirst().orElseThrow()
+              .withSourcePath(paths[i]));
             acc.projects.put(paths[i], ps);
             acc.paths.add(paths[i]);
         }
@@ -233,11 +234,11 @@ class NodeDependencyScanTest {
               .sourcePath(Paths.get("packages/a/package-lock.json")).text("member lock").build());
         }
         acc.projects.computeIfAbsent(ROOT, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
-          PlainText.builder().sourcePath(ROOT).text("{\"name\":\"root\",\"private\":true}")
-            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+          Manifest.of(PlainText.builder().sourcePath(ROOT).text("{\"name\":\"root\",\"private\":true}")
+            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build());
         acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
-          PlainText.builder().sourcePath(MEMBER).text("{\"name\":\"a\"}")
-            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Npm)))).build();
+          Manifest.of(PlainText.builder().sourcePath(MEMBER).text("{\"name\":\"a\"}")
+            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Npm)))).build());
         acc.paths.addAll(Arrays.asList(ROOT, MEMBER));
         Path workspace = Paths.get("pnpm-workspace.yaml");
         NodeDependencyScan.capturePackageManagerFile(acc, "unread".equals(listed) ?
@@ -276,19 +277,19 @@ class NodeDependencyScanTest {
           PlainText.builder().sourcePath(Paths.get(lockName)).text("root lock").build());
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + lockName))
           .text("member lock").build());
-        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+        acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
           .text("{\"name\":\"root\",\"private\":true,\"workspaces\":[\"" + pattern + "\"]}")
           .markers(Markers.build(singletonList(nodeResolutionResult(pm, singletonList("packages/a/package.json")))))
-          .build();
-        acc.projects.get(MEMBER).capturedPackageJson = PlainText.builder().sourcePath(MEMBER)
+          .build());
+        acc.projects.get(MEMBER).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(MEMBER)
           .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
-          .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
+          .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build());
         if (mid) {
             Path packages = Paths.get("packages/package.json");
             NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
-            ps.capturedPackageJson = PlainText.builder().sourcePath(packages)
+            ps.capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(packages)
               .text("{\"name\":\"mid\",\"private\":true,\"workspaces\":[\"x/*\"]}")
-              .markers(Markers.build(singletonList(nodeResolutionResult(pm, emptyList())))).build();
+              .markers(Markers.build(singletonList(nodeResolutionResult(pm, emptyList())))).build());
             acc.projects.put(packages, ps);
         }
         if (configFile != null) {
@@ -334,16 +335,17 @@ class NodeDependencyScanTest {
             NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(dir + "/pnpm-lock.yaml"))
               .text("own lock").build());
         }
-        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+        acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
           .text("{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]}")
           .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
             singletonList("packages/a/package.json")))))
-          .build();
+          .build());
         NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(project,
           k -> new NodeDependencyScan.ProjectState());
-        ps.capturedPackageJson = PlainText.builder().sourcePath(project)
+        SourceFile manifest = PlainText.builder().sourcePath(project)
           .text("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
           .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+        ps.capturedPackageJson = Manifest.of(manifest);
         if (!"none".equals(workspace)) {
             NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder()
               .sourcePath(Paths.get("pnpm-workspace.yaml"))
@@ -359,7 +361,7 @@ class NodeDependencyScanTest {
           lock.getNameCount() == 1 ? "root lock" : "own lock");
         if (reported != null) {
             ExecutionContext ctx = new InMemoryExecutionContext();
-            LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(ps.capturedPackageJson,
+            LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(manifest,
               ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, project), emptyMap(), ctx);
             assertThat(result).isNotNull();
             assertThat(result.isSuccess()).isFalse();
@@ -406,16 +408,16 @@ class NodeDependencyScanTest {
                     NodeDependencyScan.captureLock(acc, PlainText.builder()
                       .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
                 }
-                acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+                acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
                   .text("package.json".equals(file) ? text : "{\"name\":\"root\",\"private\":true}")
                   .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
                     singletonList("packages/a/package.json")))))
-                  .build();
+                  .build());
                 SourceFile member = PlainText.builder().sourcePath(MEMBER)
                   .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
                   .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
                 acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState())
-                  .capturedPackageJson = member;
+                  .capturedPackageJson = Manifest.of(member);
                 String unshared = shared ? "" : "\nsharedWorkspaceLockfile: false\n";
                 if ("pnpm-workspace.yaml".equals(file)) {
                     capture(acc, file, "unread".equals(text) ? text : text + unshared);
@@ -457,15 +459,16 @@ class NodeDependencyScanTest {
             }
             NodeDependencyScan.ProjectState root = acc.projects.computeIfAbsent(ROOT,
               k -> new NodeDependencyScan.ProjectState());
-            root.capturedPackageJson = PlainText.builder().sourcePath(ROOT).text("{\"name\":\"root\",\"private\":true}")
+            root.capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
+              .text("{\"name\":\"root\",\"private\":true}")
               .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
                 singletonList("packages/a/package.json")))))
-              .build();
+              .build());
             SourceFile member = PlainText.builder().sourcePath(MEMBER)
               .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
               .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
             acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
-              member;
+              Manifest.of(member);
             capture(acc, "pnpm-workspace.yaml", "packages: [");
 
             NodeDependencyScan.linkWorkspaceMembers(acc);
@@ -498,18 +501,18 @@ class NodeDependencyScanTest {
             NodeDependencyScan.captureLock(acc, PlainText.builder()
               .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
         }
-        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+        acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
           .text("{\"name\":\"root\",\"private\":true}")
           .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
             singletonList("packages/a/package.json")))))
-          .build();
+          .build());
         acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
-          PlainText.builder().sourcePath(MEMBER)
+          Manifest.of(PlainText.builder().sourcePath(MEMBER)
             .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
             .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(
               singletonList(new NodeResolutionResult.Npmrc(NodeResolutionResult.NpmrcScope.Project,
                 singletonMap("registry", "https://registry.npmjs.org/")))))))
-            .build();
+            .build());
         capture(acc, "pnpm-workspace.yaml", "packages:\n  - 'packages/*'\n" +
                                             (shared ? "" : "sharedWorkspaceLockfile: false\n"));
         capture(acc, ".npmrc", "unread");
@@ -847,7 +850,8 @@ class NodeDependencyScanTest {
         SourceFile manifest = PlainText.builder().sourcePath(path).text(text)
           .markers(Markers.build(singletonList(marker))).build();
         NodeDependencyScan.capturePackageManagerFile(acc, manifest);
-        acc.projects.computeIfAbsent(path, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = manifest;
+        acc.projects.computeIfAbsent(path, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+          Manifest.of(manifest);
         return manifest;
     }
 
@@ -862,12 +866,12 @@ class NodeDependencyScanTest {
           PlainText.builder().sourcePath(Paths.get(rootLock)).text("root lock").build());
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + memberLock))
           .text("member lock").build());
-        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+        acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
           .text("{\"private\":true,\"workspaces\":[\"packages/*\"]}")
           .markers(Markers.build(singletonList(nodeResolutionResult(rootPm, singletonList("packages/a/package.json")))))
-          .build();
-        acc.projects.get(MEMBER).capturedPackageJson = PlainText.builder().sourcePath(MEMBER).text("{\"name\":\"a\"}")
-          .markers(Markers.build(singletonList(nodeResolutionResult(memberPm)))).build();
+          .build());
+        acc.projects.get(MEMBER).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(MEMBER)
+          .text("{\"name\":\"a\"}").markers(Markers.build(singletonList(nodeResolutionResult(memberPm)))).build());
         return acc;
     }
 
@@ -905,8 +909,8 @@ class NodeDependencyScanTest {
             if (!lockFirst) {
                 NodeDependencyScan.captureLock(acc, lock);
             }
-            acc.projects.get(manifest).capturedPackageJson = PlainText.builder().sourcePath(manifest)
-              .text("{\"name\":\"app\"}").markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
+            acc.projects.get(manifest).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(manifest)
+              .text("{\"name\":\"app\"}").markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build());
 
             NodeDependencyScan.linkWorkspaceMembers(acc);
             NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
@@ -955,8 +959,8 @@ class NodeDependencyScanTest {
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(lockName)).text("lock").build());
         capture(acc, "packages/c/package.yaml", "name: c\n");
         capture(acc, "packages/d/package.json5", "{name: 'd'}\n");
-        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT).text("{\"private\":true}")
-          .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
+        acc.projects.get(ROOT).capturedPackageJson = Manifest.of(PlainText.builder().sourcePath(ROOT)
+          .text("{\"private\":true}").markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build());
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, ROOT);

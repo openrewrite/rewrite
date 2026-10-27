@@ -21,6 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.AddDependencyVisitor;
+import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -167,18 +168,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          */
         List<BomCandidate> bomCandidates = new ArrayList<>();
 
+        /**
+         * What resolving the BOM candidates reads of each project that has some, by project key.
+         */
+        Map<String, SpringBomProperty.Project> bomCandidateProjects = new HashMap<>();
+
         AtomicBoolean bomCandidatesResolved = new AtomicBoolean();
 
         /**
-         * The root project's if it was scanned, otherwise the first one seen, so that a catalog
+         * The root project's repositories if it was scanned, otherwise the first one's, so that a catalog
          * carrying no marker of its own resolves against the same repositories the build does.
          */
-        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
+        AtomicReference<@Nullable ProjectRepositories> repositories = new AtomicReference<>();
     }
 
     @Value
     static class BomCandidate {
-        GradleProject gradleProject;
+        String projectKey;
         GroupArtifact ga;
         String configurationName;
 
@@ -213,8 +219,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
-                    if (gradleProject != null && (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath()))) {
-                        acc.gradleProject.set(gradleProject);
+                    if (gradleProject != null && (acc.repositories.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.repositories.set(ProjectRepositories.of(gradleProject));
                     }
                     for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
                         if (!acc.scriptImportedBoms.contains(bom)) {
@@ -384,9 +390,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             // Which BOMs the build imports isn't known until every script has been scanned.
             private void recordBomCandidate(GradleDependency gradleDependency, GroupArtifact ga, String configName) {
-                if (gradleProject != null && SpringBomProperty.isPluginApplied(gradleProject) &&
+                GradleProject project = gradleProject;
+                if (project != null && SpringBomProperty.isPluginApplied(project) &&
                         gradleDependency.getDeclaredVersion() == null && !gradleDependency.isPlatform()) {
-                    acc.bomCandidates.add(new BomCandidate(gradleProject, ga, configName, gradleDependency.getVersion()));
+                    String projectKey = getGradleProjectKey(project);
+                    acc.bomCandidates.add(new BomCandidate(projectKey, ga, configName, gradleDependency.getVersion()));
+                    acc.bomCandidateProjects.computeIfAbsent(projectKey, k -> SpringBomProperty.Project.of(project));
                 }
             }
 
@@ -433,10 +442,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
             private final TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
                 // A catalog file has no marker and a settings script no GradleProject, so fall back to a scanned project's repositories
-                @Nullable GradleProject gradleProject = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
-                        .findFirst(GradleProject.class).orElseGet(acc.gradleProject::get);
-                return upgradeCatalog(catalog, dependencyMatcher,
-                        new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
+                ProjectRepositories repositories = acc.repositories.get();
+                DependencyVersionSelector selector = catalog.getCursor().firstEnclosingOrThrow(SourceFile.class).getMarkers()
+                        .findFirst(GradleProject.class)
+                        .map(gradleProject -> new DependencyVersionSelector(metadataFailures, gradleProject, null))
+                        .orElseGet(() -> repositories == null ? new DependencyVersionSelector(metadataFailures, null, null) :
+                                repositories.selector(metadataFailures));
+                return upgradeCatalog(catalog, dependencyMatcher, selector, ctx);
             });
 
             @Override
@@ -610,16 +622,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return;
         }
         for (BomCandidate candidate : acc.bomCandidates) {
-            GradleProject gradleProject = candidate.getGradleProject();
+            SpringBomProperty.Project project = acc.bomCandidateProjects.get(candidate.getProjectKey());
             GroupArtifact ga = candidate.getGa();
-            SpringBomProperty property = SpringBomProperty.find(gradleProject, acc.scriptImportedBoms, ga, ctx);
+            SpringBomProperty property = SpringBomProperty.find(project, acc.scriptImportedBoms, ga, ctx);
             if (property == null) {
                 continue;
             }
             String selected;
             try {
                 GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), candidate.getResolvedVersion());
-                selected = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                selected = project.getRepositories().selector(metadataFailures)
                         .select(gav, candidate.getConfigurationName(), newVersion, versionPattern, ctx);
             } catch (MavenDownloadingException e) {
                 continue;
@@ -628,13 +640,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 continue;
             }
             acc.gaToNewVersion.put(ga, selected);
-            acc.bomPropertiesPerModule.computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashSet<>()).add(property.getName());
+            acc.bomPropertiesPerModule.computeIfAbsent(candidate.getProjectKey(), k -> new HashSet<>()).add(property.getName());
             acc.versionPropNameToGA.computeIfAbsent(property.getName(), k -> new HashMap<>())
                     .computeIfAbsent(ga, k -> new HashSet<>())
                     .add(candidate.getConfigurationName());
             Map<GroupArtifact, Set<String>> usages = acc.variableNames.computeIfAbsent(property.getName(), k -> new HashMap<>());
             usages.computeIfAbsent(ga, k -> new HashSet<>()).add(candidate.getConfigurationName());
-            property.governedOnClasspath(gradleProject, ga).forEach((governed, configurations) ->
+            property.governedOnClasspath(project, ga).forEach((governed, configurations) ->
                     usages.computeIfAbsent(governed, k -> new HashSet<>()).addAll(configurations));
         }
     }
@@ -913,13 +925,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         /**
          * Declares each BOM property override the script does not set yet. Properties the script already sets are
          * updated in {@code postVisit}, and those defined in gradle.properties by {@code UpdateProperties}.
+         * The script itself is read too, since the scan misses a declaration an earlier recipe made this cycle.
          */
         private JavaSourceFile declareBomProperties(JavaSourceFile cu, ExecutionContext ctx) {
             if (gradleProject == null) {
                 return cu;
             }
-            for (String property : acc.bomPropertiesPerModule.getOrDefault(getGradleProjectKey(gradleProject), emptySet())) {
-                if (acc.gradlePropertiesKeys.contains(property) || acc.declaredExtProperties.contains(property)) {
+            Set<String> bomProperties = acc.bomPropertiesPerModule.getOrDefault(getGradleProjectKey(gradleProject), emptySet());
+            Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
+            for (String property : bomProperties) {
+                if (acc.gradlePropertiesKeys.contains(property) || acc.declaredExtProperties.contains(property) ||
+                        declaredInScript.contains(property)) {
                     continue;
                 }
                 String version = safeUpdatedVersion(property, dependencyMatcher, acc, gradleProject, ctx);

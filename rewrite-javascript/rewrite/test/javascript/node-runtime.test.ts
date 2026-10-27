@@ -224,8 +224,8 @@ describe("NodeRuntime", () => {
 
     describe("RPC", () => {
         async function roundTrip(after: NodeRuntime, before?: NodeRuntime): Promise<NodeRuntime> {
-            const batch = await new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
-            return new RpcReceiveQueue(new Map(), Json.Kind.Document, async () => batch, undefined, false)
+            const batch = new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
+            return new RpcReceiveQueue(new Map(), Json.Kind.Document, [batch], undefined, false)
                 .receive<NodeRuntime>(before);
         }
 

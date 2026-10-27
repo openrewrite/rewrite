@@ -36,12 +36,7 @@ public class FilterTagChildrenVisitor<T> extends XmlVisitor<T> {
     public Xml visitTag(Xml.Tag tag, T ctx) {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
         if (scope.isScope(t)) {
-            t = t.withContent(ListUtils.map(t.getContent(), it -> {
-                if (childTest.test(it)) {
-                    return it;
-                }
-                return null;
-            }));
+            t = t.withContent(ListUtils.filter(t.getContent(), childTest::test));
         }
         return t;
     }

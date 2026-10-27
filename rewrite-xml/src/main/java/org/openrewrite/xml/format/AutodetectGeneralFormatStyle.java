@@ -28,8 +28,7 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
      * more common in the supplied AST.
      */
     public static GeneralFormatStyle autodetectGeneralFormatStyle(Xml.Document x) {
-        LineEndingsCount count = new LineEndingsCount();
-        new AutodetectGeneralFormatStyle().visit(x, count);
+        LineEndingsCount count = new AutodetectGeneralFormatStyle().reduce(x, new LineEndingsCount());
         if(count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
         } else {

@@ -66,6 +66,22 @@ class TemplateOptions:
     context_sensitive: bool = False
 
 
+def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
+    """Whether the result goes where the tree declares a `Statement`."""
+    from rewrite.python import tree as py
+    target = coordinates.tree
+    if not isinstance(target, Statement):
+        return False
+    ambiguous = isinstance(target, Expression) and \
+        not isinstance(target, (py.ExpressionStatement, py.StatementExpression))
+    if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
+            or cursor is None or getattr(cursor.value, 'id', None) != target.id:
+        return True
+    # A node that is both, like a call, is a statement only where a statement list holds it.
+    from .precedence import enclosing_tree
+    return isinstance(enclosing_tree(cursor.parent), (j.Block, py.CompilationUnit))
+
+
 class TemplateEngine:
     """
     Core engine for parsing and processing templates.
@@ -441,11 +457,9 @@ class TemplateEngine:
                 # Replace the prefix to match original
                 result = result.replace(prefix=original.prefix)
 
-        # Check if we need to wrap expression in statement
-        # This happens when inserting an expression where a statement is expected
-        target = coordinates.tree
-        if isinstance(result, Expression) and isinstance(target, Statement):
-            # Wrap expression in ExpressionStatement
+        # As the parser does, wrap only an expression that is not itself a Statement.
+        if (isinstance(result, Expression) and not isinstance(result, Statement)
+                and _in_statement_slot(coordinates, cursor)):
             result = py.ExpressionStatement(
                 random_id(),
                 result,

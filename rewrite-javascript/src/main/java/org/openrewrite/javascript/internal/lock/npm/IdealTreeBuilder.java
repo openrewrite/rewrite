@@ -574,8 +574,10 @@ public final class IdealTreeBuilder {
             currentDep = null;
 
             if (replaced != null) {
-                // before npm 7.24.2 the peer set a replacement no longer satisfies stays where it is, and building it
-                // again can replace the replacement in turn: a loop that comes back to where it was never ends
+                // Before npm 7.24.2 the peer set a replacement no longer satisfies stays where it is, and building it
+                // again can replace the replacement in turn. With npm/cli#9987 a node that failed to load and a peer
+                // it conflicts with can replace each other (npm/cli#10149). A loop that comes back to where it was
+                // never ends.
                 String earlier = statesAfterReplace.putIfAbsent(loopState(), replaced);
                 if (earlier != null) {
                     throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: its tree and its " +
@@ -755,7 +757,8 @@ public final class IdealTreeBuilder {
                     }
                 }
             } else if (cpd.getCanPlaceSelf() == REPLACE) {
-                if (!options.getRelease().prunesConflictedPeerSets()) {
+                if (!options.getRelease().prunesConflictedPeerSets() ||
+                    options.getRelease().defersPeerConflictToLoadFailure()) {
                     replaced = placed.getName() + "@" + Js.string(placed.getVersion()) + " replaced the one at " +
                                placed.getLocation();
                 }
@@ -1187,8 +1190,10 @@ public final class IdealTreeBuilder {
                         continue;
                     }
 
-                    // before npm 7.5.4 a conflict stands only where it is forced or not the project's
-                    if (conflictOK || !required.contains(dep) && options.getRelease().letsUnrequiredPeersConflict()) {
+                    // the conflict passes where it is forced or not the project's, and from npm 7.5.4 where the
+                    // project does not require the dep
+                    if (conflictOK || !required.contains(dep) && options.getRelease().letsUnrequiredPeersConflict() ||
+                        loadFailures.contains(dep) && options.getRelease().defersPeerConflictToLoadFailure()) {
                         if (options.getRelease().marksPeerConflictsOfLoadedPeerSet()) {
                             edge.setPeerConflicted(true);
                         }
@@ -1212,9 +1217,11 @@ public final class IdealTreeBuilder {
                 }
             }
 
-            // before npm 7.5.5 a conflict stands only where it is forced or not the project's
+            // the conflict passes where it is forced or not the project's, and from npm 7.5.5 where the project
+            // does not require the dependent
             if (conflictOK || !required.contains(edge.getFrom()) &&
-                              options.getRelease().letsUnrequiredDependentsConflict()) {
+                              options.getRelease().letsUnrequiredDependentsConflict() ||
+                loadFailures.contains(current) && options.getRelease().defersPeerConflictToLoadFailure()) {
                 continue;
             }
 

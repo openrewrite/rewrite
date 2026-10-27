@@ -23,6 +23,9 @@ dependencies = [
     "more_itertools>=10.0.0",
     "ty-types>=0.0.84",  # Type inference CLI for Python type attribution
     "parso>=0.7.1,<0.8",  # Python 2/3 parser with CST support (0.8+ dropped Python 2.7 grammar)
+    # RPC frame encoding. Declared only where orjson publishes a wheel, as elsewhere pip would need
+    # a Rust toolchain to build it. The RPC codec falls back to the stdlib json module without it.
+    "orjson>=3.10; platform_python_implementation == 'CPython' and (platform_machine == 'x86_64' or platform_machine == 'aarch64' or platform_machine == 'arm64' or platform_machine == 'AMD64' or platform_machine == 'ARM64')",
 ]
 
 [project.optional-dependencies]

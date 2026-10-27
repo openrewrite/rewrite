@@ -273,4 +273,25 @@ class ChangeNamespaceValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void rebindMisspelledSchemaInstanceNamespace() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
+          xml(
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.4"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-Instance">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """,
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """
+          )
+        );
+    }
 }
