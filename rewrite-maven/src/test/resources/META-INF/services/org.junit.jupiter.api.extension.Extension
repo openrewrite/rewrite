@@ -1,1 +1,2 @@
 org.openrewrite.maven.MavenSettingsAutoLoadingExtension
+org.openrewrite.maven.SharedMavenPomCacheExtension
