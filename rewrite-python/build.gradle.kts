@@ -391,13 +391,22 @@ val pythonUpdateVersion = tasks.register("pythonUpdateVersion") {
 
     doLast {
         val content = pyprojectFile.readText()
+        // The [project] table's own key alone, at a line's start: unanchored, the pattern also matched the end of
+        // ruff's target-version and ty's python-version, which the release then set to rewrite's version.
         val updated = content.replace(
-            Regex("""version\s*=\s*"[^"]*""""),
+            Regex("""(?m)^version\s*=\s*"[^"]*""""),
             """version = "$pythonVersion""""
         )
         pyprojectFile.writeText(updated)
         logger.lifecycle("Updated pyproject.toml version to $pythonVersion")
     }
+}
+
+// pythonInstall and pytestTest read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a release
+// builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's output
+// in no declared order, and they should see the version it sets.
+listOf(pythonInstall, pytestTest).forEach { reader ->
+    reader.configure { mustRunAfter(pythonUpdateVersion) }
 }
 
 // Task to install build dependencies
