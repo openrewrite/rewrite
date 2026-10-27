@@ -196,6 +196,10 @@ testing {
                             .withPathSensitivity(PathSensitivity.RELATIVE)
                         // Avoid two tasks driving C# RPC processes at the same time.
                         shouldRunAfter(tasks.named("test"))
+                        // Tiered PGO first runs hot code instrumented, which the short-lived C# processes
+                        // these tests start pay for without living long enough to profit from: without it
+                        // they parse CSharpPrinterParityTest's own sources in less than half the time.
+                        environment("DOTNET_TieredPGO", "0")
                     }
                 }
             }
