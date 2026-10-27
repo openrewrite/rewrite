@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as fs from "fs";
 import * as path from "path";
 import * as rpc from "vscode-jsonrpc/node";
 import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
@@ -23,31 +22,10 @@ import {Cursor, isSourceFile} from "../../src/tree";
 import {foundSearchResult, Markers, markupDebug, markupInfo} from "../../src/markers";
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from "../../src/print";
 import {MarkerPrinter as RequestedMarkerPrinter, Print} from "../../src/rpc/request/print";
+import {moduleDir, parse, Source} from "./printer-parity";
 
-const moduleDir = path.resolve(__dirname, "../..");
 // Files that between them hold every type of tree the printer prints, shared with JavaScriptPrinterParityTest.
 const syntaxDir = path.resolve(moduleDir, "../src/integTest/resources/printer-parity");
-
-interface Source {
-    cu: JS.CompilationUnit;
-    text: string;
-}
-
-async function parse(dir: string): Promise<Source[]> {
-    const files = (fs.readdirSync(dir, {recursive: true}) as string[])
-        .filter(file => /\.(ts|tsx|js|jsx|mjs)$/.test(file))
-        .sort();
-    expect(files).not.toHaveLength(0);
-
-    const texts = files.map(file => fs.readFileSync(path.join(dir, file), "utf8"));
-    const sources: Source[] = [];
-    for await (const parsed of new JavaScriptParser({relativeTo: dir})
-        .parse(...files.map((file, i) => ({text: texts[i], sourcePath: file})))) {
-        expect(parsed.kind, files[sources.length]).toEqual(JS.Kind.CompilationUnit);
-        sources.push({cu: parsed as JS.CompilationUnit, text: texts[sources.length]});
-    }
-    return sources;
-}
 
 // Parsed once for the tests that print them, none of which changes the trees it is given.
 let syntax: Promise<Source[]> | undefined;
@@ -107,14 +85,6 @@ describeJavaRpc("Java printer parity", () => {
             expect(await javaRpc.rpc.print(cu), cu.sourcePath).toEqual(printed);
         }
     }, 120_000);
-
-    testJavaRpc("the sources of this module", async ({javaRpc}) => {
-        for (const {cu, text} of await parse(path.join(moduleDir, "src"))) {
-            const printed = await TreePrinters.print(cu);
-            expect(printed, cu.sourcePath).toEqual(text);
-            expect(await javaRpc.rpc.print(cu), cu.sourcePath).toEqual(printed);
-        }
-    }, 300_000);
 
     testJavaRpc("markers", async ({javaRpc}) => {
         const markerPrinters: [RequestedMarkerPrinter, MarkerPrinter][] = [
