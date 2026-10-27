@@ -49,6 +49,14 @@ async function parse(dir: string): Promise<Source[]> {
     return sources;
 }
 
+function unclosedFences(printed: string): string[] {
+    const fences = new Map<string, number>();
+    for (const [fence] of printed.matchAll(/\{\{[0-9a-f-]{36}}}/g)) {
+        fences.set(fence, (fences.get(fence) ?? 0) + 1);
+    }
+    return [...fences].filter(([, count]) => count !== 2).map(([fence]) => fence);
+}
+
 /**
  * Marks every tree, and every third comment, left padding and container, as a recipe would.
  */
@@ -127,6 +135,9 @@ describeJavaRpc("Java printer parity", () => {
                     expect(printed, cu.sourcePath).toEqual(text);
                 } else {
                     expect(printed, cu.sourcePath).not.toEqual(text);
+                }
+                if (requested === RequestedMarkerPrinter.FENCED) {
+                    expect(unclosedFences(printed), cu.sourcePath).toEqual([]);
                 }
                 expect(await javaRpc.rpc.print(marked, undefined, requested), `${cu.sourcePath} ${requested}`).toEqual(printed);
             }
