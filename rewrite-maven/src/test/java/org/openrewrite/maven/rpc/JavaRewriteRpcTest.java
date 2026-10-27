@@ -47,9 +47,11 @@ class JavaRewriteRpcTest {
             assertThat(languages).contains("org.openrewrite.xml.tree.Xml$Document");
 
             server.getOutputStream().close();
-            boolean exited = server.waitFor(30, SECONDS);
-            assertThat(exited).as("exited after stdin closed, stderr: %s", Files.readString(stderr)).isTrue();
+            assertThat(server.waitFor(30, SECONDS)).as("exited after stdin closed").isTrue();
             assertThat(server.exitValue()).isZero();
+        } catch (Exception | AssertionError e) {
+            // The server's stack trace is only in its stderr file, which the temp directory's cleanup deletes
+            throw new AssertionError("Server stderr:\n" + new String(Files.readAllBytes(stderr)), e);
         } finally {
             client.shutdown();
             server.destroyForcibly();
