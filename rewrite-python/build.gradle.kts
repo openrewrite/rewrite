@@ -270,8 +270,6 @@ pytestJavaRpcTest.configure {
     // The jars rather than test-classpath.txt, which lists their paths, so a Java-side change re-runs the tests
     inputs.files(javaRpcClasspath)
         .withNormalizer(ClasspathNormalizer::class)
-    // pythonUpdateVersion rewrites the pyproject.toml pytest reads, in a publish that runs the tests as well
-    mustRunAfter("pythonUpdateVersion")
 }
 
 tasks.named("check") {
@@ -402,10 +400,10 @@ val pythonUpdateVersion = tasks.register("pythonUpdateVersion") {
     }
 }
 
-// pythonInstall and pytestTest read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a release
-// builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's output
-// in no declared order, and they should see the version it sets.
-listOf(pythonInstall, pytestTest).forEach { reader ->
+// pythonInstall and the pytest tasks read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a
+// release builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's
+// output in no declared order, and they should see the version it sets.
+listOf(pythonInstall, pytestTest, pytestJavaRpcTest).forEach { reader ->
     reader.configure { mustRunAfter(pythonUpdateVersion) }
 }
 
