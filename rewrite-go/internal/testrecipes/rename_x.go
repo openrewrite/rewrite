@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package golang
+package testrecipes
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
