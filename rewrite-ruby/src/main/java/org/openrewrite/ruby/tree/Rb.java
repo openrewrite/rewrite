@@ -102,7 +102,6 @@ public interface Rb extends J {
         FileAttributes fileAttributes;
 
         @Nullable // for backwards compatibility
-        @With(AccessLevel.PRIVATE)
         String charsetName;
 
         @Getter

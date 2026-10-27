@@ -108,7 +108,6 @@ public interface S extends J {
         FileAttributes fileAttributes;
 
         @Nullable // for backwards compatibility
-        @With(AccessLevel.PRIVATE)
         String charsetName;
 
         @With
