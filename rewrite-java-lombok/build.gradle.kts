@@ -71,6 +71,9 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.isFork = true
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    // javac 8 warns once per annotation processing round that Java 8 lacks the ElementType.MODULE jspecify's
+    // annotations target. The warning has no lint category, so only -nowarn removes it, as in rewrite-java-8.
+    options.isWarnings = false
 }
 
 tasks.withType<Test>().configureEach {
