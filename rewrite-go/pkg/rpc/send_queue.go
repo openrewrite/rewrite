@@ -392,3 +392,11 @@ var valueTypeMap = map[reflect.Type]string{}
 func RegisterValueType(goType reflect.Type, javaClassName string) {
 	valueTypeMap[goType] = javaClassName
 }
+
+// JavaClassName returns the Java class registered for v's Go type, or "" when none is.
+func JavaClassName(v any) string {
+	if v == nil {
+		return ""
+	}
+	return valueTypeMap[reflect.TypeOf(v)]
+}

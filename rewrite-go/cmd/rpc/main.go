@@ -2457,19 +2457,9 @@ func (s *server) handleGenerate(params json.RawMessage) (any, *rpcError) {
 		newID := uuid.New().String()
 		s.localObjects[newID] = t
 		resp.IDs = append(resp.IDs, newID)
-		resp.SourceFileTypes = append(resp.SourceFileTypes, sourceFileTypeFor(t))
+		resp.SourceFileTypes = append(resp.SourceFileTypes, rpc.JavaClassName(t))
 	}
 	return resp, nil
-}
-
-// sourceFileTypeFor returns the FQN Java expects for a Go-side tree.
-// Currently every Go source file is a CompilationUnit; expand if other
-// SourceFile types are added.
-func sourceFileTypeFor(t java.Tree) string {
-	if _, ok := t.(*golang.CompilationUnit); ok {
-		return "org.openrewrite.golang.tree.Go$CompilationUnit"
-	}
-	return ""
 }
 
 type traceGetObjectRequest struct {
