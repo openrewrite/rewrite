@@ -19,10 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -554,6 +559,47 @@ class ChangeTypeTest implements RewriteTest {
                   fun <T> foo(t: T): Target where T : CharSequence = Target()
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void methodReference() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original {
+                  fun foo() {}
+              }
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              val f = Original::foo
+              """,
+            """
+              import x.y.Target
+
+              val f = Target::foo
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MemberReference> refs = new ArrayList<>();
+                new KotlinIsoVisitor<List<J.MemberReference>>() {
+                    @Override
+                    public J.MemberReference visitMemberReference(J.MemberReference memberRef,
+                                                                  List<J.MemberReference> found) {
+                        found.add(memberRef);
+                        return memberRef;
+                    }
+                }.visit(cu, refs);
+                assertThat(refs).singleElement()
+                  .extracting(ref -> ref.getReference().getType())
+                  .isInstanceOfSatisfying(JavaType.Method.class, method ->
+                    assertThat(method.getDeclaringType().getFullyQualifiedName()).isEqualTo("x.y.Target"));
+            })
           )
         );
     }

@@ -628,6 +628,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 oldNameToChangedType.put(oldType, array);
                 oldNameToChangedType.put(array, array);
                 return array;
+            } else if (oldType instanceof JavaType.Method) {
+                return updateType((JavaType.Method) oldType);
             }
 
             return oldType;
