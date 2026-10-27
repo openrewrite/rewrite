@@ -440,8 +440,8 @@ class UnfoldPropertiesTest implements RewriteTest {
     @Test
     void preserveCommentsOnDuplicatedNestedSections() {
         rewriteRun(
-          // a comment keeps the sections from merging, so the output repeats a key
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false)
+            .because("a comment keeps the sections from merging, so the output repeats a key").build()),
           yaml(
             """
               spring:
@@ -467,8 +467,8 @@ class UnfoldPropertiesTest implements RewriteTest {
     // TODO implement handling of comments, remove this test and enable the `mergeDuplicatedSectionsWitComments` test
     void mergeDuplicatedSectionsCommentsAreIgnored() {
         rewriteRun(
-          // the output repeats a key until comments are handled
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false)
+            .because("the output repeats a key until comments are handled").build()),
           yaml(
             """
               logging.level:

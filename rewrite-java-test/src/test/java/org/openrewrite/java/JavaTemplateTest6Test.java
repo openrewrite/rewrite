@@ -286,8 +286,8 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           }))
-            // resolving List through the file's imports is what this tests
-            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false)
+              .because("resolving List through the file's imports is what this tests").build())
             .afterRecipe(run -> {
               var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
               JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();

@@ -22,6 +22,9 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Checks of how a recipe behaves and what it produces. {@link TypeValidation} checks the LST the recipe is given.
  */
@@ -109,6 +112,10 @@ public class RecipeQualityValidation {
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
 
+    /// Why the checks this turns off don't apply, which a test must give when it turns any off, so that a reviewer
+    /// reads the reason next to the opt-out.
+    private @Nullable String because;
+
     /// How a failed check's message ends. Without an honest way out, an agent told to get a build green works around
     /// the check instead, such as by rebuilding an object from a few of its fields so that the recipe no longer keeps
     /// the real one.
@@ -118,8 +125,8 @@ public class RecipeQualityValidation {
                                      "workaround.";
 
     static String optOut(String check) {
-        return "spec.recipeQualityValidation(RecipeQualityValidation.builder()." + check + "(false).build()), " +
-               "with a comment next to it that says why";
+        return "spec.recipeQualityValidation(RecipeQualityValidation.builder()." + check +
+               "(false).because(\"<why the check doesn't apply>\").build())";
     }
 
     /**
@@ -127,6 +134,49 @@ public class RecipeQualityValidation {
      */
     public static RecipeQualityValidation all() {
         return new RecipeQualityValidation();
+    }
+
+    private void requireReasonForChecksTurnedOff() {
+        if (because != null && !because.trim().isEmpty()) {
+            return;
+        }
+        List<String> off = new ArrayList<>();
+        if (!executionContextUnchanged) {
+            off.add("executionContextUnchanged");
+        }
+        if (!noEditsInScanningPhase) {
+            off.add("noEditsInScanningPhase");
+        }
+        if (!lightweightAccumulators) {
+            off.add("lightweightAccumulators");
+        }
+        if (!reportingMarkersOnly) {
+            off.add("reportingMarkersOnly");
+        }
+        if (!minimalFormatting) {
+            off.add("minimalFormatting");
+        }
+        if (!matchByTypeNotName) {
+            off.add("matchByTypeNotName");
+        }
+        if (!importReferencedTypes) {
+            off.add("importReferencedTypes");
+        }
+        if (!removeUnusedImports) {
+            off.add("removeUnusedImports");
+        }
+        if (!parserShapedTrees) {
+            off.add("parserShapedTrees");
+        }
+        if (!orderStepsForEarlierChanges) {
+            off.add("orderStepsForEarlierChanges");
+        }
+        if (!off.isEmpty()) {
+            throw new AssertionError("RecipeQualityValidation turns off " + String.join(", ", off) +
+                                     " without saying why. Add .because(\"..\") with the reason the check doesn't " +
+                                     "apply to this recipe, so that a reviewer reads it next to the opt-out. " +
+                                     WHEN_STUCK);
+        }
     }
 
     /**
@@ -140,6 +190,7 @@ public class RecipeQualityValidation {
         if (quality == null) {
             quality = all();
         }
+        quality.requireReasonForChecksTurnedOff();
         TypeValidation before = TypeValidation.before(testMethodSpec, testClassSpec);
         return builder()
                 .types(quality.types())
@@ -153,6 +204,7 @@ public class RecipeQualityValidation {
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .because(quality.because())
                 .build();
     }
 }

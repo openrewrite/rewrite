@@ -209,8 +209,20 @@ class RewriteTestTest implements RewriteTest {
           ));
         assertThat(e).hasStackTraceContaining("in a ScanningRecipe's accumulator")
           .hasStackTraceContaining("in Cursor messages")
-          .hasStackTraceContaining("executionContextUnchanged(false), with a comment next to it that says why")
+          .hasStackTraceContaining("executionContextUnchanged(false).because(")
           .hasStackTraceContaining("leave this test failing");
+    }
+
+    @Test
+    void rejectOptOutWithoutReason() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec
+            .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
+            .recipe(new KeepsWhatItScans()),
+          text("foo")
+        ));
+        assertThat(e).hasMessageContaining("turns off lightweightAccumulators without saying why")
+          .hasMessageContaining(".because(");
     }
 
     @Test
@@ -220,7 +232,7 @@ class RewriteTestTest implements RewriteTest {
           text("foo")
         ));
         assertThat(e).hasStackTraceContaining("make the edits in getVisitor(acc)")
-          .hasStackTraceContaining("noEditsInScanningPhase(false)");
+          .hasStackTraceContaining("noEditsInScanningPhase(false).because(");
     }
 
     @Test
@@ -243,7 +255,8 @@ class RewriteTestTest implements RewriteTest {
     void allowScannerEdit() {
         rewriteRun(
           spec -> spec
-            .recipeQualityValidation(RecipeQualityValidation.builder().noEditsInScanningPhase(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().noEditsInScanningPhase(false)
+              .because("the test checks that the opt-out lets a scanner edit").build())
             .recipe(new ScannerEdit()),
           text("foo")
         );
@@ -358,7 +371,8 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().reportingMarkersOnly(false).build())
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().reportingMarkersOnly(false)
+                .because("the test checks that the opt-out turns the check off").build())
                 .expectedCyclesThatMakeChanges(1)
                 .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                     @Override
@@ -965,7 +979,8 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false).build())
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false)
+                .because("the test checks that the opt-out turns the check off").build())
                 .recipe(formatWholeClassAfterRename()),
               java(
                 BEFORE,
@@ -1426,7 +1441,8 @@ class RewriteTestTest implements RewriteTest {
         void matchByTypeNotNameTurnedOff() {
             rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
-                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)
+                  .because("the recipe matches qualified calls by name on purpose").build()),
               java(
                 """
                   import java.util.Collections;
@@ -1716,7 +1732,8 @@ class RewriteTestTest implements RewriteTest {
         void optOut() {
             rewriteRun(
               spec -> spec.recipe(new UseObjectsIsNull(null))
-                .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false)
+                  .because("the test checks that the opt-out turns the check off").build()),
               java(
                 """
                   class A {
@@ -1851,7 +1868,8 @@ class RewriteTestTest implements RewriteTest {
         void optOut() {
             rewriteRun(
               spec -> spec.recipe(new RemoveCalls("emptyList", null))
-                .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false)
+                  .because("the test checks that the opt-out turns the check off").build()),
               java(
                 """
                   import java.util.Collections;
@@ -1993,7 +2011,8 @@ class RewriteTestTest implements RewriteTest {
         void optOut() {
             rewriteRun(
               spec -> spec.recipe(new ReturnNullByHand(null))
-                .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false)
+                  .because("the test checks that the opt-out turns the check off").build()),
               java(
                 """
                   class A {
@@ -2122,7 +2141,8 @@ class RewriteTestTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipeFromYaml(RECURSIVE_FIRST.replace("MovePackagesBroadFirst", "MovePackagesOptOut"),
                   "org.openrewrite.test.MovePackagesOptOut")
-                .recipeQualityValidation(RecipeQualityValidation.builder().orderStepsForEarlierChanges(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().orderStepsForEarlierChanges(false)
+                  .because("the test checks that the opt-out keeps a deliberate order").build()),
               java(
                 """
                   package a.b;
@@ -2216,7 +2236,7 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
               .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
                                     "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
-              .hasMessageContaining("lightweightAccumulators(false).build()), with a comment next to it that says why")
+              .hasMessageContaining("lightweightAccumulators(false).because(")
               .hasMessageContaining("leave this test failing");
         }
 
@@ -2269,7 +2289,8 @@ class RewriteTestTest implements RewriteTest {
         void turnedOff() {
             rewriteRun(
               spec -> spec
-                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
+                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false)
+                  .because("the test checks that the opt-out turns the check off").build())
                 .recipe(new KeepsWhatItScans()),
               text("foo")
             );

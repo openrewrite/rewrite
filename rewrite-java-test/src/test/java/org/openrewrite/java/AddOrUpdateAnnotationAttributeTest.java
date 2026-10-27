@@ -1608,8 +1608,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         void matchConstant() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hi", "Const.A.B.HI", false, null))
-                // the old value is matched as written, so it misses `org.example.Const.A.B.HI`
-                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)
+                  .because("the old value is matched as written, so it misses `org.example.Const.A.B.HI`").build()),
               java(
                 """
                   package org.example;
@@ -1702,8 +1702,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         void matchEnumValue() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Values.TWO", "Values.ONE", null, null))
-                // the old value is matched as written, so it misses `org.example.Values.ONE`
-                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)
+                  .because("the old value is matched as written, so it misses `org.example.Values.ONE`").build()),
               java(
                 """
                   package org.example;
@@ -1739,8 +1739,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         void replaceValueArrayWhenSingleValueMatchesImplicitArray() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Values.TWO,Values.THREE", "Values.ONE", null, null))
-                // the old value is matched as written, so it misses `org.example.Values.ONE`
-                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)
+                  .because("the old value is matched as written, so it misses `org.example.Values.ONE`").build()),
               java(
                 """
                   package org.example;
@@ -1913,8 +1913,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         void matchClass() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", "Long.class", null, null))
-                // the old value is matched as written, so it misses `java.lang.Long.class`
-                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)
+                  .because("the old value is matched as written, so it misses `java.lang.Long.class`").build()),
               java(
                 """
                   package org.example;

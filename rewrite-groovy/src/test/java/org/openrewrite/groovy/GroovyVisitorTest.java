@@ -31,8 +31,8 @@ class GroovyVisitorTest implements RewriteTest {
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(
           spec -> spec
-            // the formatter under test removes the parentheses itself
-            .recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false)
+              .because("the formatter under test removes the parentheses itself").build())
             .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
                 @Override
                 public Tree treeChanged(Cursor cursor, Tree newTree) {

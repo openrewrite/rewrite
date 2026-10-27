@@ -43,7 +43,8 @@ class ExecutionContextTest implements RewriteTest {
                   return text;
               }
           }).withCausesAnotherCycle(true))
-            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()),
+            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false)
+              .because("the test checks that a message put on the ExecutionContext causes another cycle").build()),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);

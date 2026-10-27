@@ -304,8 +304,8 @@ class RemoveImportTest implements RewriteTest {
     void removeStarImportEvenIfReferredTo() {
         rewriteRun(
           spec -> spec.recipe(removeImport("java.util.List", true))
-            // forced removal leaves List named without an import
-            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false)
+              .because("forced removal leaves List named without an import").build()),
           java(
             """
               import java.util.List;

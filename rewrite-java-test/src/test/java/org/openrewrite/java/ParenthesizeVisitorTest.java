@@ -41,8 +41,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .recipe(toRecipe(Reparenthesize::new))
-          // the visitor reparenthesizes trees with their parentheses stripped, which no parser makes
-          .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build());
+          .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false)
+            .because("the visitor reparenthesizes trees with their parentheses stripped, which no parser makes")
+            .build());
     }
 
     @DocumentExample
