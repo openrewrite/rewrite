@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.tools.JavaFileObject;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +35,7 @@ import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -49,48 +51,44 @@ class ClasspathJarIndexTest {
         Path pathing = jar("pathing.jar", "first.jar", "b/B.class");
         Path last = jar("last.jar", null, "c/C.class");
 
-        assertThat(jars(asList(first, classes, last))).containsExactly(last);
+        assertThat(indexed(asList(first, classes, last))).containsExactly(last.toFile());
 
-        assertThat(jars(asList(first, pathing, last))).containsExactly(last);
+        assertThat(indexed(asList(first, pathing, last))).containsExactly(last.toFile());
     }
 
     @Test
-    void listsAPackageOrItsSubpackagesButNotMetaInf() throws IOException {
-        ClasspathJarIndex index = index(jar("lib.jar", null, "a/A.class", "a/b/C.class", "a/D.java",
-                "META-INF/versions/11/a/A.class"));
+    void listsAndFindsTheClassesJavacReadsFromAPackageOrItsSubpackages() throws IOException {
+        List<ClasspathJarIndex> lib = ClasspathJarIndex.indexTrailingJars(singletonList(jar("lib.jar", null,
+                "a/A.class", "a/b/C.class", "a/D.java", "a/E$with space$1.class", "META-INF/versions/11/a/A.class")));
 
-        assertThat(binaryNames(index, "a", false)).containsExactly("a.A", "a.D");
+        assertThat(binaryNames(lib, "a", false)).containsExactly("a.A", "a.D");
 
-        assertThat(binaryNames(index, "", true)).containsExactlyInAnyOrder("a.A", "a.b.C", "a.D");
+        assertThat(binaryNames(lib, "", true)).containsExactlyInAnyOrder("a.A", "a.b.C", "a.D");
+
+        JavaFileObject c = ClasspathJarIndex.find(lib, "a.b.C", JavaFileObject.Kind.CLASS, StandardCharsets.UTF_8);
+        assertThat(c).isNotNull();
+        assertThat(ClasspathJarIndex.binaryName(c)).isEqualTo("a.b.C");
     }
 
     @Test
     void indexesAJarAgainOnceItIsReplaced() throws IOException {
-        Path lib = jar("lib.jar", null, "a/A.class");
-        assertThat(binaryNames(index(lib), "a", false)).containsExactly("a.A");
+        List<Path> lib = singletonList(jar("lib.jar", null, "a/A.class"));
+        assertThat(binaryNames(ClasspathJarIndex.indexTrailingJars(lib), "a", false)).containsExactly("a.A");
 
         jar("lib.jar", null, "a/A.class", "a/B.class");
-        assertThat(binaryNames(index(lib), "a", false)).containsExactly("a.A", "a.B");
+        assertThat(binaryNames(ClasspathJarIndex.indexTrailingJars(lib), "a", false)).containsExactly("a.A", "a.B");
     }
 
-    private List<Path> jars(List<Path> classpath) {
-        List<Path> jars = new ArrayList<>();
-        for (ClasspathJarIndex index : ClasspathJarIndex.indexTrailingJars(classpath)) {
-            jars.add(index.getJar());
-        }
-        return jars;
+    private static List<File> indexed(List<Path> classpath) {
+        List<File> files = new ArrayList<>();
+        ClasspathJarIndex.location(emptyList(), ClasspathJarIndex.indexTrailingJars(classpath)).forEach(files::add);
+        return files;
     }
 
-    private static ClasspathJarIndex index(Path jar) {
-        return ClasspathJarIndex.indexTrailingJars(singletonList(jar)).get(0);
-    }
-
-    private static List<String> binaryNames(ClasspathJarIndex index, String packageName, boolean recurse) {
-        List<JavaFileObject> files = new ArrayList<>();
-        index.list(packageName, EnumSet.of(JavaFileObject.Kind.CLASS, JavaFileObject.Kind.SOURCE), recurse,
-                StandardCharsets.UTF_8, files);
+    private static List<String> binaryNames(List<ClasspathJarIndex> jars, String packageName, boolean recurse) {
         List<String> names = new ArrayList<>();
-        for (JavaFileObject file : files) {
+        for (JavaFileObject file : ClasspathJarIndex.list(emptyList(), jars, packageName,
+                EnumSet.of(JavaFileObject.Kind.CLASS, JavaFileObject.Kind.SOURCE), recurse, StandardCharsets.UTF_8)) {
             names.add(ClasspathJarIndex.binaryName(file));
         }
         return names;

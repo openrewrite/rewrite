@@ -15,21 +15,25 @@
  */
 package org.openrewrite.java.internal.parser;
 
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaParser;
 
 import javax.lang.model.SourceVersion;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -40,53 +44,51 @@ import static java.util.Collections.emptyList;
 
 /**
  * The class and source files of a jar on a Java parser's classpath by package. javac's file manager opens and walks
- * every jar on its classpath for each parser, so a jar is indexed once per JVM and shared by every parser's file
- * manager.
+ * every jar on its classpath for each parser, so a parser whose execution context sets
+ * {@link JavaParser#SHARE_CLASSPATH_JAR_INDEX} lists its jars from an index read once per JVM.
  */
 public final class ClasspathJarIndex {
-    private static final int MAX_JARS = 512;
+    private static final URI PLACEHOLDER_URI = URI.create("file:///");
 
     /**
-     * By path, size and modification time, so that a jar replaced on disk is read again. An evicted jar keeps its file
-     * open until the parsers that use it are collected.
+     * By path, file key, size and modification time, so that a jar replaced on disk is read again.
      */
-    private static final Map<String, Optional<ClasspathJarIndex>> INDEXES =
-            new LinkedHashMap<String, Optional<ClasspathJarIndex>>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, Optional<ClasspathJarIndex>> eldest) {
-                    return size() > MAX_JARS;
-                }
-            };
+    private static final Map<String, SoftReference<ClasspathJarIndex>> INDEXES = new ConcurrentHashMap<>();
 
-    @Getter
     private final Path jar;
-
-    private final String jarUri;
-    private final ZipFile zip;
-    private final Map<String, List<ZipEntry>> entriesByPackage = new HashMap<>();
+    private final Map<String, List<String>> entriesByPackage = new HashMap<>();
+    private final Set<String> entries = new HashSet<>();
     private final boolean addsToClasspath;
+
+    /**
+     * Opened to read the first class javac completes from the jar, and closed once the index is collected.
+     */
+    private @Nullable ZipFile zip;
 
     private ClasspathJarIndex(Path jar) throws IOException {
         this.jar = jar;
-        this.jarUri = jar.toAbsolutePath().toUri().toString();
-        this.zip = new ZipFile(jar.toFile());
-        Enumeration<? extends ZipEntry> entries = zip.entries();
-        while (entries.hasMoreElements()) {
-            ZipEntry entry = entries.nextElement();
-            String name = entry.getName();
-            int slash = name.lastIndexOf('/');
-            String dir = slash < 0 ? "" : name.substring(0, slash);
-            if (!entry.isDirectory() && kind(name) != null && isPackage(dir)) {
-                entriesByPackage.computeIfAbsent(dir.replace('/', '.'), d -> new ArrayList<>()).add(entry);
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            Enumeration<? extends ZipEntry> zipEntries = zip.entries();
+            while (zipEntries.hasMoreElements()) {
+                ZipEntry entry = zipEntries.nextElement();
+                String name = entry.getName();
+                JavaFileObject.Kind kind = kind(name);
+                int slash = name.lastIndexOf('/');
+                String dir = slash < 0 ? "" : name.substring(0, slash);
+                if (!entry.isDirectory() && kind != null && isPackage(dir) &&
+                    isClass(name.substring(slash + 1, name.length() - kind.extension.length()))) {
+                    entriesByPackage.computeIfAbsent(dir.replace('/', '.'), d -> new ArrayList<>()).add(name);
+                    entries.add(name);
+                }
             }
-        }
-        ZipEntry manifestEntry = zip.getEntry(JarFile.MANIFEST_NAME);
-        if (manifestEntry == null) {
-            this.addsToClasspath = false;
-        } else {
-            try (InputStream in = zip.getInputStream(manifestEntry)) {
-                Attributes attributes = new Manifest(in).getMainAttributes();
-                this.addsToClasspath = attributes.getValue(Attributes.Name.CLASS_PATH) != null;
+            ZipEntry manifest = zip.getEntry(JarFile.MANIFEST_NAME);
+            if (manifest == null) {
+                addsToClasspath = false;
+            } else {
+                try (InputStream in = zip.getInputStream(manifest)) {
+                    Attributes attributes = new Manifest(in).getMainAttributes();
+                    addsToClasspath = attributes.getValue(Attributes.Name.CLASS_PATH) != null;
+                }
             }
         }
     }
@@ -97,15 +99,16 @@ public final class ClasspathJarIndex {
      * which javac would search them all.
      */
     public static List<ClasspathJarIndex> indexTrailingJars(List<Path> classpath) {
-        LinkedList<ClasspathJarIndex> trailing = new LinkedList<>();
+        List<ClasspathJarIndex> trailing = new ArrayList<>();
         for (int i = classpath.size() - 1; i >= 0; i--) {
             ClasspathJarIndex index = of(classpath.get(i));
             if (index == null || index.addsToClasspath) {
                 break;
             }
-            trailing.addFirst(index);
+            trailing.add(index);
         }
-        return trailing.isEmpty() ? emptyList() : new ArrayList<>(trailing);
+        Collections.reverse(trailing);
+        return trailing;
     }
 
     private static @Nullable ClasspathJarIndex of(Path entry) {
@@ -118,78 +121,107 @@ public final class ClasspathJarIndex {
             if (!attributes.isRegularFile()) {
                 return null;
             }
-            key = entry.toAbsolutePath() + "|" + attributes.size() + "|" + attributes.lastModifiedTime().toMillis();
+            key = entry.toAbsolutePath() + "|" + attributes.fileKey() + "|" + attributes.size() + "|" +
+                  attributes.lastModifiedTime().toMillis();
         } catch (IOException e) {
             return null;
         }
-        Optional<ClasspathJarIndex> index;
-        synchronized (INDEXES) {
-            index = INDEXES.get(key);
-        }
+        SoftReference<ClasspathJarIndex> cached = INDEXES.get(key);
+        ClasspathJarIndex index = cached == null ? null : cached.get();
         if (index == null) {
             try {
-                index = Optional.of(new ClasspathJarIndex(entry));
+                index = new ClasspathJarIndex(entry);
             } catch (IOException e) {
                 // javac reports a jar it can't read
-                index = Optional.empty();
+                return null;
             }
-            synchronized (INDEXES) {
-                Optional<ClasspathJarIndex> raced = INDEXES.putIfAbsent(key, index);
-                if (raced != null) {
-                    index = raced;
-                }
-            }
+            INDEXES.put(key, new SoftReference<>(index));
         }
-        return index.orElse(null);
+        return index;
     }
 
     /**
-     * Adds the files of {@code packageName}, or of it and its subpackages, as javac's own listing of a jar does.
+     * javac's own listing of the classpath entries before {@code jars}, followed by the files of {@code packageName},
+     * or of it and its subpackages, in the jars.
      */
-    public void list(String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse, Charset charset,
-                     Collection<JavaFileObject> into) {
-        if (recurse) {
-            for (Map.Entry<String, List<ZipEntry>> pkg : entriesByPackage.entrySet()) {
-                if (packageName.isEmpty() || pkg.getKey().equals(packageName) ||
-                    pkg.getKey().startsWith(packageName + ".")) {
-                    add(pkg.getValue(), kinds, charset, into);
-                }
-            }
-        } else {
-            add(entriesByPackage.getOrDefault(packageName, emptyList()), kinds, charset, into);
+    public static Iterable<JavaFileObject> list(Iterable<JavaFileObject> listed, List<ClasspathJarIndex> jars,
+                                                String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse,
+                                                Charset charset) {
+        if (jars.isEmpty()) {
+            return listed;
         }
+        List<JavaFileObject> all = new ArrayList<>();
+        for (JavaFileObject file : listed) {
+            all.add(file);
+        }
+        for (ClasspathJarIndex jar : jars) {
+            if (recurse) {
+                for (Map.Entry<String, List<String>> pkg : jar.entriesByPackage.entrySet()) {
+                    if (packageName.isEmpty() || pkg.getKey().equals(packageName) ||
+                        pkg.getKey().startsWith(packageName + ".")) {
+                        jar.add(pkg.getValue(), kinds, charset, all);
+                    }
+                }
+            } else {
+                jar.add(jar.entriesByPackage.getOrDefault(packageName, emptyList()), kinds, charset, all);
+            }
+        }
+        return all;
     }
 
     /**
-     * @return The file of a class or of its source by binary name, or null when the jar has none.
+     * @return The file of a class or of its source by binary name in the first of {@code jars} that has it.
      */
-    public @Nullable JavaFileObject find(String binaryName, JavaFileObject.Kind kind, Charset charset) {
-        int dot = binaryName.lastIndexOf('.');
-        String packageName = dot < 0 ? "" : binaryName.substring(0, dot);
+    public static @Nullable JavaFileObject find(List<ClasspathJarIndex> jars, String binaryName,
+                                                JavaFileObject.Kind kind, Charset charset) {
         String entryName = binaryName.replace('.', '/') + kind.extension;
-        for (ZipEntry entry : entriesByPackage.getOrDefault(packageName, emptyList())) {
-            if (entry.getName().equals(entryName)) {
-                return new JarEntryFile(this, entry, kind, charset);
+        for (ClasspathJarIndex jar : jars) {
+            if (jar.entries.contains(entryName)) {
+                return new JarEntryFile(jar, entryName, kind, charset);
             }
         }
         return null;
     }
 
     /**
-     * @return The binary name of a file this index listed, or null for another file.
+     * @return The files of a classpath location, followed by {@code jars}.
+     */
+    public static Iterable<? extends File> location(Iterable<? extends File> location, List<ClasspathJarIndex> jars) {
+        if (jars.isEmpty()) {
+            return location;
+        }
+        List<File> all = new ArrayList<>();
+        for (File file : location) {
+            all.add(file);
+        }
+        for (ClasspathJarIndex jar : jars) {
+            all.add(jar.jar.toFile());
+        }
+        return all;
+    }
+
+    /**
+     * @return The binary name of a file listed or found in an index, or null for another file.
      */
     public static @Nullable String binaryName(JavaFileObject file) {
         return file instanceof JarEntryFile ? ((JarEntryFile) file).binaryName : null;
     }
 
-    private void add(List<ZipEntry> entries, Set<JavaFileObject.Kind> kinds, Charset charset,
+    private void add(List<String> names, Set<JavaFileObject.Kind> kinds, Charset charset,
                      Collection<JavaFileObject> into) {
-        for (ZipEntry entry : entries) {
-            JavaFileObject.Kind kind = kind(entry.getName());
+        for (String name : names) {
+            JavaFileObject.Kind kind = kind(name);
             if (kind != null && kinds.contains(kind)) {
-                into.add(new JarEntryFile(this, entry, kind, charset));
+                into.add(new JarEntryFile(this, name, kind, charset));
             }
         }
+    }
+
+    private synchronized ZipFile zip() throws IOException {
+        if (zip == null) {
+            zip = new ZipFile(jar.toFile());
+        }
+        return zip;
     }
 
     private static JavaFileObject.@Nullable Kind kind(String name) {
@@ -216,37 +248,47 @@ public final class ClasspathJarIndex {
         return true;
     }
 
+    /**
+     * Whether javac reads a file of a package as a class, as it does a {@code package-info} but not a class file
+     * whose name holds a space, such as one Kotlin compiles a function with spaces in its name to.
+     */
+    private static boolean isClass(String simpleName) {
+        return SourceVersion.isIdentifier(simpleName) || "package-info".equals(simpleName);
+    }
+
     private static final class JarEntryFile extends SimpleJavaFileObject {
         private final ClasspathJarIndex index;
-        private final ZipEntry entry;
+        private final String entryName;
         private final Charset charset;
         private final String binaryName;
-        private final URI uri;
 
-        JarEntryFile(ClasspathJarIndex index, ZipEntry entry, Kind kind, Charset charset) {
-            // SimpleJavaFileObject requires a hierarchical URI, which a jar entry's URI isn't
-            super(URI.create("file:///" + entry.getName()), kind);
+        JarEntryFile(ClasspathJarIndex index, String entryName, Kind kind, Charset charset) {
+            // a jar entry's URI isn't the hierarchical one SimpleJavaFileObject requires, so toUri() makes its own
+            super(PLACEHOLDER_URI, kind);
             this.index = index;
-            this.entry = entry;
+            this.entryName = entryName;
             this.charset = charset;
-            String name = entry.getName();
-            this.binaryName = name.substring(0, name.length() - kind.extension.length()).replace('/', '.');
-            this.uri = URI.create("jar:" + index.jarUri + "!/" + name);
+            this.binaryName = entryName.substring(0, entryName.length() - kind.extension.length()).replace('/', '.');
         }
 
         @Override
         public URI toUri() {
-            return uri;
+            return URI.create("jar:" + index.jar.toAbsolutePath().toUri() + "!/" + entryName);
         }
 
         @Override
         public String getName() {
-            return index.jar + "(" + entry.getName() + ")";
+            return index.jar + "(" + entryName + ")";
         }
 
         @Override
         public InputStream openInputStream() throws IOException {
-            return index.zip.getInputStream(entry);
+            ZipFile zip = index.zip();
+            ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                throw new FileNotFoundException(getName());
+            }
+            return zip.getInputStream(entry);
         }
 
         @Override
@@ -258,14 +300,18 @@ public final class ClasspathJarIndex {
 
         @Override
         public long getLastModified() {
-            return entry.getTime();
+            try {
+                ZipEntry entry = index.zip().getEntry(entryName);
+                return entry == null ? 0 : entry.getTime();
+            } catch (IOException e) {
+                return 0;
+            }
         }
 
         @Override
         public boolean isNameCompatible(String simpleName, Kind kind) {
             String fileName = simpleName + kind.extension;
-            return kind == getKind() &&
-                   (entry.getName().equals(fileName) || entry.getName().endsWith("/" + fileName));
+            return kind == getKind() && (entryName.equals(fileName) || entryName.endsWith("/" + fileName));
         }
     }
 }

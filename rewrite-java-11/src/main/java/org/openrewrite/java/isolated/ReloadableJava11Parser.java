@@ -217,7 +217,8 @@ public class ReloadableJava11Parser implements JavaParser {
             }
 
             try {
-                pfm.setClasspath(new ArrayList<>(classpath));
+                pfm.setClasspath(new ArrayList<>(classpath),
+                        Boolean.TRUE.equals(ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -392,23 +393,28 @@ public class ReloadableJava11Parser implements JavaParser {
 
     private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
-        private final Charset charset;
         private List<ClasspathJarIndex> indexedJars = emptyList();
 
         public ByteArrayCapableJavacFileManager(Context context,
                                                 boolean register,
-                                                @Nullable Charset charset,
+                                                Charset charset,
                                                 Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
-            this.charset = charset == null ? Charset.defaultCharset() : charset;
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)
                     .collect(toList());
         }
 
-        void setClasspath(List<Path> classpath) throws IOException {
-            indexedJars = ClasspathJarIndex.indexTrailingJars(classpath);
-            setLocationFromPaths(StandardLocation.CLASS_PATH, classpath.subList(0, classpath.size() - indexedJars.size()));
+        void setClasspath(List<Path> classpath, boolean shareJarIndex) throws IOException {
+            indexedJars = shareJarIndex ? ClasspathJarIndex.indexTrailingJars(classpath) : emptyList();
+            List<Path> searchedByJavac = classpath.subList(0, classpath.size() - indexedJars.size());
+            setLocationFromPaths(StandardLocation.CLASS_PATH, searchedByJavac);
+        }
+
+        @Override
+        public Iterable<? extends File> getLocation(Location location) {
+            Iterable<? extends File> files = super.getLocation(location);
+            return StandardLocation.CLASS_PATH == location ? ClasspathJarIndex.location(files, indexedJars) : files;
         }
 
         @Override
@@ -424,31 +430,19 @@ public class ReloadableJava11Parser implements JavaParser {
         }
 
         @Override
-        public @Nullable JavaFileObject getJavaFileForInput(Location location, String className, JavaFileObject.Kind kind) throws IOException {
+        public @Nullable JavaFileObject getJavaFileForInput(Location location, String className,
+                                                            JavaFileObject.Kind kind) throws IOException {
             JavaFileObject file = super.getJavaFileForInput(location, className, kind);
-            if (file == null && StandardLocation.CLASS_PATH == location) {
-                for (ClasspathJarIndex jar : indexedJars) {
-                    file = jar.find(className, kind, charset);
-                    if (file != null) {
-                        break;
-                    }
-                }
-            }
-            return file;
+            return file == null && StandardLocation.CLASS_PATH == location ?
+                    ClasspathJarIndex.find(indexedJars, className, kind, Charset.forName(getEncodingName())) : file;
         }
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH == location) {
-                Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                if (!indexedJars.isEmpty()) {
-                    List<JavaFileObject> withJars = new ArrayList<>();
-                    listed.forEach(withJars::add);
-                    for (ClasspathJarIndex jar : indexedJars) {
-                        jar.list(packageName, kinds, recurse, charset, withJars);
-                    }
-                    listed = withJars;
-                }
+                Iterable<JavaFileObject> listed = ClasspathJarIndex.list(
+                        super.list(location, packageName, kinds, recurse), indexedJars, packageName, kinds, recurse,
+                        Charset.forName(getEncodingName()));
                 return Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
