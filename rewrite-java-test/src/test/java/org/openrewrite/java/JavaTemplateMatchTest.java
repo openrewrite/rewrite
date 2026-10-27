@@ -24,6 +24,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1088,8 +1089,9 @@ class JavaTemplateMatchTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
-            // the visitor swaps method references and lambdas, so every cycle undoes the last
             .expectedCyclesThatMakeChanges(1).cycles(1)
+            // the visitor swaps method references and lambdas, so every cycle undoes the last
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build())
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
                   .bindType("java.util.function.Function<Object, String>")

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import org.openrewrite.toml.tree.Toml;
@@ -312,7 +313,9 @@ class ChangeValueTest implements RewriteTest {
           spec -> spec.recipes(
             new ChangeValue("server.port", "8080"),
             new ChangeValue("server.port", "9090")
-          ).expectedCyclesThatMakeChanges(2).cycles(2), // each ChangeValue overwrites the other in every cycle
+          ).expectedCyclesThatMakeChanges(2).cycles(2)
+            // each ChangeValue overwrites the other in every cycle
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build()),
           toml(
             """
               [server]

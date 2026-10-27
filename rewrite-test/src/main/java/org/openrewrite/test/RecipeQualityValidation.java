@@ -109,6 +109,11 @@ public class RecipeQualityValidation {
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
 
+    /// Controls whether the recipe is validated to settle in the cycles the test expects it to make changes in, with
+    /// one more cycle run to show that it changes nothing more, even when the test sets the cycles to run.
+    @Builder.Default
+    private boolean settles = true;
+
     /// How a failed check's message ends. Without it, an agent told to make the build pass works around the check.
     static final String WHEN_STUCK = "If none of these fits the recipe, leave this test failing and describe what " +
                                      "the recipe needs.";
@@ -144,6 +149,7 @@ public class RecipeQualityValidation {
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .settles(quality.settles())
                 .build();
     }
 }

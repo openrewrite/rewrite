@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Option
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
+import org.openrewrite.test.RecipeQualityValidation
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
@@ -33,9 +34,10 @@ class KotlinRecipeTest : RewriteTest {
     fun `replaces all text with provided replacement argument text`() =
         rewriteRun(
             { spec ->
-                // the two steps each replace all text, so they undo each other in every cycle
                 spec.cycles(1)
                     .expectedCyclesThatMakeChanges(1)
+                    // the two steps each replace all text, so they undo each other in every cycle
+                    .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build())
                     .recipeFromYaml(
                     """
                     type: specs.openrewrite.org/v1beta/recipe

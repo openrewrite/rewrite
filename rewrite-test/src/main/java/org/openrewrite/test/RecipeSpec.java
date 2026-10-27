@@ -216,9 +216,9 @@ public class RecipeSpec {
         return this;
     }
 
-    /**
-     * The cycles to run, by default one more than {@link #expectedCyclesThatMakeChanges(int)} and at least two.
-     */
+    /// The cycles to run, by default one more than [#expectedCyclesThatMakeChanges(int)] and at least two. Fewer than
+    /// that still run one more, to show that the recipe settles, unless the test opts out with
+    /// [RecipeQualityValidation#settles()].
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
         return this;

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -81,7 +82,9 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     void addToVarargs() {
         rewriteRun(
           spec -> spec.recipe(new AddLiteralMethodArgument("B qux(int...)", 2, 2, "int"))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .cycles(1).expectedCyclesThatMakeChanges(1)
+            // the varargs call still matches once the argument is added, so the recipe adds it again in every cycle
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build()),
           java(
             "class A {{ B.qux(0, 1); }}",
             "class A {{ B.qux(0, 1, 2); }}"

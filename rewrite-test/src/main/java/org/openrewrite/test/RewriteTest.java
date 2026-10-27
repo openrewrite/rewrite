@@ -251,6 +251,10 @@ public interface RewriteTest extends SourceSpecs {
                 break;
             }
         }
+        if (cycles <= expectedCyclesThatMakeChanges &&
+            RecipeQualityValidation.of(testMethodSpec, testClassSpec).settles()) {
+            cycles = expectedCyclesThatMakeChanges + 1;
+        }
 
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
