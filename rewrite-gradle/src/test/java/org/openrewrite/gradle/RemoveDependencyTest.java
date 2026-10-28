@@ -212,6 +212,121 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeMatchingNotationNextToFilesDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0", files("lib/local.jar")
+                  runtimeOnly files("lib/other.jar"), "org.springframework.boot:spring-boot-starter-json:2.7.0"
+                  testImplementation /* JSON */ "org.springframework.boot:spring-boot-starter-json:2.7.0", files("lib/test.jar")
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation files("lib/local.jar")
+                  runtimeOnly files("lib/other.jar")
+                  testImplementation files("lib/test.jar")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeSingleDependencyWrittenAsSeveralArguments() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def bootVersion = '2.7.0'
+              def withoutLogging = { exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging' }
+
+              dependencies {
+                  implementation group: 'org.springframework.boot', name: 'spring-boot-starter-web', version:bootVersion
+                  implementation 'org.springframework.boot:spring-boot-starter-json:2.7.0', withoutLogging
+                  implementation 'com.google.guava:guava:29.0-jre'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def bootVersion = '2.7.0'
+              def withoutLogging = { exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging' }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeKotlinDependencyWithConfigurationArgument() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:2.7.0", dependencyConfiguration = { isTransitive = false })
+                  implementation("com.google.guava:guava:29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeGradleDependencyUsingMapNotationWithExclusion() {
         rewriteRun(
           buildGradle(

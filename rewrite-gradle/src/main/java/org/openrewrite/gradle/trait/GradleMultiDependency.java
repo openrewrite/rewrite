@@ -29,6 +29,8 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
@@ -47,7 +49,7 @@ import static org.openrewrite.gradle.trait.GradleDependency.isDependencyDeclarat
 /**
  * Represents one or more Gradle dependencies declared in a single method invocation.
  * Gradle's groovy DLS allows invocations like:
- * For varargs: implementation('g:a:1.0', 'g:a:2.0', 'dep3:3.0')
+ * For varargs: implementation('g:a:1.0', 'g:a:2.0', files('lib/local.jar'))
  * There is not a corresponding dependency form in the kotlin DSL.
  */
 @Value
@@ -77,32 +79,42 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Check if the cursor points at a method invocation that has multiple arguments which can be interpreted as Gradle's dependency string or map notation.
-     * This is useful to differentiate between the Gradle Groovy DSL's varargs method and the Gradle Kotlin DSL which has
-     * dependency methods which accept a sequence of strings representing the individual part of GAV coordinates.
+     * Whether the call declares several dependencies, read the way Gradle's Groovy DSL reads its arguments.
+     * With exactly two arguments, Gradle applies a closure in second place as configuration.
+     * A variable in second place may hold such a closure.
+     * At least one argument must be a string or map notation, so that a dependency written as map entries stays one.
      */
-    private static boolean methodArgumentsContainMultipleDependencyNotations(Cursor methodCursor) {
+    private static boolean declaresSeveralDependencies(Cursor methodCursor) {
         Object maybeMi = methodCursor.getValue();
-        if (!(maybeMi instanceof J.MethodInvocation)) {
+        if (!(maybeMi instanceof J.MethodInvocation) || methodCursor.firstEnclosing(K.CompilationUnit.class) != null) {
             return false;
         }
-        J.MethodInvocation m = (J.MethodInvocation) maybeMi;
-        long count = m.getArguments().stream()
-                .filter(it -> {
-                    if (it instanceof G.MapLiteral) {
-                        return true;
-                    }
-                    String printed = it.print(methodCursor).trim();
-                    // Strip surrounding quotes if present (from Groovy/Kotlin string literals)
-                    if ((printed.startsWith("'") && printed.endsWith("'")) ||
-                        (printed.startsWith("\"") && printed.endsWith("\""))) {
-                        printed = printed.substring(1, printed.length() - 1);
-                    }
-                    return DependencyNotation.parse(printed) != null;
-                })
-                .limit(2)
-                .count();
-        return m.getArguments().size() > 1 && count > 1;
+        List<Expression> arguments = ((J.MethodInvocation) maybeMi).getArguments();
+        if (arguments.size() < 2) {
+            return false;
+        }
+        if (arguments.size() == 2) {
+            Expression second = arguments.get(1);
+            if (second instanceof J.Lambda || second instanceof J.Identifier) {
+                return false;
+            }
+        }
+        return arguments.stream().anyMatch(it -> isNotation(it, methodCursor));
+    }
+
+    private static boolean isNotation(Expression argument, Cursor cursor) {
+        if (argument instanceof G.MapLiteral) {
+            return true;
+        }
+        if (argument instanceof J.Literal) {
+            Object value = ((J.Literal) argument).getValue();
+            return value instanceof String && DependencyNotation.parse((String) value) != null;
+        }
+        if (argument instanceof G.GString) {
+            String printed = argument.withPrefix(Space.EMPTY).print(cursor);
+            return DependencyNotation.parse(printed.substring(1, printed.length() - 1)) != null;
+        }
+        return false;
     }
 
     /**
@@ -240,7 +252,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
                 return null;
             }
 
-            return new GradleMultiDependency(cursor, matcher, methodArgumentsContainMultipleDependencyNotations(cursor));
+            return new GradleMultiDependency(cursor, matcher, declaresSeveralDependencies(cursor));
         }
     }
 }
