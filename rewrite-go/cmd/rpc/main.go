@@ -183,6 +183,8 @@ type serverConfig struct {
 	recipeInstallDir string
 }
 
+var testActivators []recipe.Activator
+
 func newServer(cfg serverConfig) *server {
 	var logOut io.Writer
 	if cfg.logFile != "" {
@@ -211,6 +213,7 @@ func newServer(cfg serverConfig) *server {
 
 	reg := recipe.NewRegistry()
 	reg.Activate(recipes.Activate)
+	reg.Activate(testActivators...)
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
@@ -307,6 +310,18 @@ func (s *server) closeMetrics() {
 	}
 }
 
+// remoteObjectCount counts the ids in both directions, as the single remoteObjects map of the
+// Java, JS, Python and C# peers does.
+func (s *server) remoteObjectCount() int {
+	n := len(s.remoteObjects)
+	for id := range s.reverseRemoteObjects {
+		if _, ok := s.remoteObjects[id]; !ok {
+			n++
+		}
+	}
+	return n
+}
+
 // recordMetric appends one row to the metrics CSV. Safe to call from
 // concurrent goroutines; rows are written under metricsMu so they don't
 // interleave. Errors are logged and dropped — metrics emission must never
@@ -335,7 +350,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
 		strconv.Itoa(len(s.localObjects)),
-		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.remoteObjectCount()),
 		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
@@ -1451,6 +1466,7 @@ func (s *server) handleEvict(params json.RawMessage) bool {
 	}
 	delete(s.localObjects, req.ID)
 	delete(s.remoteObjects, req.ID)
+	delete(s.reverseRemoteObjects, req.ID)
 	if cp, ok := s.refCheckpoints[req.ID]; ok {
 		s.localRefs.RollbackTo(cp.localRefsNext)
 		for k := range s.reverseRemoteRefs {
@@ -2457,19 +2473,9 @@ func (s *server) handleGenerate(params json.RawMessage) (any, *rpcError) {
 		newID := uuid.New().String()
 		s.localObjects[newID] = t
 		resp.IDs = append(resp.IDs, newID)
-		resp.SourceFileTypes = append(resp.SourceFileTypes, sourceFileTypeFor(t))
+		resp.SourceFileTypes = append(resp.SourceFileTypes, rpc.JavaClassName(t))
 	}
 	return resp, nil
-}
-
-// sourceFileTypeFor returns the FQN Java expects for a Go-side tree.
-// Currently every Go source file is a CompilationUnit; expand if other
-// SourceFile types are added.
-func sourceFileTypeFor(t java.Tree) string {
-	if _, ok := t.(*golang.CompilationUnit); ok {
-		return "org.openrewrite.golang.tree.Go$CompilationUnit"
-	}
-	return ""
 }
 
 type traceGetObjectRequest struct {

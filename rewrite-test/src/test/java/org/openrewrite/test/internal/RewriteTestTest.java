@@ -221,6 +221,36 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void recipeFailureOnUnprintableTreeKeepsCause() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(block.withStatements(ListUtils.map(block.getStatements(), s ->
+                    s instanceof J.If ? ((J.If) s).getPadding().withThenPart(null) : s)), ctx);
+              }
+
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  throw new IllegalStateException("boom");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(boolean b) {
+                      if (b) m(b);
+                  }
+              }
+              """
+          )
+        ));
+        assertThat(e).hasMessageStartingWith("Failed to run recipe at Cursor{")
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("boom");
+    }
+
+    @Test
     void typeValidationAppliedToNewSourceFiles() {
         assertThrows(AssertionError.class, () ->
           rewriteRun(
@@ -1971,6 +2001,90 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void rejectStatementThatLeavesIfWithoutThenPart() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveThenPart()),
+              java(
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) g(); else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """,
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.RemoveThenPart):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `h();`");
+        }
+
+        @Test
+        void rejectLiteralWhoseSourceDoesNotParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new QuoteToStringByHand()),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return '"';
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return \"\"\";
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.QuoteToStringByHand):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `return \"\"\"`");
+        }
+
+        @Test
+        void acceptSourceThatAlreadyDidNotParse() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(true))
+                .typeValidationOptions(TypeValidation.all().erroneous(false)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void reparseConvertedSourceWithItsNewLanguage() {
             rewriteRun(
               spec -> spec.recipe(new YamlToJava()),
@@ -2497,6 +2611,49 @@ class ReturnNullByHand extends Recipe {
                 }
                 return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveThenPart extends Recipe {
+
+    String displayName = "Remove the then-part of an `if`";
+
+    String description = "Removes a method call that is the whole then-part of an `if`, leaving the `if` without one.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                return getCursor().getParentTreeCursor().getValue() instanceof J.If ? null : method;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class QuoteToStringByHand extends Recipe {
+
+    String displayName = "Replace a quote character with a string";
+
+    String description = "Replaces `'\"'` by a string literal, writing its source without escaping the quote.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (!Character.valueOf('"').equals(literal.getValue())) {
+                    return literal;
+                }
+                return literal.withValue("\"").withValueSource("\"\"\"").withType(JavaType.Primitive.String);
             }
         };
     }

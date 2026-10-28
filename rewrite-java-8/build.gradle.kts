@@ -53,7 +53,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.isFork = true
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.isWarnings = false
-    options.compilerArgs.add("-XDsuppressNotes")
 }
 
 tasks.withType<Test>().configureEach {
@@ -67,11 +66,14 @@ tasks.withType<Javadoc>().configureEach {
     executable = javaToolchains.javadocToolFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     }.get().executablePath.toString()
+    // Java 8 lacks the ElementType.MODULE that jspecify's annotations target. This silences javac's warning
+    // about it, as compileJava's `-nowarn` does, while javadoc's own warnings still print.
+    (options as CoreJavadocOptions).addBooleanOption("XD-Xlint:none", true)
 }
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -109,6 +111,11 @@ normalization {
             ignoreCompletely()
         }
     }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
 }
 
 tasks.named("check") {

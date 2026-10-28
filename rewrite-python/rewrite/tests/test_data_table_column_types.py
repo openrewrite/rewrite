@@ -69,6 +69,7 @@ def test_annotation_maps_to_java_type_name(field_name, expected):
 class OptionalRow:
     maybe_text: Optional[str] = field(metadata=column("Maybe Text", "Nullable"))
     maybe_count: Optional[int] = field(metadata=column("Maybe Count", "Nullable"))
+    maybe_ratio: float | None = field(metadata=column("Maybe Ratio", "Nullable"))
 
 
 def test_optional_unwraps_to_the_underlying_type():
@@ -78,6 +79,7 @@ def test_optional_unwraps_to_the_underlying_type():
     columns = columns_by_name(table)
     assert columns["maybe_text"]["type"] == "String"
     assert columns["maybe_count"]["type"] == "Long"
+    assert columns["maybe_ratio"]["type"] == "Double"
 
 
 @dataclass

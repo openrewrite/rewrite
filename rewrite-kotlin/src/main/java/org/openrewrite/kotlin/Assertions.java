@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.Extension;
@@ -52,6 +53,10 @@ import static org.openrewrite.test.SourceSpecs.dir;
 @SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
 @CheckReturnValue
 public final class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
 
     private Assertions() {
     }

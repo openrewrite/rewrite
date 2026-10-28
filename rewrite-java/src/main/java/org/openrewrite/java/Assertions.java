@@ -23,6 +23,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -53,6 +54,10 @@ import static org.openrewrite.test.SourceSpecs.dir;
 @SuppressWarnings("unused")
 @CheckReturnValue
 public class Assertions {
+    static {
+        HashMapJavaTypeCache.useForParsers();
+    }
+
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();
     private static final Map<String, JavaSourceSet> javaSourceSets = new ConcurrentHashMap<>();
@@ -63,6 +68,9 @@ public class Assertions {
     static void customizeExecutionContext(ExecutionContext ctx) {
         if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
             ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+        if (ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX) == null) {
+            ctx.putMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX, true);
         }
     }
 

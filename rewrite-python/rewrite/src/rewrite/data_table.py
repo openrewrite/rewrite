@@ -21,6 +21,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from types import UnionType
 from typing import (Any, Dict, Generic, Iterator, List, Optional, Type, TypeVar, TYPE_CHECKING,
                     Union, cast, get_args, get_origin)
 
@@ -279,7 +280,8 @@ def _unwrap_optional(annotation: Any) -> Any:
     `str` must both report String.
     """
     args = [a for a in get_args(annotation) if a is not type(None)]
-    if get_origin(annotation) is Union and len(args) == 1:
+    # Before Python 3.14, `X | None` is a `UnionType`, apart from the `typing.Union` that `Optional[X]` is.
+    if get_origin(annotation) in (Union, UnionType) and len(args) == 1:
         return args[0]
     return annotation
 

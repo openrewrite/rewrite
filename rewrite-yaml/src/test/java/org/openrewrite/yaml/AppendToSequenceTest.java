@@ -465,11 +465,9 @@ class AppendToSequenceTest implements RewriteTest {
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs
                   value: "name: \\"env-var-2\\"\\n    value: \\"value-2\\""
-                  fileMatcher: devops/deploy/dev-vars.yaml
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs
                   value: "name: \\"env-var-3\\"\\n    value: \\"value-3\\""
-                  fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
           yaml(
             """
