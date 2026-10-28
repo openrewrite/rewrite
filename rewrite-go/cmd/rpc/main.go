@@ -310,6 +310,18 @@ func (s *server) closeMetrics() {
 	}
 }
 
+// remoteObjectCount counts the ids in both directions, as the single remoteObjects map of the
+// Java, JS, Python and C# peers does.
+func (s *server) remoteObjectCount() int {
+	n := len(s.remoteObjects)
+	for id := range s.reverseRemoteObjects {
+		if _, ok := s.remoteObjects[id]; !ok {
+			n++
+		}
+	}
+	return n
+}
+
 // recordMetric appends one row to the metrics CSV. Safe to call from
 // concurrent goroutines; rows are written under metricsMu so they don't
 // interleave. Errors are logged and dropped — metrics emission must never
@@ -338,7 +350,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
 		strconv.Itoa(len(s.localObjects)),
-		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.remoteObjectCount()),
 		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
@@ -1454,6 +1466,7 @@ func (s *server) handleEvict(params json.RawMessage) bool {
 	}
 	delete(s.localObjects, req.ID)
 	delete(s.remoteObjects, req.ID)
+	delete(s.reverseRemoteObjects, req.ID)
 	if cp, ok := s.refCheckpoints[req.ID]; ok {
 		s.localRefs.RollbackTo(cp.localRefsNext)
 		for k := range s.reverseRemoteRefs {
