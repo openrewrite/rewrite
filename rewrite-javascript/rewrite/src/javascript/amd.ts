@@ -29,7 +29,7 @@ import {
 } from "../java";
 import {JS} from "./tree";
 import {moduleNameOf} from "./add-import";
-import {cursorOf, deconflict, namesDeclaredWithin, scopeOf} from "./scope";
+import {cursorOf, deconflict, namesDeclaredWithin, namesReferencedWithin, scopeOf} from "./scope";
 import {Cursor} from "../tree";
 import {JavaScriptVisitor} from "./visitor";
 import {ExecutionContext} from "../execution";
@@ -696,8 +696,14 @@ export function bindAmd(
         return undefined;
     }
     // A parameter is in scope across the whole factory, and the queue hands this name to later
-    // requests at cursors inside it, so every name the factory declares is one it has to clear.
-    const taken = [...bindings, ...namesDeclaredWithin(amd.block.factory), ...queued.map(v => v.binding)];
+    // requests at cursors inside it, so every name the factory declares is one it has to clear,
+    // as is every name it reads from further out, such as a global like `Element`, which it would capture.
+    const taken = [
+        ...bindings,
+        ...namesDeclaredWithin(amd.block.factory),
+        ...namesReferencedWithin(amd.block.factory),
+        ...queued.map(v => v.binding)
+    ];
     const requested = preferredName ?? derivedBindingName(module)!;
     const binding = deconflict(requested, candidate => taken.includes(candidate));
     if (pinned && binding !== requested) {
