@@ -22,15 +22,18 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.tree.Version;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
 import static org.openrewrite.xml.AddToTagVisitor.addToTag;
 import static org.openrewrite.xml.MapTagChildrenVisitor.mapTagChildren;
-import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -88,46 +91,74 @@ public class AddPluginDependency extends Recipe {
                     dependencies = Xml.Tag.build("<dependencies />").withPrefix("\n");
                     plugin = addToTag(plugin, plugin, dependencies, getCursor().getParentOrThrow());
                 }
-                Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>" +
-                                artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
-                        .withPrefix("\n");
-
                 // The dependency being added may already exist and may or may not need its version updated
                 Optional<Xml.Tag> maybeExistingDependency = dependencies.getChildren()
                         .stream()
                         .filter(it -> groupId.equals(it.getChildValue("groupId").orElse(null)) &&
                                 artifactId.equals(it.getChildValue("artifactId").orElse(null)))
                         .findAny();
-                if (maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
-                    return plugin;
-                }
-                if (maybeExistingDependency.isPresent() && version != null) {
-                    ResolvedPom pom = getResolutionResult().getPom();
-                    String existingVersion = maybeExistingDependency.get().getChildValue("version")
-                            .map(pom::getValue)
-                            .orElse(null);
-                    String requestedVersion = pom.getValue(version);
-                    if (existingVersion != null && requestedVersion != null &&
-                        new Version(existingVersion).compareTo(new Version(requestedVersion)) >= 0) {
-                        return plugin;
-                    }
-                }
                 if (maybeExistingDependency.isPresent()) {
-                    plugin = mapTagChildren(plugin, dependencies, it -> {
-                        if (it == maybeExistingDependency.get()) {
-                            return newDependencyTag;
-                        }
-                        return it;
-                    });
-                } else {
-                    plugin = addToTag(plugin, dependencies, newDependencyTag, getCursor().getParentOrThrow());
+                    return updateVersion(plugin, dependencies, maybeExistingDependency.get(), ctx);
                 }
+                Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>" +
+                                artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
+                        .withPrefix("\n");
+                plugin = addToTag(plugin, dependencies, newDependencyTag, getCursor().getParentOrThrow());
                 if (formatAllDependencies) {
                     plugin = autoFormat(plugin, dependencies, ctx, getCursor().getParentOrThrow());
                 } else {
                     plugin = autoFormat(plugin, newDependencyTag, ctx, getCursor().getParentOrThrow());
                 }
                 return plugin;
+            }
+
+            private Xml.Tag updateVersion(Xml.Tag plugin, Xml.Tag dependencies, Xml.Tag dependency,
+                                          ExecutionContext ctx) {
+                Optional<Xml.Tag> versionTag = dependency.getChild("version");
+                if (version == null) {
+                    return versionTag
+                            .map(it -> (Xml.Tag) new RemoveContentVisitor<>(it, false, true)
+                                    .visitNonNull(plugin, ctx, getCursor().getParentOrThrow()))
+                            .orElse(plugin);
+                }
+                if (!versionTag.isPresent()) {
+                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + version + "</version>");
+                    return (Xml.Tag) new AddToTagVisitor<>(dependency, newVersionTag,
+                            new MavenTagInsertionComparator(dependency.getChildren()))
+                            .visitNonNull(plugin, ctx, getCursor().getParentOrThrow());
+                }
+                String existingValue = versionTag.get().getValue().orElse(null);
+                ResolvedPom pom = getResolutionResult().getPom();
+                String existingVersion = pom.getValue(existingValue);
+                String requestedVersion = pom.getValue(version);
+                if (existingVersion != null && requestedVersion != null &&
+                    new Version(existingVersion).compareTo(new Version(requestedVersion)) >= 0) {
+                    return plugin;
+                }
+                // changeChildTagValue leaves a property owned by an in-repo parent to be changed in that parent.
+                // This recipe edits only poms that declare the plugin, so it replaces the reference with the version.
+                Xml.Tag updated = isPropertyOfInRepoParent(existingValue) ?
+                        (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), version).visitNonNull(dependency, ctx) :
+                        changeChildTagValue(dependency, "version", version, ctx);
+                return mapTagChildren(plugin, dependencies, it -> it == dependency ? updated : it);
+            }
+
+            private boolean isPropertyOfInRepoParent(@Nullable String value) {
+                if (!isProperty(value)) {
+                    return false;
+                }
+                String propertyName = value.substring(2, value.length() - 1);
+                if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                    return false;
+                }
+                MavenResolutionResult parent = getResolutionResult().getParent();
+                while (parent != null) {
+                    if (parent.getPom().getRequested().getProperties().containsKey(propertyName)) {
+                        return true;
+                    }
+                    parent = parent.getParent();
+                }
+                return false;
             }
         };
     }
