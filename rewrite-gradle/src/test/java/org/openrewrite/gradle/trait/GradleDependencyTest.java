@@ -844,6 +844,48 @@ class GradleDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeVersionKeepsTrailingClosureOfMapEntries() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.removeVersion().getTree()))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: "com.google.guava", name: "guava", version: "28.2-jre") {
+                      exclude group: "com.google.code.findbugs"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: "com.google.guava", name: "guava") {
+                      exclude group: "com.google.code.findbugs"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiComponentLiteralsTwoArgs() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi()),

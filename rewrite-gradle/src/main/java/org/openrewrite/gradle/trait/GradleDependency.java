@@ -918,6 +918,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }));
         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
             updated = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                if (!(arg instanceof G.MapEntry)) {
+                    return arg;
+                }
                 G.MapEntry entry = (G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
                     //noinspection DataFlowIssue
