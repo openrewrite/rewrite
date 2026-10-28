@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
@@ -93,7 +92,6 @@ public class MavenResolutionResult implements Marker, Heavyweight {
         return userProperties == null ? emptyMap() : userProperties;
     }
 
-    @CanIgnoreReturnValue
     public MavenResolutionResult unsafeSetManagedReference(Integer id) {
         this.managedReference = id;
         return this;

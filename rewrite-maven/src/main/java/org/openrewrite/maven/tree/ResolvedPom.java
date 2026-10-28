@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -162,7 +161,6 @@ public class ResolvedPom implements Heavyweight {
      *
      * @return This POM after deduplication.
      */
-    @CanIgnoreReturnValue
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
