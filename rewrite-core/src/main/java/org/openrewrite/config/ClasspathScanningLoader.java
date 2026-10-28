@@ -53,8 +53,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
-    private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-
     private final List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
     // Index of the next YAML loader to drain into the shared maps via progressive scan.
     // Each loader is parsed at most once; subsequent loadRecipe calls hit the shared
@@ -585,7 +583,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
         }
         categoryDescriptors.addAll(loader.listCategoryDescriptors());
         styles.addAll(loader.listStyles());
-        recipeExamples.putAll(loader.listRecipeExamples());
         return true;
     }
 
@@ -610,7 +607,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         if (!recipeDescriptorsExtracted) {
             recipeDescriptorsExtracted = true;
             for (YamlResourceLoader loader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(loader.listRecipeDescriptors(recipes.values(), recipeExamples));
+                recipeDescriptors.addAll(loader.listRecipeDescriptors(recipes.values()));
             }
         }
     }
@@ -719,9 +716,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
-        // Examples are a YAML-only concept; the class scan does not populate this map.
-        ensureYamlScanned();
-        return recipeExamples;
+        return emptyMap();
     }
 
     @Override

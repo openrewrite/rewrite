@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.MavenSettingsAutoLoadingExtension.withMavenCentralMirror;
 
 class ResolvedPomTest implements RewriteTest {
 
@@ -470,7 +471,7 @@ class ResolvedPomTest implements RewriteTest {
             createJarFile(localRepository);
 
             List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace)));
             ctx.setRepositories(List.of(mavenLocal));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
@@ -496,7 +497,7 @@ class ResolvedPomTest implements RewriteTest {
             createJarFile(localRepository2);
 
             List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace)));
             ctx.setRepositories(List.of(mavenLocal, mavenLocal2));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
@@ -526,8 +527,8 @@ class ResolvedPomTest implements RewriteTest {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository, "com.some", "some-artifact", "1");
 
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(mavenLocal));
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(mavenLocal)));
 
             rewriteRun(
               spec -> spec.executionContext(ctx),
@@ -623,8 +624,8 @@ class ResolvedPomTest implements RewriteTest {
         MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
         createJarFile(localRepository, "com.some", "some-artifact", "1");
 
-        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
-          .setRepositories(List.of(mavenLocal));
+        MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(List.of(mavenLocal)));
 
         rewriteRun(
           spec -> spec.executionContext(ctx),

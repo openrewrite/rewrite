@@ -61,11 +61,27 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @return The text that a parser which carries on past a syntax error, as Java's does, couldn't read in
+     * {@code sourceFile}, or null when it read all of it.
+     */
+    default @Nullable String syntaxError(SourceFile sourceFile) {
+        return null;
+    }
+
+    /**
      * @return A parser of the format alone, for text that a source's own parser rejects because it checks more than
      * the format, as Maven's does with a POM's coordinates, or null when the source's parser checks only the format.
      */
     default Parser.@Nullable Builder syntaxParser() {
         return null;
+    }
+
+    /**
+     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, as the
+     * check compares no types.
+     */
+    default Parser.Builder untypedParser(Parser.Builder parser) {
+        return parser;
     }
 
     /**

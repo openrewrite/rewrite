@@ -84,7 +84,8 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RewriteRpcTest implements RewriteTest {
-    Environment env = Environment.builder()
+    // Scanning the runtime classpath reads every class file on it, so the tests share one scan
+    private static final Environment TEXT_RECIPES = Environment.builder()
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
 
@@ -100,7 +101,7 @@ class RewriteRpcTest implements RewriteTest {
         var serverIn = new PipedInputStream(clientOut);
         var clientIn = new PipedInputStream(serverOut);
 
-        marketplace = env.toMarketplace(runtimeClasspath());
+        marketplace = TEXT_RECIPES.toMarketplace(runtimeClasspath());
 
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
@@ -1188,7 +1189,7 @@ class RewriteRpcTest implements RewriteTest {
 
                 @Override
                 public RecipeDescriptor describe(RecipeListing listing) {
-                    return env.activateRecipes(listing.getName()).getDescriptor();
+                    return TEXT_RECIPES.activateRecipes(listing.getName()).getDescriptor();
                 }
 
                 @Override

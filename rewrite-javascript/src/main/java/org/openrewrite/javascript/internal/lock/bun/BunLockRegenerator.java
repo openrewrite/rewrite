@@ -228,7 +228,7 @@ public final class BunLockRegenerator {
     }
 
     /**
-     * The lock bun writes as the release that installs ({@link Inputs#getRelease()}), after a second install over it
+     * The lock bun writes as the release that installs ({@link Inputs#release}), after a second install over it
      * changed nothing.
      */
     public Result regenerate() {

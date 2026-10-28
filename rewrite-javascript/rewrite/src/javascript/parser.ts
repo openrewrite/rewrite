@@ -356,6 +356,12 @@ export class JavaScriptParser extends Parser {
             host.getCurrentDirectory = () => this.relativeTo || originalGetCurrentDirectory();
         }
 
+        // TypeScript keeps a resolution cache for a program only when it resolves modules itself. Without one, every
+        // import and every file's module format reads the package.json files on its path again.
+        const moduleResolutionCache = ts.createModuleResolutionCache(host.getCurrentDirectory(),
+            fileName => host.getCanonicalFileName(fileName), compilerOptions);
+        host.getModuleResolutionCache = () => moduleResolutionCache;
+
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             const normalizedFileName = path.normalize(fileName);
@@ -479,7 +485,7 @@ export class JavaScriptParser extends Parser {
                     normalizedFileName,
                     compilerOptions,
                     host,
-                    undefined,
+                    moduleResolutionCache,
                     undefined,
                     ts.getModeForUsageLocation(containingSourceFile, moduleLiteral, compilerOptions)
                 );

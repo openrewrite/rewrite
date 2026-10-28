@@ -3,13 +3,14 @@ import {Cursor} from "../../src/tree";
 import {
     amdBlockOf, bodyOf, deconflict, dependencyNames, derivedBindingName, elementsOf, enclosingAmdBlock,
     identifierOf, javascript, JavaScriptParser, JavaScriptVisitor, JS, lastSegment, namesDeclaredWithin,
-    namesUsed, parameterNames, parametersOf, present, references, withDependency, withoutDependencyAt,
-    withUnboundDependency
+    namesUsed, parameterNames, parametersOf, present, references, sourceFileCache, withDependency,
+    withoutDependencyAt, withUnboundDependency
 } from "../../src/javascript";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 async function firstCall(source: string): Promise<J.MethodInvocation> {
-    const parser = new JavaScriptParser();
     const gen = parser.parse({text: source, sourcePath: "a.js"});
     const parsed = (await gen.next()).value as JS.CompilationUnit;
     const statement = parsed.statements[0].element;

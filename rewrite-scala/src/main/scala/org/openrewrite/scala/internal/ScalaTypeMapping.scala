@@ -30,6 +30,7 @@ import dotty.tools.dotc.util.Spans
 
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
+import org.openrewrite.scala.tree.Union
 
 import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
@@ -574,10 +575,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def isVariable(sym: Symbol): Boolean =
     sym.isTerm && !sym.is(Flags.Method) && !sym.is(Flags.Package) && !isErrorSymbol(sym)
 
-  /** Look up JavaType.Variable by name (fallback). */
-  def variableTypeForName(name: String): JavaType.Variable = {
+  /**
+   * Look up JavaType.Variable by name (fallback), preferring the variable of that name defined where the tree starts:
+   * a pattern binder `v` in `case v: Int` has no typed node of its own span, only the `Bind` that also covers `: Int`.
+   */
+  def variableTypeForName(name: String, span: Spans.Span): JavaType.Variable = {
     if (name == null || name.isEmpty) return null
-    symbolsByName.get(name) match {
+    val definedHere = if (!span.exists) None else spanMap.get(span.start).flatMap(_.iterator
+      .map(t => try t.symbol catch { case _: Throwable => null })
+      .find(sym => sym != null && sym.exists && isVariable(sym) && sym.name.toString == name))
+    definedHere.orElse(symbolsByName.get(name)) match {
       case Some(sym) if !sym.isClass && isVariable(sym) =>
         try { mapVariableType(sym) } catch { case _: Throwable => null }
       case _ => null
@@ -615,7 +622,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
         case at: AndType => mapType(at.tp1)
-        case _: OrType => unknown
+        case ot: OrType => mapUnionType(ot, sig)
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
@@ -628,6 +635,13 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     } catch {
       case _: Throwable => unknown
     }
+  }
+
+  private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
+    case Nil => mapType(ctx.definitions.NothingType)
+    case (_, only) :: Nil => mapType(only)
+    case members => typeFactory.computeMultiCatch(sig, (union: Union) =>
+      union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */
@@ -671,6 +685,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case "scala.Double" => return JavaType.Primitive.Double
       case "scala.Boolean" => return JavaType.Primitive.Boolean
       case "scala.Unit" => return JavaType.Primitive.Void
+      case "scala.Null" => return JavaType.Primitive.Null
+      case "scala.Matchable" => return mapType(ctx.definitions.ObjectType)
       case _ =>
     }
 
@@ -762,12 +778,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       })
   }
 
-  def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+  def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+    val sym = javaClassOfStatics(symbol)
     // Members of library types are not populated to avoid deep recursive type
-    // graphs that cause StackOverflowError in recipes like ChangeType.
+    // graphs that cause StackOverflowError in recipes like ChangeType. A class
+    // loaded from TASTy has a source too, so also check what it was loaded from.
     val isSourceDefined = try {
       val src = sym.source
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
+      val file = sym.associatedFile
+      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala") &&
+        file != null && !file.ext.isScalaBinary
     } catch {
       case _: Throwable => false
     }
@@ -846,6 +866,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
     })
   }
+
+  /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
+  private def javaClassOfStatics(sym: Symbol): Symbol =
+    if (sym.is(Flags.JavaDefined) && sym.is(Flags.ModuleClass) && sym.companionClass.exists) sym.companionClass
+    else sym
 
   // --- Method and Variable type mapping ---
 

@@ -695,7 +695,9 @@ public class GradleDependencyConfiguration implements Heavyweight, Serializable,
             }
             return it;
         }, repositories, ctx);
-        if (maybeUpdated == this) {
+        if (maybeUpdated == this && (constraints == null || constraints.stream().noneMatch(it ->
+                Objects.equals(it.getArtifactId(), constraint.getArtifactId()) &&
+                Objects.equals(it.getGroupId(), constraint.getGroupId())))) {
             maybeUpdated = addConstraint(constraint, repositories, ctx);
         }
         return maybeUpdated;

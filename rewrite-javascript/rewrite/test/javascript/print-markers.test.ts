@@ -15,15 +15,17 @@
  */
 import * as fs from "fs";
 import * as path from "path";
-import {JavaScriptParser, JavaScriptVisitor, JS} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, sourceFileCache} from "../../src/javascript";
 import {J} from "../../src/java";
 import {foundSearchResult, markupInfo} from "../../src/markers";
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from "../../src/print";
 
 const syntaxDir = path.resolve(__dirname, "../../../src/integTest/resources/printer-parity");
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 async function parse(text: string, sourcePath: string): Promise<JS.CompilationUnit> {
-    const parsed = (await new JavaScriptParser().parse({text, sourcePath}).next()).value;
+    const parsed = (await parser.parse({text, sourcePath}).next()).value;
     expect(parsed.kind, sourcePath).toEqual(JS.Kind.CompilationUnit);
     return parsed as JS.CompilationUnit;
 }

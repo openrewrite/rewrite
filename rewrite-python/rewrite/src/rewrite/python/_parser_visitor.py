@@ -7,9 +7,9 @@ import re
 import sys
 import token
 from argparse import ArgumentError
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
-from tokenize import generate_tokens, TokenInfo
+from tokenize import detect_encoding, generate_tokens, TokenInfo
 from typing import Optional, TypeVar, cast, Callable, List, Tuple, Dict, Sequence, Union, Iterable, NamedTuple
 
 from rewrite import random_id, Markers
@@ -22,7 +22,7 @@ from . import tree as py
 from .annotation_utils import VALUE_SUBSCRIPTS, subscript_head
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
 from .printer import PythonPrinter
-from .type_mapping import PythonTypeMapping, compute_source_line_data
+from .type_mapping import _BOM, PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
@@ -139,6 +139,27 @@ def _with_line_breaks_of(source: str, text: str) -> str:
     return re.sub('\n', lambda _: next(line_breaks, '\n'), text)
 
 
+def read_source(path: str) -> Tuple[str, Optional[str]]:
+    """A Python file's text as the interpreter decodes it, with its own line endings and byte order mark.
+
+    The second value names the charset to write the file back in, where its bytes depend on one.
+    """
+    with open(path, 'rb') as f:
+        raw = f.read()
+    try:
+        declared, _ = detect_encoding(BytesIO(raw).readline)
+    except SyntaxError:
+        # A coding line the interpreter rejects leaves the default.
+        declared = 'utf-8'
+    if declared in ('utf-8', 'utf-8-sig'):
+        return raw.decode('utf-8'), None
+    source = raw.decode(declared)
+    try:
+        return source, (declared if raw.decode('utf-8') != source else None)
+    except UnicodeDecodeError:
+        return source, declared
+
+
 class ParserVisitor(ast.NodeVisitor):
     _source: str
     _parentheses_stack: List[_ParenStackEntry]
@@ -147,14 +168,17 @@ class ParserVisitor(ast.NodeVisitor):
     _paren_pairs: Dict[int, int]
     _bom_marked: bool
 
-    # UTF-8 BOM character
-    _BOM = '\ufeff'
-
     def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None,
                  type_mapping: Optional['_EmbeddedTypeMapping'] = None):
         super().__init__()
+        # From the source with its byte order mark, which ty's offsets count.
+        source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
+        self._type_mapping = type_mapping if type_mapping is not None else PythonTypeMapping(
+            source, file_path, ty_client,
+            source_lines=source_lines, line_byte_offsets=line_byte_offsets)
+
         # Detect and strip UTF-8 BOM if present
-        if source.startswith(self._BOM):
+        if source.startswith(_BOM):
             self._bom_marked = True
             source = source[1:]
         else:
@@ -162,12 +186,6 @@ class ParserVisitor(ast.NodeVisitor):
 
         self._source = source
         self._parentheses_stack = []
-
-        # Single pass: compute lines, byte offsets, and byte-to-char mapping together
-        source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
-        self._type_mapping = type_mapping if type_mapping is not None else PythonTypeMapping(
-            source, file_path, ty_client,
-            source_lines=source_lines, line_byte_offsets=line_byte_offsets)
 
         # The tokenizer wants a single line-ending spelling (it rejects a mix), so it
         # gets \n throughout while the original source keeps the spelling that

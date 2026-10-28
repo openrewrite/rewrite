@@ -30,12 +30,10 @@ import select
 import sys
 import tempfile
 import time
-import tokenize
 import traceback
 import threading
 
 from datetime import datetime, timezone
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
@@ -397,27 +395,8 @@ def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=No
                       project_language_level: Optional[str] = None,
                       check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
-    with open(path, 'rb') as f:
-        raw = f.read()
-    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
-    try:
-        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
-    except SyntaxError:
-        # A coding line the interpreter rejects: read as before one was looked for.
-        declared = 'utf-8'
-    charset_name = None
-    if declared in ('utf-8', 'utf-8-sig'):
-        # A byte order mark is left in the text for the parser, which records it.
-        source = raw.decode('utf-8')
-    else:
-        source = raw.decode(declared)
-        try:
-            # Reported to the host only where the bytes depend on it, as a name it may not know.
-            if raw.decode('utf-8') != source:
-                charset_name = declared
-        except UnicodeDecodeError:
-            charset_name = declared
+    from rewrite.python._parser_visitor import read_source
+    source, charset_name = read_source(path)
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
                                project_language_level=project_language_level,
@@ -1213,32 +1192,29 @@ def handle_get_object(params: dict) -> List[dict]:
             {'state': 'END_OF_OBJECT'}
         ]
 
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Get the "before" state - what we previously sent to Java
+    before = remote_objects.get(obj_id)
+
+    saved_refs = local_refs.snapshot()
+    _last_sent[:] = [obj_id, saved_refs]
+    q = RpcSendQueue(source_file_type, local_refs)
     try:
-        from rewrite.rpc.send_queue import RpcSendQueue
-
-        # Get the "before" state - what we previously sent to Java
-        before = remote_objects.get(obj_id)
-
-        saved_refs = local_refs.snapshot()
-        _last_sent[:] = [obj_id, saved_refs]
-        q = RpcSendQueue(source_file_type, local_refs)
-        try:
-            result = q.generate(obj, before)
-        except BaseException:
-            # Java receives nothing of this exchange, so refs assigned during it name
-            # objects it never got; citing them later would fail on its side.
-            local_refs.rollback_to(saved_refs)
-            raise
-
-        # Update remote_objects to track that Java now has this version
-        remote_objects[obj_id] = obj
-
-        return result
-
+        result = q.generate(obj, before)
     except BaseException as e:
+        # Java receives nothing of this exchange, so refs assigned during it name
+        # objects it never got; citing them later would fail on its side.
+        local_refs.rollback_to(saved_refs)
+        remote_objects.pop(obj_id, None)
         source_path = getattr(obj, 'source_path', None)
-        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        return [{'state': 'END_OF_OBJECT'}]
+        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
+        raise
+
+    # Update remote_objects to track that Java now has this version
+    remote_objects[obj_id] = obj
+
+    return result
 
 
 def handle_abort_get_object(params: dict) -> bool:

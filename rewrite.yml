@@ -66,7 +66,6 @@ recipeList:
 #  - org.openrewrite.staticanalysis.RemoveUnusedPrivateFields  # deliberately not applied here: too opinionated for this repository
 #  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods  # deliberately not applied here: too opinionated for this repository
   - org.openrewrite.staticanalysis.ReplaceLambdaWithMethodReference
-#  - org.openrewrite.staticanalysis.ReplaceStackWithDeque  # 9 files; ArrayDeque flips iteration order and drops Stack's synchronization, in parser hot paths
   - org.openrewrite.staticanalysis.ReplaceStringBuilderWithString
   - org.openrewrite.staticanalysis.ReplaceWeekYearWithYear
   - org.openrewrite.staticanalysis.URLEqualsHashCodeRecipes

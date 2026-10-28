@@ -303,18 +303,21 @@ export class RecipeSpec {
 
     private async expectResultsToMatchAfter(specs: SourceSpec<any>[], changeset: Result[], parsed: [SourceSpec<any>, SourceFile][]) {
         for (const spec of specs) {
+            if (spec.before === null) {
+                continue;
+            }
             const matchingSpec = parsed.find(([s, _]) => s === spec);
-            const result = changeset.find(c => {
-                if (c.before) {
-                    return c.before === matchingSpec![1];
-                } else if (c.after) {
-                    const matchingSpec = specs.find(s => s.path === c.after!.sourcePath);
-                    return !!matchingSpec;
-                }
-            });
+            const result = changeset.find(c => c.before === matchingSpec![1]);
             const after = result?.after;
 
-            if (!spec.after) {
+            if (spec.after === null) {
+                if (!result || after) {
+                    throw new Error('Expected recipe to delete file:\n' + trimIndent(spec.before));
+                }
+            } else if (!spec.after) {
+                if (result && !after) {
+                    throw new Error('Expected no change but recipe deleted the file:\n' + trimIndent(spec.before));
+                }
                 if (after && after !== result?.before) {
                     const actual = await TreePrinters.print(after);
                     const expected = dedent(spec.before!);

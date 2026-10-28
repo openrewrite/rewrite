@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -143,17 +145,23 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
         MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
           .snapshots(false).knownToExist(true).build();
+        MavenExecutionContextView recipeCtx = MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+          MavenExecutionContextView.view(new InMemoryExecutionContext())
+            .setLocalRepository(mavenLocal)
+            .setPomCache(new InMemoryMavenPomCache()));
+        // Maven Central, or the mirror that stands in for it, as the downloader names it: at https unless only http
+        // answers, as for a mirror on the build's own loopback address
+        MavenRepository central = requireNonNull(new MavenPomDownloader(recipeCtx)
+          .normalizeRepository(MavenRepository.MAVEN_CENTRAL, recipeCtx, null));
 
         rewriteRun(
           spec -> spec
             .recipe(updateModel())
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-            )
-            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-              .setPomCache(new InMemoryMavenPomCache())
-            ),
+            .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+              MavenExecutionContextView.view(new InMemoryExecutionContext())
+                .setLocalRepository(mavenLocal)
+            ))
+            .recipeExecutionContext(recipeCtx),
           pomXml(
             """
               <project>
@@ -176,15 +184,15 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+              %1$s: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
+              %1$s: HTTP 404)~~>--><dependency>
                     <groupId>com.bad</groupId>
                     <artifactId>bad-artifact</artifactId>
                     <version>1</version>
                   </dependency>
                 </dependencies>
               </project>
-              """,
+              """.formatted(central.getUri()),
             spec -> spec.beforeRecipe(maven ->
                 // make the local pom bad before running the recipe
                 Files.writeString(localPom,
