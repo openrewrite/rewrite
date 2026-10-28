@@ -244,7 +244,8 @@ class DependencyManifestTest {
         assertThat(pythonVersion(asList(">=3.9", ">=3.13"))).isEqualTo("3.13");
         assertThat(pythonVersion(singletonList(">=3.8,<3.12"))).isEqualTo("3.11");
         assertThat(pythonVersion(singletonList("==3.11.*"))).isEqualTo("3.11");
-        assertThat(pythonVersion(singletonList("<3.10"))).isNull();
+        assertThat(pythonVersion(singletonList("<3.9"))).isEqualTo("3.8");
+        assertThat(pythonVersion(singletonList("<3.8"))).isNull();
     }
 
     private void write(String path, String content) throws IOException {
