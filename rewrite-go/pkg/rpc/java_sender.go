@@ -86,9 +86,6 @@ func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q.GetAndSendList(id,
 		func(v any) []any {
 			annots := v.(*java.Identifier).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a
@@ -641,9 +638,6 @@ func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree,
 	q.GetAndSendList(ptt,
 		func(v any) []any {
 			annots := v.(*java.ParenthesizedTypeTree).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a
