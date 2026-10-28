@@ -680,15 +680,15 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
         // Refusing a file once it has arrived takes the same path as failing to receive it.
         Path failing = Path.of("app", "pnpm-workspace.yaml");
-        ExecutionContext ctx = new InMemoryExecutionContext();
-        ParsingExecutionContextView.view(ctx).setParsingListener(new ParsingEventListener() {
-            @Override
-            public void startedParsing(Parser.Input input) {
-                if (input.getPath().equals(failing)) {
-                    throw new IllegalStateException("Cannot take " + input.getPath());
-                }
-            }
-        });
+        ExecutionContext ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext())
+          .setParsingListener(new ParsingEventListener() {
+              @Override
+              public void startedParsing(Parser.Input input) {
+                  if (input.getPath().equals(failing)) {
+                      throw new IllegalStateException("Cannot take " + input.getPath());
+                  }
+              }
+          });
 
         // Source paths are relative to the repository, a directory above the project being parsed.
         List<SourceFile> sourceFiles = client()

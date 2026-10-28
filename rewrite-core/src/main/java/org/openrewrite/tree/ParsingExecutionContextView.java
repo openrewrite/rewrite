@@ -15,7 +15,6 @@
  */
 package org.openrewrite.tree;
 
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
@@ -38,7 +37,6 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return new ParsingExecutionContextView(ctx);
     }
 
-    @CanIgnoreReturnValue
     public ParsingExecutionContextView setParsingListener(ParsingEventListener listener) {
         putMessage(PARSING_LISTENER, listener);
         return this;
@@ -48,7 +46,6 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
     }
 
-    @CanIgnoreReturnValue
     public ParsingExecutionContextView setCharset(@Nullable Charset charset) {
         putMessage(CHARSET, charset);
         return this;
