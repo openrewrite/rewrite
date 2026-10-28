@@ -97,7 +97,7 @@ class ScalaTreeVisitor(
 
   /** Look up JavaType.Variable by span (primary) or name (fallback). */
   private def variableTypeFor(span: Spans.Span): JavaType.Variable = typeMapping.map(_.variableTypeFor(span)).orNull
-  private def variableTypeForName(name: String): JavaType.Variable = typeMapping.map(_.variableTypeForName(name)).orNull
+  private def variableTypeForName(name: String, span: Spans.Span): JavaType.Variable = typeMapping.map(_.variableTypeForName(name, span)).orNull
 
   /** Resolve a fully-qualified type name to a JavaType. */
   private def typeForFqn(fqn: String): JavaType = typeMapping.map(_.typeForFqn(fqn)).orNull
@@ -251,8 +251,8 @@ class ScalaTreeVisitor(
     }
     // Fallback: try name-based lookup for untyped trees
     tree match {
-      case id: Trees.Ident[?] => variableTypeForName(id.name.toString)
-      case vd: Trees.ValDef[?] => variableTypeForName(vd.name.toString)
+      case id: Trees.Ident[?] => variableTypeForName(id.name.toString, id.span)
+      case vd: Trees.ValDef[?] => variableTypeForName(vd.name.toString, vd.span)
       case _ => null
     }
   }

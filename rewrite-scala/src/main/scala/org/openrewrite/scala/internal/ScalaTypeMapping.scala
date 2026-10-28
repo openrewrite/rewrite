@@ -575,10 +575,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def isVariable(sym: Symbol): Boolean =
     sym.isTerm && !sym.is(Flags.Method) && !sym.is(Flags.Package) && !isErrorSymbol(sym)
 
-  /** Look up JavaType.Variable by name (fallback). */
-  def variableTypeForName(name: String): JavaType.Variable = {
+  /**
+   * Look up JavaType.Variable by name (fallback), preferring the variable of that name defined where the tree starts:
+   * a pattern binder `v` in `case v: Int` has no typed node of its own span, only the `Bind` that also covers `: Int`.
+   */
+  def variableTypeForName(name: String, span: Spans.Span): JavaType.Variable = {
     if (name == null || name.isEmpty) return null
-    symbolsByName.get(name) match {
+    val definedHere = if (!span.exists) None else spanMap.get(span.start).flatMap(_.iterator
+      .map(t => try t.symbol catch { case _: Throwable => null })
+      .find(sym => sym != null && sym.exists && isVariable(sym) && sym.name.toString == name))
+    definedHere.orElse(symbolsByName.get(name)) match {
       case Some(sym) if !sym.isClass && isVariable(sym) =>
         try { mapVariableType(sym) } catch { case _: Throwable => null }
       case _ => null

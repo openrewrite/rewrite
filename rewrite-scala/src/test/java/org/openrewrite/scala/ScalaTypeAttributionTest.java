@@ -2171,6 +2171,47 @@ class ScalaTypeAttributionTest implements RewriteTest {
         assertThat(javaMethod(javaCu, "getKey").getMethodType()).isNotNull().isSameAs(method(scalaCu, "getKey").getMethodType());
     }
 
+    @Test
+    void sameNamedLocalsOfDifferentTypesInOneMethod() {
+        rewriteRun(
+          scala(
+            """
+            class SameNamedLocals {
+              def m(): Unit = {
+                { val x = 1 }
+                { val x = "s" }
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x")))
+                  .extracting(v -> TypeUtils.toString(v.getVariableType().getType()))
+                  .containsExactly("int", "java.lang.String");
+            })
+          )
+        );
+    }
+
+    @Test
+    void sameNamedCaseBindersOfDifferentTypes() {
+        rewriteRun(
+          scala(
+            """
+            class SameNamedBinders {
+              def m(o: Any): String = o match {
+                case v: Int => v.toString
+                case v: String => v
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu ->
+                assertThat(findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("v")))
+                  .extracting(i -> TypeUtils.toString(i.getFieldType().getType()))
+                  .containsExactly("int", "int", "java.lang.String", "java.lang.String"))
+          )
+        );
+    }
+
     private static J.Identifier lambdaParameter(J cu, String name) {
         return findAll(cu, J.Lambda.class, l -> true).stream()
           .flatMap(l -> l.getParameters().getParameters().stream())

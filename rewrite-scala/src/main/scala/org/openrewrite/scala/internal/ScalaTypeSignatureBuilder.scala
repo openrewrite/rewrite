@@ -215,11 +215,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   def variableSignature(sym: Symbols.Symbol): String = {
-    val owner =
-      if (sym.owner.isClass) binaryName(sym.owner)
-      else if (sym.owner.is(Flags.Method)) methodSignature(sym.owner)
-      else sym.owner.fullName.toString
-    owner + "{name=" + sym.name.toString + "}"
+    val name = "{name=" + sym.name.toString
+    if (sym.owner.isClass) return binaryName(sym.owner) + name + "}"
+    val owner = if (sym.owner.is(Flags.Method)) methodSignature(sym.owner) else sym.owner.fullName.toString
+    owner + name + (if (sym.span.exists) ",pos=" + sym.span.start else "") + "}"
   }
 
   /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
