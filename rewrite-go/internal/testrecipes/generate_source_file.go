@@ -17,7 +17,7 @@
 package testrecipes
 
 import (
-	"strings"
+	"path"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
@@ -93,7 +93,7 @@ func printSourceFile(t java.Tree) string {
 }
 
 func parseSourceFile(sourcePath, text string) []java.Tree {
-	if sourcePath == "go.mod" || strings.HasSuffix(sourcePath, "/go.mod") {
+	if path.Base(sourcePath) == "go.mod" {
 		gm, err := parser.ParseGoModFile(sourcePath, text)
 		if err != nil {
 			return nil
