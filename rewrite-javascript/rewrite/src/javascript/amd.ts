@@ -698,8 +698,9 @@ export function bindAmd(
     // A parameter is in scope across the whole factory, and the queue hands this name to later
     // requests at cursors inside it, so every name the factory declares is one it has to clear,
     // as is every name it reads from further out, such as a global like `Element`, which it would capture.
+    // A pinned alias is exempt from the latter: its caller names a global on purpose to take it over.
     const declaredWithin = namesDeclaredWithin(amd.block.factory);
-    const referencedWithin = namesReferencedWithin(amd.block.factory);
+    const referencedWithin = pinned ? new Set<string>() : namesReferencedWithin(amd.block.factory);
     const isTaken = (candidate: string) => declaredWithin.has(candidate) || referencedWithin.has(candidate) ||
         bindings.includes(candidate) || queued.some(v => v.binding === candidate);
     const requested = preferredName ?? derivedBindingName(module)!;

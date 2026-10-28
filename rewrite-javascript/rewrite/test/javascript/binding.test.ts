@@ -334,6 +334,17 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Object_1");
     });
 
+    test("AMD binds a pinned alias over a global the factory reads, since taking it over is the caller's intent", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind({module: "sap/ui/thirdparty/jquery", alias: "jQuery"}, bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { jQuery('x'); target(); });`,
+            `sap.ui.define(["sap/ui/thirdparty/jquery"], function (jQuery) { jQuery('x'); jQuery.target(); });`
+        ));
+        expect(bound.name).toBe("jQuery");
+    });
+
     test("AMD avoids a name a destructuring pattern binds", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
