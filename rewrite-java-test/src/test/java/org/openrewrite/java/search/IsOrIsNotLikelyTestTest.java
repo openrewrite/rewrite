@@ -101,11 +101,11 @@ public class IsOrIsNotLikelyTestTest {
 
         @SuppressWarnings("SpellCheckingInspection")
         default SourceSpecs srcIntegTestJava(SourceSpecs... javaSources) {
-            return dir("src/integTest/java", spec -> spec.markers(javaSourceSet("integTest")), javaSources);
+            return dir("src/integTest/java", spec -> sourceSet(spec, "integTest"), javaSources);
         }
 
         default SourceSpecs srcCompatibilityTestJava(SourceSpecs... javaSources) {
-            return dir("src/compatibility-test/java", spec -> spec.markers(javaSourceSet("compatibilityTest")), javaSources);
+            return dir("src/compatibility-test/java", spec -> sourceSet(spec, "compatibilityTest"), javaSources);
         }
     }
 

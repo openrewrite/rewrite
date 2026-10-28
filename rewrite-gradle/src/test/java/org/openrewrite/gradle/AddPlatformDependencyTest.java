@@ -292,7 +292,7 @@ class AddPlatformDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, null)),
           mavenProject("project",
-            srcMainJava(java(usingGuavaIntMath, spec -> spec.markers(javaSourceSet("integrationTest")))),
+            srcMainJava(java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
             buildGradle(
               //language=groovy
               """
@@ -354,7 +354,7 @@ class AddPlatformDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, true)),
           mavenProject("project",
-            srcMainJava(java(usingGuavaIntMath, spec -> spec.markers(javaSourceSet("integrationTest")))),
+            srcMainJava(java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
             buildGradle(
               //language=groovy
               """

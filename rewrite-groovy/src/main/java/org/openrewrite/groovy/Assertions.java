@@ -28,7 +28,7 @@ import org.openrewrite.test.SourceSpecs;
 import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
-import static org.openrewrite.java.Assertions.javaSourceSet;
+import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @CheckReturnValue
@@ -73,7 +73,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainGroovy(SourceSpecs... javaSources) {
-        return srcMainGroovy(spec -> spec.markers(javaSourceSet("main")), javaSources);
+        return srcMainGroovy(spec -> sourceSet(spec, "main"), javaSources);
     }
 
     public static SourceSpecs srcTestGroovy(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -81,6 +81,6 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestGroovy(SourceSpecs... javaSources) {
-        return srcTestGroovy(spec -> spec.markers(javaSourceSet("test")), javaSources);
+        return srcTestGroovy(spec -> sourceSet(spec, "test"), javaSources);
     }
 }

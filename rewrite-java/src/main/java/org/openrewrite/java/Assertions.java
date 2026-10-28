@@ -358,12 +358,12 @@ public class Assertions {
                 Integer.toString(sourceCompatibility), Integer.toString(targetCompatibility));
     }
 
-    public static JavaProject javaProject(String projectName) {
+    private static JavaProject javaProject(String projectName) {
         return javaProjects.computeIfAbsent(projectName, name ->
                 new JavaProject(Tree.randomId(), name, null));
     }
 
-    public static JavaSourceSet javaSourceSet(String sourceSet) {
+    private static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
                 new JavaSourceSet(Tree.randomId(), name, emptyList(), emptyMap()));
     }
