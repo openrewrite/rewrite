@@ -1607,7 +1607,7 @@ class AddDependencyTest implements RewriteTest {
               spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
               mavenProject("project",
                 srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
+                  java(usingGuavaIntMath, spec -> spec.markers(javaSourceSet("integrationTest")))),
                 buildGradle(
                   //language=groovy
                   """
@@ -1664,7 +1664,7 @@ class AddDependencyTest implements RewriteTest {
               spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
               mavenProject("project",
                 srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "test"))),
+                  java(usingGuavaIntMath, spec -> spec.markers(javaSourceSet("test")))),
                 buildGradle(
                   //language=groovy
                   """
@@ -1723,7 +1723,7 @@ class AddDependencyTest implements RewriteTest {
               spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, recipeConfiguration)),
               mavenProject("project",
                 srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
+                  java(usingGuavaIntMath, spec -> spec.markers(javaSourceSet("integrationTest")))),
                 buildGradle(
                   //language=groovy
                   """
@@ -2087,7 +2087,7 @@ class AddDependencyTest implements RewriteTest {
                       }
                   }
                   """,
-                sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")
+                spec -> spec.markers(javaSourceSet("integrationTest"))
               )
             ),
             buildGradle(

@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.java.Assertions.project;
+import static org.openrewrite.java.Assertions.javaProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddAnnotationProcessorTest implements RewriteTest {
@@ -3081,7 +3081,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       </build>
                   </project>
                   """,
-                spec -> project(spec, "aggregator")
+                spec -> spec.markers(javaProject("aggregator"))
               ),
               mavenProject("parent",
                 pomXml(

@@ -26,7 +26,7 @@ import org.openrewrite.test.SourceSpecs;
 import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
-import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.java.Assertions.javaSourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @CheckReturnValue
@@ -93,7 +93,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainScala(SourceSpecs... scalaSources) {
-        return srcMainScala(spec -> sourceSet(spec, "main"), scalaSources);
+        return srcMainScala(spec -> spec.markers(javaSourceSet("main")), scalaSources);
     }
 
     public static SourceSpecs srcTestScala(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... scalaSources) {
@@ -101,6 +101,6 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestScala(SourceSpecs... scalaSources) {
-        return srcTestScala(spec -> sourceSet(spec, "test"), scalaSources);
+        return srcTestScala(spec -> spec.markers(javaSourceSet("test")), scalaSources);
     }
 }

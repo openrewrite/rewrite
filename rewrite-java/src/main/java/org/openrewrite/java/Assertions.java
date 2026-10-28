@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -193,7 +192,7 @@ public class Assertions {
     }
 
     public static SourceSpecs mavenProject(String project, SourceSpecs... sources) {
-        return mavenProject(project, spec -> project(spec, project), sources);
+        return mavenProject(project, spec -> spec.markers(javaProject(project)), sources);
     }
 
     public static SourceSpecs srcMainJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -201,7 +200,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainJava(SourceSpecs... javaSources) {
-        return srcMainJava(spec -> sourceSet(spec, "main"), javaSources);
+        return srcMainJava(spec -> spec.markers(javaSourceSet("main")), javaSources);
     }
 
     public static SourceSpecs srcMainResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -209,7 +208,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainResources(SourceSpecs... resources) {
-        return srcMainResources(spec -> sourceSet(spec, "main"), resources);
+        return srcMainResources(spec -> spec.markers(javaSourceSet("main")), resources);
     }
 
     public static SourceSpecs srcTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -217,7 +216,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestJava(SourceSpecs... javaSources) {
-        return srcTestJava(spec -> sourceSet(spec, "test"), javaSources);
+        return srcTestJava(spec -> spec.markers(javaSourceSet("test")), javaSources);
     }
 
     public static SourceSpecs srcTestResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -225,7 +224,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestResources(SourceSpecs... resources) {
-        return srcTestResources(spec -> sourceSet(spec, "test"), resources);
+        return srcTestResources(spec -> spec.markers(javaSourceSet("test")), resources);
     }
 
     public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -233,15 +232,13 @@ public class Assertions {
     }
 
     public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
-        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+        return srcSmokeTestJava(spec -> spec.markers(javaSourceSet("smokeTest")), javaSources);
     }
 
-    @CanIgnoreReturnValue
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
         return sourceSpec.markers(javaVersion(version));
     }
 
-    @CanIgnoreReturnValue
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
             spec.markers(javaVersion(version));
@@ -253,12 +250,10 @@ public class Assertions {
      * Attach a {@link JavaVersion} where the compiling JDK ({@code createdBy}) may differ from the
      * {@code -source}/{@code --release} bytecode level, e.g. JDK 23 producing Java 8 bytecode.
      */
-    @CanIgnoreReturnValue
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
         return sourceSpec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
     }
 
-    @CanIgnoreReturnValue
     public static SourceSpecs version(SourceSpecs sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
         for (SourceSpec<?> spec : sourceSpec) {
             spec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
@@ -266,12 +261,10 @@ public class Assertions {
         return sourceSpec;
     }
 
-    @CanIgnoreReturnValue
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
         return sourceSpec.markers(javaProject(projectName));
     }
 
-    @CanIgnoreReturnValue
     public static SourceSpec<?> sourceSet(SourceSpec<?> sourceSpec, String sourceSet) {
         sourceSpec.markers(javaSourceSet(sourceSet));
         return sourceSpec;
@@ -365,12 +358,12 @@ public class Assertions {
                 Integer.toString(sourceCompatibility), Integer.toString(targetCompatibility));
     }
 
-    private static JavaProject javaProject(String projectName) {
+    public static JavaProject javaProject(String projectName) {
         return javaProjects.computeIfAbsent(projectName, name ->
                 new JavaProject(Tree.randomId(), name, null));
     }
 
-    private static JavaSourceSet javaSourceSet(String sourceSet) {
+    public static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
                 new JavaSourceSet(Tree.randomId(), name, emptyList(), emptyMap()));
     }

@@ -46,7 +46,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.java.Assertions.javaSourceSet;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
 
@@ -176,7 +176,7 @@ public final class Assertions {
     }
 
     public static SourceSpecs srcMainKotlin(SourceSpecs... kotlinSources) {
-        return srcMainKotlin(spec -> sourceSet(spec, "main"), kotlinSources);
+        return srcMainKotlin(spec -> spec.markers(javaSourceSet("main")), kotlinSources);
     }
 
     public static SourceSpecs srcTestKotlin(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... kotlinSources) {
@@ -184,7 +184,7 @@ public final class Assertions {
     }
 
     public static SourceSpecs srcTestKotlin(SourceSpecs... kotlinSources) {
-        return srcTestKotlin(spec -> sourceSet(spec, "test"), kotlinSources);
+        return srcTestKotlin(spec -> spec.markers(javaSourceSet("test")), kotlinSources);
     }
 
     private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
