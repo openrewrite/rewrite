@@ -15,83 +15,16 @@
  */
 package org.openrewrite.python.tree;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 
 public final class PySpace {
-
-    public static final class SpaceBuilder {
-        private @Nullable String initialWhitespace;
-        private @Nullable List<Comment> comments;
-
-        private @Nullable StringBuilder whitespaceBuilder;
-        private @Nullable String nextComment;
-
-        private String finishWhitespace() {
-            if (whitespaceBuilder == null) {
-                return "";
-            }
-            String ws = whitespaceBuilder.toString();
-            whitespaceBuilder.setLength(0);
-            return ws;
-        }
-
-        private void finishComment() {
-            String whitespace = finishWhitespace();
-            if (nextComment != null) {
-                if (comments == null) {
-                    comments = new ArrayList<>();
-                }
-                comments.add(new PyComment(nextComment, whitespace, false, Markers.EMPTY));
-            } else if (!whitespace.isEmpty()) {
-                if (this.initialWhitespace != null) {
-                    throw new IllegalStateException("unexpected");
-                }
-                this.initialWhitespace = whitespace;
-            }
-        }
-
-        @SuppressWarnings("UnusedReturnValue")
-        public SpaceBuilder addWhitespace(String whitespace) {
-            if (whitespaceBuilder == null) {
-                whitespaceBuilder = new StringBuilder();
-            }
-            whitespaceBuilder.append(whitespace);
-            return this;
-        }
-
-        @SuppressWarnings("UnusedReturnValue")
-        public SpaceBuilder addComment(String commentWithHash) {
-            finishComment();
-            nextComment = commentWithHash;
-            return this;
-        }
-
-        public Space build() {
-            finishComment();
-            Space space = Space.build(
-                    initialWhitespace == null ? "" : initialWhitespace,
-                    comments == null ? emptyList() : comments
-            );
-            reset();
-            return space;
-        }
-
-        public SpaceBuilder reset() {
-            this.initialWhitespace = null;
-            this.whitespaceBuilder.setLength(0);
-            this.comments = null;
-            return this;
-        }
-    }
 
     public static Space appendWhitespace(Space space, String whitespace) {
         if (!space.getComments().isEmpty()) {
