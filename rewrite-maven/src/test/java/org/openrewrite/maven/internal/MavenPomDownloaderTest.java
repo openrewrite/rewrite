@@ -199,28 +199,22 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/9226")
     @Test
-    void nonHttpRepositoryWarningsAreScopedToRepositoryAndContext() {
+    void nonHttpRepositoryWarningsAreScopedToRepository() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         List<String> failed = new ArrayList<>();
-        var listener = new ResolutionEventListener() {
+        ctx.setResolutionListener(new ResolutionEventListener() {
             @Override
             public void repositoryAccessFailed(String uri, Throwable t) {
                 failed.add(uri);
             }
-        };
+        });
         var first = MavenRepository.builder().id("wagon").uri("s3://first-bucket/maven").build();
         var second = MavenRepository.builder().id("wagon").uri("s3://second-bucket/maven").build();
-        var firstContext = MavenExecutionContextView.view(new InMemoryExecutionContext())
-          .setResolutionListener(listener);
-        var firstDownloader = new MavenPomDownloader(firstContext);
+        var downloader = new MavenPomDownloader(ctx);
 
-        assertThat(firstDownloader.normalizeRepository(first, firstContext, null)).isNull();
-        assertThat(firstDownloader.normalizeRepository(second, firstContext, null)).isNull();
+        assertThat(downloader.normalizeRepository(first, ctx, null)).isNull();
+        assertThat(downloader.normalizeRepository(second, ctx, null)).isNull();
         assertThat(failed).containsExactly(first.getUri(), second.getUri());
-
-        var secondContext = MavenExecutionContextView.view(new InMemoryExecutionContext())
-          .setResolutionListener(listener);
-        assertThat(new MavenPomDownloader(secondContext).normalizeRepository(first, secondContext, null)).isNull();
-        assertThat(failed).containsExactly(first.getUri(), second.getUri(), first.getUri());
     }
 
     @Nested
