@@ -22,17 +22,20 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
 import static java.util.Collections.singletonList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -72,7 +75,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Check if the cursor points at a method invocation that has multiple arguments which can be interpreted as Gradle's dependency string notation.
+     * Check if the cursor points at a method invocation that has multiple arguments which can be interpreted as Gradle's dependency string or map notation.
      * This is useful to differentiate between the Gradle Groovy DSL's varargs method and the Gradle Kotlin DSL which has
      * dependency methods which accept a sequence of strings representing the individual part of GAV coordinates.
      */
@@ -84,6 +87,9 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         J.MethodInvocation m = (J.MethodInvocation) maybeMi;
         long count = m.getArguments().stream()
                 .filter(it -> {
+                    if (it instanceof G.MapLiteral) {
+                        return true;
+                    }
                     String printed = it.print(methodCursor).trim();
                     // Strip surrounding quotes if present (from Groovy/Kotlin string literals)
                     if ((printed.startsWith("'") && printed.endsWith("'")) ||
@@ -102,25 +108,35 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      * that matches the provided DependencyMatcher.
      * Returns a new J.MethodInvocation with updated arguments if any dependencies changed.
      *
-     * @param mapper Function to transform each matching GradleDependency
-     * @return The updated J.MethodInvocation if any changes were made, or the original if not
+     * @param mapper Function to transform each matching GradleDependency, or to remove it by returning null
+     * @return The updated J.MethodInvocation if any changes were made, the original if not,
+     * or null if every dependency was removed
      */
-    public J.MethodInvocation map(Function<GradleDependency, J.MethodInvocation> mapper) {
+    public J.@Nullable MethodInvocation map(Function<GradleDependency, J.@Nullable MethodInvocation> mapper) {
         if (isVarargs()) {
-            return getTree().withArguments(
-                ListUtils.map(getTree().getArguments(), argument -> {
-                    // Make a synthetic GradleDependency representing wrapping a single dependency notation
-                    J.MethodInvocation m = getTree().withArguments(singletonList(argument));
-                    Optional<GradleDependency> dep = new GradleDependency.Matcher()
-                            .matcher(matcher)
-                            .get(new Cursor(getCursor().getParent(), m));
-                    if (dep.isPresent()) {
-                        J.MethodInvocation result = mapper.apply(dep.get());
-                        return result.getArguments().get(0);
-                    }
-                    return argument;
-                })
-            );
+            J.MethodInvocation m = getTree();
+            List<JRightPadded<Expression>> arguments = m.getPadding().getArguments().getPadding().getElements();
+            List<JRightPadded<Expression>> mapped = ListUtils.map(arguments, argument -> {
+                // Make a synthetic GradleDependency representing wrapping a single dependency notation
+                J.MethodInvocation single = m.withArguments(singletonList(argument.getElement()));
+                Optional<GradleDependency> dep = new GradleDependency.Matcher()
+                        .matcher(matcher)
+                        .get(new Cursor(getCursor().getParent(), single));
+                if (dep.isPresent()) {
+                    J.MethodInvocation result = mapper.apply(dep.get());
+                    return result == null ? null : argument.withElement(result.getArguments().get(0));
+                }
+                return argument;
+            });
+            if (mapped.isEmpty()) {
+                return null;
+            }
+            // The argument that becomes first takes the original first argument's whitespace and keeps its own comments.
+            // The argument that becomes last takes the original last argument's trailing space.
+            String firstWhitespace = arguments.get(0).getElement().getPrefix().getWhitespace();
+            mapped = ListUtils.mapFirst(mapped, a -> a.withElement(a.getElement().withPrefix(a.getElement().getPrefix().withWhitespace(firstWhitespace))));
+            mapped = ListUtils.mapLast(mapped, a -> a.withAfter(arguments.get(arguments.size() - 1).getAfter()));
+            return m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(mapped));
         } else {
             Optional<GradleDependency> dep = new GradleDependency.Matcher()
                     .matcher(matcher)

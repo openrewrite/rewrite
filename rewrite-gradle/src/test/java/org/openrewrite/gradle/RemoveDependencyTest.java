@@ -165,6 +165,53 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeMatchingNotationsOfSeveralInOneCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:2.7.0", "com.google.guava:guava:29.0-jre")
+                  implementation "org.springframework.boot:spring-boot-starter-jdbc:2.7.0", "org.springframework.boot:spring-boot-starter-json:2.7.0"
+                  testImplementation(
+                          // Actuator
+                          [group: "org.springframework.boot", name: "spring-boot-starter-actuator", version: "2.7.0"],
+                          // JUnit
+                          [group: "junit", name: "junit", version: "4.13.2"],
+                          // Spring test support
+                          [group: "org.springframework.boot", name: "spring-boot-starter-test", version: "2.7.0"]
+                  )
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+                  testImplementation(
+                          // JUnit
+                          [group: "junit", name: "junit", version: "4.13.2"]
+                  )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeGradleDependencyUsingMapNotationWithExclusion() {
         rewriteRun(
           buildGradle(
