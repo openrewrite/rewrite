@@ -142,8 +142,6 @@ class AddDependencyVisitorConcurrencyTest {
     }
 
     private static ExecutionContext withParsingListener(ParsingEventListener listener) {
-        ExecutionContext ctx = new InMemoryExecutionContext();
-        ParsingExecutionContextView.view(ctx).setParsingListener(listener);
-        return ctx;
+        return ParsingExecutionContextView.view(new InMemoryExecutionContext()).setParsingListener(listener);
     }
 }

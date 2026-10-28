@@ -192,7 +192,7 @@ public class Assertions {
     }
 
     public static SourceSpecs mavenProject(String project, SourceSpecs... sources) {
-        return mavenProject(project, spec -> project(spec, project), sources);
+        return mavenProject(project, spec -> spec.markers(javaProject(project)), sources);
     }
 
     public static SourceSpecs srcMainJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -200,7 +200,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainJava(SourceSpecs... javaSources) {
-        return srcMainJava(spec -> sourceSet(spec, "main"), javaSources);
+        return srcMainJava(spec -> spec.markers(javaSourceSet("main")), javaSources);
     }
 
     public static SourceSpecs srcMainResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -208,7 +208,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcMainResources(SourceSpecs... resources) {
-        return srcMainResources(spec -> sourceSet(spec, "main"), resources);
+        return srcMainResources(spec -> spec.markers(javaSourceSet("main")), resources);
     }
 
     public static SourceSpecs srcTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -216,7 +216,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestJava(SourceSpecs... javaSources) {
-        return srcTestJava(spec -> sourceSet(spec, "test"), javaSources);
+        return srcTestJava(spec -> spec.markers(javaSourceSet("test")), javaSources);
     }
 
     public static SourceSpecs srcTestResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
@@ -224,7 +224,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcTestResources(SourceSpecs... resources) {
-        return srcTestResources(spec -> sourceSet(spec, "test"), resources);
+        return srcTestResources(spec -> spec.markers(javaSourceSet("test")), resources);
     }
 
     public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
@@ -232,7 +232,7 @@ public class Assertions {
     }
 
     public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
-        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+        return srcSmokeTestJava(spec -> spec.markers(javaSourceSet("smokeTest")), javaSources);
     }
 
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {

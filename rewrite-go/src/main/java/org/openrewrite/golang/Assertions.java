@@ -128,7 +128,7 @@ public final class Assertions {
      * context, so imports of the modules it requires carry real types.
      */
     public static SourceSpecs goProject(String project, SourceSpecs... sources) {
-        return goProject(project, spec -> project(spec, project), sources);
+        return goProject(project, spec -> spec.markers(new GoProject(Tree.randomId(), project, null)), sources);
     }
 
     public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
