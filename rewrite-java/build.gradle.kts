@@ -47,7 +47,6 @@ dependencies {
     checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
         isTransitive = false
     }
-    compileOnly("com.google.errorprone:error_prone_annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
     implementation("org.apache.commons:commons-text:latest.release")
