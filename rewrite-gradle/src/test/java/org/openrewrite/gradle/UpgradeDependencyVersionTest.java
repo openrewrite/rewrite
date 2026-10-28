@@ -2581,6 +2581,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void cannotDownloadMetaDataForOneNotationOfSeveralInOneCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                implementation "commons-lang:commons-lang:2.6", "com.google.guava:guava:29.0-jre"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/implementation "commons-lang:commons-lang:2.6", "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinDslString() {
         rewriteRun(
           buildGradleKts(
