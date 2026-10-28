@@ -432,6 +432,47 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void relocateOnlyMatchingNotationsOfSeveralInOneCall() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              def langVersion = '2.6'
+              dependencies {
+                  implementation "commons-lang:commons-lang:${sharedVersion}", "com.google.guava:guava:${sharedVersion}"
+                  testImplementation "junit:junit:4.13.2", "commons-lang:commons-lang:${langVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              def langVersion = '3.11'
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11", "com.google.guava:guava:${sharedVersion}"
+                  testImplementation "junit:junit:4.13.2", "org.apache.commons:commons-lang3:${langVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeIfExists() {
         rewriteRun(
           spec -> spec.recipes(
@@ -1378,6 +1419,51 @@ class ChangeDependencyTest implements RewriteTest {
               }
               dependencies {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupeKeepsSiblingNotationsAndUpgradesSurvivorAmongThem() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+              "commons-lang",
+              "commons-lang",
+              "org.apache.commons",
+              "commons-lang3",
+              "3.14.x",
+              null,
+              null,
+              null
+          )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.11"
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre', 'commons-lang:commons-lang:2.6', 'org.apache.commons:commons-lang3:3.11'
+                  testImplementation 'junit:junit:4.13.2', 'commons-lang:commons-lang:2.6', "org.apache.commons:commons-lang3:${commonsVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.14.0"
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre', 'org.apache.commons:commons-lang3:3.14.0'
+                  testImplementation 'junit:junit:4.13.2', "org.apache.commons:commons-lang3:${commonsVersion}"
               }
               """
           )
