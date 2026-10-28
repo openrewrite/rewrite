@@ -2175,6 +2175,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
+	if phase != "edit" && phase != "scan" {
+		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
+	}
+
 	// Get the tree from Java via bidirectional RPC
 	s.captureRefCheckpoint(req.TreeID)
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
@@ -2185,30 +2189,7 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// Resolve ctx first because ScanningRecipe.InitialValue may need it.
 	ctx := s.resolveExecutionContext(req.PID)
 
-	// Get the visitor based on phase. For ScanningRecipe, both scan and edit
-	// phases need access to the accumulator; the accumulator is created
-	// lazily on the first scan visit.
-	var v recipe.TreeVisitor
-	switch phase {
-	case "edit":
-		if sr, ok := r.(recipe.ScanningRecipe); ok {
-			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			v = sr.EditorWithData(acc)
-		} else {
-			v = r.Editor()
-		}
-	case "scan":
-		sr, ok := r.(recipe.ScanningRecipe)
-		if !ok {
-			// scan visitor for a non-scanning recipe is a no-op
-			return &visitResponse{Modified: false}, nil
-		}
-		acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-		v = sr.Scanner(acc)
-	default:
-		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
-	}
-
+	v := s.instantiateVisitor(req.Visitor, ctx)
 	if v == nil {
 		return &visitResponse{Modified: false}, nil
 	}
@@ -2222,7 +2203,11 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
 	if after == nil {
-		after = before
+		if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			q.AfterVisits()
+		}
+		delete(s.localObjects, req.TreeID)
+		return &visitResponse{Modified: true}, nil
 	}
 	// Drain any after-visits queued via GoVisitor.DoAfterVisit during
 	// the main visit. Mirrors JavaVisitor's afterVisit drain — recipes
@@ -2235,12 +2220,8 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 
 	// Store the result — update both localObjects (for forward GetObject)
 	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
-	if after != nil {
-		s.localObjects[req.TreeID] = after
-		s.reverseRemoteObjects[req.TreeID] = after
-	} else {
-		delete(s.localObjects, req.TreeID)
-	}
+	s.localObjects[req.TreeID] = after
+	s.reverseRemoteObjects[req.TreeID] = after
 
 	return &visitResponse{Modified: modified}, nil
 }
@@ -2297,11 +2278,33 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 	case "scan":
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			return sr.Scanner(acc)
+			if scanner := sr.Scanner(acc); scanner != nil {
+				return &scanOnlyVisitor{scanner: scanner}
+			}
 		}
 		return nil
 	}
 	return nil
+}
+
+// scanOnlyVisitor runs a scanner for its effect on the accumulator and hands
+// back the tree it was given, as the Java and JS peers do: a scanner can
+// neither change nor delete a source file.
+type scanOnlyVisitor struct {
+	scanner recipe.TreeVisitor
+}
+
+func (v *scanOnlyVisitor) Visit(t java.Tree, p any) java.Tree {
+	if after := v.scanner.Visit(t, p); after != nil {
+		visitor.DrainAfterVisits(v.scanner, after, p)
+	}
+	return t
+}
+
+func (v *scanOnlyVisitor) SetCursor(c *visitor.Cursor) {
+	if ca, ok := v.scanner.(interface{ SetCursor(c *visitor.Cursor) }); ok {
+		ca.SetCursor(c)
+	}
 }
 
 // batchVisitRequest is the parameter type for BatchVisit.
