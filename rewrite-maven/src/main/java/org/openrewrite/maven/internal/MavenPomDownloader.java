@@ -1008,6 +1008,7 @@ public class MavenPomDownloader {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
+                    mavenCache.putNormalizedRepository(repository, null);
                     return null;
                 }
                 // An endpoint that has already failed to connect during this run is skipped rather

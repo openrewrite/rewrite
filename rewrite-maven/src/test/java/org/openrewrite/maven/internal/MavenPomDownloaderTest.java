@@ -85,6 +85,55 @@ class MavenPomDownloaderTest implements RewriteTest {
           .containsExactly("first", "third");
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9226")
+    @ParameterizedTest
+    @ValueSource(strings = {"artifactregistry://example.com/maven", "s3://example-bucket/maven"})
+    void nonHttpRepositoryWarnedOnce(String repositoryUri) {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        List<String> failed = new ArrayList<>();
+        List<String> failedPreviously = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable t) {
+                failed.add(uri);
+            }
+
+            @Override
+            public void repositoryAccessFailedPreviously(String uri) {
+                failedPreviously.add(uri);
+            }
+        });
+        var repository = MavenRepository.builder().id("wagon").uri(repositoryUri).build();
+        var downloader = new MavenPomDownloader(ctx);
+
+        assertThat(downloader.normalizeRepository(repository, ctx, null)).isNull();
+        assertThat(downloader.normalizeRepository(repository, ctx, null)).isNull();
+        assertThat(new MavenPomDownloader(ctx).normalizeRepository(repository, ctx, null)).isNull();
+
+        assertThat(failed).containsExactly(repositoryUri);
+        assertThat(failedPreviously).containsExactly(repositoryUri, repositoryUri);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9226")
+    @Test
+    void nonHttpRepositoryWarningsAreScopedToRepository() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        List<String> failed = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable t) {
+                failed.add(uri);
+            }
+        });
+        var first = MavenRepository.builder().id("wagon").uri("s3://first-bucket/maven").build();
+        var second = MavenRepository.builder().id("wagon").uri("s3://second-bucket/maven").build();
+        var downloader = new MavenPomDownloader(ctx);
+
+        assertThat(downloader.normalizeRepository(first, ctx, null)).isNull();
+        assertThat(downloader.normalizeRepository(second, ctx, null)).isNull();
+        assertThat(failed).containsExactly(first.getUri(), second.getUri());
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
