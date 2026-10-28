@@ -29,6 +29,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
@@ -37,6 +38,7 @@ import org.openrewrite.trait.VisitFunction2;
 import static java.util.Collections.singletonList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -107,6 +109,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      * Maps a transformation function over each GradleDependency in this multi-dependency
      * that matches the provided DependencyMatcher.
      * Returns a new J.MethodInvocation with updated arguments if any dependencies changed.
+     * Of each call the mapper returns, only the dependency's argument and the call's markers are kept.
      *
      * @param mapper Function to transform each matching GradleDependency, or to remove it by returning null
      * @return The updated J.MethodInvocation if any changes were made, the original if not,
@@ -116,15 +119,22 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         if (isVarargs()) {
             J.MethodInvocation m = getTree();
             List<JRightPadded<Expression>> arguments = m.getPadding().getArguments().getPadding().getElements();
+            // Marker edits pass from one notation's synthetic call to the next, then onto the real call
+            AtomicReference<Markers> markers = new AtomicReference<>(m.getMarkers());
             List<JRightPadded<Expression>> mapped = ListUtils.map(arguments, argument -> {
                 // Make a synthetic GradleDependency representing wrapping a single dependency notation
-                J.MethodInvocation single = m.withArguments(singletonList(argument.getElement()));
+                J.MethodInvocation single = m.withMarkers(markers.get())
+                        .withArguments(singletonList(argument.getElement()));
                 Optional<GradleDependency> dep = new GradleDependency.Matcher()
                         .matcher(matcher)
                         .get(new Cursor(getCursor().getParent(), single));
                 if (dep.isPresent()) {
                     J.MethodInvocation result = mapper.apply(dep.get());
-                    return result == null ? null : argument.withElement(result.getArguments().get(0));
+                    if (result == null) {
+                        return null;
+                    }
+                    markers.set(result.getMarkers());
+                    return argument.withElement(result.getArguments().get(0));
                 }
                 return argument;
             });
@@ -136,7 +146,8 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
             String firstWhitespace = arguments.get(0).getElement().getPrefix().getWhitespace();
             mapped = ListUtils.mapFirst(mapped, a -> a.withElement(a.getElement().withPrefix(a.getElement().getPrefix().withWhitespace(firstWhitespace))));
             mapped = ListUtils.mapLast(mapped, a -> a.withAfter(arguments.get(arguments.size() - 1).getAfter()));
-            return m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(mapped));
+            return m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(mapped))
+                    .withMarkers(markers.get());
         } else {
             Optional<GradleDependency> dep = new GradleDependency.Matcher()
                     .matcher(matcher)
