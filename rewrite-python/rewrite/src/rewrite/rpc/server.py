@@ -1192,32 +1192,29 @@ def handle_get_object(params: dict) -> List[dict]:
             {'state': 'END_OF_OBJECT'}
         ]
 
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Get the "before" state - what we previously sent to Java
+    before = remote_objects.get(obj_id)
+
+    saved_refs = local_refs.snapshot()
+    _last_sent[:] = [obj_id, saved_refs]
+    q = RpcSendQueue(source_file_type, local_refs)
     try:
-        from rewrite.rpc.send_queue import RpcSendQueue
-
-        # Get the "before" state - what we previously sent to Java
-        before = remote_objects.get(obj_id)
-
-        saved_refs = local_refs.snapshot()
-        _last_sent[:] = [obj_id, saved_refs]
-        q = RpcSendQueue(source_file_type, local_refs)
-        try:
-            result = q.generate(obj, before)
-        except BaseException:
-            # Java receives nothing of this exchange, so refs assigned during it name
-            # objects it never got; citing them later would fail on its side.
-            local_refs.rollback_to(saved_refs)
-            raise
-
-        # Update remote_objects to track that Java now has this version
-        remote_objects[obj_id] = obj
-
-        return result
-
+        result = q.generate(obj, before)
     except BaseException as e:
+        # Java receives nothing of this exchange, so refs assigned during it name
+        # objects it never got; citing them later would fail on its side.
+        local_refs.rollback_to(saved_refs)
+        remote_objects.pop(obj_id, None)
         source_path = getattr(obj, 'source_path', None)
-        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        return [{'state': 'END_OF_OBJECT'}]
+        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
+        raise
+
+    # Update remote_objects to track that Java now has this version
+    remote_objects[obj_id] = obj
+
+    return result
 
 
 def handle_abort_get_object(params: dict) -> bool:
