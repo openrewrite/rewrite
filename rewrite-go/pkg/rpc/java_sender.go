@@ -340,7 +340,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			init := v.(*java.ForControl).Init
 			if init == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*init}
 		},
@@ -359,7 +359,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			update := v.(*java.ForControl).Update
 			if update == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*update}
 		},

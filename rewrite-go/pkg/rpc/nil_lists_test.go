@@ -44,6 +44,16 @@ func TestNilAnnotationsCrossTheWireAsAnEmptyList(t *testing.T) {
 	}
 }
 
+func TestNilForClausesCrossTheWireAsEmptyLists(t *testing.T) {
+	id := uuid.New()
+	common := len(sendTree(&java.Empty{ID: id}))
+
+	fields := sendTree(&java.ForControl{ID: id})[common:]
+
+	// init and update are lists around the nullable condition
+	require.Equal(t, []State{Add, Change, NoChange, Add, Change}, states(fields))
+}
+
 func sendTree(tree java.Tree) []RpcObjectData {
 	var messages []RpcObjectData
 	q := NewSendQueue(1000, func(batch []RpcObjectData) {
