@@ -1335,7 +1335,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                 mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), versionEntry))));
                     } else {
                         // Map entries as separate arguments
-                        updated = m.withArguments(ListUtils.concat(m.getArguments(), versionEntry));
+                        updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionEntry));
                     }
                 }
             }
@@ -1361,7 +1361,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (!versionFound) {
                 // Add a new version assignment
                 J.Assignment versionAssignment = createVersionAssignment(newVersion);
-                updated = m.withArguments(ListUtils.concat(m.getArguments(), versionAssignment));
+                updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionAssignment));
             }
         } else if (firstArg instanceof K.StringTemplate) {
             // For StringTemplate, we convert to a simple string literal with the new version
@@ -1417,6 +1417,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         String quotedVersion = quote + newVersion + quote;
         return new J.Literal(randomId(), declaredVersion.getPrefix(), declaredVersion.getMarkers(),
                 newVersion, quotedVersion, null, JavaType.Primitive.String);
+    }
+
+    private static List<Expression> insertBeforeTrailingClosure(List<Expression> arguments, Expression argument) {
+        int last = arguments.size() - 1;
+        return ListUtils.insert(arguments, argument, arguments.get(last) instanceof J.Lambda ? last : last + 1);
     }
 
     private static String quoteOf(List<? extends Expression> arguments) {

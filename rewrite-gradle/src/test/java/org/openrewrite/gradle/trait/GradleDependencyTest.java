@@ -760,6 +760,90 @@ class GradleDependencyTest implements RewriteTest {
     }
 
     @Test
+    void withDeclaredVersionAddsMapEntryBeforeTrailingClosure() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredVersion("29.0-jre").getTree()))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: "com.google.guava", name: "guava") {
+                      exclude group: "com.google.code.findbugs"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group: "com.google.guava", name: "guava", version: "29.0-jre") {
+                      exclude group: "com.google.code.findbugs"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredVersionAddsNamedArgumentBeforeTrailingLambda() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredVersion("29.0-jre").getTree()))),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group = "com.google.guava", name = "guava") {
+                      exclude(group = "com.google.code.findbugs")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(group = "com.google.guava", name = "guava", version = "29.0-jre") {
+                      exclude(group = "com.google.code.findbugs")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiComponentLiteralsTwoArgs() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi()),
