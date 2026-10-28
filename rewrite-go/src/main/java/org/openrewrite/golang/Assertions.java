@@ -15,7 +15,6 @@
  */
 package org.openrewrite.golang;
 
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -129,7 +128,7 @@ public final class Assertions {
      * context, so imports of the modules it requires carry real types.
      */
     public static SourceSpecs goProject(String project, SourceSpecs... sources) {
-        return goProject(project, spec -> project(spec, project), sources);
+        return goProject(project, spec -> spec.markers(new GoProject(Tree.randomId(), project, null)), sources);
     }
 
     public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
@@ -175,7 +174,6 @@ public final class Assertions {
      * {@code goProject(name, ...)} consumer to apply the marker to every
      * child source.
      */
-    @CanIgnoreReturnValue
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
         return sourceSpec.markers(new GoProject(Tree.randomId(), projectName, null));
     }
