@@ -108,7 +108,6 @@ public interface S extends J {
         FileAttributes fileAttributes;
 
         @Nullable // for backwards compatibility
-        @With(AccessLevel.PRIVATE)
         String charsetName;
 
         @With
@@ -401,7 +400,7 @@ public interface S extends J {
      * file, each introducing a scope with its own body. Such a package is therefore
      * modeled as a statement that owns its body, rather than as the compilation unit's
      * single {@link J.Package} header. The non-braced leading {@code package a.b.c}
-     * form continues to be represented as {@link CompilationUnit#getPackageDeclaration()}.
+     * form continues to be represented as {@link S.CompilationUnit#getPackageDeclaration()}.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2723,7 +2722,7 @@ public interface S extends J {
     /**
      * A Scala string interpolation such as {@code s"Hello, $name"}, {@code f"$x%2.2f"}, or
      * {@code raw"a\nb"}. The {@code interpolator} identifier captures the {@code s}/{@code f}/{@code raw}
-     * (or any custom {@link StringContext} extension) prefix. {@code parts} interleaves
+     * (or any custom {@link scala.StringContext} extension) prefix. {@code parts} interleaves
      * {@link J.Literal} text chunks with {@link Interpolation} nodes, so the embedded
      * expressions are first-class, visitable LST elements rather than opaque source text.
      */

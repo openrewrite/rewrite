@@ -38,7 +38,7 @@ import static org.openrewrite.python.internal.pdmlock.PdmLockFixtures.resource;
 
 /**
  * Golden scenarios replay PDM 2.28.0 runs against pypi.org (see the fixture README); the recorded
- * index/metadata responses under {@code /pdmlock/http/} keep the tests offline.
+ * index/metadata responses under {@code /lock/pdm/http/} keep the tests offline.
  */
 class PdmLockEngineTest {
 
@@ -117,6 +117,19 @@ class PdmLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
         assertThat(result.getFailure().getPackageName()).isEqualTo("attrs");
+    }
+
+    @Test
+    void lockInputsFreshnessTrackingIsRefusedByName() {
+        // the fixture's [metadata] holds lock_inputs sub-tables and no content_hash (see README)
+        Result result = PdmLockEngine.regenerate(
+                resource("i-lock-inputs/pyproject.toml"),
+                resource("i-lock-inputs/pdm.lock"),
+                ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+        assertThat(result.getFailure().getDetail()).contains("lock_inputs");
+        assertThat(http.requests).isEmpty();
     }
 
     static final class RoutedHttp implements HttpSender {

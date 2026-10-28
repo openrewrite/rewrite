@@ -50,6 +50,9 @@ public class XmlParser implements Parser {
             "jxb",
             "xjb",
             "jsp",
+            // JSP documents and tag files in XML syntax
+            "jspx",
+            "tagx",
             // WebSphere/Rational Application Developer object-relational mapping for CMP entity beans
             "mapxmi",
             "tblxmi",
@@ -115,7 +118,8 @@ public class XmlParser implements Parser {
                         input.getFileAttributes(),
                         sourceStr,
                         is.getCharset(),
-                        is.isCharsetBomMarked()
+                        is.isCharsetBomMarked(),
+                        parser.htmlMode
                 ).visitDocument(parser.document());
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
@@ -140,7 +144,7 @@ public class XmlParser implements Parser {
             return false;
         }
         String p = path.toString().toLowerCase();
-        return p.endsWith(".jsp") || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
+        return p.endsWith(".jsp") || p.endsWith(".html") || p.endsWith(".htm");
     }
 
     @Override

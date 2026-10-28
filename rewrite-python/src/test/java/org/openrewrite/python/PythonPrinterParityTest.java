@@ -64,9 +64,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -409,38 +417,58 @@ class PythonPrinterParityTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.MINUTES)
-    void nativeModuleSources() throws IOException {
+    void nativeModuleSources() throws Exception {
         Path root = Paths.get("rewrite").toAbsolutePath();
         List<Path> files;
         try (Stream<Path> src = Files.walk(root.resolve("src")); Stream<Path> tests = Files.walk(root.resolve("tests"))) {
             files = Stream.concat(src, tests).filter(p -> p.toString().endsWith(".py")).sorted().collect(toList());
         }
 
-        // a process of its own, as the shared one traces every message and this many trees fill the log
-        PythonRewriteRpc rpc = PythonRewriteRpc.builder().get();
-        List<Path> compared = new ArrayList<>();
-        try {
-            SoftAssertions.assertSoftly(softly -> {
-                // in batches, so that no single parse request outlasts the RPC timeout
-                for (int i = 0; i < files.size(); i += 25) {
-                    List<Path> batch = files.subList(i, Math.min(files.size(), i + 25));
-                    List<SourceFile> parsed = rpc.parse(batch, ParseOptions.builder().relativeTo(root).build(),
-                      new InMemoryExecutionContext()).collect(toList());
-                    for (int j = 0; j < parsed.size(); j++) {
-                        // what the interpreter cannot parse there is nothing to compare for
-                        if (parsed.get(j) instanceof Py.CompilationUnit cu) {
-                            compared.add(batch.get(j));
-                            String printed = cu.printAll();
-                            softly.assertThat(printed).as("%s against its source", cu.getSourcePath()).isEqualTo(read(batch.get(j)));
-                            softly.assertThat(printed).as("%s against the Python printer", cu.getSourcePath()).isEqualTo(rpc.print(cu));
-                        }
-                    }
-                }
-            });
-        } finally {
-            rpc.shutdown();
+        // in batches, so that no single parse request outlasts the RPC timeout
+        Queue<List<Path>> batches = new ConcurrentLinkedQueue<>();
+        for (int i = 0; i < files.size(); i += 25) {
+            batches.add(files.subList(i, Math.min(files.size(), i + 25)));
         }
-        assertThat(compared).as("files the Python parser accepted").hasSizeGreaterThan(files.size() * 9 / 10);
+        // Parsing and sending the trees takes most of the time, so processes of the test's own share the batches out,
+        // as the shared one traces every message and this many trees fill the log
+        int processes = 4;
+        Map<Path, List<String>> printed = new ConcurrentSkipListMap<>();
+        ExecutorService pool = Executors.newFixedThreadPool(processes);
+        try {
+            List<Future<?>> workers = new ArrayList<>();
+            for (int p = 0; p < processes; p++) {
+                workers.add(pool.submit(() -> {
+                    PythonRewriteRpc rpc = PythonRewriteRpc.builder().get();
+                    try {
+                        for (List<Path> batch = batches.poll(); batch != null; batch = batches.poll()) {
+                            List<SourceFile> parsed = rpc.parse(batch, ParseOptions.builder().relativeTo(root).build(),
+                              new InMemoryExecutionContext()).collect(toList());
+                            for (int j = 0; j < parsed.size(); j++) {
+                                // what the interpreter cannot parse there is nothing to compare for
+                                if (parsed.get(j) instanceof Py.CompilationUnit cu) {
+                                    printed.put(batch.get(j), List.of(cu.printAll(), rpc.print(cu)));
+                                }
+                            }
+                        }
+                    } finally {
+                        rpc.shutdown();
+                    }
+                }));
+            }
+            for (Future<?> worker : workers) {
+                worker.get();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        SoftAssertions.assertSoftly(softly -> printed.forEach((file, jvmAndPython) -> {
+            Path sourcePath = root.relativize(file);
+            softly.assertThat(jvmAndPython.get(0)).as("%s against its source", sourcePath).isEqualTo(read(file));
+            softly.assertThat(jvmAndPython.get(0)).as("%s against the Python printer", sourcePath)
+              .isEqualTo(jvmAndPython.get(1));
+        }));
+        assertThat(printed).as("files the Python parser accepted").hasSizeGreaterThan(files.size() * 9 / 10);
     }
 
     @Test
@@ -504,6 +532,35 @@ class PythonPrinterParityTest {
                   .isEqualTo(rpc().print(cu, Print.MarkerPrinter.from(markerPrinter)));
             }
         });
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void fencesCloseAroundEveryTree() {
+        SoftAssertions.assertSoftly(softly -> {
+            for (SourceFile parsed : parse(SYNTAX)) {
+                Py.CompilationUnit cu = markEveryTree((Py.CompilationUnit) parsed);
+                String printed = cu.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.FENCED));
+                softly.assertThat(unclosedFences(printed))
+                  .as("Java printer's unclosed fences in %s", parsed.printAll())
+                  .isEmpty();
+                softly.assertThat(unclosedFences(rpc().print(cu, Print.MarkerPrinter.FENCED)))
+                  .as("Python printer's unclosed fences in %s", parsed.printAll())
+                  .isEmpty();
+            }
+        });
+    }
+
+    private static final Pattern FENCE = Pattern.compile("\\{\\{[0-9a-f-]{36}}}");
+
+    private static Set<String> unclosedFences(String printed) {
+        Map<String, Integer> fences = new HashMap<>();
+        Matcher fence = FENCE.matcher(printed);
+        while (fence.find()) {
+            fences.merge(fence.group(), 1, Integer::sum);
+        }
+        fences.values().removeIf(count -> count == 2);
+        return fences.keySet();
     }
 
     static Stream<Arguments> markerPrinters() {
@@ -588,8 +645,7 @@ class PythonPrinterParityTest {
                     printed.put(tree.getClass(), tree.print(getCursor().getParentOrThrow()));
                     assertThat(tree.print(getCursor().getParentTreeCursor())).isEqualTo(printed.get(tree.getClass()));
 
-                    PrintOutputCapture<Integer> alone = new PrintOutputCapture<>(0);
-                    new PythonPrinter<Integer>().visit(tree, alone);
+                    PrintOutputCapture<Integer> alone = new PythonPrinter<Integer>().reduce(tree, new PrintOutputCapture<>(0));
                     withoutAncestors.put(tree.getClass(), alone.getOut());
                 }
                 return tree;

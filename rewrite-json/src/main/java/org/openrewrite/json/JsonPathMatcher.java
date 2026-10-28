@@ -32,6 +32,7 @@ import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
@@ -429,6 +430,8 @@ public class JsonPathMatcher {
                 s = ctx.StringLiteral().getText();
             } else if (ctx.TRUE() != null || ctx.FALSE() != null) {
                 return Boolean.valueOf(ctx.getText());
+            } else if (ctx.PositiveNumber() != null || ctx.NegativeNumber() != null || ctx.NumericLiteral() != null) {
+                return new BigDecimal(ctx.getText());
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
@@ -759,15 +762,25 @@ public class JsonPathMatcher {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 switch (operator) {
                     case "==":
-                        return Objects.equals(lh, rh);
+                        return valueEquals(lh, rh);
                     case "!=":
-                        return !Objects.equals(lh, rh);
+                        return !valueEquals(lh, rh);
                     case "=~":
                         return Pattern.compile(rh.toString()).matcher(lh.toString()).matches();
                 }
                 return false;
             };
             return predicate.test(lhs, rhs);
+        }
+
+        private boolean valueEquals(@Nullable Object lhs, @Nullable Object rhs) {
+            if (lhs instanceof Number && rhs instanceof BigDecimal) {
+                if (lhs instanceof Double && !Double.isFinite((Double) lhs)) {
+                    return false;
+                }
+                return new BigDecimal(lhs.toString()).compareTo((BigDecimal) rhs) == 0;
+            }
+            return Objects.equals(lhs, rhs);
         }
 
         // Extract the result from JSON objects that can match by key.

@@ -24,7 +24,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -364,7 +363,7 @@ public class Autodetect extends NamedStyles {
             }
             // Visit only those parts of the declaration we're interested in getting indentation info from
             visitStatement(method, stats);
-            ListUtils.map(method.getLeadingAnnotations(), a -> visitAndCast(a, stats));
+            method.getLeadingAnnotations().forEach(a -> visit(a, stats));
             visitContainer(method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, stats);
             visit(method.getBody(), stats);
             return method;
@@ -397,7 +396,7 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations vd, IndentStatistics stats) {
             visitStatement(vd, stats);
-            ListUtils.map(vd.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, stats));
+            vd.getPadding().getVariables().forEach(t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, stats));
             return vd;
         }
 

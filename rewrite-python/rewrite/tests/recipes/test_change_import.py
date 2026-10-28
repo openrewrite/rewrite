@@ -14,6 +14,8 @@
 
 """Tests for ChangeImport recipe."""
 
+from pathlib import Path
+
 from rewrite.python.recipes.change_import import ChangeImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
@@ -54,6 +56,59 @@ class TestChangeImport:
             python(
                 "from typing import Callable\n",
                 "from collections.abc import Callable\n",
+            )
+        )
+
+    def test_crlf_line_breaks(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "import os\r\nfrom typing import Mapping\r\n\r\nx: Mapping = {}\r\n",
+                "import os\r\nfrom collections.abc import Mapping\r\n\r\nx: Mapping = {}\r\n",
+            )
+        )
+
+    def test_moved_member_joins_its_section(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Iterable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import logging
+
+                import random
+                from typing import Iterable
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                """
+                import logging
+                from collections.abc import Iterable
+
+                import random
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                path=Path('training/dataset/transforms.py'),
             )
         )
 

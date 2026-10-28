@@ -172,7 +172,6 @@ public final class GradleProjectBuilder {
                 .collect(toList());
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
         if (!(repo instanceof AuthenticationSupportedInternal)) {
             return builder;
@@ -181,8 +180,12 @@ public final class GradleProjectBuilder {
         Credentials credentials = getCredentials((AuthenticationSupportedInternal) repo);
         if (credentials instanceof PasswordCredentials) {
             PasswordCredentials passwordCredentials = (PasswordCredentials) credentials;
-            Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
-            Optional.ofNullable(passwordCredentials.getPassword()).ifPresent(builder::password);
+            if (passwordCredentials.getUsername() != null) {
+                builder = builder.username(passwordCredentials.getUsername());
+            }
+            if (passwordCredentials.getPassword() != null) {
+                builder = builder.password(passwordCredentials.getPassword());
+            }
         }
         return builder;
     }

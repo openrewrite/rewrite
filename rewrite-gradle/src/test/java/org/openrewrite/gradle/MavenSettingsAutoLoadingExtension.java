@@ -59,11 +59,11 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
         }
     }
 
-    // Without a settings.xml mirror, use the one the build passes as REWRITE_GRADLE_MIRROR_* (local runs)
+    // Without a settings.xml mirror, use the one named by MAVEN_CENTRAL_MIRROR_* (local runs)
     private static void addMirrorFromEnvironment(MavenExecutionContextView mctx) {
-        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
-        String username = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
-        String password = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        String username = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
+        String password = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
         if (isNullOrEmpty(url) || isNullOrEmpty(username) || isNullOrEmpty(password) ||
             mctx.getMirrors().stream().anyMatch(mirror -> mirror.matches(MAVEN_CENTRAL))) {
             return;

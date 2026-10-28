@@ -24,13 +24,17 @@ import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -127,6 +131,50 @@ class GradleParserTest implements RewriteTest {
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
                 var d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5270")
+    @Test
+    void develocityExtensionIsTypeAttributed() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.19.2'
+              }
+              develocity {
+                  server = 'https://dev.example.com/'
+                  buildScan {
+                      publishing.onlyIf { false }
+                  }
+                  buildCache {
+                      remote(develocity.buildCache) {
+                          enabled = true
+                      }
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var declaringTypes = new ArrayList<String>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        JavaType.Method type = method.getMethodType();
+                        declaringTypes.add(method.getSimpleName() + ": " +
+                                           (type == null ? null : type.getDeclaringType().getFullyQualifiedName()));
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(declaringTypes).contains(
+                  "develocity: RewriteSettings",
+                  "buildScan: DevelocitySpec",
+                  "onlyIf: com.gradle.develocity.agent.gradle.scan.BuildScanPublishingConfiguration",
+                  "buildCache: org.gradle.api.initialization.Settings"
+                );
+                assertThat(FindMethods.find(cu, "org.gradle.api.initialization.Settings plugins(..)", true)).isNotEmpty();
             })
           )
         );

@@ -53,6 +53,13 @@ public class RecipeQualityValidation {
     private boolean noEditsInScanningPhase = true;
 
     /**
+     * Controls whether a ScanningRecipe's accumulator is validated to keep values, such as coordinates, paths and ids,
+     * and no {@link org.openrewrite.Heavyweight} objects such as trees, which would stay in memory all cycle.
+     */
+    @Builder.Default
+    private boolean lightweightAccumulators = true;
+
+    /**
      * Controls whether the recipe is validated to add only markers that report, such as search results and markup,
      * and none that it keeps information in.
      */
@@ -80,6 +87,13 @@ public class RecipeQualityValidation {
      */
     @Builder.Default
     private boolean importReferencedTypes = true;
+
+    /**
+     * Controls whether the recipe is validated to remove the imports that the code it removes was the only use of,
+     * and to add none that nothing uses.
+     */
+    @Builder.Default
+    private boolean removeUnusedImports = true;
 
     /**
      * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
@@ -118,10 +132,12 @@ public class RecipeQualityValidation {
                 .types(quality.types())
                 .executionContextUnchanged(quality.executionContextUnchanged() && before.immutableExecutionContext())
                 .noEditsInScanningPhase(quality.noEditsInScanningPhase() && before.immutableScanning())
+                .lightweightAccumulators(quality.lightweightAccumulators())
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
+                .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .build();

@@ -34,12 +34,8 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     public  Yaml.@Nullable Sequence visitSequence(Yaml.Sequence sequence, P p) {
         Yaml.Sequence s = super.visitSequence(sequence, p);
         if (cursor == null || cursor.isScopeInPath(s)) {
-            s = s.withEntries(ListUtils.map(s.getEntries(), e -> {
-                if (e.getBlock() == null || isEmptyScalar(e.getBlock())) {
-                    return null;
-                }
-                return e;
-            }));
+            s = s.withEntries(ListUtils.filter(s.getEntries(), e ->
+              !(e.getBlock() == null || isEmptyScalar(e.getBlock()))));
             if (s.getEntries().isEmpty()) {
                 //noinspection ConstantConditions
                 return null;

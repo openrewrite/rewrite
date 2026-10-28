@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import {Cursor, ExecutionContext, produceAsync} from "../../src";
-import {emptySpace, Expression, J, rightPadded} from "../../src/java";
+import {Cursor, ExecutionContext, foundSearchResult, produceAsync} from "../../src";
+import {emptySpace, Expression, J, rightPadded, TextComment} from "../../src/java";
 import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
 import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
@@ -58,6 +58,32 @@ describe('JavaScript visitor formatting', () => {
             typescript(
                 'console.log("hello");',
                 'console.log("hello", `extra`);'
+            )
+        );
+    });
+
+    test('visits the space before await in for-await-of', async () => {
+        // given
+        class RenameCommentVisitor extends JavaScriptVisitor<ExecutionContext> {
+            public override async visitSpace(space: J.Space, ctx: ExecutionContext): Promise<J.Space> {
+                const s = await super.visitSpace(space, ctx);
+                return {
+                    ...s,
+                    comments: s.comments.map(c => c.kind === J.Kind.TextComment && (c as TextComment).text === ' c ' ?
+                        {...c, text: ' d '} as TextComment : c)
+                };
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RenameCommentVisitor());
+
+        // when && then
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'async function f(xs: AsyncIterable<number>) { for /* c */ await (const x of xs) {} }',
+                'async function f(xs: AsyncIterable<number>) { for /* d */ await (const x of xs) {} }'
             )
         );
     });
@@ -115,5 +141,24 @@ describe('JavaScript visitor formatting', () => {
                 undefined
             ]);
         });
+    });
+
+    test('visits modifiers of constructor types', async () => {
+        class MarkModifierVisitor extends JavaScriptVisitor<ExecutionContext> {
+            protected override async visitModifier(modifier: J.Modifier, ctx: ExecutionContext): Promise<J | undefined> {
+                return foundSearchResult(await super.visitModifier(modifier, ctx) as J.Modifier);
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new MarkModifierVisitor());
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'type C = abstract new () => object;',
+                'type C = /*~~>*/abstract new () => object;'
+            )
+        );
     });
 });

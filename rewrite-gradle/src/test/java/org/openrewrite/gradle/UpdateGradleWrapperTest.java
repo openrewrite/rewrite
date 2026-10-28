@@ -606,8 +606,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
                         addIfMissing: false
                 """,
               "org.openrewrite.gradle.MultipleWrapperUpdates")
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
             .afterRecipe(run -> {
                 var gradleSh = result(run, PlainText.class, "gradlew");
@@ -1028,6 +1026,93 @@ class UpdateGradleWrapperTest implements RewriteTest {
             gradlew,
             gradlewBat,
             gradleWrapperJarQuark
+          )
+        );
+    }
+
+    @Test
+    void doNotAddWrapperWhenRootIsNotAGradleBuild() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isEmpty()),
+          dir("fixtures/example",
+            buildGradle(
+              """
+                plugins {
+                    id "java"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotAddWrapperToRootWhenNestedBuildHasItsOwnWrapper() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+            .allSatisfy(result -> assertThat(Objects.requireNonNull(result.getAfter()).getSourcePath()).startsWithRaw(Path.of("infra")))),
+          dir("infra",
+            buildGradle(
+              """
+                plugins {
+                    id "java"
+                }
+                """
+            ),
+            properties(
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                """,
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                """,
+              spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+            ),
+            text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)),
+            text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)),
+            other("", spec -> spec.path(WRAPPER_JAR_LOCATION))
+          )
+        );
+    }
+
+    @Test
+    void doNotUpdateWrapperScriptsWithoutWrapperProperties() {
+        rewriteRun(
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark,
+          // an included build with copies of the wrapper scripts, but no gradle/wrapper of its own
+          dir("included-build",
+            text("#!/bin/sh\necho stale\n", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+            text("@rem stale\r\n", spec -> spec.path(WRAPPER_BATCH_LOCATION))
           )
         );
     }

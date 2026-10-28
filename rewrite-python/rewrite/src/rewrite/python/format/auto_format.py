@@ -1,6 +1,7 @@
 from typing import Optional
 
 from .blank_lines import BlankLinesVisitor
+from .line_breaks import general_format_style
 from .minimum_viable_spacing import MinimumViableSpacingVisitor
 from .normalize_format import NormalizeFormatVisitor
 from .normalize_line_breaks_visitor import NormalizeLineBreaksVisitor
@@ -13,7 +14,6 @@ from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
 from ... import Recipe, Tree, Cursor
 from ...java import JavaSourceFile
-from ...style import GeneralFormatStyle
 from ...visitor import P, T
 
 
@@ -57,8 +57,8 @@ class AutoFormatVisitor(PythonVisitor[P]):
 
         tree = _tabs_and_indents(cu, self._stop_after).visit(tree, p, self._cursor.fork())
 
-        tree = NormalizeLineBreaksVisitor(cu.get_style(GeneralFormatStyle) or GeneralFormatStyle(False),
-                                          self._stop_after).visit(tree, p, self._cursor.fork())
+        tree = NormalizeLineBreaksVisitor(general_format_style(cu), self._stop_after).visit(
+            tree, p, self._cursor.fork())
 
         tree = RemoveTrailingWhitespaceVisitor(self._stop_after).visit(tree, self._cursor.fork())
 

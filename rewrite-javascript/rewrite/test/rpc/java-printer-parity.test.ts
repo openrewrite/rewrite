@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as fs from "fs";
 import * as path from "path";
 import * as rpc from "vscode-jsonrpc/node";
 import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
@@ -23,30 +22,21 @@ import {Cursor, isSourceFile} from "../../src/tree";
 import {foundSearchResult, Markers, markupDebug, markupInfo} from "../../src/markers";
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from "../../src/print";
 import {MarkerPrinter as RequestedMarkerPrinter, Print} from "../../src/rpc/request/print";
+import {moduleDir, parse, Source} from "./printer-parity";
 
-const moduleDir = path.resolve(__dirname, "../..");
 // Files that between them hold every type of tree the printer prints, shared with JavaScriptPrinterParityTest.
 const syntaxDir = path.resolve(moduleDir, "../src/integTest/resources/printer-parity");
 
-interface Source {
-    cu: JS.CompilationUnit;
-    text: string;
-}
+// Parsed once for the tests that print them, none of which changes the trees it is given.
+let syntax: Promise<Source[]> | undefined;
+const parseSyntax = () => syntax ??= parse(syntaxDir);
 
-async function parse(dir: string): Promise<Source[]> {
-    const files = (fs.readdirSync(dir, {recursive: true}) as string[])
-        .filter(file => /\.(ts|tsx|js|jsx|mjs)$/.test(file))
-        .sort();
-    expect(files).not.toHaveLength(0);
-
-    const texts = files.map(file => fs.readFileSync(path.join(dir, file), "utf8"));
-    const sources: Source[] = [];
-    for await (const parsed of new JavaScriptParser({relativeTo: dir})
-        .parse(...files.map((file, i) => ({text: texts[i], sourcePath: file})))) {
-        expect(parsed.kind, files[sources.length]).toEqual(JS.Kind.CompilationUnit);
-        sources.push({cu: parsed as JS.CompilationUnit, text: texts[sources.length]});
+function unclosedFences(printed: string): string[] {
+    const fences = new Map<string, number>();
+    for (const [fence] of printed.matchAll(/\{\{[0-9a-f-]{36}}}/g)) {
+        fences.set(fence, (fences.get(fence) ?? 0) + 1);
     }
-    return sources;
+    return [...fences].filter(([, count]) => count !== 2).map(([fence]) => fence);
 }
 
 /**
@@ -97,20 +87,12 @@ class Mark extends JavaScriptVisitor<number> {
 describeJavaRpc("Java printer parity", () => {
 
     testJavaRpc("syntax files", async ({javaRpc}) => {
-        for (const {cu, text} of await parse(syntaxDir)) {
+        for (const {cu, text} of await parseSyntax()) {
             const printed = await TreePrinters.print(cu);
             expect(printed, cu.sourcePath).toEqual(text);
             expect(await javaRpc.rpc.print(cu), cu.sourcePath).toEqual(printed);
         }
     }, 120_000);
-
-    testJavaRpc("the sources of this module", async ({javaRpc}) => {
-        for (const {cu, text} of await parse(path.join(moduleDir, "src"))) {
-            const printed = await TreePrinters.print(cu);
-            expect(printed, cu.sourcePath).toEqual(text);
-            expect(await javaRpc.rpc.print(cu), cu.sourcePath).toEqual(printed);
-        }
-    }, 300_000);
 
     testJavaRpc("markers", async ({javaRpc}) => {
         const markerPrinters: [RequestedMarkerPrinter, MarkerPrinter][] = [
@@ -119,7 +101,7 @@ describeJavaRpc("Java printer parity", () => {
             [RequestedMarkerPrinter.FENCED, MarkerPrinter.FENCED],
             [RequestedMarkerPrinter.SANITIZED, MarkerPrinter.SANITIZED],
         ];
-        for (const {cu, text} of await parse(syntaxDir)) {
+        for (const {cu, text} of await parseSyntax()) {
             const marked = await new Mark().visitDefined<JS.CompilationUnit>(cu, 0);
             for (const [requested, markerPrinter] of markerPrinters) {
                 const printed = await TreePrinters.printer(marked).print(marked, new PrintOutputCapture(markerPrinter));
@@ -128,6 +110,9 @@ describeJavaRpc("Java printer parity", () => {
                 } else {
                     expect(printed, cu.sourcePath).not.toEqual(text);
                 }
+                if (requested === RequestedMarkerPrinter.FENCED) {
+                    expect(unclosedFences(printed), cu.sourcePath).toEqual([]);
+                }
                 expect(await javaRpc.rpc.print(marked, undefined, requested), `${cu.sourcePath} ${requested}`).toEqual(printed);
             }
         }
@@ -135,7 +120,7 @@ describeJavaRpc("Java printer parity", () => {
 
     // What is printed for a tree can depend on what encloses it, so both sides are given its cursor.
     testJavaRpc("subtrees", async ({javaRpc}) => {
-        for (const {cu} of await parse(syntaxDir)) {
+        for (const {cu} of await parseSyntax()) {
             const subtrees: [J, Cursor][] = [];
             await new class extends JavaScriptVisitor<number> {
                 protected override async preVisit(tree: J, _p: number): Promise<J | undefined> {

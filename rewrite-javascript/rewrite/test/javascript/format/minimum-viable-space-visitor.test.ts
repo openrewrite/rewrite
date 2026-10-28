@@ -52,7 +52,7 @@ describe('MinimumViableSpacingVisitor', () => {
         const ret = typescript(before, after);
         class JavaScriptParserWithSpacesRemoved extends JavaScriptParser {
             constructor() {
-                super({});
+                super({sourceFileCache});
             }
 
             override async *parse(...inputs: ParserInput[]): AsyncGenerator<JS.CompilationUnit> {

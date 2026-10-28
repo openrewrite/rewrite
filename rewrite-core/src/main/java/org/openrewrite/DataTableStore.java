@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * </ul>
  * <p>
  * Each data table bucket is identified by the data table's class name and
- * its {@link DataTable#getGroup() group} (for community tables) or
+ * its {@link DataTable#group group} (for community tables) or
  * {@link DataTable#getInstanceName()} (for private tables).
  */
 public interface DataTableStore {

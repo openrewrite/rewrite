@@ -189,25 +189,25 @@ export function libc(osName: string): string | null | undefined {
  * Register RPC codec for NodeRuntime, in the order the Java marker sends and receives its fields.
  */
 RpcCodecs.registerCodec(NodeRuntimeKind, {
-    async rpcReceive(before: NodeRuntime, q: RpcReceiveQueue): Promise<NodeRuntime> {
+    rpcReceive(before: NodeRuntime, q: RpcReceiveQueue): NodeRuntime {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            nodeVersion: await q.receive(before.nodeVersion),
-            os: await q.receive(before.os),
-            cpu: await q.receive(before.cpu),
-            libc: await q.receive(before.libc),
-            packageManager: await q.receive(before.packageManager),
-            packageManagerVersion: await q.receive(before.packageManagerVersion),
+            id: q.receive(before.id),
+            nodeVersion: q.receive(before.nodeVersion),
+            os: q.receive(before.os),
+            cpu: q.receive(before.cpu),
+            libc: q.receive(before.libc),
+            packageManager: q.receive(before.packageManager),
+            packageManagerVersion: q.receive(before.packageManagerVersion),
         });
     },
 
-    async rpcSend(after: NodeRuntime, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.nodeVersion);
-        await q.getAndSend(after, a => a.os);
-        await q.getAndSend(after, a => a.cpu);
-        await q.getAndSend(after, a => a.libc);
-        await q.getAndSend(after, a => a.packageManager);
-        await q.getAndSend(after, a => a.packageManagerVersion);
+    rpcSend(after: NodeRuntime, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.nodeVersion);
+        q.getAndSend(after, a => a.os);
+        q.getAndSend(after, a => a.cpu);
+        q.getAndSend(after, a => a.libc);
+        q.getAndSend(after, a => a.packageManager);
+        q.getAndSend(after, a => a.packageManagerVersion);
     }
 });

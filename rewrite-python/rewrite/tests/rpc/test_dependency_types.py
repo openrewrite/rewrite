@@ -464,6 +464,68 @@ class TestExportedTypes:
         assert {m._name for m in (withall._methods or [])} == {"_special"}
         assert not withall._members  # __all__ itself is not public API
 
+    def test_leaves_out_the_distributions_own_tests(self, tmp_path):
+        # A test suite shipped in the wheel is no API of the distribution.
+        pkg = tmp_path / "suitelib"
+        (pkg / "tests").mkdir(parents=True)
+        (pkg / "core" / "tests").mkdir(parents=True)
+        (pkg / "__init__.py").write_text("class Api:\n    def call(self) -> None:\n        ...\n")
+        (pkg / "core" / "__init__.py").write_text("class Engine:\n    def start(self) -> None:\n        ...\n")
+        (pkg / "tests" / "__init__.py").touch()
+        (pkg / "tests" / "test_api.py").write_text(
+            "class TestApi:\n    def test_call(self) -> None:\n        ...\n")
+        (pkg / "core" / "tests" / "__init__.py").touch()
+        (pkg / "core" / "tests" / "test_engine.py").write_text(
+            "class TestEngine:\n    def test_start(self) -> None:\n        ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        assert "suitelib.Api" in by_fqn
+        assert "suitelib.core.Engine" in by_fqn
+        assert [fqn for fqn in by_fqn if "tests" in fqn.split(".")] == []
+
+    def test_module_level_api_of_a_file_with_crlf_line_endings(self, tmp_path):
+        pkg = tmp_path / "crlflib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_bytes(
+            b"import os\r\n"
+            b"\r\n"
+            b"GREETING = \"hello\"\r\n"
+            b"\r\n"
+            b"def shout(text: str) -> str:\r\n"
+            b"    return text.upper()\r\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        module_type = by_fqn.get("crlflib")
+        assert isinstance(module_type, JavaType.Class)
+        assert {m._name for m in (module_type._methods or [])} == {"shout"}
+        greeting = next(v for v in module_type._members or [] if v._name == "GREETING")
+        assert greeting._type == JavaType.Primitive.String
+
+    def test_module_level_api_of_a_file_opening_with_a_byte_order_mark(self, tmp_path):
+        pkg = tmp_path / "bomlib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_bytes(
+            "\ufeffGREETING = 'hello'\n\ndef shout(text: str) -> str:\n    return text.upper()\n".encode())
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        module_type = by_fqn.get("bomlib")
+        assert isinstance(module_type, JavaType.Class)
+        assert {m._name for m in (module_type._methods or [])} == {"shout"}
+
+    def test_a_file_in_another_encoding_costs_only_its_own_types(self, tmp_path):
+        pkg = tmp_path / "latinlib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("class Api:\n    def call(self) -> None:\n        ...\n")
+        (pkg / "legacy.py").write_bytes(
+            b"# -*- coding: latin-1 -*-\nSIGN = '\xb1'\n\nclass Legacy:\n    ...\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        assert "latinlib.Api" in by_fqn
+
     def test_own_module_filter_excludes_sibling(self):
         # "clickhouse" shares the "click" prefix but not the "click." boundary,
         # so a class it defines must not leak into click's own exported types even

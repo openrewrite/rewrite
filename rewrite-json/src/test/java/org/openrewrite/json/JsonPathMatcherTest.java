@@ -198,6 +198,130 @@ class JsonPathMatcherTest {
         );
     }
 
+    private final List<String> numbers = List.of(
+      //language=json5
+      """
+        {
+          "list": [
+            {"n": 1},
+            {"n": 2},
+            {"n": -1},
+            {"n": 1.0},
+            {"n": 1000},
+            {"n": 3000000000},
+            {"n": 12345678901234567890},
+            {"n": "1"}
+          ]
+        }
+        """
+    );
+
+    @Test
+    void numericEquality() {
+        assertMatched(
+          "$.list[?(@.n == 1)]",
+          numbers,
+          List.of("{\"n\": 1}", "{\"n\": 1.0}")
+        );
+        assertMatched(
+          "$.list[?(@.n == -1)]",
+          numbers,
+          List.of("{\"n\": -1}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 3000000000)]",
+          numbers,
+          List.of("{\"n\": 3000000000}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 12345678901234567890)]",
+          numbers,
+          List.of("{\"n\": 12345678901234567890}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 1e3)]",
+          numbers,
+          List.of("{\"n\": 1000}")
+        );
+    }
+
+    @Test
+    void numericInequality() {
+        assertMatched(
+          "$.list[?(@.n != 1)]",
+          numbers,
+          List.of(
+            "{\"n\": 2}",
+            "{\"n\": -1}",
+            "{\"n\": 1000}",
+            "{\"n\": 3000000000}",
+            "{\"n\": 12345678901234567890}",
+            "{\"n\": \"1\"}"
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnScalarList() {
+        assertMatched(
+          "$.list[?(@ == 2)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [1, 2, 3]
+              }
+              """
+          ),
+          List.of("2")
+        );
+    }
+
+    @Test
+    void numericEqualityIsStrictAboutStrings() {
+        assertNotMatched(
+          "$[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": "1"
+              }
+              """
+          )
+        );
+        assertNotMatched(
+          "$[?(@.n == '1')]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnNonFiniteNumbers() {
+        assertNotMatched(
+          "$.list[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [
+                  {"n": NaN},
+                  {"n": Infinity},
+                  {"n": -Infinity}
+                ]
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void multipleWildcards() {
         assertMatched(

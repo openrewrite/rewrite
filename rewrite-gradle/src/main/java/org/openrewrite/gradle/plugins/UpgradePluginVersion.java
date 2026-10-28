@@ -21,9 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.GradlePlugin;
+import org.openrewrite.gradle.trait.VersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -57,7 +59,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     @EqualsAndHashCode.Exclude
-    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -101,6 +103,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     public static class DependencyVersionState {
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
         Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
+
+        /**
+         * The root project's repositories if it was scanned, otherwise the first one's, which a catalog resolves
+         * against when no settings script was scanned.
+         */
+        AtomicReference<@Nullable ProjectRepositories> projectRepositories = new AtomicReference<>();
+        AtomicReference<@Nullable ProjectRepositories> settingsRepositories = new AtomicReference<>();
     }
 
     @Override
@@ -125,6 +134,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
+                    if (gradleProject != null && (acc.projectRepositories.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.projectRepositories.set(ProjectRepositories.of(gradleProject));
+                    }
+                    if (gradleSettings != null) {
+                        acc.settingsRepositories.set(ProjectRepositories.of(gradleSettings));
+                    }
                     localVariableValues.clear();
                 }
                 return super.visit(tree, ctx);
@@ -204,6 +219,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
+        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+            // A selector given settings resolves from the settings' repositories alone
+            ProjectRepositories settingsRepositories = acc.settingsRepositories.get();
+            ProjectRepositories repositories = settingsRepositories != null ? settingsRepositories :
+                    acc.projectRepositories.get();
+            return upgradeVersionCatalog(catalog, repositories == null ?
+                    new DependencyVersionSelector(metadataFailures, null, null) :
+                    repositories.selector(metadataFailures), ctx);
+        });
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -324,13 +348,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (acc.versionPropNameToPluginId.containsKey(visited.getSimpleName()) && visited.getInitializer() instanceof J.Literal) {
                     J.Literal initializer = (J.Literal) visited.getInitializer();
                     String oldVersion = literalValue(initializer);
-                    String newVersion = acc.pluginIdToNewVersion.get(acc.versionPropNameToPluginId.get(visited.getSimpleName()));
-                    if (newVersion != null && !newVersion.equals(oldVersion)) {
-                        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+                    String resolvedVersion = acc.pluginIdToNewVersion.get(acc.versionPropNameToPluginId.get(visited.getSimpleName()));
+                    if (resolvedVersion != null && !resolvedVersion.equals(oldVersion)) {
+                        VersionComparator versionComparator = Semver.validate(resolvedVersion, versionPattern).getValue();
                         if (versionComparator == null) {
                             return visited;
                         }
-                        Optional<String> finalVersion = versionComparator.upgrade(oldVersion != null ? oldVersion : "", singletonList(newVersion));
+                        Optional<String> finalVersion = versionComparator.upgrade(oldVersion != null ? oldVersion : "", singletonList(resolvedVersion));
                         if (finalVersion.isPresent()) {
                             return visited.withInitializer(ChangeStringLiteral.withStringValue(initializer, finalVersion.get()));
                         }
@@ -339,7 +363,71 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 return visited;
             }
         };
-        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
+        TreeVisitor<?, ExecutionContext> gradleVisitor =
+                Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor);
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return propertiesVisitor.isAcceptable(sourceFile, ctx) ||
+                        updateVersionCatalog.isAcceptable(sourceFile, ctx) ||
+                        gradleVisitor.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                Tree t = tree;
+                if (t instanceof SourceFile) {
+                    SourceFile sourceFile = (SourceFile) t;
+                    if (propertiesVisitor.isAcceptable(sourceFile, ctx)) {
+                        t = propertiesVisitor.visitNonNull(t, ctx);
+                    }
+                    if (updateVersionCatalog.isAcceptable(sourceFile, ctx)) {
+                        t = updateVersionCatalog.visitNonNull(t, ctx);
+                    }
+                    if (gradleVisitor.isAcceptable(sourceFile, ctx)) {
+                        t = gradleVisitor.visitNonNull(t, ctx);
+                    }
+                }
+                return t;
+            }
+        };
+    }
+
+    private Tree upgradeVersionCatalog(VersionCatalog catalog, DependencyVersionSelector versionSelector,
+                                       ExecutionContext ctx) {
+        Map<String, String> declarations = catalog.getVersionDeclarations();
+        Map<String, String> selectedVersions = new LinkedHashMap<>();
+        List<MavenDownloadingException> failures = new ArrayList<>();
+
+        for (Map.Entry<String, VersionCatalog.Entry> plugin : catalog.getPluginVersions().entrySet()) {
+            if (!StringUtils.matchesGlob(plugin.getKey(), pluginIdPattern)) {
+                continue;
+            }
+            String currentVersion = plugin.getValue().getResolvedVersion(declarations);
+            if (currentVersion == null) {
+                continue;
+            }
+            try {
+                String selectedVersion = versionSelector.select(
+                        new GroupArtifactVersion(
+                                plugin.getKey(), plugin.getKey() + ".gradle.plugin", currentVersion),
+                        "classpath", newVersion, versionPattern, ctx);
+                if (selectedVersion != null && !selectedVersion.equals(currentVersion)) {
+                    selectedVersions.put(plugin.getKey(), selectedVersion);
+                }
+            } catch (MavenDownloadingException e) {
+                failures.add(e);
+            }
+        }
+
+        Tree tree = catalog.withPluginVersions(selectedVersions).getTree();
+        if (!tree.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            for (MavenDownloadingException failure : failures) {
+                tree = failure.warn(tree);
+            }
+        }
+        return tree;
     }
 
     private @Nullable String literalValue(Expression expr) {

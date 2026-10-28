@@ -45,6 +45,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class GradleProjectTest implements RewriteTest {
 
@@ -632,6 +633,39 @@ class GradleProjectTest implements RewriteTest {
                   .isEqualTo("2.19.2");
             }
           )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+                  }
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addOrUpdateConstraintsLeavesAnIdenticalConstraintAlone() {
+        Map<String, List<GroupArtifactVersion>> constraint = Map.of("implementation",
+          List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2")));
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              public Tree visit(Tree tree, ExecutionContext ctx) {
+                  GradleProject once = tree.getMarkers().findFirst(GradleProject.class).orElseThrow()
+                    .addOrUpdateConstraints(constraint, ctx);
+                  assertThat(once.addOrUpdateConstraints(constraint, ctx)).isSameAs(once);
+                  return tree;
+              }
+          })),
           buildGradle(
             """
               plugins {

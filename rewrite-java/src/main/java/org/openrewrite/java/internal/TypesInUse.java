@@ -68,6 +68,14 @@ public class TypesInUse {
     private final Set<String> docReferencePackages;
 
     /**
+     * Canonical ({@code $} replaced with {@code .}) fully qualified names of the same documentation-comment
+     * references whose packages are recorded in {@link #docReferencePackages}, so type-changing recipes can
+     * find them too. Equally transient, and queried only via {@link #hasDocReference}.
+     */
+    @Getter(AccessLevel.NONE)
+    private final Set<String> docReferenceTypes;
+
+    /**
      * Lazily-built prefix tree over every fully qualified name reachable via
      * {@link TypeUtils#isAssignableTo(String, JavaType)} starting from any type referenced in this
      * compilation unit. Each terminating node carries two pairs of bits per visibility:
@@ -112,7 +120,8 @@ public class TypesInUse {
                 findTypesInUse.getDeclaredMethods(),
                 findTypesInUse.getUsedMethods(),
                 findTypesInUse.getVariables(),
-                findTypesInUse.getDocReferencePackages());
+                findTypesInUse.getDocReferencePackages(),
+                findTypesInUse.getDocReferenceTypes());
     }
 
     /**
@@ -125,7 +134,7 @@ public class TypesInUse {
                                 Set<JavaType.Method> declaredMethods,
                                 Set<JavaType.Method> usedMethods,
                                 Set<JavaType.Variable> variables) {
-        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, emptySet());
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, emptySet(), emptySet());
     }
 
     /**
@@ -142,6 +151,15 @@ public class TypesInUse {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether any fully qualified documentation-comment reference in this compilation unit is exactly
+     * {@code fullyQualifiedType}, treating {@code $} and {@code .} as equivalent in inner-class FQNs.
+     * Covers the references that {@link #hasType} deliberately omits.
+     */
+    public boolean hasDocReference(String fullyQualifiedType) {
+        return docReferenceTypes.contains(fullyQualifiedType.replace('$', '.'));
     }
 
     /**
@@ -623,6 +641,7 @@ public class TypesInUse {
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
         private final Set<String> docReferencePackages = new HashSet<>();
+        private final Set<String> docReferenceTypes = new HashSet<>();
 
         @Override
         public J.Import visitImport(J.Import _import, Integer p) {
@@ -671,7 +690,9 @@ public class TypesInUse {
                         !(cursor.getValue() instanceof J.Lambda)) {
                     if (isFullyQualifiedJavaDocReference(cursor)) {
                         if (javaType instanceof JavaType.FullyQualified) {
-                            docReferencePackages.add(((JavaType.FullyQualified) javaType).getPackageName());
+                            JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                            docReferencePackages.add(fq.getPackageName());
+                            docReferenceTypes.add(fq.getFullyQualifiedName().replace('$', '.'));
                         }
                     } else {
                         types.add(javaType);

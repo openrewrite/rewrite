@@ -136,6 +136,69 @@ func TestResolveModuleGraphStdlibOnly(t *testing.T) {
 	assert.Truef(t, sawMain, "expected the main package mapped to its module in %+v", pkgs)
 }
 
+// TestResolveModuleGraphOutsideWorkspace: a module below a go.work that doesn't
+// use it resolves to its own build list, not the workspace's.
+func TestResolveModuleGraphOutsideWorkspace(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	t.Setenv("GOWORK", "")
+	// given: a workspace using ./app, with ./tools left out of it
+	root := t.TempDir()
+	writeFile(t, root, "go.work", "go 1.22\n\nuse ./app\n")
+	app, tools := filepath.Join(root, "app"), filepath.Join(root, "tools")
+	require.NoError(t, os.Mkdir(app, 0o755))
+	require.NoError(t, os.Mkdir(tools, 0o755))
+	writeFile(t, app, "go.mod", "module example.com/app\n\ngo 1.22\n")
+	writeFile(t, app, "app.go", "package app\n")
+	writeFile(t, tools, "go.mod", "module example.com/tools\n\ngo 1.22\n")
+	writeFile(t, tools, "tools.go", "package tools\n")
+
+	// when
+	mods, res, err := ResolveModuleGraph(tools)
+
+	// then: the build list and package map are the module's own
+	require.NoError(t, err, "resolve failed")
+	assert.False(t, res.Incomplete, "module outside the workspace should resolve completely")
+	assert.Empty(t, res.Unresolved)
+	require.Lenf(t, mods, 1, "expected only the tools module in %+v", mods)
+	assert.Equal(t, "example.com/tools", mods[0].ModulePath)
+	assert.True(t, mods[0].Main)
+	require.Len(t, res.Packages, 1)
+	assert.Equal(t, "example.com/tools", res.Packages[0].ImportPath)
+}
+
+// TestResolveModuleGraphInWorkspace: a module the go.work uses (here via a use
+// block) is still resolved in workspace mode.
+func TestResolveModuleGraphInWorkspace(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	t.Setenv("GOWORK", "")
+	// given
+	root := t.TempDir()
+	writeFile(t, root, "go.work", "go 1.22\n\nuse (\n\t./app\n\t./lib\n)\n")
+	app, lib := filepath.Join(root, "app"), filepath.Join(root, "lib")
+	require.NoError(t, os.Mkdir(app, 0o755))
+	require.NoError(t, os.Mkdir(lib, 0o755))
+	writeFile(t, app, "go.mod", "module example.com/app\n\ngo 1.22\n")
+	writeFile(t, app, "app.go", "package app\n")
+	writeFile(t, lib, "go.mod", "module example.com/lib\n\ngo 1.22\n")
+	writeFile(t, lib, "lib.go", "package lib\n")
+
+	// when
+	mods, res, err := ResolveModuleGraph(app)
+
+	// then: the workspace's build list includes both used modules
+	require.NoError(t, err, "resolve failed")
+	assert.False(t, res.Incomplete)
+	var paths []string
+	for _, m := range mods {
+		paths = append(paths, m.ModulePath)
+	}
+	assert.ElementsMatch(t, []string{"example.com/app", "example.com/lib"}, paths)
+}
+
 func TestParseGoListPackagesComplete(t *testing.T) {
 	// given: `go list -e -deps -json ./...` output where everything resolved
 	stream := `

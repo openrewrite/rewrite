@@ -471,6 +471,12 @@ function asValueImport(jsImport: JS.Import, member: string | undefined): JS.Impo
     });
 }
 
+/** Whether `element` is the placeholder an empty `{}` of an import or destructuring parses to. */
+function isEmptyPlaceholder(element: J | undefined): boolean {
+    return element?.kind === J.Kind.Empty ||
+        (element?.kind === JS.Kind.ImportSpecifier && (element as JS.ImportSpecifier).specifier.kind === J.Kind.Empty);
+}
+
 /** The member a specifier imports and the name it binds it under, which are the same absent an alias. */
 function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member: string } | undefined {
     if (specifier.specifier?.kind === J.Kind.Identifier) {
@@ -733,7 +739,7 @@ function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
             ? (namedBindings as JS.NamedImports).elements.elements[0]?.element
             : isObjectBindingPattern(pattern) ? pattern.bindings.elements[0]?.element : undefined;
         // A list laid out one per line says nothing about how a one-line list is spaced.
-        if (first && !first.prefix.whitespace.includes('\n')) {
+        if (first && !isEmptyPlaceholder(first) && !first.prefix.whitespace.includes('\n')) {
             score += first.prefix.whitespace.length > 0 ? 1 : -1;
         }
     }
@@ -997,6 +1003,15 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         const updatedNamedImports: JS.NamedImports = await this.produceJavaScript(
                             namedImports, p, async namedDraft => {
                                 const newSpecifier = this.createImportSpecifier();
+
+                                if (existingElements.every(elem => isEmptyPlaceholder(elem.element))) {
+                                    const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
+                                    namedDraft.elements = {
+                                        ...namedImports.elements,
+                                        elements: [rightPadded({...newSpecifier, prefix: braceSpace}, braceSpace)]
+                                    };
+                                    return;
+                                }
 
                                 const newElements = existingElements.flatMap((elem, j) => {
                                     const results: J.RightPadded<JS.ImportSpecifier>[] = [];
@@ -2657,8 +2672,19 @@ function withElementAt(
     return {...pattern, bindings: {...pattern.bindings, elements}};
 }
 
-function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElement): JS.ObjectBindingPattern {
+function withElement(
+    pattern: JS.ObjectBindingPattern,
+    binding: JS.BindingElement,
+    braceSpacing: boolean
+): JS.ObjectBindingPattern {
     const elements = pattern.bindings.elements;
+    if (elements.every(elem => isEmptyPlaceholder(elem.element))) {
+        const braceSpace = braceSpacing ? singleSpace : emptySpace;
+        return {
+            ...pattern,
+            bindings: {...pattern.bindings, elements: [rightPadded({...binding, prefix: braceSpace}, braceSpace)]}
+        };
+    }
     const last = elements[elements.length - 1];
     const first = elements[0].element.prefix;
     const prefix = elements.length > 1 ? elements[1].element.prefix
@@ -2683,7 +2709,7 @@ function joinedRequire(
     binding: JS.BindingElement
 ): JS.CompilationUnit {
     const pattern = requirePattern(target) as JS.ObjectBindingPattern;
-    const joined = withPattern(target, withElement(pattern, binding));
+    const joined = withPattern(target, withElement(pattern, binding, detectBraceSpacing(cu)));
     return {...cu, statements: cu.statements.map(s => s.element === target ? {...s, element: joined} : s)};
 }
 

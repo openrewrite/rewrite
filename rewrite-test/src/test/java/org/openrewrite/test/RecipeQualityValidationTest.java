@@ -26,6 +26,7 @@ class RecipeQualityValidationTest {
         RecipeQualityValidation all = RecipeQualityValidation.all();
         assertThat(all.executionContextUnchanged()).isTrue();
         assertThat(all.noEditsInScanningPhase()).isTrue();
+        assertThat(all.lightweightAccumulators()).isTrue();
         assertThat(all.reportingMarkersOnly()).isTrue();
         assertThat(all.minimalFormatting()).isTrue();
         assertThat(all.matchByTypeNotName()).isTrue();

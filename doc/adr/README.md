@@ -13,3 +13,4 @@
 * [11. Native Node.js lock file regeneration](0011-native-node-lock-regeneration.md) (superseded by 13)
 * [12. Ruby parsing via Prism](0012-ruby-parsing-via-prism.md)
 * [13. Lock regeneration follows each package manager's own resolver](0013-lock-regeneration-follows-each-package-manager.md)
+* [14. Native Python delta resolution for closure-changing edits: per-manager feasibility and scope](0014-native-python-delta-resolution-per-manager.md)

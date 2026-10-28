@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.ExcludeDependency;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -201,6 +202,52 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
               }
               """.formatted(method)
+          )
+        );
+    }
+
+    @Test
+    void resolvedDependencyWithTransitivesAfterReResolution() {
+        rewriteRun(
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipes(
+              new ExcludeDependency("commons-logging", "commons-logging", null),
+              // marks once, as a later cycle sees the cached transitives through getResolvedDependency() too
+              RewriteTest.toRecipe(() -> new GradleDependency.Matcher().asVisitor(dep ->
+                dep.getTree().getMarkers().findFirst(SearchResult.class).isPresent() ? dep.getTree() :
+                SearchResult.found(dep.getTree(), String.format("shallow: %s, with transitives: %s",
+                  dep.getResolvedDependency().findDependency("commons-codec", "commons-codec") != null,
+                  dep.getResolvedDependencyWithTransitives().findDependency("commons-codec", "commons-codec") != null))))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.apache.httpcomponents:httpclient:4.5.13"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~(shallow: false, with transitives: true)~~>*/implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
+              }
+              """
           )
         );
     }

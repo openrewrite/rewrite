@@ -479,6 +479,32 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    /**
+     * A basic string's value is the decoded text, so a marker such as
+     * {@code python_version < "3.11"} written with escaped quotes reads back with the quotes
+     * themselves; a literal string has no escapes and keeps its backslashes.
+     */
+    @Test
+    void basicStringEscapesAreDecoded() {
+        rewriteRun(
+          toml(
+            """
+              basic = "tomli; python_version < \\"3.11\\"\\tx\\\\y\\u00e9"
+              literal = 'a\\"b'
+              multiline = \"""
+              first\\
+                  second\"""
+              beyondUnicode = "\\U00110000"
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getValues())
+                .extracting(Toml.KeyValue.class::cast)
+                .extracting(keyValue -> ((Toml.Literal) keyValue.getValue()).getValue())
+                .containsExactly("tomli; python_version < \"3.11\"\tx\\yé", "a\\\"b", "firstsecond", "\\U00110000"))
+          )
+        );
+    }
+
     @Test
     void multiBytesUnicode() {
         rewriteRun(

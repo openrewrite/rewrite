@@ -28,7 +28,7 @@ import static org.openrewrite.python.internal.pipfilelock.PipfileLockHash.hash;
 
 /**
  * All expected hashes were recorded from Python 3.14 via
- * {@code src/test/resources/pipfilelock/oracle.py hash [--canonical] [--sources-json ...]},
+ * {@code record/pipenv-oracle.py hash [--canonical] [--sources-json ...]},
  * which reproduces pipenv's {@code Project.calculate_pipfile_hash}. The minimal fixture's
  * hash was additionally confirmed against a real {@code pipenv lock} run (pipenv 2026.6.2),
  * whose lock is checked in as {@code locks/real-pipenv-2026.6.2.Pipfile.lock}.

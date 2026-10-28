@@ -54,8 +54,8 @@ class AddDependencyTest implements RewriteTest {
                                 "{\n" +
                                 "  \"name\": \"x\",\n" +
                                 "  \"dependencies\": {\n" +
-                                "    \"uuid\": \"^9.0.0\",\n" +
-                                "    \"lodash\": \"^4.17.21\"\n" +
+                                "    \"lodash\": \"^4.17.21\",\n" +
+                                "    \"uuid\": \"^9.0.0\"\n" +
                                 "  }\n" +
                                 "}\n")));
     }

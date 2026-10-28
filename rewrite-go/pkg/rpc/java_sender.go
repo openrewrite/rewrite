@@ -61,7 +61,7 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	}
 	q := p.(*SendQueue)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
+	q.GetAndSend(t, func(v any) any { return spaceRef(v.(java.J).GetPrefix()) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
@@ -86,9 +86,6 @@ func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q.GetAndSendList(id,
 		func(v any) []any {
 			annots := v.(*java.Identifier).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a
@@ -172,7 +169,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// end space
-	q.GetAndSend(b, func(v any) any { return v.(*java.Block).End },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*java.Block).End) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	return b
 }
@@ -343,7 +340,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			init := v.(*java.ForControl).Init
 			if init == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*init}
 		},
@@ -362,7 +359,7 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 		func(v any) []any {
 			update := v.(*java.ForControl).Update
 			if update == nil {
-				return nil
+				return []any{}
 			}
 			return []any{*update}
 		},
@@ -538,7 +535,7 @@ func (s *JavaSender) VisitVariableDeclarations(vd *java.VariableDeclarations, p 
 	q.GetAndSend(vd, func(v any) any {
 		va := v.(*java.VariableDeclarations).Varargs
 		if va != nil {
-			return *va
+			return spaceRef(*va)
 		}
 		return nil
 	}, func(v any) { sendSpace(v.(java.Space), q) })
@@ -641,9 +638,6 @@ func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree,
 	q.GetAndSendList(ptt,
 		func(v any) []any {
 			annots := v.(*java.ParenthesizedTypeTree).Annotations
-			if annots == nil {
-				return nil
-			}
 			result := make([]any, len(annots))
 			for i, a := range annots {
 				result[i] = a
