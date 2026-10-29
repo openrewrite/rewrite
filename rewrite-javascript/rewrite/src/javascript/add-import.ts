@@ -1346,6 +1346,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const self = this;
         const matchesModule = (name: string | undefined) =>
             name !== undefined && (name === expectedDeclaringType || name === targetModule);
+        const alreadyBound = moduleScopeBindings(compilationUnit).some(b => b.name === targetName);
 
         // If no existing imports from this module, look for unresolved references
         // If there ARE existing imports, look for references with the expected declaring type
@@ -1416,7 +1417,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                             }
                         }
                         // 4. References typed as the module's namespace object (e.g. `z` from zod)
-                        else if (type && Type.isClass(type) &&
+                        else if (!alreadyBound && type && Type.isClass(type) &&
                             sameModule((type as Type.Class).fullyQualifiedName, targetModule)) {
                             found = true;
                         }
