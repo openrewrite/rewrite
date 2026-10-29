@@ -68,6 +68,35 @@ public interface G extends J {
         return getPrefix().getComments();
     }
 
+    /**
+     * An import with Groovy annotations, which are not supported by Java imports.
+     */
+    @ToString
+    @Getter
+    @With
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class AnnotatedImport implements G, Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Space prefix;
+        Markers markers;
+        List<J.Annotation> leadingAnnotations;
+        J.Import importDeclaration;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitAnnotatedImport(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -186,10 +215,8 @@ public interface G extends J {
         @Override
         @Transient
         public List<Import> getImports() {
-            return statements.stream()
+            return getPadding().getImports().stream()
                     .map(JRightPadded::getElement)
-                    .filter(J.Import.class::isInstance)
-                    .map(J.Import.class::cast)
                     .collect(toList());
         }
 
@@ -286,7 +313,8 @@ public interface G extends J {
                         .collect(toList());
                 int insertionIdx = 0;
                 for (JRightPadded<Statement> statement : statements) {
-                    if (!(statement.getElement() instanceof J.Import)) {
+                    if (!(statement.getElement() instanceof J.Import) &&
+                        !(statement.getElement() instanceof AnnotatedImport)) {
                         break;
                     }
                     insertionIdx++;
@@ -315,21 +343,40 @@ public interface G extends J {
             @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
+                // Import recipes format the space before the whole annotated import, not the gap after its annotations.
                 //noinspection unchecked
                 return t.statements.stream()
-                        .filter(s -> s.getElement() instanceof J.Import)
-                        .map(s -> (JRightPadded<J.Import>) (Object) s)
+                        .filter(s -> s.getElement() instanceof J.Import || s.getElement() instanceof AnnotatedImport)
+                        .map(s -> s.getElement() instanceof AnnotatedImport ?
+                                new JRightPadded<>(((AnnotatedImport) s.getElement()).getImportDeclaration()
+                                        .withPrefix(s.getElement().getPrefix()),
+                                        s.getAfter(), s.getMarkers()) :
+                                (JRightPadded<J.Import>) (Object) s)
                         .collect(toList());
             }
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
-                        .filter(s -> !(s.getElement() instanceof J.Import))
+                        .filter(s -> !(s.getElement() instanceof J.Import) &&
+                                     !(s.getElement() instanceof AnnotatedImport))
                         .collect(toList());
                 //noinspection unchecked
                 statements.addAll(0, imports.stream()
-                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .map(i -> {
+                            for (JRightPadded<Statement> original : t.statements) {
+                                if (original.getElement() instanceof AnnotatedImport) {
+                                    AnnotatedImport annotated = (AnnotatedImport) original.getElement();
+                                    if (annotated.getImportDeclaration().getId().equals(i.getElement().getId())) {
+                                        return original.withElement(annotated.withPrefix(i.getElement().getPrefix())
+                                                .withImportDeclaration(i.getElement()
+                                                        .withPrefix(annotated.getImportDeclaration().getPrefix())))
+                                                .withAfter(i.getAfter()).withMarkers(i.getMarkers());
+                                    }
+                                }
+                            }
+                            return (JRightPadded<Statement>) (Object) i;
+                        })
                         .collect(toList()));
 
                 List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
@@ -338,7 +385,17 @@ public interface G extends J {
                 } else {
                     boolean hasChanges = false;
                     for (int i = 0; i < originalImports.size(); i++) {
-                        if (originalImports.get(i) != imports.get(i)) {
+                        JRightPadded<Import> original = originalImports.get(i);
+                        JRightPadded<Import> replacement = imports.get(i);
+                        J.Import before = original.getElement();
+                        J.Import after = replacement.getElement();
+                        if ((before != after &&
+                            (!before.getId().equals(after.getId()) || before.getPrefix() != after.getPrefix() ||
+                             before.getMarkers() != after.getMarkers() || before.getQualid() != after.getQualid() ||
+                             before.getPadding().getStatic() != after.getPadding().getStatic() ||
+                             before.getPadding().getAlias() != after.getPadding().getAlias())) ||
+                            original.getAfter() != replacement.getAfter() ||
+                            original.getMarkers() != replacement.getMarkers()) {
                             hasChanges = true;
                             break;
                         }

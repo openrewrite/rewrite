@@ -34,6 +34,20 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return "groovy";
     }
 
+    public J visitAnnotatedImport(G.AnnotatedImport annotatedImport, P p) {
+        G.AnnotatedImport a = annotatedImport;
+        a = a.withPrefix(visitSpace(a.getPrefix(), GSpace.Location.ANNOTATED_IMPORT_PREFIX, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(a, p);
+        if (!(temp instanceof G.AnnotatedImport)) {
+            return temp;
+        }
+        a = (G.AnnotatedImport) temp;
+        a = a.withLeadingAnnotations(ListUtils.map(a.getLeadingAnnotations(), annotation -> visitAndCast(annotation, p)));
+        J.Import anImport = visitAndCast(a.getImportDeclaration(), p);
+        return anImport == null ? null : a.withImportDeclaration(anImport);
+    }
+
     public J visitCompilationUnit(G.CompilationUnit cu, P p) {
         G.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
