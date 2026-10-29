@@ -612,7 +612,7 @@ public class GroovyParserVisitor {
                         while (i < len && !source.startsWith(d.close, i)) {
                             i++;
                         }
-                        i += d.close.length();
+                        i = closingDelimiterIndex(i, d.close) + d.close.length();
                         continue;
                     }
                 }
@@ -4118,7 +4118,23 @@ public class GroovyParserVisitor {
                 "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
             );
         }
-        return source.substring(beginIndex, endIndex);
+        return source.substring(beginIndex, closingDelimiterIndex(endIndex, untilDelim));
+    }
+
+    /// Groovy reads one or two quotes directly before the closing delimiter of a triple-quoted string as part of
+    /// its content, so `'''a''''` is the string `a'`.
+    ///
+    /// @param index where the first occurrence of `close` starts
+    /// @return where the closing delimiter actually starts
+    private int closingDelimiterIndex(int index, String close) {
+        if (!"'''".equals(close) && !"\"\"\"".equals(close)) {
+            return index;
+        }
+        int run = 0;
+        while (index + run < source.length() && source.charAt(index + run) == close.charAt(0)) {
+            run++;
+        }
+        return run == 4 || run == 5 ? index + run - 3 : index;
     }
 
     /**
@@ -4250,6 +4266,7 @@ public class GroovyParserVisitor {
                     i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
             } else if (source.startsWith(delimiter.close, i)) {
+                i = closingDelimiterIndex(i, delimiter.close);
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;
             }
