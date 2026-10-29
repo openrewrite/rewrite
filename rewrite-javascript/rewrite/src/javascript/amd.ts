@@ -667,18 +667,19 @@ export function bindAmd(
     const modules = dependencyNames(amd.block);
     const bindings = parameterNames(amd.block);
 
-    const declared = module === "" ? -1 : modules.indexOf(module);
-    if (declared >= 0) {
-        const bound = bindings[declared];
-        if (bound === undefined) {
-            // A parameter that is not a plain name gives the module no binding to hand back.
-            return undefined;
-        }
-        // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
-        // block — on the `define` call, or on its dependency array — has nothing to measure.
-        const cursor = cursorOf(visitor);
-        const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
-        if (withinFactory === undefined || declaresParameters(scopeOf(cursor!).declaringScope(bound), amd.block.factory)) {
+    const declared = module === "" ? [] : modules.flatMap((m, i) => m === module ? [i] : []);
+    if (declared.length > 0 && bindings[declared[0]] === undefined) {
+        // A parameter that is not a plain name gives the module no binding to hand back.
+        return undefined;
+    }
+    // Only code the factory encloses can shadow its parameter, so a cursor elsewhere in the
+    // block — on the `define` call, or on its dependency array — has nothing to measure.
+    const cursor = cursorOf(visitor);
+    const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
+    for (const index of declared) {
+        const bound = bindings[index];
+        if (bound !== undefined && (withinFactory === undefined ||
+            declaresParameters(scopeOf(cursor!).declaringScope(bound), amd.block.factory))) {
             return bound;
         }
     }

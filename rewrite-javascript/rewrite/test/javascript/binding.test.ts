@@ -615,10 +615,19 @@ describe("maybeBind", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("a/B", bound));
-        // A second cycle checks only the shadowed first dependency and appends it a third time
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], function (B) { function inner() { var B = 1; target(); return B; } });`,
+            `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; B_1.target(); return B; } });`
+        ));
+        expect(bound.name).toBe("B_1");
+    });
+
+    test("AMD reuses a later dependency on the module where the first one's parameter is shadowed", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/B", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; target(); return B; } });`,
             `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; B_1.target(); return B; } });`
         ));
         expect(bound.name).toBe("B_1");
