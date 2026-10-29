@@ -400,8 +400,6 @@ const d = {x, y, z};`
 
     test('type parameter default should have space before equals', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
-        // A second cycle resets and restores the space before the default type
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `type Test<TFieldValues extends FieldValues= FieldValues> = TFieldValues;`,
@@ -417,6 +415,16 @@ const d = {x, y, z};`
                 `function createArray<T= string>(value: T): T[] { return [value]; }`,
                 `function createArray<T = string>(value: T): T[] { return [value]; }`
             )
+        )
+    });
+
+    test('type parameter bounds space around equals and before the closing bracket or comma', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(`type A<T extends X > = T;`, `type A<T extends X> = T;`),
+            typescript(`type B<T  =  X> = T;`, `type B<T = X> = T;`),
+            typescript(`type C<T extends X=  Y> = T;`, `type C<T extends X = Y> = T;`),
+            typescript(`function f<T extends X , U>() {}`, `function f<T extends X, U>() {}`)
         )
     });
 });

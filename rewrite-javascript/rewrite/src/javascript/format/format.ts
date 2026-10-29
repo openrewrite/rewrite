@@ -255,6 +255,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
+        if (this.cursor.value?.kind === J.Kind.TypeParameter) {
+            return ret;
+        }
         return produce(ret, draft => {
             if (draft.elements.length > 0) {
                 // Apply beforeComma rule to all elements except the last
@@ -640,9 +643,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 const hasConstraint = constraintType.element.kind !== J.Kind.Empty;
                 const hasDefault = defaultType.element.kind !== J.Kind.Empty;
 
+                if (hasDefault && !defaultType.element.prefix.whitespace.includes("\n")) {
+                    defaultType.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                }
                 if (hasConstraint) {
-                    // Space before '=' for default type (in the `after` of constraint type)
-                    if (hasDefault && !constraintType.after.whitespace.includes("\n")) {
+                    if (!hasDefault) {
+                        this.spaceAfterRightPaddedDraft(constraintType, this.style.other.beforeComma);
+                    } else if (!constraintType.after.whitespace.includes("\n")) {
+                        // Space before '=' for default type (in the `after` of constraint type)
                         constraintType.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
                     }
                 } else if (hasDefault) {
