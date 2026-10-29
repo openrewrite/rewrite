@@ -2032,6 +2032,7 @@ describe('AddImport visitor', () => {
         test('should add import for zod z when no other zod import exists (with onlyIfReferenced)', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+            spec.cycles = 1;
 
             //language=typescript
             await withDir(async (repo) => {
