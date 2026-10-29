@@ -240,7 +240,7 @@ export class RecipeSpec {
             const dataTable = dataTables.find(dt => dt.descriptor.name === name);
             if (!dataTable) {
                 throw new Error(`No data table named ${name}` + (dataTables.length === 0 ? "" :
-                    `\nFound data tables: ${dataTables.map(dt => dt.descriptor.name).join(", ")}`));
+                    `\nFound data tables: ${[...new Set(dataTables.map(dt => dt.descriptor.name))].join(", ")}`));
             }
             await assertion(store.getRows(name, dataTable.group));
         }
