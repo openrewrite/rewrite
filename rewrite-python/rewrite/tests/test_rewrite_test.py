@@ -568,6 +568,8 @@ def _marking_calls(marker: Callable[[], Marker], rename: Optional[str] = None) -
         def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
             mi = super().visit_method_invocation(mi, ctx)
             if rename is not None:
+                if mi.name.simple_name == rename:
+                    return mi
                 mi = mi.replace(name=mi.name.replace(simple_name=rename))
             return mi.replace(markers=mi.markers.add(marker()))
 
@@ -690,7 +692,7 @@ class TestGeneratedSources:
     COMPAT = 'def helper():\n    return None\n'
 
     @staticmethod
-    def _recipe(file_name="pkg/_helper.py", contents=None):
+    def _recipe(file_name="pkg/_helper.py", contents=None, again=False):
         contents = contents if contents is not None else TestGeneratedSources.COMPAT
 
         class Generates(ScanningRecipe[Set[str]]):
@@ -718,7 +720,7 @@ class TestGeneratedSources:
                 return Scan()
 
             def generate(self, acc: Set[str], ctx: ExecutionContext) -> List[SourceFile]:
-                if not acc:
+                if not acc or (file_name in acc and not again):
                     return []
                 import ast
 
@@ -841,7 +843,7 @@ class TestExtraCycles:
 
     def test_a_recipe_that_generates_a_file_again_fails(self):
         with pytest.raises(AssertionError, match="  pkg/_helper.py, which it generated"):
-            RecipeSpec(recipe=TestGeneratedSources._recipe()).rewrite_run(
+            RecipeSpec(recipe=TestGeneratedSources._recipe(again=True)).rewrite_run(
                 python("import os", path=Path("pkg/client.py")),
                 python(None, TestGeneratedSources.COMPAT, path=Path("pkg/_helper.py")),
             )

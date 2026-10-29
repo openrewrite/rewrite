@@ -1,7 +1,7 @@
 from rewrite import Markers, random_id
 from rewrite.java import (Assert, Binary, Block, Expression, Identifier, P, J, JLeftPadded, MethodInvocation,
                           Return, Space, JRightPadded, Ternary, Unary)
-from rewrite.python import Binary as PyBinary, MinimumViableSpacingVisitor, PythonVisitor
+from rewrite.python import Binary as PyBinary, CompilationUnit, MinimumViableSpacingVisitor, PythonVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
 
@@ -143,6 +143,8 @@ class RenameBinaryRight(PythonVisitor):
 
     def visit_python_binary(self, binary: PyBinary, p: P) -> J:
         b = super().visit_python_binary(binary, p)
+        if isinstance(b.right, Identifier) and b.right.simple_name == 'z':
+            return b
         replacement = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], 'z', None, None)
         return b.replace(right=replacement)
 
@@ -257,9 +259,12 @@ def test_space_before_generated_not_after_ternary_if():
 
 class DuplicateMethod(PythonVisitor):
     def visit_block(self, block: Block, p: P) -> J:
-        if block.statements and isinstance(block.statements[0], MethodInvocation):
+        cu = self.cursor.first_enclosing_or_throw(CompilationUnit)
+        if len(cu.statements) == 1 and len(block.statements) == 1 and \
+                isinstance(block.statements[0], MethodInvocation):
             existing_rp = block.padding.statements[0]
             stmt = existing_rp.element.replace(prefix=Space.EMPTY)
             new_rp = JRightPadded(stmt, Space.EMPTY, existing_rp.markers)
             new_statements = list(block.padding.statements) + [new_rp]
             return block.padding.replace(statements=new_statements)
+        return block
