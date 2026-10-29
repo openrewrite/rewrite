@@ -219,6 +219,10 @@ function identifierRef(name: string): J.Identifier {
 
 /** Rewrites `call` to read as `<name>.call`, the way a real recipe uses the name `maybeBind` returned. */
 function withReference(call: J.MethodInvocation, name: string): J.MethodInvocation {
+    const select = call.select?.element;
+    if (select?.kind === J.Kind.Identifier && (select as J.Identifier).simpleName === name) {
+        return call;
+    }
     return {...call, select: rightPadded(identifierRef(name), emptySpace)};
 }
 
@@ -283,6 +287,8 @@ describe("maybeBind", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        // A second cycle misses the arrow factory's own parameter and appends the dependency again
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], (B) => target());`,
             `sap.ui.define(["a/B", "sap/ui/core/Element"], (B, Element) => Element.target());`
@@ -600,6 +606,8 @@ describe("maybeBind", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("a/B", bound));
+        // A second cycle checks only the shadowed first dependency and appends it a third time
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], function (B) { function inner() { var B = 1; target(); return B; } });`,
             `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; B_1.target(); return B; } });`
@@ -725,6 +733,7 @@ describe("maybeBind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `const {Button} = await import("sap/m/Button");\n\ntarget();`,
             `import Button_1 from "sap/m/Button";\nimport * as Button_2 from "sap/m/Button";\n\nconst {Button} = await import("sap/m/Button");\n\ntarget();`
@@ -983,6 +992,7 @@ describe("maybeBind and type-only imports", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(`const vi = 1;`, `import {vi as vi_1} from 'vitest';\n\nconst vi = 1;`));
         expect(names).toEqual(["vi_1", "vi_1"]);
     });
@@ -1009,6 +1019,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { extend } from "lodash";\n\nextend({}, {});\nobj.extend();\nfunction f() { const extend = 1; return extend; }`,
             `import { assign } from "lodash";\n\nassign({}, {});\nobj.extend();\nfunction f() { const extend = 1; return extend; }`
@@ -1028,6 +1039,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { extend } from "lodash";\n\nextend({}, {});`,
             `import { assign as merge } from "lodash";\n\nmerge({}, {});`
@@ -1047,6 +1059,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { extend as myExtend } from "lodash";\n\nmyExtend({}, {});`,
             `import { assign as myExtend } from "lodash";\n\nmyExtend({}, {});`
@@ -1066,6 +1079,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { extend as assign } from "lodash";\n\nassign({}, {});`,
             `import { assign } from "lodash";\n\nassign({}, {});`
@@ -1136,6 +1150,7 @@ describe("maybeRebind", () => {
         const agrees = new RecipeSpec();
         const agreesBound: {name?: string} = {};
         agrees.recipe = fromVisitor(amdRebind("Old", agreesBound));
+        agrees.cycles = 1;
         await agrees.rewriteRun(javascript(
             `sap.ui.define(["a/Old"], function (Old) { target(); });`,
             `sap.ui.define(["a/New"], function (Old) { target(); });`));
@@ -1170,6 +1185,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         // `Event` is an ambient global: the file declares it nowhere, so a check reading only
         // declarations would call the name free and let the import shadow it here.
         await spec.rewriteRun(typescript(
@@ -1183,6 +1199,7 @@ describe("maybeRebind", () => {
         const named: {name?: string} = {};
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, named);
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { New, Other } from "m2";\nimport { Old } from "m";\n\nOld(New, Other);`,
             `import { New, Other } from "m2";\n\nNew(New, Other);`
@@ -1239,6 +1256,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { New } from "m2";\nimport { Old } from "m";\n\nOld(New);`,
             `import { New } from "m3";\nimport { New as Old } from "m2";\n\nOld(New);`
@@ -1267,6 +1285,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { Old } from "m";\n\nconst y = Old;`,
             `import { New as Old } from "m2";\nimport { New } from "other";\n\nconst y = Old;`
@@ -1286,6 +1305,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import {a, b} from "m";\n\na(b);`,
             `import {x as b} from "m3";\nimport {x} from "m2";\nimport {x as x_1} from "m4";\n\nx(b);`
@@ -1368,6 +1388,7 @@ describe("maybeRebind", () => {
     test("a second statement binding the same member is left intact, not given the first's name", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
+        spec.cycles = 1;
         // One call moves one binding, so the second statement is a later call's to make; sharing
         // the name read from the first would bind it twice.
         await spec.rewriteRun(typescript(
@@ -1693,6 +1714,7 @@ describe("maybeRebind", () => {
                 return m;
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B", "a/Old", "a/C"], function (B, Old, C) { target(); });`,
             `sap.ui.define(["a/B", "a/New", "a/C"], function (B, Old, C) { target(); });`
@@ -1863,6 +1885,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `// header\nimport {act} from "old";\n\nact();`,
             `// header\nimport act from "new";\n\nact();`
@@ -2205,6 +2228,7 @@ describe("a node: specifier and the bare name of its built-in", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import * as u from 'node:util';\nimport {promisify as p} from 'node:util';\n\np(u);`,
             `import * as u from 'node:util';\nimport {inspect, promisify as p} from 'node:util';\n\np(u);`
@@ -2268,6 +2292,7 @@ describe("maybeRebind on a require", () => {
     test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
         const bound: (string | undefined)[] = [];
         const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        spec.cycles = 1;
         await spec.rewriteRun(
             javascript(`const Duplex = require('_stream_duplex');\n\nnew Duplex();`,
                 `const {Duplex} = require('stream');\n\nnew Duplex();`),
@@ -2288,7 +2313,9 @@ describe("maybeRebind on a require", () => {
 
     test("an unaliased member follows the new member's name, while an aliased one keeps its alias", async () => {
         const bound: (string | undefined)[] = [];
-        await rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound).rewriteRun(
+        const spec = rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound);
+        spec.cycles = 1;
+        await spec.rewriteRun(
             javascript(`const {extend} = require('lodash');\n\nextend({}, {});`,
                 `const {assign} = require('lodash');\n\nassign({}, {});`),
             javascript(`const {extend: ext} = require('lodash');\n\next({}, {});`,

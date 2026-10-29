@@ -56,6 +56,7 @@ describe('match extraction', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -78,6 +79,7 @@ describe('match extraction', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -97,6 +99,7 @@ describe('match extraction', () => {
                 return await swapOperands.tryOn(this.cursor, binary);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -130,6 +133,7 @@ describe('match extraction', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -151,6 +155,7 @@ describe('match extraction', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript

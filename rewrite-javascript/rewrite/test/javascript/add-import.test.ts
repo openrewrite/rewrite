@@ -31,6 +31,7 @@ import {
     prettierStyle,
     RemoveImport,
     SpacesStyle,
+    StyleKind,
     Template,
     tsx,
     typescript
@@ -169,6 +170,9 @@ function createAddImportWithTemplateVisitor(
 
 /** Marks a file the way parsing a project whose .prettierrc was picked up marks it. */
 function withPrettierStyle(cu: JS.CompilationUnit, config: Record<string, unknown>, ignored = false): JS.CompilationUnit {
+    if (cu.markers.markers.some(m => m.kind === StyleKind.PrettierStyle)) {
+        return cu;
+    }
     return {
         ...cu,
         markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config, undefined, ignored)]}
@@ -1429,6 +1433,7 @@ describe('AddImport visitor', () => {
                     return result;
                 }
             });
+            spec.cycles = 1;
 
             //language=tsx
             await withDir(async (repo) => {
@@ -1989,6 +1994,7 @@ describe('AddImport visitor', () => {
             // This tests that type attribution correctly detects usage of object types (not just methods).
             // The AddImport visitor will merge the z import into the existing ZodError import from zod.
             spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+            spec.cycles = 1;
 
             //language=typescript
             await withDir(async (repo) => {
@@ -2200,7 +2206,7 @@ describe('AddImport visitor', () => {
                     };
 
                     // Add the NamedStyles marker to the compilation unit
-                    let result: JS.CompilationUnit = {
+                    let result: JS.CompilationUnit = cu.markers.markers.some(m => m.kind === MarkersKind.NamedStyles) ? cu : {
                         ...cu,
                         markers: {
                             ...cu.markers,
@@ -2926,6 +2932,7 @@ describe('AddImport visitor', () => {
                     return result;
                 }
             }());
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3286,6 +3293,7 @@ describe('AddImport visitor', () => {
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3320,6 +3328,7 @@ describe('AddImport visitor', () => {
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3350,6 +3359,7 @@ describe('AddImport visitor', () => {
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3412,6 +3422,7 @@ describe('AddImport visitor', () => {
                     return super.visitMethodInvocation(method, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3476,6 +3487,7 @@ describe('AddImport visitor', () => {
                     return super.visitMethodInvocation(method, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(

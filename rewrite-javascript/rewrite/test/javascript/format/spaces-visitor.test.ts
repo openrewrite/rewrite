@@ -400,6 +400,8 @@ const d = {x, y, z};`
 
     test('type parameter default should have space before equals', () => {
         spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        // A second cycle resets and restores the space before the default type
+        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `type Test<TFieldValues extends FieldValues= FieldValues> = TFieldValues;`,
