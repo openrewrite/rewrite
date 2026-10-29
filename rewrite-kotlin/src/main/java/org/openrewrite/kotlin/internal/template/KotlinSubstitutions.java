@@ -17,11 +17,16 @@ package org.openrewrite.kotlin.internal.template;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypedTree;
+import org.openrewrite.kotlin.tree.K;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.nCopies;
+import static org.openrewrite.Tree.randomId;
 
 public class KotlinSubstitutions extends Substitutions {
     private final Object[] parameters;
@@ -100,5 +105,11 @@ public class KotlinSubstitutions extends Substitutions {
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
         return newObjectParameter(fqn, index);
+    }
+
+    @Override
+    public J toStatement(J j) {
+        return j instanceof Expression && !(j instanceof Statement) ?
+                new K.ExpressionStatement(randomId(), (Expression) j) : j;
     }
 }

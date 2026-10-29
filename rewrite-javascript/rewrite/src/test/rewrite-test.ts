@@ -27,6 +27,7 @@ import {isNamedStyles} from "../style";
 import {JavaScriptVisitor} from "../javascript";
 import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J, Type} from "../java";
+import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -44,9 +45,11 @@ interface RecipeSpecConfiguration {
     checkParsePrintIdempotence: boolean;
     allowEmptyDiff: boolean;
     checkReportingMarkersOnly: boolean;
+    cycles?: number;
+    expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
     recipeExecutionContext: ExecutionContext;
-    dataTableAssertions: { [key: string]: (rows: any[]) => void };
+    dataTableAssertions: { [key: string]: (rows: any[]) => void | Promise<void> };
 }
 
 export class RecipeSpec {
@@ -58,6 +61,19 @@ export class RecipeSpec {
      * its output carry.
      */
     checkReportingMarkersOnly: boolean = true
+
+    /**
+     * The cycles to run, by default one more than {@link expectedCyclesThatMakeChanges} and at least two. The
+     * cycles after the expected ones, and a run on a fresh parse of the output, fail the test if they change
+     * anything, so setting this to 1 turns the stability checks off.
+     */
+    cycles?: number
+
+    /**
+     * How many cycles a recipe needs to settle, by default 1. A recipe that only reaches its result over
+     * several cycles declares how many here, and the test then compares the output of the last of them.
+     */
+    expectedCyclesThatMakeChanges?: number
 
     recipe: Recipe = new NoopRecipe()
 
@@ -72,7 +88,7 @@ export class RecipeSpec {
      */
     recipeExecutionContext: ExecutionContext = this.executionContext;
 
-    private dataTableAssertions: { [key: string]: (rows: any[]) => void } = {}
+    private dataTableAssertions: { [key: string]: (rows: any[]) => void | Promise<void> } = {}
 
     // A suite typically declares one spec and configures it per test, which makes the spec a
     // channel between tests unless each test starts from the same configuration. A consumer opts
@@ -85,7 +101,11 @@ export class RecipeSpec {
         RecipeSpec.live?.push(this);
     }
 
-    dataTable<Row>(name: string, allRows: (rows: Row[]) => void) {
+    /**
+     * Asserts on the rows the first cycle of each subsequent {@link rewriteRun} writes to the named data
+     * table, failing the run when the recipe wrote none.
+     */
+    dataTable<Row>(name: string, allRows: (rows: Row[]) => void | Promise<void>) {
         this.dataTableAssertions[name] = allRows;
     }
 
@@ -94,6 +114,8 @@ export class RecipeSpec {
             checkParsePrintIdempotence: this.checkParsePrintIdempotence,
             allowEmptyDiff: this.allowEmptyDiff,
             checkReportingMarkersOnly: this.checkReportingMarkersOnly,
+            cycles: this.cycles,
+            expectedCyclesThatMakeChanges: this.expectedCyclesThatMakeChanges,
             recipe: this.recipe,
             recipeExecutionContext: this.recipeExecutionContext,
             dataTableAssertions: {...this.dataTableAssertions}
@@ -194,17 +216,152 @@ export class RecipeSpec {
             }
         }
 
-        const changeset = (await scheduleRun(this.recipe,
-            allParsed.map(([_, sourceFile]) => sourceFile),
-            this.recipeExecutionContext)).changeset;
+        this.recipeExecutionContext.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
+        const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;
+        const cycles = this.cycles ?? Math.max(2, expectedCycles + 1);
+        const {changeset, unsettled} = await this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile),
+            cycles, expectedCycles);
 
+        this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);
         this.checkReportingMarkersOnly && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
         await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
         await this.expectGeneratedFiles(flattenedSpecs, changeset);
+        if (unsettled) {
+            await this.expectNoFurtherChanges(unsettled.changes,
+                `Expected recipe to complete in ${pluralCycles(expectedCycles)}, but cycle ${unsettled.cycle} changed`);
+        }
+        cycles > expectedCycles && await this.expectStableOnFreshParse(flattenedSpecs, allParsed, changeset);
+        await this.expectDataTables();
+    }
 
-        // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
-        //     assertion(getRows(name, this.recipeExecutionContext));
-        // }
+    private async expectDataTables() {
+        const store: InMemoryDataTableStore = this.recipeExecutionContext.messages[DATA_TABLE_STORE];
+        const dataTables = store.getDataTables();
+        for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
+            const dataTable = dataTables.find(dt => dt.descriptor.name === name);
+            if (!dataTable) {
+                throw new Error(`No data table named ${name}` + (dataTables.length === 0 ? "" :
+                    `\nFound data tables: ${[...new Set(dataTables.map(dt => dt.descriptor.name))].join(", ")}`));
+            }
+            await assertion(store.getRows(name, dataTable.group));
+        }
+    }
+
+    private async runCycles(sources: SourceFile[], cycles: number, expectedCycles: number):
+        Promise<{ changeset: Result[], unsettled?: { cycle: number, changes: Result[] } }> {
+        const lineages: { origin?: SourceFile, latest?: SourceFile }[] = sources.map(s => ({origin: s, latest: s}));
+        const changesetOf = () => lineages.map(({origin, latest}) => new Result(origin, latest));
+        let changeset: Result[] | undefined;
+        let cyclesThatMadeChanges = 0;
+        for (let cycle = 1; cycle <= cycles; cycle++) {
+            const live = lineages.filter(l => l.latest).map(l => l.latest!);
+            const ctx = cycle === 1 ? this.recipeExecutionContext : this.laterRunContext();
+            const changes = (await scheduleRun(this.recipe, live, ctx)).changeset.filter(r => r.before !== r.after);
+            if (changes.length === 0) {
+                break;
+            }
+            if (changeset) {
+                return {changeset, unsettled: {cycle, changes}};
+            }
+            cyclesThatMadeChanges++;
+            for (const {before, after} of changes) {
+                const lineage = before && lineages.find(l => l.latest === before);
+                if (lineage) {
+                    lineage.latest = after;
+                } else {
+                    lineages.push({latest: after});
+                }
+            }
+            if (cycle >= expectedCycles) {
+                changeset = changesetOf();
+            }
+        }
+        if (cyclesThatMadeChanges < expectedCycles && expectedCycles > 1) {
+            throw new Error(`Expected recipe to complete in ${pluralCycles(expectedCycles)}, ` +
+                `but it settled after ${pluralCycles(cyclesThatMadeChanges)}. Lower expectedCyclesThatMakeChanges.`);
+        }
+        return {changeset: changeset ?? changesetOf()};
+    }
+
+    /** Data tables are written by the first cycle only, as in Java. */
+    private laterRunContext(): ExecutionContext {
+        const messages = {...this.recipeExecutionContext.messages};
+        delete messages[DATA_TABLE_STORE];
+        return new ExecutionContext(messages);
+    }
+
+    private async expectNoFurtherChanges(changes: Result[], headline: string, sanitized: boolean = false) {
+        const print = (sourceFile: SourceFile) => sanitized ? printSanitized(sourceFile) : TreePrinters.print(sourceFile);
+        const found: string[] = [];
+        for (const {before, after} of changes) {
+            if (!before) {
+                found.push(`  ${after!.sourcePath}, which it generated`);
+            } else if (!after) {
+                found.push(`  ${before.sourcePath}, which it deleted`);
+            } else {
+                const [expected, actual] = [await print(before), await print(after)];
+                if (expected !== actual) {
+                    found.push(`  ${after.sourcePath}\nExpected:\n${expected}\n\nActual:\n${actual}`);
+                } else if (!sanitized && !this.allowEmptyDiff) {
+                    found.push(`  ${after.sourcePath}, whose LST it changed without changing the printed source`);
+                }
+            }
+        }
+        if (found.length > 0) {
+            throw new Error([
+                `${headline} the sources again:`,
+                ...found,
+                "A recipe should recognize code it has already changed and leave it alone, so that running it " +
+                "again changes nothing. A recipe that is meant to need more cycles declares how many with " +
+                "expectedCyclesThatMakeChanges."
+            ].join("\n"));
+        }
+    }
+
+    /**
+     * Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
+     * recipe that recognizes its own output only by the shape of that LST changes it again.
+     */
+    private async expectStableOnFreshParse(specs: SourceSpec<any>[], parsed: [SourceSpec<any>, SourceFile][],
+                                           changeset: Result[]) {
+        if (!changeset.some(r => r.before !== r.after)) {
+            return;
+        }
+        const finals = changeset.filter(r => r.after).map(({before, after}): [SourceSpec<any> | undefined, SourceFile] => [
+            before ? parsed.find(([_, sourceFile]) => sourceFile === before)?.[0] :
+                specs.find(s => s.path === after!.sourcePath),
+            after!
+        ]);
+
+        const reparsedByFinal = new Map<SourceFile, SourceFile>();
+        const kinds = new Set(finals.filter(([spec]) => spec).map(([spec]) => spec!.kind));
+        for (const kind of kinds) {
+            const group = finals.filter(([spec]) => spec?.kind === kind);
+            const inputs = [];
+            for (const [_, sourceFile] of group) {
+                inputs.push({text: await printSanitized(sourceFile), sourcePath: sourceFile.sourcePath});
+            }
+            let i = 0;
+            try {
+                for await (const reparsed of group[0][0]!.parser(this.executionContext).parse(...inputs)) {
+                    if (!isParseError(reparsed) && await printSanitized(reparsed) === inputs[i].text) {
+                        // What the source file carries, like its styles, comes from outside its text
+                        reparsedByFinal.set(group[i][1], {...reparsed, markers: group[i][1].markers});
+                    }
+                    i++;
+                }
+            } catch {
+                // files that do not parse again keep the LST the recipe produced
+            }
+        }
+        if (reparsedByFinal.size === 0) {
+            return;
+        }
+
+        const sources = finals.map(([_, sourceFile]) => reparsedByFinal.get(sourceFile) ?? sourceFile);
+        const changes = (await scheduleRun(this.recipe, sources, this.laterRunContext())).changeset
+            .filter(r => r.before !== r.after);
+        await this.expectNoFurtherChanges(changes, "Running the recipe on a fresh parse of its output changed", true);
     }
 
     private async expectNoParseFailures(parsed: [SourceSpec<any>, SourceFile][]) {
@@ -291,9 +448,7 @@ export class RecipeSpec {
      */
     private async freshParsePlacements(spec: SourceSpec<any>, after: SourceFile): Promise<Set<string>> {
         try {
-            // Without the comments that search results and markup print as
-            const out = new PrintOutputCapture(MarkerPrinter.SANITIZED);
-            const text = await TreePrinters.printer(after).print(after, out);
+            const text = await printSanitized(after);
             const reparsed = await spec.parser(this.executionContext).parseOne({text, sourcePath: after.sourcePath});
             return isParseError(reparsed) ? new Set() : new Set(markerPlacements(reparsed).keys());
         } catch {
@@ -357,9 +512,21 @@ export class RecipeSpec {
         }
     }
 
+    private expectNoUnexpectedGeneratedFiles(specs: SourceSpec<any>[], changeset: Result[]) {
+        const expectedPaths = new Set(specs.filter(spec => !spec.before).map(spec => spec.path));
+        const unexpected = changeset.filter(c => !c.before && c.after && !expectedPaths.has(c.after.sourcePath));
+        if (unexpected.length > 0) {
+            throw new Error([
+                "The recipe generated source files the test did not expect:",
+                ...unexpected.map(c => `  ${c.after!.sourcePath}`),
+                "Describe each with a spec that has a null before and the path of the file."
+            ].join("\n"));
+        }
+    }
+
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile, before?: SourceFile) {
         if (!after) {
-            throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
+            throw new Error('Expected for recipe to have produced a change for file:\n' + (trimIndent(spec.before) || spec.path))
         }
         await new ValidateWhitespaceVisitor().visit(after, this.executionContext);
         const actualAfter = await TreePrinters.print(after);
@@ -418,6 +585,15 @@ class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
         return ret;
     }
+}
+
+/** Without the comments that search results and markup print as. */
+function printSanitized(sourceFile: SourceFile): Promise<string> {
+    return TreePrinters.printer(sourceFile).print(sourceFile, new PrintOutputCapture(MarkerPrinter.SANITIZED));
+}
+
+function pluralCycles(count: number): string {
+    return `${count} cycle${count === 1 ? "" : "s"}`;
 }
 
 /** Markers that report on an LST rather than describe it, which a recipe is free to leave. */

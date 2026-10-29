@@ -172,43 +172,39 @@ export class OrderImports extends Recipe {
                                 return; // Nothing to sort
                             }
 
-                            // Handle trailing comma
-                            const trailingComma = elements.length > 0 &&
-                                elements[elements.length - 1].markers?.markers.find(m => m.kind === J.Markers.TrailingComma);
-                            if (trailingComma) {
-                                elements[elements.length - 1].markers.markers =
-                                    elements[elements.length - 1].markers.markers.filter(m => m.kind !== J.Markers.TrailingComma);
-                            }
+                            const bySortKey = (a: { element: unknown }, b: { element: unknown }) =>
+                                this.getSpecifierSortKey(a.element as JS.ImportSpecifier)
+                                    .localeCompare(this.getSpecifierSortKey(b.element as JS.ImportSpecifier));
+                            if (elements.some((e, i) => i > 0 && bySortKey(elements[i - 1], e) > 0)) {
+                                const trailingComma = elements[elements.length - 1].markers?.markers.find(m => m.kind === J.Markers.TrailingComma);
+                                if (trailingComma) {
+                                    elements[elements.length - 1].markers.markers =
+                                        elements[elements.length - 1].markers.markers.filter(m => m.kind !== J.Markers.TrailingComma);
+                                }
 
-                            // Sort by the imported name (not alias)
-                            elements.sort((a, b) => {
-                                const nameA = this.getSpecifierSortKey(a.element as JS.ImportSpecifier);
-                                const nameB = this.getSpecifierSortKey(b.element as JS.ImportSpecifier);
-                                return nameA.localeCompare(nameB);
-                            });
+                                elements.sort(bySortKey);
 
-                            // Normalize spacing based on es6ImportExportBraces style
-                            const braceSpace = useBraceSpaces ? " " : "";
-                            for (let i = 0; i < elements.length; i++) {
-                                if (i === 0) {
-                                    // First element: space after opening brace based on style
-                                    elements[i].element.prefix = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
-                                } else {
-                                    // Other elements: space after comma
-                                    elements[i].element.prefix = {kind: J.Kind.Space, whitespace: ' ', comments: []};
+                                if (trailingComma) {
+                                    elements[elements.length - 1].markers.markers.push(trailingComma);
                                 }
                             }
-                            // Last element: space before closing brace based on style
-                            elements[elements.length - 1].after = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
 
-                            // Restore trailing comma to last element
-                            if (trailingComma && elements.length > 0 &&
-                                !elements[elements.length - 1].markers.markers.find(m => m.kind === J.Markers.TrailingComma)) {
-                                elements[elements.length - 1].markers.markers.push(trailingComma);
+                            const braceSpace = useBraceSpaces ? " " : "";
+                            const differs = (space: J.Space, whitespace: string) =>
+                                space.whitespace !== whitespace || space.comments.length > 0;
+                            const spaceOf = (whitespace: string): J.Space => ({kind: J.Kind.Space, whitespace, comments: []});
+                            for (let i = 0; i < elements.length; i++) {
+                                const whitespace = i === 0 ? braceSpace : ' ';
+                                if (differs(elements[i].element.prefix, whitespace)) {
+                                    elements[i].element.prefix = spaceOf(whitespace);
+                                }
+                            }
+                            if (differs(elements[elements.length - 1].after, braceSpace)) {
+                                elements[elements.length - 1].after = spaceOf(braceSpace);
                             }
                         });
 
-                        ret.push(produce(importPadded, draft => {
+                        ret.push(importSorted === import_ ? importPadded : produce(importPadded, draft => {
                             draft.element = importSorted;
                         }));
                     } else {

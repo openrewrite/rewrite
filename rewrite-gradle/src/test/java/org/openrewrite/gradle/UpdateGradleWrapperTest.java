@@ -2022,6 +2022,56 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
+    void updateWrapperWithNonGradleBuildToolMarkerNextToGradleBuild() {
+        BuildTool moderneCli = new BuildTool(Tree.randomId(), BuildTool.Type.ModerneCli, "");
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", null, Boolean.FALSE, null, null)),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties").markers(moderneCli)
+              .afterRecipe(gradleWrapperProperties ->
+                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).contains(moderneCli))
+          ),
+          text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).markers(moderneCli).after(notEmpty)),
+          dir("sdk",
+            properties(
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                """,
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                """,
+              spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                .markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))
+            )
+          )
+        );
+    }
+
+    @Test
     void doNotDowngradeWithoutBuildToolMarker() {
         HttpSender unhelpfulSender = request -> {
             if (request.getUrl().toString().contains("gradle.org")) {

@@ -8,7 +8,7 @@ import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -1352,7 +1352,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         const collector = new class extends JavaScriptVisitor<void> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
-                if (identifier.simpleName === targetName) {
+                if (!found && identifier.simpleName === targetName && isFree(this.cursor, identifier)) {
                     const type = identifier.type;
                     const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {
@@ -1415,37 +1415,14 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 found = true;
                             }
                         }
+                        // 4. References typed as the module's namespace object (e.g. `z` from zod)
+                        else if (type && Type.isClass(type) &&
+                            sameModule((type as Type.Class).fullyQualifiedName, targetModule)) {
+                            found = true;
+                        }
                     }
                 }
                 return super.visitIdentifier(identifier, p);
-            }
-
-            override async visitMethodInvocation(methodInvocation: J.MethodInvocation, p: void): Promise<J | undefined> {
-                if (expectedDeclaringType && methodInvocation.methodType && methodInvocation.methodType.name === targetName &&
-                    matchesModule(Type.FullyQualified.getFullyQualifiedName(methodInvocation.methodType.declaringType))) {
-                    found = true;
-                }
-                return super.visitMethodInvocation(methodInvocation, p);
-            }
-
-            override async visitFunctionCall(functionCall: JS.FunctionCall, p: void): Promise<J | undefined> {
-                if (expectedDeclaringType && functionCall.methodType && functionCall.methodType.name === targetName &&
-                    matchesModule(Type.FullyQualified.getFullyQualifiedName(functionCall.methodType.declaringType))) {
-                    found = true;
-                }
-                return super.visitFunctionCall(functionCall, p);
-            }
-
-            override async visitFieldAccess(fieldAccess: J.FieldAccess, p: void): Promise<J | undefined> {
-                const type = fieldAccess.type;
-                if (type && Type.isMethod(type)) {
-                    const methodType = type as Type.Method;
-                    if (expectedDeclaringType && methodType.name === targetName &&
-                        matchesModule(Type.FullyQualified.getFullyQualifiedName(methodType.declaringType))) {
-                        found = true;
-                    }
-                }
-                return super.visitFieldAccess(fieldAccess, p);
             }
         };
 

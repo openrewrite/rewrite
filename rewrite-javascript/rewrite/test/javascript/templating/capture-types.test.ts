@@ -86,6 +86,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),
@@ -227,6 +228,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),

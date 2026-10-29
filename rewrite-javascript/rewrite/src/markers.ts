@@ -275,6 +275,10 @@ export function markupDebug<T extends { markers: Markers }>(t: T, message: strin
  * Helper to add a markup marker to a tree node.
  */
 function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    if (t.markers.markers.some(m => m.kind === markup.kind &&
+        (m as Markup).message === markup.message && (m as Markup).detail === markup.detail)) {
+        return t;
+    }
     return {
         ...t,
         markers: {
