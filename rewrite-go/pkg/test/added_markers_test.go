@@ -18,6 +18,7 @@ package test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/uuid"
@@ -65,10 +66,16 @@ func (v *callMarker) VisitMethodInvocation(mi *java.MethodInvocation, p any) jav
 		return mi
 	}
 	cu, _ := visitor.FirstEnclosing[*golang.CompilationUnit](v.Cursor())
+	marker := v.recipe.marker(cu)
+	for _, m := range mi.Markers.Entries() {
+		if reflect.TypeOf(m) == reflect.TypeOf(marker) {
+			return mi
+		}
+	}
 	if v.recipe.rename != "" {
 		mi = mi.WithName(mi.Name.WithName(v.recipe.rename))
 	}
-	return mi.WithMarkers(java.AddMarker(mi.Markers, v.recipe.marker(cu)))
+	return mi.WithMarkers(java.AddMarker(mi.Markers, marker))
 }
 
 func visitedMarker(*golang.CompilationUnit) java.Marker { return visited{Ident: uuid.New()} }
