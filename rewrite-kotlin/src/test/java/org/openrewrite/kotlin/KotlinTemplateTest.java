@@ -1176,4 +1176,36 @@ class KotlinTemplateTest implements RewriteTest {
               """)
           ));
     }
+
+    @Test
+    void substituteAnnotatedExpressionAsStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"println".equals(method.getSimpleName())) {
+                      return method;
+                  }
+                  J.Block block = getCursor().firstEnclosingOrThrow(J.Block.class);
+                  J.VariableDeclarations checked = (J.VariableDeclarations) block.getStatements().get(0);
+                  return KotlinTemplate.builder("#{any()}")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), checked.getVariables().get(0).getInitializer());
+              }
+          })),
+          kotlin(
+            """
+              fun test() {
+                  val checked = @Suppress("UNUSED_EXPRESSION") check(true)
+                  println()
+              }
+              """,
+            """
+              fun test() {
+                  val checked = @Suppress("UNUSED_EXPRESSION") check(true)
+                  @Suppress("UNUSED_EXPRESSION") check(true)
+              }
+              """
+          ));
+    }
 }
