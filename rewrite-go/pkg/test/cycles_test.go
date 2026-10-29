@@ -277,3 +277,121 @@ func TestFreshParseKeepsWhatTheSourceFileCarriesFromOutsideItsText(t *testing.T)
 		}}).
 		RewriteRun(t, source)
 }
+
+func TestFewerCyclesThanExpectedCyclesThatMakeChangesFails(t *testing.T) {
+	// given
+	spec := NewRecipeSpec().
+		WithRecipe(&renameIdentifiers{rename: oneStepAlong}).
+		WithCycles(1).
+		WithExpectedCyclesThatMakeChanges(2)
+
+	// when
+	got := failures(t, spec, Golang(`
+		package main
+
+		func a() {}
+	`, `
+		package main
+
+		func c() {}
+	`))
+
+	// then
+	assert.Equal(t, []string{"Cycles is 1, fewer than the 2 ExpectedCyclesThatMakeChanges."}, got)
+}
+
+func TestFreshParseStillRunsWhenALaterCycleOnlyRebuildsTreesUnchecked(t *testing.T) {
+	// given
+	spec := NewRecipeSpec().WithRecipe(&renameIdentifiers{rename: func(_ *identifierRenamer, ident *java.Identifier) *java.Identifier {
+		if ident.Name == "main" {
+			rebuilt := *ident
+			return &rebuilt
+		}
+		if !strings.HasPrefix(ident.Name, "hi") || ident.Type == done {
+			return ident
+		}
+		return ident.WithName(ident.Name + "_x").WithType(done)
+	}})
+	spec.CheckUnchangedTreeIdentity = false
+
+	// when
+	got := failures(t, spec, Golang(`
+		package main
+
+		func hi() {}
+	`, `
+		package main
+
+		func hi_x() {}
+	`))
+
+	// then
+	require.Len(t, got, 1)
+	assert.True(t, strings.HasPrefix(got[0], "Running the recipe on a fresh parse of its output changed the sources again:\n"), got[0])
+}
+
+// stamp is a marker a recipe leaves on a source file it has changed.
+type stamp struct {
+	Ident uuid.UUID
+}
+
+func (m stamp) ID() uuid.UUID { return m.Ident }
+
+// stampedRename renames identifiers starting with hi in a source file without a
+// stamp, stamping the file.
+type stampedRename struct {
+	recipe.Base
+}
+
+func (r *stampedRename) Name() string        { return "org.openrewrite.golang.test.StampedRename" }
+func (r *stampedRename) DisplayName() string { return "Stamped rename" }
+func (r *stampedRename) Description() string {
+	return "Renames identifiers in a source file it has not stamped."
+}
+
+func (r *stampedRename) Editor() recipe.TreeVisitor {
+	return visitor.Init(&stampedRenamer{})
+}
+
+type stampedRenamer struct {
+	visitor.GoVisitor
+}
+
+func (v *stampedRenamer) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	if java.HasMarker[stamp](cu.Markers) {
+		return cu
+	}
+	renamed := v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
+	if renamed == cu {
+		return cu
+	}
+	return renamed.WithMarkers(java.AddMarker(renamed.Markers, stamp{Ident: uuid.New()}))
+}
+
+func (v *stampedRenamer) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	if !strings.HasPrefix(ident.Name, "hi") {
+		return ident
+	}
+	return ident.WithName(ident.Name + "_x")
+}
+
+func TestFreshParseDropsMarkersTheRecipeLeftOnTheSourceFile(t *testing.T) {
+	// given
+	spec := NewRecipeSpec().WithRecipe(&stampedRename{})
+	spec.CheckReportingMarkersOnly = false
+
+	// when
+	got := failures(t, spec, Golang(`
+		package main
+
+		func hi() {}
+	`, `
+		package main
+
+		func hi_x() {}
+	`))
+
+	// then
+	require.Len(t, got, 1)
+	assert.True(t, strings.HasPrefix(got[0], "Running the recipe on a fresh parse of its output changed the sources again:\n"), got[0])
+}

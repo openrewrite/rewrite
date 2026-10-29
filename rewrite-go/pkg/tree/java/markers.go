@@ -139,6 +139,7 @@ func AddMarker(markers Markers, marker Marker) Markers {
 // sameReport tells whether a and b report the same finding or problem, as the
 // equality of SearchResult and Markup on the Java side does regardless of id.
 func sameReport(a, b Marker) bool {
+	a, b = reportValue(a), reportValue(b)
 	switch a := a.(type) {
 	case SearchResult:
 		b, ok := b.(SearchResult)
@@ -148,6 +149,20 @@ func sameReport(a, b Marker) bool {
 		return ok && a.Level == b.Level && a.Message == b.Message && a.Detail == b.Detail
 	}
 	return false
+}
+
+func reportValue(m Marker) Marker {
+	switch p := m.(type) {
+	case *SearchResult:
+		if p != nil {
+			return *p
+		}
+	case *Markup:
+		if p != nil {
+			return *p
+		}
+	}
+	return m
 }
 
 // SearchResult is a marker indicating that a search recipe found a match.

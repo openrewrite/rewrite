@@ -65,3 +65,14 @@ func TestMarkupAddsAMarkupOfAnotherLevel(t *testing.T) {
 	// then
 	assert.Len(t, errored.Entries(), 2)
 }
+
+func TestFoundSearchResultKeepsAnEqualSearchResultHeldByPointer(t *testing.T) {
+	// given
+	found := AddMarker(EmptyMarkers, &SearchResult{Description: "found"})
+
+	// when
+	again := FoundSearchResult(found, "found")
+
+	// then
+	assert.Same(t, found, again)
+}
