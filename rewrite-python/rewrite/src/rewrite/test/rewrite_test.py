@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from rewrite import (
     Cursor,
+    DelegatingExecutionContext,
     ExecutionContext,
     InMemoryExecutionContext,
     InMemoryLargeSourceSet,
@@ -32,6 +33,7 @@ from rewrite import (
     Recipe,
     TreeVisitor,
 )
+from rewrite.data_table import DATA_TABLE_STORE
 from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
@@ -110,6 +112,7 @@ class _Workspace:
     """Where a run's sources sit on disk while they parse."""
 
     paths: Dict[int, Path]
+    texts: Dict[int, str]
     written: Dict[int, str]
     ty_client: Optional[Any]
     # Whether ty attributed this run, and if not, why.
@@ -117,6 +120,9 @@ class _Workspace:
 
     def source_path(self, spec: SourceSpec) -> Path:
         return self.paths[id(spec)]
+
+    def text(self, spec: SourceSpec) -> str:
+        return self.texts[id(spec)]
 
     def file_path(self, spec: SourceSpec) -> Optional[str]:
         # Only a ty session reads this path; an untyped parse has no use for it.
@@ -165,6 +171,16 @@ class RecipeSpec:
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
 
+    # The cycles to run, by default one more than `expected_cycles_that_make_changes` and at least two.
+    # The cycles after the expected ones, and a run on a fresh parse of the output, fail the test if
+    # they change anything, so setting this to 1 turns the stability checks off.
+    cycles: Optional[int] = None
+
+    # How many cycles a recipe needs to settle, by default 1. A recipe that only reaches its result
+    # over several cycles declares how many here, and the test then compares the output of the last
+    # of them.
+    expected_cycles_that_make_changes: Optional[int] = None
+
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return replace(self, recipe=recipe)
 
@@ -184,9 +200,11 @@ class RecipeSpec:
         1. Groups specs by kind (language)
         2. Parses them using appropriate parsers
         3. Validates parse/print idempotence if enabled
-        4. Runs the recipe
+        4. Runs the recipe for ``expected_cycles_that_make_changes`` cycles, each on the
+           output of the one before
         5. Checks that the recipe added no markers for its own use, if enabled
         6. Compares results with expected "after" states
+        7. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -203,7 +221,8 @@ class RecipeSpec:
 
         # Parse and validate all source files
         all_parsed: List[Tuple[SourceSpec, SourceFile]] = []
-        with self._workspace(specs) as workspace:
+        texts = {id(spec): dedent(spec.before) for spec in specs if spec.before is not None}
+        with self._workspace(specs, texts) as workspace:
             ty_status = workspace.ty_status
             for kind, kind_specs in specs_by_kind.items():
                 parsed = self._parse(kind_specs, workspace)
@@ -220,10 +239,10 @@ class RecipeSpec:
             for spec, sf in all_parsed
         ]
 
-        # Run the recipe
         source_files = [sf for _, sf in all_parsed]
-        lss = InMemoryLargeSourceSet(source_files)
-        results = self.recipe.run(lss, self.execution_context)
+        expected_cycles = self.expected_cycles_that_make_changes or 1
+        cycles = self.cycles if self.cycles is not None else max(2, expected_cycles + 1)
+        results, unsettled = self._run_cycles(source_files, cycles, expected_cycles)
         if self.check_reporting_markers_only:
             assert_no_added_markers(source_files, results, self._reparse)
 
@@ -245,6 +264,135 @@ class RecipeSpec:
         # Validate results match expected after states
         self._expect_results_to_match_after(source_specs, all_parsed, result_map, ty_status)
         self._expect_generated(source_specs, generated)
+        if unsettled is not None:
+            cycle, changes = unsettled
+            self._expect_no_further_changes(
+                changes,
+                f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but cycle {cycle} changed",
+            )
+        if cycles > expected_cycles:
+            self._expect_stable_on_fresh_parse(specs, all_parsed, results)
+
+    def _run_cycles(
+        self, sources: List[SourceFile], cycles: int, expected_cycles: int,
+    ) -> Tuple[List[Result], Optional[Tuple[int, List[Result]]]]:
+        """Run the recipe cycle after cycle on what the cycle before produced.
+
+        Returns the changes of the expected cycles, from the parsed sources to the output of the
+        last of them, and the cycle that changed the sources after that, with its changes.
+        """
+        # Each entry follows one source file from where it started to where it is now, either
+        # end being None for a file a cycle generated or deleted.
+        lineages: List[List[Optional[SourceFile]]] = [[sf, sf] for sf in sources]
+
+        def changeset() -> List[Result]:
+            return [Result(origin, latest) for origin, latest in lineages]
+
+        settled: Optional[List[Result]] = None
+        cycles_that_made_changes = 0
+        for cycle in range(1, cycles + 1):
+            live = [latest for _, latest in lineages if latest is not None]
+            ctx = self.execution_context if cycle == 1 else _LaterCycleContext(self.execution_context)
+            changes = [r for r in self.recipe.run(InMemoryLargeSourceSet(live), ctx) if r._before is not r._after]
+            if not changes:
+                break
+            if settled is not None:
+                return settled, (cycle, changes)
+            cycles_that_made_changes += 1
+            for change in changes:
+                lineage = next((lineage for lineage in lineages
+                                if change._before is not None and lineage[1] is change._before), None)
+                if lineage is not None:
+                    lineage[1] = change._after
+                else:
+                    lineages.append([None, change._after])
+            if cycle >= expected_cycles:
+                settled = changeset()
+        if expected_cycles > 1 and cycles_that_made_changes < expected_cycles:
+            raise AssertionError(
+                f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but it settled after "
+                f"{_plural_cycles(cycles_that_made_changes)}. Lower expected_cycles_that_make_changes."
+            )
+        return (settled if settled is not None else changeset()), None
+
+    def _expect_no_further_changes(self, changes: List[Result], headline: str, sanitized: bool = False) -> None:
+        found: List[str] = []
+        for change in changes:
+            before, after = change._before, change._after
+            if before is None:
+                if after is not None:
+                    found.append(f"  {after.source_path}, which it generated")
+            elif after is None:
+                found.append(f"  {before.source_path}, which it deleted")
+            else:
+                expected, actual = _print(before, sanitized), _print(after, sanitized)
+                if expected != actual:
+                    found.append(f"  {after.source_path}\nExpected:\n{expected}\n\nActual:\n{actual}")
+                elif not sanitized and not self.allow_empty_diff:
+                    found.append(f"  {after.source_path}, whose LST it changed without changing the printed source")
+        if found:
+            raise AssertionError("\n".join([
+                f"{headline} the sources again:",
+                *found,
+                "A recipe should recognize code it has already changed and leave it alone, so that running it "
+                "again changes nothing. A recipe that is meant to need more cycles declares how many with "
+                "expected_cycles_that_make_changes.",
+            ]))
+
+    def _expect_stable_on_fresh_parse(
+        self,
+        specs: List[SourceSpec],
+        parsed: List[Tuple[SourceSpec, SourceFile]],
+        results: List[Result],
+    ) -> None:
+        """Run the recipe once more on a fresh parse of its output.
+
+        Code that the next run reads is parsed from the printed output, not the LST this run
+        produced, and a recipe that recognizes its own output only by the shape of that LST
+        changes it again.
+        """
+        from rewrite.python.tree import CompilationUnit
+        if not any(r._before is not r._after for r in results):
+            return
+        finals = [r._after for r in results if r._after is not None]
+
+        spec_of: Dict[int, SourceSpec] = {}
+        for result in results:
+            if result._after is None:
+                continue
+            spec = next((s for s, sf in parsed if sf is result._before), None) if result._before is not None else None
+            spec_of[id(result._after)] = spec if spec is not None else SourceSpec("python", None)
+
+        reparsable = [sf for sf in finals if isinstance(sf, CompilationUnit) and _in_workspace(sf.source_path)]
+        reparse_specs = {id(sf): replace(spec_of[id(sf)], path=Path(str(sf.source_path))) for sf in reparsable}
+        texts = {id(reparse_specs[id(sf)]): _print(sf, True) for sf in reparsable}
+        # The rest of the run's specs, like a pyproject(), shape the workspace as they did the first parse.
+        others = [s for s in specs if s.kind != "python" and s.before is not None]
+        texts.update({id(s): dedent(s.before) for s in others})
+
+        reparsed_by_final: Dict[int, SourceFile] = {}
+        with self._workspace([*reparse_specs.values(), *others], texts) as workspace:
+            for sf in reparsable:
+                spec = reparse_specs[id(sf)]
+                try:
+                    reparsed = self._parse_python(
+                        workspace.text(spec), workspace.source_path(spec), workspace.file_path(spec),
+                        workspace.ty_client,
+                    )
+                except Exception:
+                    # A file that does not parse again keeps the LST the recipe produced.
+                    continue
+                if not isinstance(reparsed, ParseError) and _print(reparsed, True) == workspace.text(spec):
+                    # What the source file carries, like its styles, comes from outside its text.
+                    reparsed_by_final[id(sf)] = reparsed.replace(markers=sf.markers)
+        if not reparsed_by_final:
+            return
+
+        sources = [reparsed_by_final.get(id(sf), sf) for sf in finals]
+        ctx = _LaterCycleContext(self.execution_context)
+        changes = [r for r in self.recipe.run(InMemoryLargeSourceSet(sources), ctx) if r._before is not r._after]
+        self._expect_no_further_changes(
+            changes, "Running the recipe on a fresh parse of its output changed", sanitized=True)
 
     def _group_by_kind(self, specs: List[SourceSpec]) -> Dict[str, List[SourceSpec]]:
         """Group source specs by their kind."""
@@ -272,7 +420,7 @@ class RecipeSpec:
                 continue
 
             parsed = self._parse_python(
-                dedent(spec.before),
+                workspace.text(spec),
                 workspace.source_path(spec),
                 workspace.file_path(spec),
                 workspace.ty_client,
@@ -288,13 +436,14 @@ class RecipeSpec:
         return result
 
     @contextmanager
-    def _workspace(self, specs: List[SourceSpec]):
+    def _workspace(self, specs: List[SourceSpec], texts: Dict[int, str]):
         """Hold every source in the run in one directory while it parses.
 
         ty reads the sources and the project metadata from there, so a declared
         Python version picks the typeshed and the sources resolve against each
         other. ``uv()`` supplies its dependency workspace through the specs;
-        otherwise the run owns one.
+        otherwise the run owns one. ``texts`` holds each source's contents by
+        the ``id`` of its spec.
         """
         import shutil
         import tempfile
@@ -303,7 +452,7 @@ class RecipeSpec:
         paths = {id(spec): spec.path or Path(f"_{uuid4().hex}.{spec.ext}") for spec in specs}
 
         if not self.type_attribution:
-            yield _Workspace(paths, {}, None, "off, type_attribution=False")
+            yield _Workspace(paths, texts, {}, None, "off, type_attribution=False")
             return
 
         root = next((spec.project_root for spec in specs if spec.project_root), None)
@@ -317,10 +466,10 @@ class RecipeSpec:
         ty_status = "on"
         try:
             for spec in specs:
-                if spec.before is None:
+                if id(spec) not in texts:
                     continue
                 logical = paths[id(spec)]
-                if logical.is_absolute() or ".." in logical.parts:
+                if not _in_workspace(logical):
                     # The run removes what it writes, so a path leading out of the
                     # workspace would write and delete on the caller's tree.
                     raise ValueError(f"a source path stays inside the workspace: {logical}")
@@ -329,7 +478,7 @@ class RecipeSpec:
                 if not destination.exists():
                     created.append(destination)
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_text(dedent(spec.before))
+                destination.write_text(texts[id(spec)])
                 written[id(spec)] = str(destination)
 
             try:
@@ -342,7 +491,7 @@ class RecipeSpec:
                 ty_client = None
                 ty_status = f"off, ty-types unavailable: {exc}"
 
-            yield _Workspace(paths, written, ty_client, ty_status)
+            yield _Workspace(paths, texts, written, ty_client, ty_status)
         finally:
             if ty_client is not None:
                 ty_client.shutdown()
@@ -387,10 +536,7 @@ class RecipeSpec:
         from rewrite.python.tree import CompilationUnit
         if not isinstance(source_file, CompilationUnit):
             return None
-        # Printed without search markers, which print as comments that are not Python.
-        printed = source_file.print(Cursor(None, Cursor.ROOT_VALUE),
-                                    PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
-        return self._parse_python(printed, source_file.source_path, None, None)
+        return self._parse_python(_print(source_file, True), source_file.source_path, None, None)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]
@@ -548,6 +694,42 @@ class RecipeSpec:
                 return actual  # Callable returned None = actual is acceptable
             return result
         return dedent(after) if after else actual
+
+
+class _LaterCycleContext(DelegatingExecutionContext):
+    """The context of a cycle after the first, which writes no data tables, as in Java."""
+
+    def __init__(self, delegate: ExecutionContext):
+        super().__init__(delegate)
+        self._data_tables = None
+
+    def get_message(self, key, default_value=None):
+        if key == DATA_TABLE_STORE:
+            return default_value if self._data_tables is None else self._data_tables
+        return super().get_message(key, default_value)
+
+    def put_message(self, key, value):
+        if key == DATA_TABLE_STORE:
+            self._data_tables = value
+        else:
+            super().put_message(key, value)
+
+
+def _print(source_file: SourceFile, sanitized: bool = False) -> str:
+    if not sanitized:
+        return source_file.print_all()
+    # Printed without search markers, which print as comments that are not Python.
+    return source_file.print(Cursor(None, Cursor.ROOT_VALUE),
+                             PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
+
+
+def _in_workspace(path: Any) -> bool:
+    path = Path(str(path))
+    return not path.is_absolute() and ".." not in path.parts
+
+
+def _plural_cycles(n: int) -> str:
+    return f"{n} cycle" if n == 1 else f"{n} cycles"
 
 
 def _source_paths(source_files: List[SourceFile]) -> str:
