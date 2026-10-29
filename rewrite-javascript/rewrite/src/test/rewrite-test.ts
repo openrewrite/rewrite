@@ -222,6 +222,7 @@ export class RecipeSpec {
         const {changeset, unsettled} = await this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile),
             cycles, expectedCycles);
 
+        this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);
         this.checkReportingMarkersOnly && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
         await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
         await this.expectGeneratedFiles(flattenedSpecs, changeset);
@@ -509,9 +510,11 @@ export class RecipeSpec {
             const after = changeset.find(c => c.after?.sourcePath === spec.path);
             await this.expectAfter(spec, after?.after);
         }
+    }
 
-        const unexpected = changeset.filter(c => !c.before && c.after &&
-            !specs.some(spec => !spec.before && spec.path === c.after!.sourcePath));
+    private expectNoUnexpectedGeneratedFiles(specs: SourceSpec<any>[], changeset: Result[]) {
+        const expectedPaths = new Set(specs.filter(spec => !spec.before).map(spec => spec.path));
+        const unexpected = changeset.filter(c => !c.before && c.after && !expectedPaths.has(c.after.sourcePath));
         if (unexpected.length > 0) {
             throw new Error([
                 "The recipe generated source files the test did not expect:",
@@ -523,7 +526,7 @@ export class RecipeSpec {
 
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile, before?: SourceFile) {
         if (!after) {
-            throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
+            throw new Error('Expected for recipe to have produced a change for file:\n' + (trimIndent(spec.before) || spec.path))
         }
         await new ValidateWhitespaceVisitor().visit(after, this.executionContext);
         const actualAfter = await TreePrinters.print(after);

@@ -8,7 +8,7 @@ import {emptyMarkers, findMarker, foundSearchResult, Marker, Markers, MarkersKin
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 import {J} from "../../src/java";
-import {JavaScriptVisitor, JS, typescript} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../src/javascript";
 
 describe("rewrite test", () => {
     test("a recipe that makes no changes", async () => {
@@ -176,6 +176,29 @@ describe("rewrite test", () => {
             const run = sut.rewriteRun({...text("existing"), path: "existing.txt"});
             await expect(run).rejects.toThrow("The recipe generated source files the test did not expect");
             await expect(run).rejects.toThrow("  generated.txt");
+        });
+
+        test("a generated file no spec describes fails before its parser markers are taken for added ones", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new class extends ScanningRecipe<{}> {
+                name = "org.openrewrite.test.generate-typescript";
+                displayName = "Generate TypeScript";
+                description = "Generates `generated.ts`.";
+
+                initialValue(_ctx: ExecutionContext): {} {
+                    return {};
+                }
+
+                async generate(_acc: {}, _ctx: ExecutionContext): Promise<SourceFile[]> {
+                    const generated: SourceFile[] = [];
+                    for await (const file of new JavaScriptParser().parse({text: "const a = 1;", sourcePath: "generated.ts"})) {
+                        generated.push(file);
+                    }
+                    return generated;
+                }
+            };
+            await expect(sut.rewriteRun({...text("existing"), path: "existing.txt"}))
+                .rejects.toThrow("The recipe generated source files the test did not expect:\n  generated.ts");
         });
 
         test("after: null expects the file to be deleted", () => {
