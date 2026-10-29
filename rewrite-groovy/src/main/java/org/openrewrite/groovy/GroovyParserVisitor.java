@@ -2297,12 +2297,26 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitNotExpression(NotExpression expression) {
+            visitPrefixOperator(expression, "!", J.Unary.Type.Not, expression.getExpression());
+        }
+
+        @Override
+        public void visitUnaryMinusExpression(UnaryMinusExpression expression) {
+            visitPrefixOperator(expression, "-", J.Unary.Type.Negative, expression.getExpression());
+        }
+
+        @Override
+        public void visitUnaryPlusExpression(UnaryPlusExpression expression) {
+            visitPrefixOperator(expression, "+", J.Unary.Type.Positive, expression.getExpression());
+        }
+
+        private void visitPrefixOperator(org.codehaus.groovy.ast.expr.Expression expression, String operator,
+                                         J.Unary.Type type, org.codehaus.groovy.ast.expr.Expression operand) {
             queue.add(insideParentheses(expression, fmt -> {
-                skip("!");
-                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
+                skip(operator);
+                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, type);
                 // Groovy 3+ does not set _INSIDE_PARENTHESES_LEVEL on PropertyExpression / MethodCallExpression,
-                // so when `!` directly wraps such an expression in parentheses, detect the parentheses from the source.
-                org.codehaus.groovy.ast.expr.Expression operand = expression.getExpression();
+                // so when the operator directly wraps such an expression in parentheses, detect the parentheses from the source.
                 int savedCursor = cursor;
                 Space beforeParen = whitespace();
                 Expression expr;
