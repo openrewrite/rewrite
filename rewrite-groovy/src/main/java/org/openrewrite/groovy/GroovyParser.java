@@ -56,7 +56,6 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -102,29 +101,18 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        Map<String, String> stepToLibraryMap = new HashMap<>();
-        for (Input input : sources) {
-            Path path = input.getPath();
-            String pathStr = path.toString().replace('\\', '/');
-            int varsIndex = pathStr.indexOf("/vars/");
-            if (varsIndex == -1 && pathStr.startsWith("vars/")) {
-                varsIndex = 0;
+        List<Input> inputs = new ArrayList<>();
+        sources.forEach(inputs::add);
+        // This index belongs to this lazy parse stream, never to the reusable ExecutionContext.
+        // Only the source root's vars/ directory establishes shared-library step provenance.
+        Map<String, String> sharedLibrarySteps = new HashMap<>();
+        for (Input input : inputs) {
+            Path path = input.getRelativePath(relativeTo).normalize();
+            if (isSharedLibraryStep(path)) {
+                String filename = path.getFileName().toString();
+                sharedLibrarySteps.put(filename.substring(0, filename.length() - ".groovy".length()),
+                        path.toString().replace('\\', '/'));
             }
-            if (varsIndex != -1 && pathStr.endsWith(".groovy")) {
-                String stepName = pathStr.substring(pathStr.lastIndexOf('/') + 1, pathStr.length() - 7);
-                String libraryName = "";
-                if (varsIndex > 0) {
-                    String sub = pathStr.substring(0, varsIndex);
-                    int lastSlash = sub.lastIndexOf('/');
-                    libraryName = lastSlash == -1 ? sub : sub.substring(lastSlash + 1);
-                } else {
-                    libraryName = "unknown";
-                }
-                stepToLibraryMap.put(stepName, libraryName);
-            }
-        }
-        if (!stepToLibraryMap.isEmpty()) {
-            ctx.putMessage("org.openrewrite.groovy.jenkins.sharedLibrarySteps", stepToLibraryMap);
         }
 
         CompilerConfiguration configuration = new CompilerConfiguration();
@@ -159,7 +147,7 @@ public class GroovyParser implements Parser {
         GroovyClassLoader classLoader = new NegativeCachingGroovyClassLoader(getClass().getClassLoader(), configuration);
 
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
-        return StreamSupport.stream(sources.spliterator(), false)
+        return inputs.stream()
                 .map(input -> {
                     ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
                     try {
@@ -196,7 +184,8 @@ public class GroovyParser implements Parser {
                                 compiled.getInput().getSource(ctx),
                                 typeCache,
                                 typeFactory,
-                                ctx
+                                isJenkinsSource(compiled.getInput().getRelativePath(relativeTo).normalize()) ?
+                                        sharedLibrarySteps : Collections.emptyMap()
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
                         if (!warnings.isEmpty()) {
@@ -227,6 +216,16 @@ public class GroovyParser implements Parser {
                     closeQuietly(classLoader);
                     closeQuietly(transformLoader);
                 });
+    }
+
+    private static boolean isSharedLibraryStep(Path path) {
+        return !path.isAbsolute() && path.getNameCount() == 2 &&
+               "vars".equals(path.getName(0).toString()) &&
+               path.getFileName().toString().endsWith(".groovy");
+    }
+
+    private static boolean isJenkinsSource(Path path) {
+        return "Jenkinsfile".equals(path.getFileName().toString()) || isSharedLibraryStep(path);
     }
 
     private static void closeQuietly(Closeable closeable) {

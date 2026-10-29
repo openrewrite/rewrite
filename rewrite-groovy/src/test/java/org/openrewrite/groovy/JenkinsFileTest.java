@@ -15,12 +15,26 @@
  */
 package org.openrewrite.groovy;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.marker.JenkinsSharedLibraryStep;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class JenkinsFileTest implements RewriteTest {
@@ -196,58 +210,160 @@ class JenkinsFileTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/7229")
     @Test
-    void jenkinsSharedLibraryMethodResolutionFromScope() {
-        rewriteRun(
-          groovy(
-            "sbPipeline()",
-            spec -> spec.path("Jenkinsfile")
-              .afterRecipe(sourceFile -> {
-                  if (sourceFile.getSourcePath().toString().contains("Jenkinsfile")) {
-                      G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
-                      J.MethodInvocation m = cu.getStatements().stream()
-                              .filter(J.MethodInvocation.class::isInstance)
-                              .map(J.MethodInvocation.class::cast)
-                              .filter(it -> "sbPipeline".equals(it.getSimpleName()))
-                              .findFirst()
-                              .orElseThrow();
-                      org.assertj.core.api.Assertions.assertThat(m.getMethodType()).isNotNull();
-                      org.assertj.core.api.Assertions.assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName())
-                              .isEqualTo("jenkins.sharedlibrary.my_library.Vars");
-                  }
-              })
-          ),
-          groovy(
-            "def call() { }",
-            spec -> spec.path("my-library/vars/sbPipeline.groovy")
-          )
-        );
+    void sharedLibraryStepHasProvenanceWithoutInventedSignature() {
+        G.CompilationUnit cu = parse(null,
+          input("Jenkinsfile", "def value = deploy('prod')"),
+          input("vars/deploy.groovy", "def call(String target) { target }"));
+        J.VariableDeclarations declaration = (J.VariableDeclarations) cu.getStatements().get(0);
+        J.MethodInvocation call = (J.MethodInvocation) declaration.getVariables().get(0).getInitializer();
+        assertThat(call.getMethodType()).isNull();
+        assertThat(call.getMarkers().findFirst(JenkinsSharedLibraryStep.class)).hasValueSatisfying(marker ->
+          assertThat(marker.getSourcePath()).isEqualTo("vars/deploy.groovy"));
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
     @Test
-    void jenkinsSharedLibraryMethodResolutionFromLibraryAnnotation() {
-        rewriteRun(
-          groovy(
-            """
-            @Library('my-pipeline-library') _
-            sbPipeline()
-            """,
-            spec -> spec.path("Jenkinsfile")
-              .afterRecipe(sourceFile -> {
-                  if (sourceFile.getSourcePath().toString().contains("Jenkinsfile")) {
-                      G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
-                      J.MethodInvocation m = cu.getStatements().stream()
-                              .filter(J.MethodInvocation.class::isInstance)
-                              .map(J.MethodInvocation.class::cast)
-                              .filter(it -> "sbPipeline".equals(it.getSimpleName()))
-                              .findFirst()
-                              .orElseThrow();
-                      org.assertj.core.api.Assertions.assertThat(m.getMethodType()).isNotNull();
-                      org.assertj.core.api.Assertions.assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName())
-                              .isEqualTo("jenkins.sharedlibrary.my_pipeline_library.Vars");
-                  }
-              })
-          )
-        );
+    void libraryAnnotationDoesNotAttributeBuiltinsOrUnknownCalls() {
+        G.CompilationUnit cu = parse(null, input("Jenkinsfile",
+          "@Library(['my-lib@1.2.0', 'other-lib@feature/test']) _\nnode { sh 'ls'; echo 'hi'; typo() }"));
+        new GroovyIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                assertThat(method.getMethodType()).isNull();
+                assertThat(method.getMarkers().findFirst(JenkinsSharedLibraryStep.class)).isEmpty();
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0);
+    }
+
+    @Test
+    void unrelatedLibraryAnnotationDoesNotAttributeCalls() {
+        G.CompilationUnit cu = parse(null, input("other.groovy",
+          "@interface Library { String value() }\n@Library('other') class Example { def run() { deploy() } }"));
+        assertNoSharedLibrarySteps(cu);
+    }
+
+    @Test
+    void nestedVarsPackageIsNotASharedLibrary() {
+        G.CompilationUnit cu = parse(null,
+          input("Jenkinsfile", "format()"),
+          input("src/main/groovy/com/acme/vars/format.groovy", "def call() {}"));
+        assertNoSharedLibrarySteps(cu);
+    }
+
+    @Test
+    void nestedVarsSourcesAreNotSteps() {
+        G.CompilationUnit cu = parse(null,
+          input("Jenkinsfile", "deploy()"),
+          input("vars/nested/deploy.groovy", "def call() {}"));
+        assertNoSharedLibrarySteps(cu);
+    }
+
+    @Test
+    void resolvedLocalMethodKeepsItsType() {
+        G.CompilationUnit cu = parse(null,
+          input("Jenkinsfile", "def deploy() { 1 }\ndeploy()"),
+          input("vars/deploy.groovy", "def call() {}"));
+        J.MethodInvocation call = (J.MethodInvocation) cu.getStatements().get(1);
+        assertThat(call.getMethodType()).isNotNull();
+        assertThat(call.getMarkers().findFirst(JenkinsSharedLibraryStep.class)).isEmpty();
+    }
+
+    @Test
+    void ordinaryGroovySourcesDoNotConsumeSharedLibrarySteps() {
+        for (String path : Arrays.asList("build.gradle", "other.groovy")) {
+            G.CompilationUnit cu = parse(null, input(path, "deploy()"),
+              input("vars/deploy.groovy", "def call() {}"));
+            assertNoSharedLibrarySteps(cu);
+        }
+    }
+
+    @Test
+    void absolutePathsAreRelativeToLibraryRoot() {
+        Path root = Paths.get("checkout/job-1234").toAbsolutePath();
+        G.CompilationUnit cu = parse(root,
+          Parser.Input.fromString(root.resolve("Jenkinsfile"), "deploy()"),
+          Parser.Input.fromString(root.resolve("vars/deploy.groovy"), "def call() {}"));
+        J.MethodInvocation call = (J.MethodInvocation) cu.getStatements().get(0);
+        assertThat(call.getMarkers().findFirst(JenkinsSharedLibraryStep.class)).hasValueSatisfying(marker ->
+          assertThat(marker.getSourcePath()).isEqualTo("vars/deploy.groovy"));
+    }
+
+    @Test
+    void varsSourcesCanCallOtherSharedLibrarySteps() {
+        G.CompilationUnit cu = parse(null, input("vars/first.groovy", "deploy()"),
+          input("vars/deploy.groovy", "def call() {}"));
+        assertThat(((J.MethodInvocation) cu.getStatements().get(0)).getMarkers()
+          .findFirst(JenkinsSharedLibraryStep.class)).isPresent();
+    }
+
+    @Test
+    void reusedContextAndInterleavedStreamsDoNotLeakSteps() {
+        GroovyParser parser = GroovyParser.builder().build();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        List<Parser.Input> first = Arrays.asList(input("Jenkinsfile", "deploy()"),
+          input("vars/deploy.groovy", "def call() {}"));
+        try (Stream<SourceFile> firstBatch = parser.parseInputs(first, null, ctx);
+             Stream<SourceFile> secondBatch = parser.parseInputs(
+               Arrays.asList(input("Jenkinsfile", "deploy()")), null, ctx)) {
+            assertNoSharedLibrarySteps((G.CompilationUnit) secondBatch.findFirst().orElseThrow());
+            assertThat(((J.MethodInvocation) ((G.CompilationUnit) firstBatch.findFirst().orElseThrow())
+              .getStatements().get(0)).getMarkers().findFirst(JenkinsSharedLibraryStep.class)).isPresent();
+        }
+    }
+
+    @Test
+    void builtinAndExplicitReceiverCallsDoNotReceiveProvenance() {
+        G.CompilationUnit cu = parse(null,
+          input("Jenkinsfile", "node { sh 'ls'; echo 'hi'; helper.deploy() }"),
+          input("vars/deploy.groovy", "def call() {}"));
+        assertNoSharedLibrarySteps(cu);
+    }
+
+    @Test
+    void separateBatchesDoNotGuessAnExternalStep() {
+        GroovyParser parser = GroovyParser.builder().build();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        try (Stream<SourceFile> library = parser.parseInputs(
+          Arrays.asList(input("vars/deploy.groovy", "def call() {}")), null, ctx)) {
+            assertThat(library.collect(toList())).allMatch(G.CompilationUnit.class::isInstance);
+        }
+        try (Stream<SourceFile> jenkinsfile = parser.parseInputs(
+          Arrays.asList(input("Jenkinsfile", "deploy()")), null, ctx)) {
+            assertNoSharedLibrarySteps((G.CompilationUnit) jenkinsfile.findFirst().orElseThrow());
+        }
+    }
+
+    @Test
+    void inputsAreTraversedOnlyOnce() {
+        List<Parser.Input> inputs = Arrays.asList(input("Jenkinsfile", "deploy()"),
+          input("vars/deploy.groovy", "def call() {}"));
+        Iterator<Parser.Input> iterator = inputs.iterator();
+        try (Stream<SourceFile> parsed = GroovyParser.builder().build().parseInputs(() -> iterator,
+          null, new InMemoryExecutionContext(Throwable::printStackTrace))) {
+            assertThat(parsed.collect(toList())).hasSize(2).allMatch(G.CompilationUnit.class::isInstance);
+        }
+    }
+
+    private static Parser.Input input(String path, String source) {
+        return Parser.Input.fromString(Paths.get(path), source);
+    }
+
+    private static G.CompilationUnit parse(@Nullable Path root, Parser.Input... inputs) {
+        try (Stream<SourceFile> parsed = GroovyParser.builder().build().parseInputs(Arrays.asList(inputs), root,
+          new InMemoryExecutionContext(Throwable::printStackTrace))) {
+            List<SourceFile> files = parsed.collect(toList());
+            assertThat(files).allMatch(G.CompilationUnit.class::isInstance);
+            return (G.CompilationUnit) files.get(0);
+        }
+    }
+
+    private static void assertNoSharedLibrarySteps(G.CompilationUnit cu) {
+        new GroovyIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                assertThat(method.getMarkers().findFirst(JenkinsSharedLibraryStep.class)).isEmpty();
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0);
     }
 }
