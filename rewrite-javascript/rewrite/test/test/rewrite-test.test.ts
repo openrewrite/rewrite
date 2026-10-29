@@ -170,6 +170,14 @@ describe("rewrite test", () => {
             );
         });
 
+        test("a generated file no spec describes fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new GenerateText();
+            const run = sut.rewriteRun({...text("existing"), path: "existing.txt"});
+            await expect(run).rejects.toThrow("The recipe generated source files the test did not expect");
+            await expect(run).rejects.toThrow("  generated.txt");
+        });
+
         test("after: null expects the file to be deleted", () => {
             const sut = new RecipeSpec();
             sut.recipe = deleteText();

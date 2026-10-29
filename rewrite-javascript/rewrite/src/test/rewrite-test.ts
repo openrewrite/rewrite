@@ -509,6 +509,16 @@ export class RecipeSpec {
             const after = changeset.find(c => c.after?.sourcePath === spec.path);
             await this.expectAfter(spec, after?.after);
         }
+
+        const unexpected = changeset.filter(c => !c.before && c.after &&
+            !specs.some(spec => !spec.before && spec.path === c.after!.sourcePath));
+        if (unexpected.length > 0) {
+            throw new Error([
+                "The recipe generated source files the test did not expect:",
+                ...unexpected.map(c => `  ${c.after!.sourcePath}`),
+                "Describe each with a spec that has a null before and the path of the file."
+            ].join("\n"));
+        }
     }
 
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile, before?: SourceFile) {
