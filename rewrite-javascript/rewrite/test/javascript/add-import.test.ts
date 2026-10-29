@@ -2270,6 +2270,41 @@ describe('AddImport visitor', () => {
                 );
             }, {unsafeCleanup: true});
         });
+
+        test('should not add import for a zod member only read through a namespace', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'string', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ZodError} from 'zod';
+                                import * as zz from 'zod';
+
+                                export const s = zz.string();
+                                export const e = ZodError;
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
     });
 
     describe('multiple maybeAddImport calls for same module', () => {
