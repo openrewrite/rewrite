@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.internal.template;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -24,8 +23,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypedTree;
 import org.openrewrite.kotlin.tree.K;
-
-import java.util.List;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.nCopies;
@@ -37,20 +34,6 @@ public class KotlinSubstitutions extends Substitutions {
     public KotlinSubstitutions(String code, Object[] parameters) {
         super(code, emptySet(), parameters);
         this.parameters = parameters;
-    }
-
-    // A Kotlin expression such as `@Suppress(..) expr` is not a Statement on its own, so one substituted
-    // into a statement position has to be wrapped the way the parser wraps it in a block
-    @Override
-    public <J2 extends J> List<J2> unsubstitute(List<J2> js) {
-        //noinspection unchecked
-        return ListUtils.map(js, j -> {
-            J2 unsubstituted = unsubstitute(j);
-            if (j instanceof Statement && unsubstituted instanceof Expression && !(unsubstituted instanceof Statement)) {
-                return (J2) new K.ExpressionStatement(randomId(), (Expression) unsubstituted);
-            }
-            return unsubstituted;
-        });
     }
 
     @Override
@@ -122,5 +105,11 @@ public class KotlinSubstitutions extends Substitutions {
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
         return newObjectParameter(fqn, index);
+    }
+
+    @Override
+    public J toStatement(J j) {
+        return j instanceof Expression && !(j instanceof Statement) ?
+                new K.ExpressionStatement(randomId(), (Expression) j) : j;
     }
 }

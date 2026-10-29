@@ -115,7 +115,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (!isScope(statement)) {
                         return statement;
                     }
-                    return spliceAround(statement, unsubstitute(templateParser.parseBlockStatements(
+                    return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
                             new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
                             substitutions.getTypeVariables(), loc, mode)), p);
                 }));
@@ -182,7 +182,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 switch (loc) {
                     case BLOCK_END: {
                         if (isScope(block)) {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
                                     new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
                                     substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
 
@@ -212,7 +212,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
                             if (isScope(statement)) {
-                                return spliceAround(statement, unsubstitute(templateParser.parseBlockStatements(
+                                return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
                                         substitutions.getTypeVariables(), loc, mode)), p);
                             }
@@ -324,7 +324,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitIf(J.If iff, Integer p) {
                 if (loc == ELSE_PREFIX && isScope(iff)) {
-                    List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                    List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
                             new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
                             substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
                     if (gen.size() != 1) {
@@ -406,7 +406,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case BLOCK_PREFIX: {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(getCursor(), Statement.class,
                                     substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
                             J.Block body = method.getBody();
                             if (body == null) {
@@ -613,25 +613,27 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
-                        if (gen.size() != 1) {
+                        J3 replacement;
+                        if (gen.size() == 1) {
+                            replacement = gen.get(0);
+                        } else if (gen.size() == 2 && gen.get(0) instanceof J.Empty) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
                             // of a method that has an implicit return
-                            if (gen.size() == 2) {
-                                if (gen.get(0) instanceof J.Empty) {
-                                    return autoFormat(gen.get(1).withPrefix(statement.getPrefix()), p);
-                                }
-                                if (gen.get(1) instanceof J.Empty) {
-                                    return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
-                                }
-                            }
+                            replacement = gen.get(1);
+                        } else if (gen.size() == 2 && gen.get(1) instanceof J.Empty) {
+                            replacement = gen.get(0);
+                        } else {
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
                                                                ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
                                                                "\nStatement:\n" + statement);
                         }
-
-                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
+                        if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
+                            //noinspection unchecked
+                            replacement = (J3) substitutions.toStatement(replacement);
+                        }
+                        return autoFormat(replacement.withPrefix(statement.getPrefix()), p);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -671,6 +673,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
                 try {
                     return substitutions.unsubstitute(substitutions.resolveTypeVariables(j));
+                } finally {
+                    substituted = true;
+                }
+            }
+
+            private <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+                try {
+                    return substitutions.unsubstituteStatements(ListUtils.map(js, substitutions::resolveTypeVariables));
                 } finally {
                     substituted = true;
                 }

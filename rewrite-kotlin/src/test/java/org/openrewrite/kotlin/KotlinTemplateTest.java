@@ -28,7 +28,9 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -1204,6 +1206,110 @@ class KotlinTemplateTest implements RewriteTest {
               fun test() {
                   val checked = @Suppress("UNUSED_EXPRESSION") check(true)
                   @Suppress("UNUSED_EXPRESSION") check(true)
+              }
+              """
+          ));
+    }
+
+    private static Recipe expressionBodyToBlockBody() {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.Block body = method.getBody();
+                if (body == null || !body.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
+                    return method;
+                }
+                Expression expr = ((K.Return) body.getStatements().get(0)).getExpression().getExpression();
+                J.MethodDeclaration m = method.withBody(body.withMarkers(Markers.EMPTY));
+                return KotlinTemplate.builder("#{any()}")
+                  .build()
+                  .apply(updateCursor(m), m.getCoordinates().replaceBody(), expr);
+            }
+        });
+    }
+
+    @Test
+    void replaceExpressionBodyWithBlockBodyKeepsExpressionAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(expressionBodyToBlockBody()),
+          kotlin(
+            """
+              class Test {
+                  fun x() = @Suppress("UNUSED_EXPRESSION") check(true)
+              }
+              """,
+            """
+              class Test {
+                  fun x() {
+                      @Suppress("UNUSED_EXPRESSION") check(true)
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceStatementWithExpressionTemplate() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"check".equals(method.getSimpleName())) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return KotlinTemplate.builder("1 + 1")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace());
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun x() {
+                      check(true)
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun x() {
+                      1 + 1
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void wrapAnnotatedExpressionStatementInTrailingLambda() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitExpressionStatement(K.ExpressionStatement statement, ExecutionContext ctx) {
+                  if (!(statement.getExpression() instanceof K.AnnotatedExpression) ||
+                      getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Lambda) {
+                      return super.visitExpressionStatement(statement, ctx);
+                  }
+                  return KotlinTemplate.builder("run {\n#{any()}\n}")
+                    .build()
+                    .apply(getCursor(), statement.getCoordinates().replace(), statement.getExpression());
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun x() {
+                      @Suppress("UNUSED_EXPRESSION") check(true)
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun x() {
+                      run {
+                          @Suppress("UNUSED_EXPRESSION") check(true)
+                      }
+                  }
               }
               """
           ));

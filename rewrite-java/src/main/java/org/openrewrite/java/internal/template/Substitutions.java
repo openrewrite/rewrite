@@ -302,6 +302,19 @@ public class Substitutions {
         return ListUtils.map(js, this::unsubstitute);
     }
 
+    @SuppressWarnings("unchecked")
+    public <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+        return ListUtils.map(js, j -> (J2) toStatement(unsubstitute(j)));
+    }
+
+    /**
+     * The tree that takes a statement's place. In Kotlin an expression stands as a statement only inside a
+     * wrapper the parser adds, and a substituted expression needs the same wrapper.
+     */
+    public J toStatement(J j) {
+        return j;
+    }
+
     /**
      * Resolve generic type variable identifiers in the template AST to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
@@ -362,6 +375,16 @@ public class Substitutions {
                     return param;
                 }
                 return super.visitBlock(block, integer);
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Integer integer) {
+                JRightPadded<T> r = super.visitRightPadded(right, loc, integer);
+                if (r != null && loc == JRightPadded.Location.BLOCK_STATEMENT && r.getElement() instanceof J) {
+                    return r.withElement((T) toStatement((J) r.getElement()));
+                }
+                return r;
             }
 
             @Override
