@@ -1350,4 +1350,41 @@ class KotlinTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void keepCommentOfExpressionBodyPassedAsParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitReturn(K.Return return_, ExecutionContext ctx) {
+                  Expression expression = return_.getExpression().getExpression();
+                  if (!(expression instanceof J.MethodInvocation) || !"check".equals(((J.MethodInvocation) expression).getSimpleName())) {
+                      return return_;
+                  }
+                  return KotlinTemplate.builder("run {\n#{any()}\n}")
+                    .build()
+                    .apply(getCursor(), return_.getCoordinates().replace(), expression);
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun test() = /* keep */ check(true)
+                  val checked: Unit
+                      get() = /* keep */ check(true)
+              }
+              """,
+            """
+              class Test {
+                  fun test() = run {
+                      /* keep */ check(true)
+                  }
+                  val checked: Unit
+                      get() = run {
+                          /* keep */ check(true)
+                      }
+              }
+              """
+          ));
+    }
 }

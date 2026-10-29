@@ -3857,8 +3857,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private J.Block convertToBlock(KtExpression ktExpression, ExecutionContext data) {
-        Expression returnExpr = convertToExpression(ktExpression.accept(this, data)).withPrefix(Space.EMPTY);
-        K.Return return_ = new K.Return(randomId(), new J.Return(randomId(), prefix(ktExpression), Markers.EMPTY.addIfAbsent(new ImplicitReturn(randomId())), returnExpr), null);
+        // Comments before the expression belong to it, so they move along when a recipe takes the expression out
+        Space prefix = prefix(ktExpression);
+        Expression returnExpr = convertToExpression(ktExpression.accept(this, data)).withPrefix(prefix.withWhitespace(""));
+        K.Return return_ = new K.Return(randomId(), new J.Return(randomId(), prefix.withComments(emptyList()), Markers.EMPTY.addIfAbsent(new ImplicitReturn(randomId())), returnExpr), null);
         return new J.Block(
                 randomId(),
                 Space.EMPTY,
