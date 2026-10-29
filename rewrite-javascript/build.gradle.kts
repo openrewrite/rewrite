@@ -4,6 +4,7 @@ import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
+import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -467,25 +468,38 @@ extensions.configure<LicenseExtension> {
 //    )
 }
 
-// The lock regeneration test fixtures (recorded package-manager output, ~18000 files including binary
-// tarballs) live in openrewrite/rewrite-javascript-lock-fixtures. The latest main is fetched once into
-// build/lock-fixtures and joins the test classpath; `clean` picks up newer fixtures.
+// The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
+// live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
+// Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
+val lockFixturesCommit = "8533f9639291673cad34703ed76178eb46bc72cf"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
+    inputs.property("commit", lockFixturesCommit)
     outputs.dir(lockFixturesDir)
-    onlyIf { !lockFixturesDir.get().dir("lock").asFile.exists() }
     doLast {
-        val archive = layout.buildDirectory.file("tmp/lock-fixtures-main.tar.gz").get().asFile
-        archive.parentFile.mkdirs()
-        uri("https://codeload.github.com/openrewrite/rewrite-javascript-lock-fixtures/tar.gz/refs/heads/main")
-            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
-        copy {
-            from(tarTree(resources.gzip(archive))) {
-                include("*/lock/**")
-                eachFile { path = path.substringAfter('/') }
-                includeEmptyDirs = false
+        val archiveDir = layout.buildDirectory.dir("tmp/lock-fixtures-archive").get().asFile
+        val archive = archiveDir.resolve("$lockFixturesCommit.tar.gz")
+        if (!archive.exists()) {
+            delete(archiveDir)
+            archiveDir.mkdirs()
+            val download = archiveDir.resolve("$lockFixturesCommit.tar.gz.part")
+            uri("https://codeload.github.com/openrewrite/rewrite-javascript-lock-fixtures/tar.gz/$lockFixturesCommit")
+                .toURL().openStream().use { input -> download.outputStream().use { input.copyTo(it) } }
+            Files.move(download.toPath(), archive.toPath())
+        }
+        delete(lockFixturesDir)
+        try {
+            copy {
+                from(tarTree(resources.gzip(archive))) {
+                    include("*/lock/**")
+                    eachFile { path = path.substringAfter('/') }
+                    includeEmptyDirs = false
+                }
+                into(lockFixturesDir)
             }
-            into(lockFixturesDir)
+        } catch (e: Exception) {
+            archive.delete()
+            throw e
         }
     }
 }
