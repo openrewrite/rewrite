@@ -154,7 +154,9 @@ public class Substitutions {
                 newObjectParameter(fqn, index) :
                 newPrimitiveParameter(fqn, index);
 
-        parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
+        // A spliced parameter takes the placeholder's whitespace and keeps its own comments
+        Space prefix = ((J) parameter).getPrefix();
+        parameters[index] = ((J) parameter).withPrefix(prefix.withWhitespace(""));
         return s;
     }
 
