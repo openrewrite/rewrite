@@ -321,7 +321,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
-            draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
+            draft.control.init.forEach((oneInit, index) => {
                 if (oneInit.element.kind === J.Kind.VariableDeclarations) {
                     const vd = oneInit.element as Draft<J.VariableDeclarations>;
                     if (vd.modifiers && vd.modifiers.length > 0) {
@@ -330,8 +330,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 }
                 oneInit.after.whitespace = "";
                 this.spaceBeforeRightPaddedElementDraft(oneInit, index === 0 ? this.style.within.forParentheses : true);
-                return oneInit;
-            }));
+            });
             if (draft.control.condition) {
                 draft.control.condition.element.prefix.whitespace = " ";
                 draft.control.condition.after.whitespace = this.style.other.beforeForSemicolon ? " " : "";

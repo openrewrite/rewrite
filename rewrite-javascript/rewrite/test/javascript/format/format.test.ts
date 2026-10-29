@@ -57,8 +57,6 @@ describe('AutoformatVisitor', () => {
     spec.recipe = fromVisitor(new AutoformatVisitor());
 
     test('everything', () => {
-        // A second cycle replaces the for loop's init list with an equal copy
-        spec.cycles = 1;
         return spec.rewriteRun(
             // TODO there should be no newline after the default case in switch
             // TODO not sure if there should be a newline after the if and after the finally
@@ -204,8 +202,6 @@ describe('AutoformatVisitor', () => {
     });
 
     test('control structure with non-block body', () => {
-        // A second cycle replaces the for loop's init list with an equal copy
-        spec.cycles = 1;
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
