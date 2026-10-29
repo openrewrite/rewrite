@@ -248,6 +248,7 @@ public class GroovyParserVisitor {
                     // Inner classes will be visited as part of visiting their containing class
                     continue;
                 }
+                addEmptyStatements(statements);
                 JRightPadded<Statement> statement = convertTopLevelStatement(unit, entry.getValue());
                 if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
                     prefix = statement.getElement().getPrefix();
@@ -265,6 +266,7 @@ public class GroovyParserVisitor {
                                 source.substring(cursor, Math.min(source.length(), cursor + 250)), t);
             }
         }
+        addEmptyStatements(statements);
 
         return new G.CompilationUnit(
                 randomId(),
@@ -1834,6 +1836,7 @@ public class GroovyParserVisitor {
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
             List<org.codehaus.groovy.ast.stmt.Statement> blockStatements = block.getStatements();
             for (int i = 0; i < blockStatements.size(); i++) {
+                addEmptyStatements(statements);
                 ASTNode statement = blockStatements.get(i);
                 J expr = doVisit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
@@ -1859,6 +1862,7 @@ public class GroovyParserVisitor {
 
                 statements.add(stat);
             }
+            addEmptyStatements(statements);
             queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace()));
             if (!withinClosure) {
                 skip("}");
@@ -4393,6 +4397,19 @@ public class GroovyParserVisitor {
         }
 
         return paddedG;
+    }
+
+    /**
+     * Groovy drops empty statements from its AST, so a stray {@code ;} that no statement claims as its terminator
+     * is mapped to a {@link J.Empty} here.
+     */
+    private void addEmptyStatements(List<JRightPadded<Statement>> statements) {
+        while (sourceStartsWith(";")) {
+            Space prefix = whitespace();
+            skip(";");
+            JRightPadded<Statement> empty = JRightPadded.build(new J.Empty(randomId(), prefix, Markers.EMPTY));
+            statements.add(empty.withMarkers(empty.getMarkers().add(new Semicolon(randomId()))));
+        }
     }
 
     private String name() {
