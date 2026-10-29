@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.Cursor.ROOT_VALUE;
@@ -65,6 +66,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private static final String REMOVE_ENTRY_PREFIX = "org.openrewrite.yaml.MergeYamlVisitor.removeEntryPrefix";
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+    private static final Pattern BLANK_LINE = Pattern.compile("\\R[ \\t]*\\R");
 
     private final Yaml existing;
     private final Yaml incoming;
@@ -258,9 +260,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 // Check if merge is done on the very first key of the yaml file
                 if (mutatedEntries.firstNewlyAddedItemIndex == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Document &&
                         ((Yaml.Mapping) ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getBlock()).getEntries().equals(((Yaml.Mapping) existing).getEntries())) {
-                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, mutatedEntries.ls.get(0).withPrefix("")); // Remove linebreak from first entry
-                    mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getPrefix() + afterInsertEntry.getPrefix()));
-                    getCursor().getParentOrThrow().putMessage(REMOVE_DOCUMENT_PREFIX, true);
+                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                    String leading = afterInsertEntry.getPrefix();
+                    if (!document.isExplicit()) {
+                        leading = document.getPrefix() + leading;
+                        getCursor().getParentOrThrow().putMessage(REMOVE_DOCUMENT_PREFIX, true);
+                    }
+                    String header = documentHeader(leading, document.isExplicit());
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, mutatedEntries.ls.get(0).withPrefix(header));
+                    mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + leading.substring(header.length())));
                 } else {
                     Yaml.Mapping.Entry firstNewlyAddedEntry = mutatedEntries.ls.get(mutatedEntries.firstNewlyAddedItemIndex);
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
@@ -429,8 +437,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
 
         List<Yaml.Sequence.Entry> mutatedEntries = map(s2.getEntries(), entry -> {
+            if (!(entry.getBlock() instanceof Yaml.Mapping)) {
+                return entry;
+            }
             Yaml.Mapping incomingMapping = (Yaml.Mapping) entry.getBlock();
             for (Yaml.Sequence.Entry existingEntry : s1.getEntries()) {
+                if (!(existingEntry.getBlock() instanceof Yaml.Mapping)) {
+                    continue;
+                }
                 Yaml.Mapping existingMapping = (Yaml.Mapping) existingEntry.getBlock();
                 if (keyMatches(existingMapping, incomingMapping)) {
                     Yaml.Sequence.Entry e1 = existingEntry.withBlock(mergeMapping(existingMapping, incomingMapping, p, cursor));
@@ -448,8 +462,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 filter(s1.getEntries(), it -> !mutatedEntries.contains(it)),
                 map(mutatedEntries, it -> autoFormat(it, p, cursor)),
                 it -> {
+                    if (it.getBlock() instanceof Yaml.Scalar) {
+                        return ((Yaml.Scalar) it.getBlock()).getValue();
+                    } else if (!(it.getBlock() instanceof Yaml.Mapping) || ((Yaml.Mapping) it.getBlock()).getEntries().isEmpty()) {
+                        return "";
+                    }
                     Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
-                    return entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue();
+                    return entry.getValue() instanceof Yaml.Scalar ?
+                            entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue() :
+                            entry.getKey().getValue();
                 }).ls;
 
         return s1.withEntries(keepInlineCommentOnItsLine(s1, entries));
@@ -588,6 +609,25 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private String substringOfAfterFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s, -1);
         return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
+    }
+
+    /// The part of the text leading a document's first entry that stays on top when a key is inserted before
+    /// that entry: the line break closing an explicit `---` marker, and comments up to the last blank line,
+    /// which describe the file rather than the entry.
+    private static String documentHeader(String leading, boolean explicit) {
+        int markerEnd = 0;
+        if (explicit) {
+            Matcher lineBreak = LINE_BREAK.matcher(leading);
+            markerEnd = lineBreak.find() ? lineBreak.end() : 0;
+        }
+        int headerEnd = markerEnd;
+        Matcher blankLine = BLANK_LINE.matcher(leading);
+        while (blankLine.find()) {
+            headerEnd = blankLine.end();
+        }
+        return leading.substring(markerEnd, headerEnd).contains("#") ?
+                leading.substring(0, headerEnd) :
+                leading.substring(0, markerEnd);
     }
 
     private static String inlineCommentOf(@Nullable String prefix) {

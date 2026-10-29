@@ -2533,6 +2533,103 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void insertBeforeFirstElementKeepsFileHeaderOnTop() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            """
+              # yaml-language-server: $schema=https://example.com/schema.json
+
+              # Comment about first
+              first: value
+              """,
+            """
+              # yaml-language-server: $schema=https://example.com/schema.json
+
+              A: a
+              # Comment about first
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeFirstElementOfExplicitDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            """
+              ---
+              first: value
+              """,
+            """
+              ---
+              A: a
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeMappingIntoSequenceWithScalarEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: a@1
+              """,
+            null,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - local.yml
+                - local: other.yml
+              """,
+            """
+              include:
+                - local.yml
+                - local: other.yml
+                - component: a@1
+              """
+          )
+        );
+    }
+
+    @Test
     void insertBeforeElementWithCommentsWithNesting() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
