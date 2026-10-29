@@ -195,6 +195,88 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void annotatedStaticStarImport() {
+        rewriteRun(
+          groovy(
+            "@Deprecated import static java.lang.Math.*",
+            spec -> spec.afterRecipe(cu -> {
+                G.AnnotatedImport annotated = (G.AnnotatedImport) cu.getStatements().getFirst();
+                assertThat(annotated.getLeadingAnnotations()).singleElement()
+                  .extracting(J.Annotation::getSimpleName).isEqualTo("Deprecated");
+                assertThat(annotated.getImportDeclaration().isStatic()).isTrue();
+                assertThat(annotated.getImportDeclaration().getQualid().getSimpleName()).isEqualTo("*");
+            })
+          )
+        );
+    }
+
+    @Test
+    void addImportPreservesAnnotationsWhenFolding() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new AddImport<>("java.util.Set", null, false))),
+          groovy(
+            """
+              @Deprecated import java.util.ArrayList
+              import java.util.Collection
+              import java.util.Collections
+              import java.util.List
+
+              class Example {}
+              """,
+            """
+              @Deprecated import java.util.ArrayList
+              import java.util.*
+
+              class Example {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void addStaticImportPreservesAnnotationsWhenFolding() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new AddImport<>("java.lang.Math", "sin", false))),
+          groovy(
+            """
+              @Deprecated import static java.lang.Math.abs
+              import static java.lang.Math.cos
+
+              class Example {}
+              """,
+            """
+              @Deprecated import static java.lang.Math.abs
+              import static java.lang.Math.*
+
+              class Example {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnnotatedImportWhenWildcardAlreadyExists() {
+        rewriteRun(
+          groovy(
+            """
+              @Deprecated import java.util.List
+              import java.util.*
+
+              class Example {
+                  Set<String> values
+              }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                G.CompilationUnit updated = cu.withImports(Collections.singletonList(cu.getImports().get(1)));
+                assertThat(updated.getImports()).hasSize(1);
+                assertThat(updated.getStatements().getFirst()).isInstanceOf(J.Import.class);
+                assertThat(updated.printAll()).doesNotContain("@Deprecated", "import java.util.List");
+            })
+          )
+        );
+    }
+
+    @Test
     void addImportDoesNotDuplicateAnnotatedImport() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new AddImport<>("java.util.List", null, false))),

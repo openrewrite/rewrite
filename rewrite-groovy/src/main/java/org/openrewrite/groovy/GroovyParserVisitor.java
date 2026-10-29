@@ -4664,7 +4664,9 @@ public class GroovyParserVisitor {
                 }
 
                 if (packageEnd < importSource.length() && importSource.charAt(packageEnd) == '*') {
-                    ImportNode node = new ImportNode(staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1)).getType());
+                    ImportNode original = staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1));
+                    ImportNode node = new ImportNode(original.getType());
+                    node.addAnnotations(original.getAnnotations());
                     node.setLineNumber(lineNo);
                     node.setColumnNumber(importIndex + 1);
                     completeStaticStarImports.add(node);

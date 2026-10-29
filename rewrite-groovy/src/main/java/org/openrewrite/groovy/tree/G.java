@@ -25,6 +25,7 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
 import org.openrewrite.groovy.service.GroovySourceFileStatementService;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -357,6 +358,7 @@ public interface G extends J {
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
+                imports = preserveAnnotatedImports(imports);
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.Import) &&
                                      !(s.getElement() instanceof AnnotatedImport))
@@ -402,6 +404,38 @@ public interface G extends J {
                     }
                     return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 }
+            }
+
+            private List<JRightPadded<Import>> preserveAnnotatedImports(List<JRightPadded<Import>> imports) {
+                return ListUtils.flatMap(imports, replacement -> {
+                    J.Import star = replacement.getElement();
+                    if (!"*".equals(star.getQualid().getSimpleName()) || t.getImports().stream().anyMatch(i ->
+                            i.getId().equals(star.getId()))) {
+                        return replacement;
+                    }
+                    List<JRightPadded<Import>> retained = new ArrayList<>();
+                    for (JRightPadded<Statement> statement : t.statements) {
+                        if (!(statement.getElement() instanceof AnnotatedImport)) {
+                            continue;
+                        }
+                        AnnotatedImport annotated = (AnnotatedImport) statement.getElement();
+                        J.Import original = annotated.getImportDeclaration();
+                        boolean sameGroup = original.isStatic() == star.isStatic() &&
+                                (star.isStatic() ? original.getTypeName().equals(star.getTypeName()) :
+                                        original.getPackageName().equals(star.getPackageName()));
+                        if (sameGroup && original.getAlias() == null && imports.stream().noneMatch(i ->
+                                i.getElement().getId().equals(original.getId()))) {
+                            // Folding replaces import IDs. Keep annotated imports explicit so their effects survive.
+                            retained.add(new JRightPadded<>(original.withPrefix(annotated.getPrefix()),
+                                    statement.getAfter(), statement.getMarkers()));
+                        }
+                    }
+                    if (retained.isEmpty()) {
+                        return replacement;
+                    }
+                    retained.add(replacement.withElement(star.withPrefix(Space.format("\n"))));
+                    return retained;
+                });
             }
 
             public List<JRightPadded<Statement>> getStatements() {
