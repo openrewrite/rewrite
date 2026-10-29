@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.AddImport;
+import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -188,6 +190,72 @@ class ImportTest implements RewriteTest {
                   anImport.withPrefix(Space.format("\n"))));
                 assertThat(formatted.printAll()).isEqualTo("\n" + cu.printAll());
             })
+          )
+        );
+    }
+
+    @Test
+    void addImportDoesNotDuplicateAnnotatedImport() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          groovy(
+            """
+              import java.util.Set
+              @Deprecated import java.util.List
+
+              class Example {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void addImportDoesNotDuplicateAnnotatedStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new AddImport<>("java.util.Collections", "emptyList", false))),
+          groovy(
+            """
+              @Deprecated import static java.util.Collections.emptyList
+
+              class Example {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportDeletesItsAnnotationsAndPreservesOtherAnnotatedImports() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new RemoveImport<>("java.util.List"))),
+          groovy(
+            """
+              @SuppressWarnings('unused') import java.util.Set
+              @Deprecated import java.util.List
+
+              class Example {}
+              """,
+            """
+              @SuppressWarnings('unused') import java.util.Set
+
+              class Example {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportPreservesUsedAnnotatedImport() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new RemoveImport<>("java.util.List"))),
+          groovy(
+            """
+              @Deprecated import java.util.List
+
+              class Example {
+                  List<String> values
+              }
+              """
           )
         );
     }
