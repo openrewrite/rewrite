@@ -42,7 +42,7 @@ type SourceSpec struct {
 	After       *string // nil means no change expected (parse-print idempotence only)
 	Path        string
 	Markers     []java.Marker                                  // markers attached to the parsed source after parse
-	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional post-parse assertion callback (.go files only)
+	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional assertion callback on the recipe's result (.go files only)
 	generated   bool                                           // true for a file the recipe is expected to Generate (see Generated)
 }
 
@@ -63,10 +63,10 @@ func (s SourceSpec) WithPath(p string) SourceSpec {
 	return s
 }
 
-// WithAfterRecipe returns a copy of s with the post-parse callback set.
-// The callback fires after parsing (with type attribution wired) and
-// before recipe application; recipes can read s.Markers off the cu and
-// assert on resolved types.
+// WithAfterRecipe returns a copy of s with the after-recipe callback set.
+// Once the source matches its expected after state, the callback receives
+// the recipe's result, or the parsed source when no recipe is configured,
+// so it can read s.Markers off the cu and assert on resolved types.
 func (s SourceSpec) WithAfterRecipe(fn func(t *testing.T, cu *golang.CompilationUnit)) SourceSpec {
 	s.AfterRecipe = fn
 	return s
@@ -608,7 +608,35 @@ type change struct {
 // implement Sources.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	t.Helper()
-	spec.verify(t, spec.parseAndApply(t, sources))
+	run := spec.parseAndApply(t, sources)
+	spec.verify(t, run)
+	if !t.Failed() {
+		spec.afterRecipe(t, run)
+	}
+}
+
+func (spec *RecipeSpec) afterRecipe(t *testing.T, run *recipeRun) {
+	t.Helper()
+	for _, ps := range run.parsed {
+		after := ps.tree
+		if spec.Recipe != nil {
+			after = ps.result
+		}
+		if cu, ok := after.(*golang.CompilationUnit); ok && ps.spec.AfterRecipe != nil {
+			ps.spec.AfterRecipe(t, cu)
+		}
+	}
+	for _, gs := range run.genSpecs {
+		if gs.AfterRecipe == nil {
+			continue
+		}
+		for _, gt := range run.generated {
+			if cu, ok := gt.(*golang.CompilationUnit); ok && cu.SourcePath == gs.Path {
+				gs.AfterRecipe(t, cu)
+				break
+			}
+		}
+	}
 }
 
 // parseAndApply parses every source and applies the recipe over its cycles
@@ -951,10 +979,6 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 		for _, e := range errs {
 			t.Errorf("whitespace attachment: %s", e)
 		}
-	}
-
-	if src.AfterRecipe != nil {
-		src.AfterRecipe(t, cu)
 	}
 
 	if spec.CheckParsePrintIdempotence {
