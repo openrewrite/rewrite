@@ -1176,4 +1176,40 @@ class KotlinTemplateTest implements RewriteTest {
               """)
           ));
     }
+
+    @Test
+    void indentLastExpressionOfTemplatedLambda() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"check".equals(method.getSimpleName())) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return KotlinTemplate.builder("run {\nval x = 1\nrequire(#{any(kotlin.Boolean)})\nx + 1\n}")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun test() {
+                      val v = check(true)
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun test() {
+                      val v = run {
+                          val x = 1
+                          require(true)
+                          x + 1
+                      }
+                  }
+              }
+              """
+          ));
+    }
 }
