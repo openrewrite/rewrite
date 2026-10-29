@@ -2073,7 +2073,8 @@ describe('AddImport visitor', () => {
 
         test.each([
             `import * as z from 'zod';`,
-            `import z from 'zod';`
+            `import z from 'zod';`,
+            `import {ZodError} from 'zod'; import * as z from 'zod';`
         ])('should not add import for zod z already bound by %s (with onlyIfReferenced)', async (existingImport) => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: "zod", member: "z", onlyIfReferenced: true}));

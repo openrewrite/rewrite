@@ -1364,7 +1364,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 found = true;
                             }
                         }
-                        else if (type && Type.isClass(type)) {
+                        else if (!alreadyBound && type && Type.isClass(type)) {
                             if (self.classTypeMatchesModule(type as Type.Class, expectedDeclaringType) ||
                                 self.classTypeMatchesModule(type as Type.Class, targetModule)) {
                                 found = true;
