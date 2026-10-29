@@ -8,7 +8,7 @@ import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -1352,7 +1352,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         const collector = new class extends JavaScriptVisitor<void> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
-                if (identifier.simpleName === targetName) {
+                if (identifier.simpleName === targetName && isFree(this.cursor, identifier)) {
                     const type = identifier.type;
                     const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {

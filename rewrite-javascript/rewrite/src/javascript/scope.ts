@@ -1076,6 +1076,15 @@ export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined
 }
 
 /**
+ * Whether the identifier reads a name nothing in the file binds where it stands, a global or nothing
+ * at all. An identifier that names rather than reads is not free. The cursor is as {@link resolve} takes it.
+ */
+export function isFree(cursor: Cursor, identifier: J.Identifier): boolean {
+    const [scopes, reading] = position(pathTo(cursor, identifier), identifier);
+    return reading !== undefined && bindingFrame(scopes, identifier.simpleName, reading) === undefined;
+}
+
+/**
  * Whether the identifier is assigned to where it stands. An assignment's target, plain or compound,
  * is, and so are the operand of `++` or `--`, the head of a for-in or for-of declaring nothing, and
  * a name in such a target's destructuring pattern. A write resolves as a value read, since

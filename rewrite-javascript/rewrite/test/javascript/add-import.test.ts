@@ -1158,6 +1158,26 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should not add import for a module member a dynamic import binds locally', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'writeFile'}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export async function write() {
+                            const {writeFile} = await import('fs');
+                            writeFile('test.txt', '', () => {});
+                            readFile('test.txt', () => {});
+                        }
+                    `
+                )
+            );
+        });
+
         test('should detect usage in field access', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
@@ -2114,6 +2134,44 @@ describe('AddImport visitor', () => {
                                 }
                             `
                         ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test.each([
+            [`top level`, `
+                const {z} = await import('zod');
+                export const s = z.string();
+            `],
+            [`a function`, `
+                export async function schema() {
+                    const {z} = await import('zod');
+                    return z.string();
+                }
+            `]
+        ])('should not add import for zod z bound by a dynamic import at %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'z', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(source),
                         //language=json
                         packageJson(
                             `
