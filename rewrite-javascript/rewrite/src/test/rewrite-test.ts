@@ -231,11 +231,6 @@ export class RecipeSpec {
         // }
     }
 
-    /**
-     * Runs the recipe until a cycle changes nothing, at most `cycles` times. The change from each source to its
-     * version after the expected cycles is what the test checks, and a cycle after those that changes anything
-     * is unsettled.
-     */
     private async runCycles(sources: SourceFile[], cycles: number, expectedCycles: number):
         Promise<{ changeset: Result[], unsettled?: { cycle: number, changes: Result[] } }> {
         const lineages: { origin?: SourceFile, latest?: SourceFile }[] = sources.map(s => ({origin: s, latest: s}));
@@ -272,10 +267,7 @@ export class RecipeSpec {
         return {changeset: changeset ?? changesetOf()};
     }
 
-    /**
-     * Data tables are written by the first cycle only, as in Java, so a later run reads the test's context
-     * without adding rows to it.
-     */
+    /** Data tables are written by the first cycle only, as in Java. */
     private laterRunContext(): ExecutionContext {
         const messages = {...this.recipeExecutionContext.messages};
         delete messages[DATA_TABLE_STORE];
@@ -336,7 +328,6 @@ export class RecipeSpec {
             let i = 0;
             try {
                 for await (const reparsed of group[0][0]!.parser(this.executionContext).parse(...inputs)) {
-                    // A parser that does not reproduce the text says nothing about what the next run reads
                     if (!isParseError(reparsed) && await printSanitized(reparsed) === inputs[i].text) {
                         // What the source file carries, like its styles, comes from outside its text
                         reparsedByFinal.set(group[i][1], {...reparsed, markers: group[i][1].markers});
@@ -344,7 +335,7 @@ export class RecipeSpec {
                     i++;
                 }
             } catch {
-                // the LST the recipe produced has to stand in for what does not parse
+                // files that do not parse again keep the LST the recipe produced
             }
         }
         if (reparsedByFinal.size === 0) {
