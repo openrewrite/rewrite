@@ -4502,6 +4502,7 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void keepTrailingCommentWhenAppendingToSequenceOfMappings() {
         rewriteRun(
@@ -4602,6 +4603,7 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
     @ParameterizedTest
     @MethodSource("insertIntoCommentedSequenceOptions")
     void keepInlineCommentWhenInsertingIntoSequence(MergeYaml.InsertMode insertMode, String insertProperty) {
@@ -4642,6 +4644,7 @@ class MergeYamlTest implements RewriteTest {
           arguments(Before, "deploy")
         );
     }
+
     @Test
     void keepTrailingCommentWhenAppendingSeveralEntries() {
         rewriteRun(
@@ -4672,6 +4675,42 @@ class MergeYamlTest implements RewriteTest {
                 y: 2
                 z: 3
               b: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppending() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
               """
           )
         );

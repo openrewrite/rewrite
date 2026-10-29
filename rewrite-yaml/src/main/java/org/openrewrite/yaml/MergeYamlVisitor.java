@@ -32,12 +32,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
@@ -299,10 +297,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return m1.withEntries(mutatedEntries.ls);
     }
 
-    /**
-     * Finds the inline comment on the last line of the block being merged into and schedules its removal
-     * from the element that stores it, so that it can be copied onto a newly appended element instead.
-     */
     private String takeTrailingComment() {
         // The trailing comment belongs to the next sibling of the nearest ancestor
         // with a following entry, which need not be the last entry in that mapping.
@@ -337,17 +331,21 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
         }
 
-        if (!comment.isEmpty()) {
-            if (commentOwner == null) {
-                c.putMessage(REMOVE_PREFIX, true);
-            } else {
-                List<UUID> entries = c.getMessage(REMOVE_ENTRY_PREFIX);
-                if (entries == null) {
-                    entries = new ArrayList<>();
-                    c.putMessage(REMOVE_ENTRY_PREFIX, entries);
-                }
-                entries.add(commentOwner.getId());
+        if (comment.isEmpty()) {
+            return comment;
+        }
+        // A merged sequence entry and the entries appended after it reach for the same comment
+        if (commentOwner == null) {
+            if (c.getMessage(REMOVE_PREFIX, false)) {
+                return "";
             }
+            c.putMessage(REMOVE_PREFIX, true);
+        } else {
+            List<UUID> owners = c.computeMessageIfAbsent(REMOVE_ENTRY_PREFIX, k -> new ArrayList<>());
+            if (owners.contains(commentOwner.getId())) {
+                return "";
+            }
+            owners.add(commentOwner.getId());
         }
         return comment;
     }
@@ -447,41 +445,41 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return s1.withEntries(keepInlineCommentOnItsLine(s1, entries));
     }
 
-    /**
-     * An inline comment is stored on the prefix of the element that follows it, so inserting entries
-     * after a commented entry would otherwise push the comment down onto the last inserted entry.
-     */
+    /// An inline comment is stored on the prefix of the element that follows it, so inserting entries
+    /// after a commented entry would otherwise push the comment down onto the last inserted entry.
     private List<Yaml.Sequence.Entry> keepInlineCommentOnItsLine(Yaml.Sequence s1, List<Yaml.Sequence.Entry> merged) {
-        if (s1.getOpeningBracketPrefix() != null) {
+        List<Yaml.Sequence.Entry> existing = s1.getEntries();
+        if (s1.getOpeningBracketPrefix() != null || merged.size() == existing.size()) {
             return merged;
         }
-        Set<UUID> existingIds = s1.getEntries().stream().map(Yaml.Sequence.Entry::getId).collect(toSet());
         int firstNew = 0;
-        while (firstNew < merged.size() && existingIds.contains(merged.get(firstNew).getId())) {
+        while (firstNew < merged.size() && existing.contains(merged.get(firstNew))) {
             firstNew++;
         }
-        if (firstNew == merged.size()) {
-            return merged;
-        }
         int afterNew = firstNew;
-        while (afterNew < merged.size() && !existingIds.contains(merged.get(afterNew).getId())) {
+        while (afterNew < merged.size() && !existing.contains(merged.get(afterNew))) {
             afterNew++;
+        }
+        if (firstNew == afterNew) {
+            return merged;
         }
 
         String comment;
-        List<Yaml.Sequence.Entry> result = new ArrayList<>(merged);
         if (afterNew < merged.size()) {
-            Yaml.Sequence.Entry after = merged.get(afterNew);
-            comment = inlineCommentOf(after.getPrefix());
-            result.set(afterNew, after.withPrefix(removeInlineComment(after.getPrefix())));
-        } else if (firstNew > 0 && !getCursor().isRoot() &&
-                   merged.get(firstNew - 1).equals(s1.getEntries().get(s1.getEntries().size() - 1))) {
+            comment = inlineCommentOf(merged.get(afterNew).getPrefix());
+        } else if (firstNew > 0 && !getCursor().isRoot() && merged.get(firstNew - 1).equals(existing.get(existing.size() - 1))) {
             comment = takeTrailingComment();
         } else {
             return merged;
         }
         if (comment.isEmpty()) {
             return merged;
+        }
+
+        List<Yaml.Sequence.Entry> result = new ArrayList<>(merged);
+        if (afterNew < merged.size()) {
+            Yaml.Sequence.Entry after = merged.get(afterNew);
+            result.set(afterNew, after.withPrefix(removeInlineComment(after.getPrefix())));
         }
         Yaml.Sequence.Entry first = merged.get(firstNew);
         result.set(firstNew, first.withPrefix(comment + first.getPrefix()));
