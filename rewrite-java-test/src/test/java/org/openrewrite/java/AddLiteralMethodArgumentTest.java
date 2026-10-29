@@ -62,6 +62,21 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
     }
 
     @Test
+    void addToFirstArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int)", 0, -1, "int")),
+          java(
+            "class A {{ B.foo(1); }}",
+            "class A {{ B.foo(-1, 1); }}"
+          ),
+          java(
+            "class C {{ B.foo(\n    1); }}",
+            "class C {{ B.foo(\n    -1, 1); }}"
+          )
+        );
+    }
+
+    @Test
     void addToMiddleArgumentAsString() {
         rewriteRun(
           spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int, int)", 1, "-1", "int")),

@@ -140,7 +140,12 @@ public class AddLiteralMethodArgument extends Recipe {
                     literalType = parsed == null ? primitive : (JavaType.Primitive) parsed[1];
                 }
 
-                Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, value, valueSource, null, literalType);
+                Space prefix = args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE;
+                if (argumentIndex < args.size()) {
+                    prefix = args.get(argumentIndex).getPrefix();
+                    args.set(argumentIndex, args.get(argumentIndex).withPrefix(Space.SINGLE_SPACE));
+                }
+                Expression literal = new J.Literal(randomId(), prefix, Markers.EMPTY, value, valueSource, null, literalType);
                 m = m.withArguments(ListUtils.insert(args, literal, argumentIndex));
 
                 JavaType.Method methodType = m.getMethodType();
