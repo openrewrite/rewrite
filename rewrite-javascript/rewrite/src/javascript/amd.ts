@@ -644,6 +644,11 @@ function queuedFor(visitor: JavaScriptVisitor<any>, blockId: UUID): AddAmdDepend
     return visitor.afterVisit.filter((v): v is AddAmdDependency<any> => v instanceof AddAmdDependency && v.blockId === blockId);
 }
 
+/** Whether `scope` is where the factory's parameters are declared, which for an arrow is the arrow wrapping its lambda. */
+function declaresParameters(scope: J | undefined, factory: J.MethodDeclaration | J.Lambda): boolean {
+    return scope === factory || (scope?.kind === JS.Kind.ArrowFunction && (scope as JS.ArrowFunction).lambda === factory);
+}
+
 /**
  * A local binding for `module` on the AMD lane, creating one where the block does not already
  * have it, or `undefined` where no safe binding exists.
@@ -673,7 +678,7 @@ export function bindAmd(
         // block — on the `define` call, or on its dependency array — has nothing to measure.
         const cursor = cursorOf(visitor);
         const withinFactory = cursor?.firstEnclosing((v): v is J => v === amd.block.factory);
-        if (withinFactory === undefined || scopeOf(cursor!).declaringScope(bound) === amd.block.factory) {
+        if (withinFactory === undefined || declaresParameters(scopeOf(cursor!).declaringScope(bound), amd.block.factory)) {
             return bound;
         }
     }

@@ -287,8 +287,6 @@ describe("maybeBind", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
-        // A second cycle misses the arrow factory's own parameter and appends the dependency again
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], (B) => target());`,
             `sap.ui.define(["a/B", "sap/ui/core/Element"], (B, Element) => Element.target());`
@@ -303,6 +301,17 @@ describe("maybeBind", () => {
         await spec.rewriteRun(javascript(
             `sap.ui.define(["sap/ui/core/Element"], function (Elem) { target(); });`,
             `sap.ui.define(["sap/ui/core/Element"], function (Elem) { Elem.target(); });`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
+    test("AMD reuses an existing dependency's parameter of an arrow factory", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/ui/core/Element"], (Elem) => target());`,
+            `sap.ui.define(["sap/ui/core/Element"], (Elem) => Elem.target());`
         ));
         expect(bound.name).toBe("Elem");
     });
