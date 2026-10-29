@@ -304,6 +304,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         Cursor c = child.getParentOrThrow();
         Yaml.Mapping.Entry commentOwner = null;
         while (!(c.getValue() instanceof Yaml.Document) && !ROOT_VALUE.equals(c.getValue())) {
+            if (c.getValue() instanceof Yaml.Sequence && child.getValue() instanceof Yaml.Sequence.Entry &&
+                    !isLastEntry((Yaml.Sequence) c.getValue(), child.getValue())) {
+                // The comment is on the prefix of the following sequence entry, which nothing here can remove
+                return "";
+            }
             if (c.getValue() instanceof Yaml.Mapping && child.getValue() instanceof Yaml.Mapping.Entry) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
                 Yaml.Mapping.Entry ancestor = child.getValue();
@@ -348,6 +353,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             owners.add(commentOwner.getId());
         }
         return comment;
+    }
+
+    private static boolean isLastEntry(Yaml.Sequence sequence, Yaml.Sequence.Entry entry) {
+        List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+        return entries.get(entries.size() - 1).getId().equals(entry.getId());
     }
 
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {

@@ -4715,4 +4715,116 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppendingFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].tags",
+            //language=yaml
+            """
+              - y
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                    - y
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].cfg",
+            //language=yaml
+            """
+              y: 2
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                    y: 2
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
 }
