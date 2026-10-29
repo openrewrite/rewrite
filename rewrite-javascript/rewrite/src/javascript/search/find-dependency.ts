@@ -163,6 +163,9 @@ export class FindDependency extends Recipe {
             private async markDependency(member: Json.Member, ctx: ExecutionContext): Promise<Json.Member> {
                 const visitedMember = await super.visitMember(member, ctx) as Json.Member;
                 const markedKey = foundSearchResult(visitedMember.key.element);
+                if (markedKey === visitedMember.key.element) {
+                    return visitedMember;
+                }
                 return {
                     ...visitedMember,
                     key: {

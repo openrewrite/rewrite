@@ -28,8 +28,6 @@ describe("FindDependency", () => {
     test("should find direct dependency", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "lodash"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -57,8 +55,6 @@ describe("FindDependency", () => {
     test("should find dev dependency", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "typescript"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -108,8 +104,6 @@ describe("FindDependency", () => {
     test("should find dependency with glob pattern", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "lod*"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -137,8 +131,6 @@ describe("FindDependency", () => {
     test("should find scoped package with glob pattern", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "@types/*"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -167,8 +159,6 @@ describe("FindDependency", () => {
         // *node* should match @types/node because we normalize * to ** for patterns without /
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "*node*"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -196,8 +186,6 @@ describe("FindDependency", () => {
     test("should match version constraint", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "lodash", version: ">=4.0.0"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -277,8 +265,6 @@ describe("FindDependency", () => {
     test("should find peer dependency", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "react"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -306,8 +292,6 @@ describe("FindDependency", () => {
     test("should find optional dependency", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "fsevents"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -335,8 +319,6 @@ describe("FindDependency", () => {
     test("should find multiple matching dependencies", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new FindDependency({packageName: "@types/*"});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
@@ -367,8 +349,6 @@ describe("FindDependency", () => {
         const spec = new RecipeSpec();
         // Search for "is-number" which is a transitive dependency of "is-odd"
         spec.recipe = new FindDependency({packageName: "is-number", onlyDirect: false});
-        // A second cycle rebuilds the marked member although its marker is already there
-        spec.cycles = 1;
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(
