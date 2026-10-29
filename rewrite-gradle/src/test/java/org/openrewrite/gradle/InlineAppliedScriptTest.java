@@ -31,7 +31,7 @@ class InlineAppliedScriptTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new InlineAppliedScript(null, null, null, null, null));
+        spec.recipe(new InlineAppliedScript(null));
     }
 
     @DocumentExample
@@ -256,40 +256,6 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void onlyScriptsMatchingFilePattern() {
-        rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript("**/dependencies.gradle", null, null, null, null)),
-          buildGradle(
-            """
-              apply from: 'gradle/publishing.gradle'
-              apply from: 'dependencies.gradle'
-              """,
-            """
-              apply from: 'gradle/publishing.gradle'
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-              """
-          ),
-          buildGradle(
-            """
-              apply plugin: 'maven-publish'
-              """,
-            spec -> spec.path("gradle/publishing.gradle")
-          ),
-          buildGradle(
-            """
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-              """,
-            null,
-            spec -> spec.path("dependencies.gradle")
-          )
-        );
-    }
-
-    @Test
     void doesNotInlineUnappliedScript() {
         rewriteRun(
           buildGradle(
@@ -311,7 +277,7 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void sharedScriptLeftAloneByDefault() {
+    void sharedScriptLeftAlone() {
         rewriteRun(
           buildGradle(
             """
@@ -324,77 +290,6 @@ class InlineAppliedScriptTest implements RewriteTest {
               apply from: "$rootDir/gradle/common.gradle"
               """,
             spec -> spec.path("b/build.gradle")
-          ),
-          buildGradle(
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            spec -> spec.path("gradle/common.gradle")
-          )
-        );
-    }
-
-    @Test
-    void sharedScriptInlinedWhenOptedIn() {
-        rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, true, null, null, null)),
-          buildGradle(
-            """
-              apply from: "$rootDir/gradle/common.gradle"
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            spec -> spec.path("a/build.gradle")
-          ),
-          buildGradle(
-            """
-              apply from: "$rootDir/gradle/common.gradle"
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            spec -> spec.path("b/build.gradle")
-          ),
-          buildGradle(
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            null,
-            spec -> spec.path("gradle/common.gradle")
-          )
-        );
-    }
-
-    @Test
-    void keepsScriptStillAppliedFromElsewhere() {
-        rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, true, null, null, null)),
-          buildGradle(
-            """
-              apply from: "$rootDir/gradle/common.gradle"
-              """,
-            """
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            spec -> spec.path("a/build.gradle")
-          ),
-          buildGradle(
-            """
-              subprojects {
-                  apply from: "$rootDir/gradle/common.gradle"
-              }
-              """
           ),
           buildGradle(
             """
@@ -619,9 +514,9 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void pluginAppliedScriptAfterPluginsBlock() {
+    void pluginAppendsScriptsInProjectDirectory() {
         rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, null)),
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
           buildGradle(
             """
               plugins {
@@ -629,8 +524,8 @@ class InlineAppliedScriptTest implements RewriteTest {
                   id 'com.example.dependencies' version '1.0'
               }
 
-              repositories {
-                  mavenCentral()
+              tasks.named('test') {
+                  useJUnitPlatform()
               }
               """,
             """
@@ -639,12 +534,59 @@ class InlineAppliedScriptTest implements RewriteTest {
                   id 'com.example.dependencies' version '1.0'
               }
 
+              tasks.named('test') {
+                  useJUnitPlatform()
+              }
+
               dependencies {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
 
               repositories {
                   mavenCentral()
+              }
+              """
+          ),
+          buildGradle(
+            """
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            null,
+            spec -> spec.path("repositories.gradle")
+          ),
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.slf4j:slf4j-api:2.0.13'
+              }
+              """,
+            null,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              ext.slf4jVersion = '2.0.13'
+              """,
+            spec -> spec.path("gradle/versions.gradle")
+          )
+        );
+    }
+
+    @Test
+    void pluginAppliedWithApplyPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
+          buildGradle(
+            """
+              apply plugin: 'com.example.dependencies'
+              """,
+            """
+              apply plugin: 'com.example.dependencies'
+
+              dependencies {
+                  implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """
           ),
@@ -661,62 +603,22 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void pluginAppliedScriptAfterApplyPlugin() {
+    void pluginAppliedFromElsewhere() {
         rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, null)),
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
           buildGradle(
             """
-              apply plugin: 'java'
-              apply plugin: 'com.example.dependencies'
-
               repositories {
                   mavenCentral()
               }
               """,
             """
-              apply plugin: 'java'
-              apply plugin: 'com.example.dependencies'
-
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-
               repositories {
                   mavenCentral()
               }
-              """
-          ),
-          buildGradle(
-            """
+
               dependencies {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-              """,
-            null,
-            spec -> spec.path("dependencies.gradle")
-          )
-        );
-    }
-
-    @Test
-    void pluginAppliedFromElsewhereInlinedAtTop() {
-        rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, null)),
-          buildGradle(
-            """
-              // Module build
-              repositories {
-                  mavenCentral()
-              }
-              """,
-            """
-              // Module build
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-
-              repositories {
-                  mavenCentral()
               }
               """,
             spec -> spec.path("app/build.gradle").markers(GradleProject.builder()
@@ -738,14 +640,16 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void pluginAppliedScriptAtEnd() {
+    void pluginAndApplyFrom() {
         rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, InlineAppliedScript.Position.END)),
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
           buildGradle(
             """
               plugins {
                   id 'com.example.dependencies' version '1.0'
               }
+
+              apply from: 'publishing.gradle'
 
               repositories {
                   mavenCentral()
@@ -756,6 +660,8 @@ class InlineAppliedScriptTest implements RewriteTest {
                   id 'com.example.dependencies' version '1.0'
               }
 
+              apply plugin: 'maven-publish'
+
               repositories {
                   mavenCentral()
               }
@@ -764,6 +670,13 @@ class InlineAppliedScriptTest implements RewriteTest {
                   implementation 'org.slf4j:slf4j-api:2.0.13'
               }
               """
+          ),
+          buildGradle(
+            """
+              apply plugin: 'maven-publish'
+              """,
+            null,
+            spec -> spec.path("publishing.gradle")
           ),
           buildGradle(
             """
@@ -778,41 +691,9 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void customPluginAppliedScript() {
-        rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", "gradle/deps.gradle", null)),
-          buildGradle(
-            """
-              plugins {
-                  id 'com.example.dependencies' version '1.0'
-              }
-              """,
-            """
-              plugins {
-                  id 'com.example.dependencies' version '1.0'
-              }
-
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-              """
-          ),
-          buildGradle(
-            """
-              dependencies {
-                  implementation 'org.slf4j:slf4j-api:2.0.13'
-              }
-              """,
-            null,
-            spec -> spec.path("gradle/deps.gradle")
-          )
-        );
-    }
-
-    @Test
     void pluginNotApplied() {
         rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, null)),
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
           buildGradle(
             """
               plugins {
@@ -832,9 +713,9 @@ class InlineAppliedScriptTest implements RewriteTest {
     }
 
     @Test
-    void pluginAppliedKotlinScript() {
+    void pluginAppendsKotlinScript() {
         rewriteRun(
-          spec -> spec.recipe(new InlineAppliedScript(null, null, "com.example.dependencies", null, null)),
+          spec -> spec.recipe(new InlineAppliedScript("com.example.dependencies")),
           buildGradleKts(
             """
               plugins {
@@ -850,12 +731,12 @@ class InlineAppliedScriptTest implements RewriteTest {
                   id("com.example.dependencies") version "1.0"
               }
 
-              dependencies {
-                  "implementation"("org.slf4j:slf4j-api:2.0.13")
-              }
-
               repositories {
                   mavenCentral()
+              }
+
+              dependencies {
+                  "implementation"("org.slf4j:slf4j-api:2.0.13")
               }
               """
           ),

@@ -32,6 +32,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
@@ -39,53 +41,14 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accumulator> {
 
-    @Option(displayName = "File pattern",
-            description = "A glob matching the paths of applied scripts that may be inlined. When omitted, every script " +
-                          "applied with `apply from` is a candidate.",
-            example = "**/dependencies.gradle",
-            required = false)
-    @Nullable
-    String filePattern;
-
-    @Option(displayName = "Inline shared scripts",
-            description = "Inline a script that is applied from more than one place into each build file that applies " +
-                          "it. Defaults to `false`, since this duplicates the script's contents.",
-            required = false)
-    @Nullable
-    Boolean inlineSharedScripts;
-
-    @Option(displayName = "Applied by plugin",
-            description = "The ID of a plugin that applies a script from the project directory itself, so that no " +
-                          "`apply from` appears in the build file. Build files applying this plugin have that script " +
-                          "inlined too.",
+    @Option(displayName = "Plugin ID",
+            description = "The ID of a plugin that applies the other `.gradle` or `.gradle.kts` scripts in a project's " +
+                          "directory itself, so that no `apply from` appears in the build file. When a project applies " +
+                          "this plugin, those scripts are appended to the end of its build file and deleted.",
             example = "com.example.dependencies",
             required = false)
     @Nullable
-    String appliedByPlugin;
-
-    @Option(displayName = "Plugin applied script",
-            description = "The path, relative to the project directory, of the script applied by `appliedByPlugin`. " +
-                          "Defaults to `dependencies.gradle`, or `dependencies.gradle.kts` for a Kotlin build file.",
-            example = "dependencies.gradle",
-            required = false)
-    @Nullable
-    String pluginAppliedScript;
-
-    @Option(displayName = "Plugin applied script position",
-            description = "Where to inline the script applied by `appliedByPlugin`, which has no `apply from` statement " +
-                          "to replace. `AFTER_PLUGINS`, the default, places it right after the statement applying the " +
-                          "plugin, or after the `buildscript` and `plugins` blocks, matching a plugin that applies the " +
-                          "script as soon as it is applied. `END` places it at the end of the build file, matching a " +
-                          "plugin that applies the script in `afterEvaluate`.",
-            valid = {"AFTER_PLUGINS", "END"},
-            required = false)
-    @Nullable
-    Position pluginAppliedScriptPosition;
-
-    public enum Position {
-        AFTER_PLUGINS,
-        END
-    }
+    String pluginId;
 
     String displayName = "Inline applied Gradle scripts";
 
@@ -96,13 +59,14 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                          "edit them. A script is left alone when inlining could change behavior: when its path cannot " +
                          "be resolved statically, it is applied inside a closure or with `to:`, it has a top-level " +
                          "`return` or its own `buildscript` or `plugins` block, it declares names that collide with " +
-                         "the build file's, or it is written in a different DSL than the build file. A script applied by a plugin, " +
-                         "rather than with `apply from`, can be inlined too by naming the plugin in `appliedByPlugin`.";
+                         "the build file's, it is applied from more than one place, or it is written in a different " +
+                         "DSL than the build file.";
 
     public static class Accumulator {
         final Map<Path, GradleFile> files = new HashMap<>();
         final Set<Path> settingsDirs = new HashSet<>();
         final Set<Path> ambiguousApplyPaths = new HashSet<>();
+        final Map<Path, List<ApplySite>> appendedSites = new HashMap<>();
 
         @Nullable
         Plan plan;
@@ -132,9 +96,10 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
         List<ApplySite> applySites;
         Set<String> declaredNames;
         boolean selfContained;
+        boolean appliesPlugin;
 
         /**
-         * Printed source, kept only for scripts matching {@link #filePattern}.
+         * Printed source, kept only for scripts.
          */
         @Nullable
         String source;
@@ -150,11 +115,6 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
         ScriptLocation location;
 
         boolean inlinable;
-
-        /**
-         * Applied by {@link #appliedByPlugin} rather than by a statement.
-         */
-        boolean implicit;
     }
 
     @Value
@@ -201,17 +161,11 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 }
                 ScriptAnalysis analysis = new ScriptAnalysis();
                 analysis.visit(cu, ctx);
-                if (kind == Kind.BUILD && appliedByPlugin != null && appliesPlugin(cu, ctx)) {
-                    String script = pluginAppliedScript != null ? pluginAppliedScript :
-                            cu instanceof K.CompilationUnit ? "dependencies.gradle.kts" : "dependencies.gradle";
-                    analysis.applySites.add(new ApplySite(location(Base.PROJECT_DIR, script), true, true));
-                }
                 for (ApplySite site : analysis.applySites) {
                     if (!site.isInlinable() && site.getLocation() != null && site.getLocation().getBase() == Base.PROJECT_DIR) {
                         acc.ambiguousApplyPaths.add(Paths.get(site.getLocation().getPath()).normalize());
                     }
                 }
-                boolean candidate = kind == Kind.SCRIPT && (filePattern == null || PathUtils.matchesGlob(path, filePattern));
                 acc.files.put(path, new GradleFile(
                         path,
                         kind,
@@ -219,18 +173,19 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                         analysis.applySites,
                         analysis.declaredNames,
                         analysis.selfContained,
-                        candidate ? cu.printAll() : null));
+                        kind == Kind.BUILD && pluginId != null && appliesPlugin(cu, ctx),
+                        kind == Kind.SCRIPT ? cu.printAll() : null));
                 return tree;
             }
         };
     }
 
     private boolean appliesPlugin(JavaSourceFile cu, ExecutionContext ctx) {
-        if (new FindPlugins(requireNonNull(appliedByPlugin), null).getVisitor().visit(cu, ctx) != cu) {
+        if (new FindPlugins(requireNonNull(pluginId), null).getVisitor().visit(cu, ctx) != cu) {
             return true;
         }
         for (Statement statement : topLevel(cu)) {
-            if (isApplyPlugin(statement, requireNonNull(appliedByPlugin))) {
+            if (isApplyPlugin(statement, requireNonNull(pluginId))) {
                 return true;
             }
         }
@@ -346,48 +301,15 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
 
                 List<JRightPadded<Statement>> inline(List<JRightPadded<Statement>> statements) {
                     List<JRightPadded<Statement>> result = expand(statements);
-                    for (ApplySite site : buildFile.getApplySites()) {
-                        if (site.isImplicit() && site.getLocation() != null) {
-                            Path target = site.getLocation().resolve(projectDir, rootDir);
-                            if (targets.contains(target)) {
-                                result = insert(result, expand(scriptBody(parse(target), imports)));
-                            }
+                    for (ApplySite site : acc.appendedSites.getOrDefault(buildFile.getPath(), emptyList())) {
+                        Path target = requireNonNull(site.getLocation()).resolve(projectDir, rootDir);
+                        if (targets.contains(target)) {
+                            Space leading = result.isEmpty() ? Space.EMPTY : Space.format("\n\n");
+                            List<JRightPadded<Statement>> body = expand(scriptBody(parse(target), imports));
+                            result = ListUtils.concatAll(result, ListUtils.mapFirst(body,
+                                    first -> first.map(s -> s.withPrefix(merge(leading, s.getPrefix())))));
                         }
                     }
-                    return result;
-                }
-
-                private List<JRightPadded<Statement>> insert(List<JRightPadded<Statement>> statements,
-                                                             List<JRightPadded<Statement>> body) {
-                    if (body.isEmpty()) {
-                        return statements;
-                    }
-                    int at = statements.size();
-                    if (pluginAppliedScriptPosition != Position.END) {
-                        at = 0;
-                        for (int i = 0; i < statements.size(); i++) {
-                            Statement s = statements.get(i).getElement();
-                            if (isApplyPlugin(s, requireNonNull(appliedByPlugin))) {
-                                at = i + 1;
-                                break;
-                            } else if (s instanceof J.Import || (s instanceof J.MethodInvocation &&
-                                       ("buildscript".equals(((J.MethodInvocation) s).getSimpleName()) ||
-                                        "plugins".equals(((J.MethodInvocation) s).getSimpleName())))) {
-                                at = i + 1;
-                            }
-                        }
-                    }
-                    List<JRightPadded<Statement>> result = new ArrayList<>(statements);
-                    Space separator = Space.format("\n\n");
-                    if (at == 0 && !statements.isEmpty()) {
-                        Space leading = statements.get(0).getElement().getPrefix();
-                        result.set(0, statements.get(0).map(s -> s.withPrefix(separator)));
-                        body = ListUtils.mapFirst(body, first -> first.map(s -> s.withPrefix(merge(leading, s.getPrefix()))));
-                    } else {
-                        Space leading = statements.isEmpty() ? Space.EMPTY : separator;
-                        body = ListUtils.mapFirst(body, first -> first.map(s -> s.withPrefix(merge(leading, s.getPrefix()))));
-                    }
-                    result.addAll(at, body);
                     return result;
                 }
 
@@ -519,6 +441,24 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 countReferences(acc, file, file.projectDir(), rootDir(acc, file.getPath()), references, perBuildFile, reached, new HashSet<>());
             }
         }
+        // The plugin applies every other script in the project directory not already applied from somewhere
+        for (GradleFile buildFile : acc.files.values()) {
+            if (buildFile.isAppliesPlugin()) {
+                List<ApplySite> appended = new ArrayList<>();
+                for (GradleFile script : acc.files.values()) {
+                    if (script.getKind() == Kind.SCRIPT && script.projectDir().equals(buildFile.projectDir()) &&
+                        !reached.contains(script.getPath())) {
+                        appended.add(new ApplySite(location(Base.PROJECT_DIR, script.getPath().getFileName().toString()), true));
+                    }
+                }
+                appended.sort(Comparator.comparing(site -> requireNonNull(site.getLocation()).getPath()));
+                acc.appendedSites.put(buildFile.getPath(), appended);
+                GradleFile withAppended = new GradleFile(buildFile.getPath(), buildFile.getKind(), buildFile.getDsl(),
+                        appended, emptySet(), true, true, null);
+                countReferences(acc, withAppended, buildFile.projectDir(), rootDir(acc, buildFile.getPath()), references,
+                        referencesPerBuildFile.computeIfAbsent(buildFile.getPath(), p -> new HashMap<>()), reached, new HashSet<>());
+            }
+        }
         // A script applied only from somewhere this recipe could not follow still applies whatever it applies
         for (GradleFile file : acc.files.values()) {
             if (file.getKind() == Kind.SCRIPT && !reached.contains(file.getPath())) {
@@ -533,8 +473,8 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 Set<Path> inlined = new HashSet<>();
                 Set<String> names = new HashSet<>(buildFile.getDeclaredNames());
                 Path rootDir = rootDir(acc, buildFile.getPath());
-                decide(acc, buildFile, buildFile, true, rootDir, references, referencesPerBuildFile.get(buildFile.getPath()),
-                        names, inlined, inlinedReferences, new HashSet<>());
+                decide(acc, buildFile, sites(acc, buildFile), true, rootDir, references,
+                        referencesPerBuildFile.get(buildFile.getPath()), names, inlined, inlinedReferences, new HashSet<>());
                 if (!inlined.isEmpty()) {
                     plan.inlinedInto.put(buildFile.getPath(), inlined);
                 }
@@ -568,10 +508,14 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
         }
     }
 
-    private void decide(Accumulator acc, GradleFile buildFile, GradleFile file, boolean fileInlined, Path rootDir,
-                        Map<Path, Integer> references, Map<Path, Integer> perBuildFile, Set<String> names,
-                        Set<Path> inlined, Map<Path, Integer> inlinedReferences, Set<Path> visiting) {
-        for (ApplySite site : file.getApplySites()) {
+    private static List<ApplySite> sites(Accumulator acc, GradleFile buildFile) {
+        return ListUtils.concatAll(buildFile.getApplySites(), acc.appendedSites.getOrDefault(buildFile.getPath(), emptyList()));
+    }
+
+    private static void decide(Accumulator acc, GradleFile buildFile, List<ApplySite> sites, boolean fileInlined, Path rootDir,
+                               Map<Path, Integer> references, Map<Path, Integer> perBuildFile, Set<String> names,
+                               Set<Path> inlined, Map<Path, Integer> inlinedReferences, Set<Path> visiting) {
+        for (ApplySite site : sites) {
             if (site.getLocation() == null) {
                 continue;
             }
@@ -587,19 +531,18 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
                 inlinedReferences.merge(target, 1, Integer::sum);
             }
             visiting.add(target);
-            decide(acc, buildFile, script, inline, rootDir, references, perBuildFile, names, inlined, inlinedReferences, visiting);
+            decide(acc, buildFile, script.getApplySites(), inline, rootDir, references, perBuildFile, names, inlined, inlinedReferences, visiting);
             visiting.remove(target);
         }
     }
 
-    private boolean canInline(Accumulator acc, GradleFile buildFile, GradleFile script, Map<Path, Integer> references,
-                              Map<Path, Integer> perBuildFile, Set<String> names) {
+    private static boolean canInline(Accumulator acc, GradleFile buildFile, GradleFile script, Map<Path, Integer> references,
+                                     Map<Path, Integer> perBuildFile, Set<String> names) {
         if (script.getSource() == null || script.getDsl() != buildFile.getDsl() || !script.isSelfContained()) {
             return false;
         }
         Path target = script.getPath();
-        if (perBuildFile.getOrDefault(target, 0) != 1 ||
-            (references.getOrDefault(target, 0) != 1 && !Boolean.TRUE.equals(inlineSharedScripts))) {
+        if (perBuildFile.getOrDefault(target, 0) != 1 || references.getOrDefault(target, 0) != 1) {
             return false;
         }
         for (Path ambiguous : acc.ambiguousApplyPaths) {
@@ -635,7 +578,7 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
             boolean topLevel = isTopLevel(getCursor());
             ApplySite site = applySite(method);
             if (site != null) {
-                applySites.add(topLevel ? site : new ApplySite(site.getLocation(), false, false));
+                applySites.add(topLevel ? site : new ApplySite(site.getLocation(), false));
             } else if (topLevel && ("buildscript".equals(method.getSimpleName()) ||
                                     "plugins".equals(method.getSimpleName()) ||
                                     "pluginManagement".equals(method.getSimpleName()))) {
@@ -729,7 +672,7 @@ public class InlineAppliedScript extends ScanningRecipe<InlineAppliedScript.Accu
             return null;
         }
         ScriptLocation location = location(from);
-        return new ApplySite(location, onlyFrom && location != null, false);
+        return new ApplySite(location, onlyFrom && location != null);
     }
 
     private static @Nullable ScriptLocation location(Expression expression) {
