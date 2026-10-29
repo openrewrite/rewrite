@@ -1415,6 +1415,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 found = true;
                             }
                         }
+                        // 4. References typed as the module's namespace object (e.g. `z` from zod)
+                        else if (type && Type.isClass(type) &&
+                            sameModule((type as Type.Class).fullyQualifiedName, targetModule)) {
+                            found = true;
+                        }
                     }
                 }
                 return super.visitIdentifier(identifier, p);
