@@ -327,6 +327,39 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Element_1");
     });
 
+    test("AMD avoids a global the factory body reads", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { return function (d) { return d instanceof Element ? target() : null; }; });`,
+            `sap.ui.define(["sap/ui/core/Element"], function (Element_1) { return function (d) { return d instanceof Element ? Element_1.target() : null; }; });`
+        ));
+        expect(bound.name).toBe("Element_1");
+    });
+
+    test("AMD avoids a global an expression-bodied arrow factory reads", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("my/lib/Object", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B"], (B) => Object.keys(target()));`,
+            `sap.ui.define(["a/B", "my/lib/Object"], (B, Object_1) => Object.keys(Object_1.target()));`
+        ));
+        expect(bound.name).toBe("Object_1");
+    });
+
+    test("AMD binds a pinned alias over a global the factory reads, since taking it over is the caller's intent", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind({module: "sap/ui/thirdparty/jquery", alias: "jQuery"}, bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define([], function () { jQuery('x'); target(); });`,
+            `sap.ui.define(["sap/ui/thirdparty/jquery"], function (jQuery) { jQuery('x'); jQuery.target(); });`
+        ));
+        expect(bound.name).toBe("jQuery");
+    });
+
     test("AMD avoids a name a destructuring pattern binds", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
