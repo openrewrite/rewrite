@@ -297,7 +297,6 @@ describe("Rewrite RPC", () => {
             text: "hello",
             sourcePath: "hello.txt"
         });
-        spec.cycles = 1;
         await spec.rewriteRun(
             {
                 ...text(
