@@ -4502,4 +4502,178 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappingsFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfScalars() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+              """
+          )
+        );
+    }
+    @ParameterizedTest
+    @MethodSource("insertIntoCommentedSequenceOptions")
+    void keepInlineCommentWhenInsertingIntoSequence(MergeYaml.InsertMode insertMode, String insertProperty) {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            insertMode,
+            insertProperty,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+                - deploy
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+                - deploy
+              """
+          )
+        );
+    }
+
+    static Stream<Arguments> insertIntoCommentedSequenceOptions() {
+        return Stream.of(
+          arguments(After, "build"),
+          arguments(Before, "deploy")
+        );
+    }
+    @Test
+    void keepTrailingCommentWhenAppendingSeveralEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              a:
+                y: 2
+                z: 3
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              a:
+                x: 1 # An awesome comment about this!
+              b: 2
+              """,
+            """
+              a:
+                x: 1 # An awesome comment about this!
+                y: 2
+                z: 3
+              b: 2
+              """
+          )
+        );
+    }
 }

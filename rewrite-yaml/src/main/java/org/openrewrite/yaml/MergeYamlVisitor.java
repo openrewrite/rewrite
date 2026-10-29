@@ -32,10 +32,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
@@ -281,53 +283,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     }
                 }
             } else {
-                // The trailing comment belongs to the next sibling of the nearest ancestor
-                // with a following entry, which need not be the last entry in that mapping.
-                Cursor child = getCursor();
-                Cursor c = child.getParentOrThrow();
-                Yaml.Mapping.Entry commentOwner = null;
-                while (!(c.getValue() instanceof Yaml.Document) && !ROOT_VALUE.equals(c.getValue())) {
-                    if (c.getValue() instanceof Yaml.Mapping && child.getValue() instanceof Yaml.Mapping.Entry) {
-                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
-                        Yaml.Mapping.Entry ancestor = child.getValue();
-                        for (int i = 0; i < entries.size() - 1; i++) {
-                            if (entries.get(i).getId().equals(ancestor.getId())) {
-                                commentOwner = entries.get(i + 1);
-                                break;
-                            }
-                        }
-                        if (commentOwner != null) {
-                            break;
-                        }
-                    }
-                    child = c;
-                    c = c.getParentOrThrow();
-                }
-
-                String comment = null;
-                if (commentOwner != null) {
-                    comment = inlineCommentOf(commentOwner.getPrefix());
-                } else if (c.getValue() instanceof Yaml.Document) {
-                    Yaml.Document doc = c.getValue();
-                    if (!preserveDocumentSeparator(doc)) {
-                        comment = inlineCommentOf(doc.getEnd().getPrefix());
-                    }
-                }
-
-                if (isNotEmpty(comment)) {
-                    // Copy comment to last mutated element AND put message on cursor to remove comment from original element
-                    Yaml.Mapping.Entry last = mutatedEntries.ls.get(mutatedEntries.ls.size() - 1);
-                    mutatedEntries.ls.set(mutatedEntries.ls.size() - 1, last.withPrefix(comment + last.getPrefix()));
-                    if (commentOwner == null) {
-                        c.putMessage(REMOVE_PREFIX, true);
-                    } else {
-                        List<UUID> entries = c.getMessage(REMOVE_ENTRY_PREFIX);
-                        if (entries == null) {
-                            entries = new ArrayList<>();
-                            c.putMessage(REMOVE_ENTRY_PREFIX, entries);
-                        }
-                        entries.add(commentOwner.getId());
-                    }
+                String comment = takeTrailingComment();
+                if (!comment.isEmpty()) {
+                    int firstNew = mutatedEntries.firstNewlyAddedItemIndex == -1 ? m1.getEntries().size() : mutatedEntries.firstNewlyAddedItemIndex;
+                    Yaml.Mapping.Entry first = mutatedEntries.ls.get(firstNew);
+                    mutatedEntries.ls.set(firstNew, first.withPrefix(comment + first.getPrefix()));
                 }
             }
         }
@@ -337,6 +297,59 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
 
         return m1.withEntries(mutatedEntries.ls);
+    }
+
+    /**
+     * Finds the inline comment on the last line of the block being merged into and schedules its removal
+     * from the element that stores it, so that it can be copied onto a newly appended element instead.
+     */
+    private String takeTrailingComment() {
+        // The trailing comment belongs to the next sibling of the nearest ancestor
+        // with a following entry, which need not be the last entry in that mapping.
+        Cursor child = getCursor();
+        Cursor c = child.getParentOrThrow();
+        Yaml.Mapping.Entry commentOwner = null;
+        while (!(c.getValue() instanceof Yaml.Document) && !ROOT_VALUE.equals(c.getValue())) {
+            if (c.getValue() instanceof Yaml.Mapping && child.getValue() instanceof Yaml.Mapping.Entry) {
+                List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
+                Yaml.Mapping.Entry ancestor = child.getValue();
+                for (int i = 0; i < entries.size() - 1; i++) {
+                    if (entries.get(i).getId().equals(ancestor.getId())) {
+                        commentOwner = entries.get(i + 1);
+                        break;
+                    }
+                }
+                if (commentOwner != null) {
+                    break;
+                }
+            }
+            child = c;
+            c = c.getParentOrThrow();
+        }
+
+        String comment = "";
+        if (commentOwner != null) {
+            comment = inlineCommentOf(commentOwner.getPrefix());
+        } else if (c.getValue() instanceof Yaml.Document) {
+            Yaml.Document doc = c.getValue();
+            if (!preserveDocumentSeparator(doc)) {
+                comment = inlineCommentOf(doc.getEnd().getPrefix());
+            }
+        }
+
+        if (!comment.isEmpty()) {
+            if (commentOwner == null) {
+                c.putMessage(REMOVE_PREFIX, true);
+            } else {
+                List<UUID> entries = c.getMessage(REMOVE_ENTRY_PREFIX);
+                if (entries == null) {
+                    entries = new ArrayList<>();
+                    c.putMessage(REMOVE_ENTRY_PREFIX, entries);
+                }
+                entries.add(commentOwner.getId());
+            }
+        }
+        return comment;
     }
 
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
@@ -399,7 +412,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 mutatedEntries.set(lastIdx, mutatedEntries.get(lastIdx).withTrailingCommaPrefix(null));
             }
 
-            return s1.withEntries(mutatedEntries);
+            return s1.withEntries(keepInlineCommentOnItsLine(s1, mutatedEntries));
         }
 
         if (objectIdentifyingProperty == null) {
@@ -431,7 +444,48 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     return entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue();
                 }).ls;
 
-        return s1.withEntries(entries);
+        return s1.withEntries(keepInlineCommentOnItsLine(s1, entries));
+    }
+
+    /**
+     * An inline comment is stored on the prefix of the element that follows it, so inserting entries
+     * after a commented entry would otherwise push the comment down onto the last inserted entry.
+     */
+    private List<Yaml.Sequence.Entry> keepInlineCommentOnItsLine(Yaml.Sequence s1, List<Yaml.Sequence.Entry> merged) {
+        if (s1.getOpeningBracketPrefix() != null) {
+            return merged;
+        }
+        Set<UUID> existingIds = s1.getEntries().stream().map(Yaml.Sequence.Entry::getId).collect(toSet());
+        int firstNew = 0;
+        while (firstNew < merged.size() && existingIds.contains(merged.get(firstNew).getId())) {
+            firstNew++;
+        }
+        if (firstNew == merged.size()) {
+            return merged;
+        }
+        int afterNew = firstNew;
+        while (afterNew < merged.size() && !existingIds.contains(merged.get(afterNew).getId())) {
+            afterNew++;
+        }
+
+        String comment;
+        List<Yaml.Sequence.Entry> result = new ArrayList<>(merged);
+        if (afterNew < merged.size()) {
+            Yaml.Sequence.Entry after = merged.get(afterNew);
+            comment = inlineCommentOf(after.getPrefix());
+            result.set(afterNew, after.withPrefix(removeInlineComment(after.getPrefix())));
+        } else if (firstNew > 0 && !getCursor().isRoot() &&
+                   merged.get(firstNew - 1).equals(s1.getEntries().get(s1.getEntries().size() - 1))) {
+            comment = takeTrailingComment();
+        } else {
+            return merged;
+        }
+        if (comment.isEmpty()) {
+            return merged;
+        }
+        Yaml.Sequence.Entry first = merged.get(firstNew);
+        result.set(firstNew, first.withPrefix(comment + first.getPrefix()));
+        return result;
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
