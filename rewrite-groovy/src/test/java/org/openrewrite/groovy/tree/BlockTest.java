@@ -74,17 +74,13 @@ class BlockTest implements RewriteTest {
             """
               if (true) { println(1);; }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                AtomicInteger empties = new AtomicInteger();
-                new GroovyIsoVisitor<Integer>() {
-                    @Override
-                    public J.Empty visitEmpty(J.Empty empty, Integer p) {
-                        empties.incrementAndGet();
-                        return super.visitEmpty(empty, p);
-                    }
-                }.visit(cu, 0);
-                assertThat(empties).hasValue(1);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(new GroovyIsoVisitor<AtomicInteger>() {
+                @Override
+                public J.Empty visitEmpty(J.Empty empty, AtomicInteger empties) {
+                    empties.incrementAndGet();
+                    return super.visitEmpty(empty, empties);
+                }
+            }.reduce(cu, new AtomicInteger())).hasValue(1))
           )
         );
     }
