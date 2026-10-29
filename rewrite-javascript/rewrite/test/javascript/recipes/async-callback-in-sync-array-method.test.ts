@@ -22,8 +22,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async callback in .some()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -45,8 +43,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async callback in .every()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -68,8 +64,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async callback in .filter()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -91,8 +85,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async callback in .find()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -114,8 +106,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async callback in .forEach()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -137,8 +127,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('flags only array receivers', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -174,8 +162,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('flags a receiver without type attribution', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=javascript
@@ -230,8 +216,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects async function reference passed to .some()', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
@@ -254,8 +238,6 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
     test('detects hasScanningRecipe pattern from run.ts', async () => {
         const spec = new RecipeSpec();
         spec.recipe = new AsyncCallbackInSyncArrayMethod();
-        // A second cycle adds the warning marker again
-        spec.cycles = 1;
 
         await spec.rewriteRun(
             //language=typescript
