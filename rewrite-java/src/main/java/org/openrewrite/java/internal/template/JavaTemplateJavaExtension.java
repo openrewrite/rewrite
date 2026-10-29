@@ -158,11 +158,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
              * The prefix for the first generated statement. When the anchor stays in the tree (BEFORE, AFTER) any
              * blank-line separator above it belongs to the anchor and the new statement joins on a single break at
              * the same indent. When the anchor is removed (REPLACEMENT) the new statement takes its position, so
-             * it also takes its whitespace — comments are dropped since replacement removes what they annotated.
+             * it also takes its whitespace — comments are dropped since replacement removes what they annotated,
+             * unless the anchor is passed back in as a parameter.
              */
             private Space firstPrefix(Statement anchor) {
                 if (mode == JavaCoordinates.Mode.REPLACEMENT) {
-                    return anchor.getPrefix().withComments(emptyList());
+                    return replacedPrefix(anchor);
                 }
                 String whitespace = anchor.getPrefix().getWhitespace();
                 return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
@@ -173,7 +174,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return Space.format("\n");
                 }
                 // Displacing the leading statement takes over its comments too, so a license header stays on top
-                return mode == JavaCoordinates.Mode.BEFORE ? anchor.getPrefix() :
+                return mode == JavaCoordinates.Mode.BEFORE ? anchor.getPrefix() : replacedPrefix(anchor);
+            }
+
+            private Space replacedPrefix(Statement anchor) {
+                return substitutions.isParameter(anchor) ? anchor.getPrefix() :
                         anchor.getPrefix().withComments(emptyList());
             }
 
