@@ -98,13 +98,14 @@ func (r *recorder) Errorf(format string, args ...any) {
 	r.failures = append(r.failures, fmt.Sprintf(format, args...))
 }
 
+func (r *recorder) Failed() bool { return len(r.failures) > 0 || r.TB.Failed() }
+
 // failures runs sources through spec as RewriteRun does, returning what it
 // reports about the recipe's results rather than failing t.
 func failures(t *testing.T, spec *RecipeSpec, sources ...Sources) []string {
 	t.Helper()
-	parsed, genSpecs, generated := spec.parseAndApply(t, sources)
 	r := &recorder{TB: t}
-	spec.verify(r, parsed, genSpecs, generated)
+	spec.verify(r, spec.parseAndApply(t, sources))
 	return r.failures
 }
 
