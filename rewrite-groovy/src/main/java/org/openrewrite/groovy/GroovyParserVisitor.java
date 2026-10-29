@@ -4769,5 +4769,4 @@ public class GroovyParserVisitor {
         modifierNameToType.put("default", J.Modifier.Type.Default);
         modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
     }
-
 }

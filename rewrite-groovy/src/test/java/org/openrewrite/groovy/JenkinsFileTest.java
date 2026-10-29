@@ -297,6 +297,16 @@ class JenkinsFileTest implements RewriteTest {
     }
 
     @Test
+    void jenkinsfileVariantsConsumeSharedLibrarySteps() {
+        for (String path : Arrays.asList("Jenkinsfile.release", "ci/Jenkinsfile-deploy")) {
+            G.CompilationUnit cu = parse(null, input(path, "deploy()"),
+              input("vars/deploy.groovy", "def call() {}"));
+            assertThat(((J.MethodInvocation) cu.getStatements().get(0)).getMarkers()
+              .findFirst(JenkinsSharedLibraryStep.class)).isPresent();
+        }
+    }
+
+    @Test
     void reusedContextAndInterleavedStreamsDoNotLeakSteps() {
         GroovyParser parser = GroovyParser.builder().build();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);

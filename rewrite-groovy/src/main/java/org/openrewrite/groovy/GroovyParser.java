@@ -225,7 +225,7 @@ public class GroovyParser implements Parser {
     }
 
     private static boolean isJenkinsSource(Path path) {
-        return "Jenkinsfile".equals(path.getFileName().toString()) || isSharedLibraryStep(path);
+        return isJenkinsfile(path.getFileName().toString()) || isSharedLibraryStep(path);
     }
 
     private static void closeQuietly(Closeable closeable) {
