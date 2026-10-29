@@ -2055,6 +2055,88 @@ describe('AddImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('should add import for zod z when no other zod import exists (with onlyIfReferenced)', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+            spec.cycles = 1;
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `,
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test.each([
+            `import * as z from 'zod';`,
+            `import z from 'zod';`,
+            `import {ZodError} from 'zod'; import * as z from 'zod';`
+        ])('should not add import for zod z already bound by %s (with onlyIfReferenced)', async (existingImport) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "zod", member: "z", onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                ${existingImport}
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should add import for React forwardRef when namespace owner has module info', async () => {
             const spec = new RecipeSpec();
             // This test verifies that when a namespace (e.g., React) owns an export (e.g., forwardRef),
