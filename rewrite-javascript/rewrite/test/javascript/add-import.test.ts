@@ -2928,11 +2928,10 @@ describe('AddImport visitor', () => {
                         alias: 'B',
                         onlyIfReferenced: false
                     }).visit(cu, p) as JS.CompilationUnit;
-                    added = (result.statements[1].element as JS.Import).moduleSpecifier!.element as J.Literal;
+                    added ??= (result.statements[1].element as JS.Import).moduleSpecifier!.element as J.Literal;
                     return result;
                 }
             }());
-            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3285,15 +3284,17 @@ describe('AddImport visitor', () => {
 
         test('a namespace or type declaration shadows an import just as a value declaration does', async () => {
             const spec = new RecipeSpec();
-            const bound: string[] = [];
+            let bound: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!);
-                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!);
+                    const answers = [
+                        maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!
+                    ];
+                    bound ??= answers;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
-            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3316,19 +3317,23 @@ describe('AddImport visitor', () => {
 
         test('a second request for the same binding gets the name the first settled on', async () => {
             const spec = new RecipeSpec();
-            const quoted: string[] = [];
-            const preferred: string[] = [];
+            let quoted: string[] | undefined;
+            let preferred: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!);
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!);
-
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!);
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!);
+                    const readFile = [
+                        maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!
+                    ];
+                    const theming = [
+                        maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!
+                    ];
+                    quoted ??= readFile;
+                    preferred ??= theming;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
-            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3350,16 +3355,18 @@ describe('AddImport visitor', () => {
 
         test('a name bound through any binding pattern is occupied without answering for the module', async () => {
             const spec = new RecipeSpec();
-            const bound: (string | undefined)[] = [];
+            let bound: (string | undefined)[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'p', member: 'default', preferredName: 'e', onlyIfReferenced: false}));
+                    const answers = [
+                        maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}),
+                        maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}),
+                        maybeAddImport(this, {module: 'p', member: 'default', preferredName: 'e', onlyIfReferenced: false})
+                    ];
+                    bound ??= answers;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
-            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3477,17 +3484,25 @@ describe('AddImport visitor', () => {
 
         test('one binding serves every site, so a name any of them shadows is taken', async () => {
             const spec = new RecipeSpec();
-            const bound: string[] = [];
+            let bound: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                private sites: string[] = [];
+
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    this.sites = [];
+                    const visited = await super.visitJsCompilationUnit(cu, p);
+                    bound ??= this.sites;
+                    return visited;
+                }
+
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
-                        bound.push(maybeAddImport(this,
+                        this.sites.push(maybeAddImport(this,
                             {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
                 }
             });
-            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
