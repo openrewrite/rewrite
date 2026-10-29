@@ -37,8 +37,6 @@ import {z} from 'zebra';
     });
 
     test("sorts named specifiers within each import alphabetically", () => {
-        // A second cycle replaces the named specifiers' spaces with equal copies
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `
@@ -50,8 +48,6 @@ import {alpha, beta, delta, gamma} from 'module';
     });
 
     test("preserves trailing comma when sorting specifiers", () => {
-        // A second cycle replaces the named specifiers' spaces with equal copies
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `
@@ -63,8 +59,6 @@ import {alpha, zebra,} from 'module';
     });
 
     test("handles aliased imports", () => {
-        // A second cycle replaces the named specifiers' spaces with equal copies
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `
@@ -181,8 +175,6 @@ import type {Z} from 'zebra';
     });
 
     test("default with named imports", () => {
-        // A second cycle replaces the named specifiers' spaces with equal copies
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `
@@ -226,8 +218,6 @@ const x = 1;
     });
 
     test("comprehensive: basic example from original test", () => {
-        // A second cycle replaces the named specifiers' spaces with equal copies
-        spec.cycles = 1;
         return spec.rewriteRun(
             typescript(
                 `
