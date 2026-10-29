@@ -134,17 +134,13 @@ class UnaryTest implements RewriteTest {
               def u = +f(3)
               def v = -x
               """,
-            spec -> spec.afterRecipe(cu -> {
-                List<J.Unary.Type> operators = new ArrayList<>();
-                new GroovyIsoVisitor<Integer>() {
-                    @Override
-                    public J.Unary visitUnary(J.Unary unary, Integer p) {
-                        operators.add(unary.getOperator());
-                        return super.visitUnary(unary, p);
-                    }
-                }.visit(cu, 0);
-                assertThat(operators).containsExactly(J.Unary.Type.Positive, J.Unary.Type.Negative);
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(new GroovyIsoVisitor<List<J.Unary.Type>>() {
+                @Override
+                public J.Unary visitUnary(J.Unary unary, List<J.Unary.Type> operators) {
+                    operators.add(unary.getOperator());
+                    return super.visitUnary(unary, operators);
+                }
+            }.reduce(cu, new ArrayList<>())).containsExactly(J.Unary.Type.Positive, J.Unary.Type.Negative))
           )
         );
     }
