@@ -90,7 +90,6 @@ public class GroovyParserVisitor {
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
-    private final Map<String, String> sharedLibrarySteps;
 
     private int cursor = 0;
 
@@ -126,12 +125,6 @@ public class GroovyParserVisitor {
 
     @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, @Nullable JavaTypeFactory typeFactory, ExecutionContext ctx) {
-        this(sourcePath, fileAttributes, source, typeCache, typeFactory, Collections.emptyMap());
-    }
-
-    GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source,
-                        JavaTypeCache typeCache, @Nullable JavaTypeFactory typeFactory,
-                        Map<String, String> sharedLibrarySteps) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
@@ -146,7 +139,6 @@ public class GroovyParserVisitor {
         this.charsetBomMarked = source.isCharsetBomMarked();
         JavaTypeFactory factory = typeFactory != null ? typeFactory : new org.openrewrite.java.internal.DefaultJavaTypeFactory(typeCache);
         this.typeMapping = new GroovyTypeMapping(factory);
-        this.sharedLibrarySteps = sharedLibrarySteps;
     }
 
     private static int groovyMajorVersion() {
@@ -2910,14 +2902,6 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-
-                if (methodType == null && call.isImplicitThis()) {
-                    String stepSourcePath = sharedLibrarySteps.get(name.getSimpleName());
-                    if (stepSourcePath != null) {
-                        markers = markers.add(new JenkinsSharedLibraryStep(randomId(), stepSourcePath));
-                    }
-                }
-
                 return new J.MethodInvocation(randomId(), fmt, markers, select, typeParameters, name, args, methodType);
             }));
         }
