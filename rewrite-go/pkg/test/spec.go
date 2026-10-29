@@ -603,7 +603,8 @@ type change struct {
 
 // RewriteRun parses each source, checks parse-print idempotence, attaches
 // any markers contributed by project wrappers (GoProject), and (if
-// configured) applies a recipe and checks the result. Accepts both bare
+// configured) applies a recipe and checks the result, then hands each source's
+// final tree to its AfterRecipe callback when every check passed. Accepts both bare
 // SourceSpec values and project wrappers like GoProject — they both
 // implement Sources.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
@@ -618,23 +619,14 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 func (spec *RecipeSpec) afterRecipe(t *testing.T, run *recipeRun) {
 	t.Helper()
 	for _, ps := range run.parsed {
-		after := ps.tree
-		if spec.Recipe != nil {
-			after = ps.result
-		}
-		if cu, ok := after.(*golang.CompilationUnit); ok && ps.spec.AfterRecipe != nil {
+		if cu, ok := ps.result.(*golang.CompilationUnit); ok && ps.spec.AfterRecipe != nil {
 			ps.spec.AfterRecipe(t, cu)
 		}
 	}
-	for _, gs := range run.genSpecs {
-		if gs.AfterRecipe == nil {
-			continue
-		}
-		for _, gt := range run.generated {
-			if cu, ok := gt.(*golang.CompilationUnit); ok && cu.SourcePath == gs.Path {
-				gs.AfterRecipe(t, cu)
-				break
-			}
+	paired, _ := pairGenerated(run.genSpecs, run.generated)
+	for k, gs := range run.genSpecs {
+		if cu, ok := paired[k].(*golang.CompilationUnit); ok && gs.AfterRecipe != nil {
+			gs.AfterRecipe(t, cu)
 		}
 	}
 }
@@ -688,10 +680,10 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) *recipeRu
 
 	// Pass 2: apply the recipe over the parsed set, cycle after cycle.
 	run := &recipeRun{parsed: parsed, genSpecs: genSpecs}
+	for i := range parsed {
+		parsed[i].result = parsed[i].tree
+	}
 	if spec.Recipe != nil {
-		for i := range parsed {
-			parsed[i].result = parsed[i].tree
-		}
 		spec.runCycles(run)
 	}
 	return run
@@ -1082,26 +1074,37 @@ func (spec *RecipeSpec) compareGenerated(t testing.TB, specs []SourceSpec, gener
 	}
 
 	mp := spec.markerPrinter()
-	matched := make([]bool, len(generated))
-	for _, gs := range specs {
-		found := false
-		for j, gt := range generated {
-			if matched[j] || gt == nil || sourcePathOf(gt) != gs.Path {
-				continue
-			}
-			matched[j] = true
-			found = true
-			if actual := printTree(gt, mp); gs.After != nil && actual != *gs.After {
-				t.Errorf("generated file %q mismatch\n\nexpected:\n%s\n\nactual:\n%s", gs.Path, *gs.After, actual)
-				showDiff(t, *gs.After, actual)
-			}
-			break
+	paired, matched := pairGenerated(specs, generated)
+	for k, gs := range specs {
+		gt := paired[k]
+		if !assert.Truef(t, gt != nil, "expected recipe to generate file %q, but it was not generated", gs.Path) {
+			continue
 		}
-		assert.Truef(t, found, "expected recipe to generate file %q, but it was not generated", gs.Path)
+		if actual := printTree(gt, mp); gs.After != nil && actual != *gs.After {
+			t.Errorf("generated file %q mismatch\n\nexpected:\n%s\n\nactual:\n%s", gs.Path, *gs.After, actual)
+			showDiff(t, *gs.After, actual)
+		}
 	}
 	for j, gt := range generated {
 		assert.Falsef(t, !matched[j] && gt != nil, "recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", sourcePathOf(gt))
 	}
+}
+
+// pairGenerated pairs each spec with the first not yet paired generated file at
+// its path, leaving nil for a spec the recipe generated nothing for.
+func pairGenerated(specs []SourceSpec, generated []java.Tree) ([]java.Tree, []bool) {
+	paired := make([]java.Tree, len(specs))
+	matched := make([]bool, len(generated))
+	for k, gs := range specs {
+		for j, gt := range generated {
+			if !matched[j] && gt != nil && sourcePathOf(gt) == gs.Path {
+				matched[j] = true
+				paired[k] = gt
+				break
+			}
+		}
+	}
+	return paired, matched
 }
 
 func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
