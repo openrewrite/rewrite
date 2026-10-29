@@ -476,11 +476,6 @@ func ValidateSpaces(root java.Tree) []string {
 	return (&recipes.WhitespaceValidationService{}).Validate(root)
 }
 
-type JavaRecipeConfig struct {
-	RecipeName string
-	Options    map[string]any
-}
-
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
@@ -503,8 +498,6 @@ type RecipeSpec struct {
 	// of them.
 	ExpectedCyclesThatMakeChanges int
 	Recipe                        recipe.Recipe
-	JavaRecipe                    *JavaRecipeConfig     // when set, delegates to Java RPC
-	JavaRpcClient                 *JavaRpcClient        // injected Java RPC client
 	MarkerPrinter                 printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
 }
 
@@ -546,21 +539,6 @@ func (spec *RecipeSpec) cycles() int {
 		return spec.Cycles
 	}
 	return spec.expectedCycles() + 1
-}
-
-// WithJavaRecipe configures the test to delegate to a Java-defined recipe via RPC.
-// Requires a JavaRpcClient to be set on the spec.
-func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any) *RecipeSpec {
-	spec.JavaRecipe = &JavaRecipeConfig{
-		RecipeName: recipeName,
-		Options:    options,
-	}
-	return spec
-}
-
-func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
-	spec.JavaRpcClient = client
-	return spec
 }
 
 // WithMarkerPrinter overrides the MarkerPrinter used when printing recipe output.
