@@ -500,4 +500,77 @@ describe("rewrite test", () => {
             return sut.rewriteRun(typescript(`foo()`, `bar()`));
         });
     });
+
+    describe("data table assertions", () => {
+        const recordReplacedText = () => fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+            protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+                ReplacedText.dataTable.insertRow(ctx, new ReplacedText(text.sourcePath, text.text));
+                return text;
+            }
+        });
+
+        test("an assertion receives the rows the recipe wrote", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = recordReplacedText();
+            let received: ReplacedText[] | undefined;
+            sut.dataTable<ReplacedText>(ReplacedText.dataTable.descriptor.name, rows => {
+                received = rows;
+            });
+
+            // when
+            await sut.rewriteRun({...text("hello"), path: "a.txt"});
+
+            // then
+            expect(received).toEqual([new ReplacedText("a.txt", "hello")]);
+        });
+
+        test("a failing assertion fails the run", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = recordReplacedText();
+            sut.dataTable<ReplacedText>(ReplacedText.dataTable.descriptor.name, rows => {
+                expect(rows).toHaveLength(2);
+            });
+
+            // when
+            const run = sut.rewriteRun({...text("hello"), path: "a.txt"});
+
+            // then
+            await expect(run).rejects.toThrow("to have a length of 2 but got 1");
+        });
+
+        test("an assertion on a data table the recipe never wrote fails the run", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = recordReplacedText();
+            sut.dataTable("org.openrewrite.NotWritten", () => {
+            });
+
+            // when
+            const run = sut.rewriteRun(text("hello"));
+
+            // then
+            await expect(run).rejects.toThrow(
+                "No data table named org.openrewrite.NotWritten\n" +
+                `Found data tables: ${ReplacedText.dataTable.descriptor.name}`);
+        });
+
+        test("each run starts with no rows", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = recordReplacedText();
+            await sut.rewriteRun({...text("first"), path: "first.txt"});
+            let received: ReplacedText[] | undefined;
+            sut.dataTable<ReplacedText>(ReplacedText.dataTable.descriptor.name, rows => {
+                received = rows;
+            });
+
+            // when
+            await sut.rewriteRun({...text("second"), path: "second.txt"});
+
+            // then
+            expect(received).toEqual([new ReplacedText("second.txt", "second")]);
+        });
+    });
 });

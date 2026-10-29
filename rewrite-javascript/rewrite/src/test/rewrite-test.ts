@@ -27,7 +27,7 @@ import {isNamedStyles} from "../style";
 import {JavaScriptVisitor} from "../javascript";
 import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J, Type} from "../java";
-import {DATA_TABLE_STORE} from "../data-table";
+import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -49,7 +49,7 @@ interface RecipeSpecConfiguration {
     expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
     recipeExecutionContext: ExecutionContext;
-    dataTableAssertions: { [key: string]: (rows: any[]) => void };
+    dataTableAssertions: { [key: string]: (rows: any[]) => void | Promise<void> };
 }
 
 export class RecipeSpec {
@@ -88,7 +88,7 @@ export class RecipeSpec {
      */
     recipeExecutionContext: ExecutionContext = this.executionContext;
 
-    private dataTableAssertions: { [key: string]: (rows: any[]) => void } = {}
+    private dataTableAssertions: { [key: string]: (rows: any[]) => void | Promise<void> } = {}
 
     // A suite typically declares one spec and configures it per test, which makes the spec a
     // channel between tests unless each test starts from the same configuration. A consumer opts
@@ -101,7 +101,11 @@ export class RecipeSpec {
         RecipeSpec.live?.push(this);
     }
 
-    dataTable<Row>(name: string, allRows: (rows: Row[]) => void) {
+    /**
+     * Asserts on the rows the first cycle of each subsequent {@link rewriteRun} writes to the named data
+     * table, failing the run when the recipe wrote none.
+     */
+    dataTable<Row>(name: string, allRows: (rows: Row[]) => void | Promise<void>) {
         this.dataTableAssertions[name] = allRows;
     }
 
@@ -212,6 +216,7 @@ export class RecipeSpec {
             }
         }
 
+        this.recipeExecutionContext.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
         const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;
         const cycles = this.cycles ?? Math.max(2, expectedCycles + 1);
         const {changeset, unsettled} = await this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile),
@@ -225,10 +230,20 @@ export class RecipeSpec {
                 `Expected recipe to complete in ${pluralCycles(expectedCycles)}, but cycle ${unsettled.cycle} changed`);
         }
         cycles > expectedCycles && await this.expectStableOnFreshParse(flattenedSpecs, allParsed, changeset);
+        await this.expectDataTables();
+    }
 
-        // for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
-        //     assertion(getRows(name, this.recipeExecutionContext));
-        // }
+    private async expectDataTables() {
+        const store: InMemoryDataTableStore = this.recipeExecutionContext.messages[DATA_TABLE_STORE];
+        const dataTables = store.getDataTables();
+        for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
+            const dataTable = dataTables.find(dt => dt.descriptor.name === name);
+            if (!dataTable) {
+                throw new Error(`No data table named ${name}` + (dataTables.length === 0 ? "" :
+                    `\nFound data tables: ${dataTables.map(dt => dt.descriptor.name).join(", ")}`));
+            }
+            await assertion(store.getRows(name, dataTable.group));
+        }
     }
 
     private async runCycles(sources: SourceFile[], cycles: number, expectedCycles: number):
