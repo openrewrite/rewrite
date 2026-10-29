@@ -219,6 +219,10 @@ function identifierRef(name: string): J.Identifier {
 
 /** Rewrites `call` to read as `<name>.call`, the way a real recipe uses the name `maybeBind` returned. */
 function withReference(call: J.MethodInvocation, name: string): J.MethodInvocation {
+    const select = call.select?.element;
+    if (select?.kind === J.Kind.Identifier && (select as J.Identifier).simpleName === name) {
+        return call;
+    }
     return {...call, select: rightPadded(identifierRef(name), emptySpace)};
 }
 
@@ -297,6 +301,17 @@ describe("maybeBind", () => {
         await spec.rewriteRun(javascript(
             `sap.ui.define(["sap/ui/core/Element"], function (Elem) { target(); });`,
             `sap.ui.define(["sap/ui/core/Element"], function (Elem) { Elem.target(); });`
+        ));
+        expect(bound.name).toBe("Elem");
+    });
+
+    test("AMD reuses an existing dependency's parameter of an arrow factory", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["sap/ui/core/Element"], (Elem) => target());`,
+            `sap.ui.define(["sap/ui/core/Element"], (Elem) => Elem.target());`
         ));
         expect(bound.name).toBe("Elem");
     });
@@ -607,6 +622,17 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("B_1");
     });
 
+    test("AMD reuses a later dependency on the module where the first one's parameter is shadowed", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind("a/B", bound));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; target(); return B; } });`,
+            `sap.ui.define(["a/B", "a/B"], function (B, B_1) { function inner() { var B = 1; B_1.target(); return B; } });`
+        ));
+        expect(bound.name).toBe("B_1");
+    });
+
     test("ESM binds a module afresh where the import it would reuse is shadowed", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -717,11 +743,14 @@ describe("maybeBind", () => {
 
     test("a destructured await import answers neither request but still occupies its name", async () => {
         const spec = new RecipeSpec();
-        const bound: (string | undefined)[] = [];
+        let bound: (string | undefined)[] | undefined;
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.push(maybeBind(this, {module: "sap/m/Button", onlyIfReferenced: false}));
-                bound.push(maybeBind(this, {module: "sap/m/Button", member: "*", onlyIfReferenced: false}));
+                const answers = [
+                    maybeBind(this, {module: "sap/m/Button", onlyIfReferenced: false}),
+                    maybeBind(this, {module: "sap/m/Button", member: "*", onlyIfReferenced: false})
+                ];
+                bound ??= answers;
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -917,7 +946,7 @@ function rebindOldToNew() {
 function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: MaybeRebindOptions["from"] = {module: "m", member: "Old"}) {
     return fromVisitor(new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-            bound.name = maybeRebind(this, {from, to});
+            bound.name ??= maybeRebind(this, {from, to});
             return super.visitJsCompilationUnit(cu, p);
         }
     });
@@ -975,11 +1004,14 @@ describe("maybeBind and type-only imports", () => {
 
     test("a type-only request takes the name a value request queued for the same member", async () => {
         const spec = new RecipeSpec();
-        const names: (string | undefined)[] = [];
+        let names: (string | undefined)[] | undefined;
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                names.push(maybeBind(this, {module: "vitest", member: "vi", onlyIfReferenced: false}));
-                names.push(maybeBind(this, {module: "vitest", member: "vi", typeOnly: true, onlyIfReferenced: false}));
+                const answers = [
+                    maybeBind(this, {module: "vitest", member: "vi", onlyIfReferenced: false}),
+                    maybeBind(this, {module: "vitest", member: "vi", typeOnly: true, onlyIfReferenced: false})
+                ];
+                names ??= answers;
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -1002,7 +1034,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "lodash", member: "extend"},
                     to: {module: "lodash", member: "assign"}
                 });
@@ -1021,7 +1053,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "lodash", member: "extend"},
                     to: {module: "lodash", member: "assign", alias: "merge"}
                 });
@@ -1040,7 +1072,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "lodash", member: "extend"},
                     to: {module: "lodash", member: "assign"}
                 });
@@ -1059,7 +1091,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "lodash", member: "extend"},
                     to: {module: "lodash", member: "assign"}
                 });
@@ -1122,7 +1154,7 @@ describe("maybeRebind", () => {
                 if (m.name.simpleName !== "target") {
                     return super.visitMethodInvocation(m, p);
                 }
-                bound.name = maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New", alias}});
+                bound.name ??= maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New", alias}});
                 return m;
             }
         };
@@ -1163,7 +1195,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "m", member: "Old"},
                     to: {module: "m2", member: "Event"}
                 });
@@ -1239,6 +1271,7 @@ describe("maybeRebind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(typescript(
             `import { New } from "m2";\nimport { Old } from "m";\n\nOld(New);`,
             `import { New } from "m3";\nimport { New as Old } from "m2";\n\nOld(New);`
@@ -1260,7 +1293,7 @@ describe("maybeRebind", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                 maybeBind(this, {module: "other", member: "New", onlyIfReferenced: false});
-                bound.name = maybeRebind(this, {
+                bound.name ??= maybeRebind(this, {
                     from: {module: "m", member: "Old"},
                     to: {module: "m2", member: "New"}
                 });
@@ -1280,9 +1313,9 @@ describe("maybeRebind", () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                 maybeRebind(this, {from: {module: "m", member: "a"}, to: {module: "m2", member: "x"}});
-                bound.rebound = maybeRebind(this, {from: {module: "m", member: "b"}, to: {module: "m3", member: "x"}});
-                bound.target = maybeBind(this, {module: "m2", member: "x"});
-                bound.bound = maybeBind(this, {module: "m4", member: "x", onlyIfReferenced: false});
+                bound.rebound ??= maybeRebind(this, {from: {module: "m", member: "b"}, to: {module: "m3", member: "x"}});
+                bound.target ??= maybeBind(this, {module: "m2", member: "x"});
+                bound.bound ??= maybeBind(this, {module: "m4", member: "x", onlyIfReferenced: false});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -1368,6 +1401,7 @@ describe("maybeRebind", () => {
     test("a second statement binding the same member is left intact, not given the first's name", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
+        spec.cycles = 1;
         // One call moves one binding, so the second statement is a later call's to make; sharing
         // the name read from the first would bind it twice.
         await spec.rewriteRun(typescript(
@@ -1689,7 +1723,7 @@ describe("maybeRebind", () => {
                 if (m.name.simpleName !== "target") {
                     return super.visitMethodInvocation(m, p);
                 }
-                bound.name = maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New"}});
+                bound.name ??= maybeRebind(this, {from: {module: "a/Old"}, to: {module: "a/New"}});
                 return m;
             }
         });
@@ -1859,7 +1893,7 @@ describe("maybeRebind", () => {
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.name = maybeRebind(this, {from: {module: "old", member: "act"}, to: {module: "new", member: "default"}});
+                bound.name ??= maybeRebind(this, {from: {module: "old", member: "act"}, to: {module: "new", member: "default"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -1869,6 +1903,7 @@ describe("maybeRebind", () => {
         ));
         expect(bound.name).toBe("act");
 
+        bound.name = undefined;
         await spec.rewriteRun({...typescript(`import {act} from "old";\n\nact();`), path: "a.cts"});
         expect(bound.name).toBeUndefined();
 
@@ -2195,13 +2230,16 @@ describe("a node: specifier and the bare name of its built-in", () => {
 
     test("name one module to maybeBind, which keeps the spelling the file uses", async () => {
         const spec = new RecipeSpec();
-        const bound: (string | undefined)[] = [];
+        let bound: (string | undefined)[] | undefined;
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.push(maybeBind(this, {module: "util", member: "promisify"}));
-                bound.push(maybeBind(this, {module: "util", member: "*"}));
-                bound.push(moduleBindings(this).bindingOf("util"));
-                bound.push(maybeBind(this, {module: "util", member: "inspect", onlyIfReferenced: false}));
+                const answers = [
+                    maybeBind(this, {module: "util", member: "promisify"}),
+                    maybeBind(this, {module: "util", member: "*"}),
+                    moduleBindings(this).bindingOf("util"),
+                    maybeBind(this, {module: "util", member: "inspect", onlyIfReferenced: false})
+                ];
+                bound ??= answers;
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -2256,9 +2294,14 @@ describe("a node: specifier and the bare name of its built-in", () => {
 describe("maybeRebind on a require", () => {
     function rebind(from: {module: string; member?: string}, to: {module: string; member?: string}, bound: (string | undefined)[] = []) {
         const spec = new RecipeSpec();
+        const answered = new Set<string>();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.push(maybeRebind(this, {from, to}));
+                const name = maybeRebind(this, {from, to});
+                if (!answered.has(cu.sourcePath)) {
+                    answered.add(cu.sourcePath);
+                    bound.push(name);
+                }
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -2288,7 +2331,8 @@ describe("maybeRebind on a require", () => {
 
     test("an unaliased member follows the new member's name, while an aliased one keeps its alias", async () => {
         const bound: (string | undefined)[] = [];
-        await rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound).rewriteRun(
+        const spec = rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound);
+        await spec.rewriteRun(
             javascript(`const {extend} = require('lodash');\n\nextend({}, {});`,
                 `const {assign} = require('lodash');\n\nassign({}, {});`),
             javascript(`const {extend: ext} = require('lodash');\n\next({}, {});`,

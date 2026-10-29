@@ -51,6 +51,7 @@ describe('JavaScript visitor formatting', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AddArgumentVisitor());
+        spec.cycles = 1;
 
         // when && test
         await spec.rewriteRun(
@@ -77,6 +78,7 @@ describe('JavaScript visitor formatting', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new RenameCommentVisitor());
+        spec.cycles = 1;
 
         // when && then
         await spec.rewriteRun(
