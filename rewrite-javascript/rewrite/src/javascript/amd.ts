@@ -513,8 +513,11 @@ export function withoutDependencyAt(
     block: AmdBlock,
     index: number
 ): J.MethodInvocation {
-    const dependencies = withElements(block.dependencies, removeEntry(elementsOf(block), index, dependencySlot));
     const parameters = parametersOf(block);
+    if (index < 0 || index >= Math.max(elementsOf(block).length, parameters.length)) {
+        return call;
+    }
+    const dependencies = withElements(block.dependencies, removeEntry(elementsOf(block), index, dependencySlot));
     const factory = index >= parameters.length ?
         block.factory :
         withParameters(block.factory, removeEntry(parameters, index, parameterSlot));

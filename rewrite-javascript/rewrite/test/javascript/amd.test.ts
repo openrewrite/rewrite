@@ -211,8 +211,6 @@ describe("withoutDependencyAt", () => {
                     withoutDependencyAt(m, block, 1);
             }
         });
-        // A second cycle's out-of-range removal returns an identical call as a new LST object
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`,
             `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`
@@ -244,8 +242,6 @@ describe("withoutDependencyAt", () => {
                     withoutDependencyAt(m, block, 0);
             }
         });
-        // A second cycle's out-of-range removal returns an identical call as a new LST object
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], function (B) {});`,
             `sap.ui.define([], function () {});`
@@ -255,7 +251,7 @@ describe("withoutDependencyAt", () => {
     test("an out-of-range index leaves the block unchanged instead of throwing", async () => {
         const call = await firstCall(`define(["a/B", "c/D"], function (B, D) {});`);
         const block = amdBlockOf(call)!;
-        expect(dependencyNames(amdBlockOf(withoutDependencyAt(call, block, 2))!)).toEqual(["a/B", "c/D"]);
+        expect(withoutDependencyAt(call, block, 2)).toBe(call);
     });
 
     function removeFirstDependency() {
@@ -271,8 +267,6 @@ describe("withoutDependencyAt", () => {
     test("removing the only parameter of an unparenthesized arrow keeps the space before the arrow", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(removeFirstDependency());
-        // A second cycle's out-of-range removal returns an identical call as a new LST object
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], B => {});`,
             `sap.ui.define([], () => {});`
@@ -282,8 +276,6 @@ describe("withoutDependencyAt", () => {
     test("removing the only parameter of a parenthesized arrow leaves its parens and arrow alone", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(removeFirstDependency());
-        // A second cycle's out-of-range removal returns an identical call as a new LST object
-        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], (B) => {});`,
             `sap.ui.define([], () => {});`
