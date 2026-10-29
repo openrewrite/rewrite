@@ -240,8 +240,15 @@ class RecipeSpec:
         ]
 
         source_files = [sf for _, sf in all_parsed]
-        expected_cycles = self.expected_cycles_that_make_changes or 1
+        expected_cycles = self.expected_cycles_that_make_changes
+        if expected_cycles is None:
+            expected_cycles = 1
         cycles = self.cycles if self.cycles is not None else max(2, expected_cycles + 1)
+        if cycles < max(1, expected_cycles):
+            raise ValueError(
+                f"cycles={cycles} has to be at least 1 and at least "
+                f"expected_cycles_that_make_changes={expected_cycles}"
+            )
         results, unsettled = self._run_cycles(source_files, cycles, expected_cycles)
         if self.check_reporting_markers_only:
             assert_no_added_markers(source_files, results, self._reparse)
@@ -288,7 +295,7 @@ class RecipeSpec:
         def changeset() -> List[Result]:
             return [Result(origin, latest) for origin, latest in lineages]
 
-        settled: Optional[List[Result]] = None
+        settled: Optional[List[Result]] = changeset() if expected_cycles == 0 else None
         cycles_that_made_changes = 0
         for cycle in range(1, cycles + 1):
             live = [latest for _, latest in lineages if latest is not None]
@@ -380,9 +387,8 @@ class RecipeSpec:
                         workspace.ty_client,
                     )
                 except Exception:
-                    # A file that does not parse again keeps the LST the recipe produced.
                     continue
-                if not isinstance(reparsed, ParseError) and _print(reparsed, True) == workspace.text(spec):
+                if _print(reparsed, True) == workspace.text(spec):
                     # What the source file carries, like its styles, comes from outside its text.
                     reparsed_by_final[id(sf)] = reparsed.replace(markers=sf.markers)
         if not reparsed_by_final:

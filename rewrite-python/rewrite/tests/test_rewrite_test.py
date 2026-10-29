@@ -827,6 +827,19 @@ class TestExtraCycles:
                            match="Expected recipe to complete in 2 cycles, but it settled after 1 cycle."):
             spec.rewrite_run(python("b = 1\n", "c = 1\n"))
 
+    def test_expected_cycles_that_make_changes_0_fails_a_recipe_that_changes(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b"), expected_cycles_that_make_changes=0,
+                          type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match="Expected recipe to complete in 0 cycles, but cycle 1 changed"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_fewer_cycles_than_expected_to_make_changes_is_rejected(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), cycles=1, expected_cycles_that_make_changes=2,
+                          type_attribution=False)
+        with pytest.raises(ValueError, match="cycles=1 has to be at least 1 and at least"):
+            spec.rewrite_run(python("a = 1\n", "c = 1\n"))
+
     def test_cycles_1_turns_the_check_off(self):
         spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), cycles=1, type_attribution=False)
         spec.rewrite_run(python("a = 1\n", "b = 1\n"))
@@ -894,6 +907,7 @@ class TestExtraCycles:
         spec = RecipeSpec(recipe=from_visitor(Case()), type_attribution=False)
         spec.rewrite_run(python("hi = 1\n", "HI = 1\n", before_recipe=loud))
 
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
     def test_a_fresh_parse_is_type_attributed(self):
         typed: List[bool] = []
 
