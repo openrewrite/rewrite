@@ -262,6 +262,17 @@ val goTest = tasks.register<Exec>("goTest") {
         exclude("build/**")
         exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(projectDir) {
+        include("**/testdata/**")
+        include("src/test/resources/**")
+        exclude("build/**")
+        exclude("vendor/**")
+    }).withPropertyName("goTestData").withPathSensitivity(PathSensitivity.RELATIVE)
+    // marker_guard_test.go and quote_test.go read these Java sources directly
+    inputs.files(listOf("rewrite-go", "rewrite-core", "rewrite-java").map { rootProject.file("$it/src/main/java") })
+        .withPropertyName("javaSources").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(javaRpcClasspath, sourceSets.main.get().output)
+        .withPropertyName("javaRpcClasspath").withNormalizer(ClasspathNormalizer::class)
     inputs.file(file("test-classpath.txt"))
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
