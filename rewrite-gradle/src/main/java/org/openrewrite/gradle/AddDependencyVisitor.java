@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -30,8 +31,10 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.Version;
 
 import java.util.function.Predicate;
 
@@ -86,10 +89,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                         "GradleProject has no configuration named '" + configuration +
                                 "'. Available configurations: " + gradleProject.getNameToConfiguration().keySet()));
             }
-            if (gdc.findRequestedDependency(groupId, artifactId) != null) {
-                return sourceFile;
-            }
-
             isKotlinDsl = sourceFile instanceof K.CompilationUnit;
             if (version != null) {
                 if (version.startsWith("$")) {
@@ -102,6 +101,46 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                         return (J) e.warn(tree);
                     }
                 }
+            }
+
+            Dependency existingDep = gdc.findRequestedDependency(groupId, artifactId);
+            if (existingDep != null) {
+                // Dependency already exists — upgrade the version if the requested version is newer
+                if (resolvedVersion != null && !resolvedVersion.startsWith("$")) {
+                    String existingVersion = existingDep.getVersion();
+                    if (existingVersion == null) {
+                        // Fall back to checking resolved dependencies in resolvable configurations
+                        for (GradleDependencyConfiguration ext : gradleProject.configurationsExtendingFrom(gdc, true)) {
+                            if (ext.isCanBeResolved()) {
+                                org.openrewrite.maven.tree.ResolvedDependency rd = ext.findResolvedDependency(groupId, artifactId);
+                                if (rd != null) {
+                                    existingVersion = rd.getVersion();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (existingVersion != null &&
+                            new Version(resolvedVersion).compareTo(new Version(existingVersion)) > 0) {
+                        String upgradeVersion = resolvedVersion;
+                        sourceFile = (JavaSourceFile) new GradleDependency.Matcher()
+                                .configuration(configuration)
+                                .groupId(groupId)
+                                .artifactId(artifactId)
+                                .asVisitor(dep -> dep.withDeclaredVersion(upgradeVersion).getTree())
+                                .visitNonNull(sourceFile, ctx);
+                        if (sourceFile != tree) {
+                            sourceFile = org.openrewrite.gradle.internal.AddDependencyVisitor.addDependency(
+                                    sourceFile,
+                                    gradleProject.getConfiguration(configuration),
+                                    new GroupArtifactVersion(groupId, artifactId, resolvedVersion),
+                                    classifier,
+                                    ctx
+                            );
+                        }
+                    }
+                }
+                return sourceFile;
             }
 
             sourceFile = (JavaSourceFile) new org.openrewrite.gradle.internal.AddDependencyVisitor(configuration, groupId, artifactId, resolvedVersion, classifier, extension, insertPredicate, dependencyModifier, isKotlinDsl)

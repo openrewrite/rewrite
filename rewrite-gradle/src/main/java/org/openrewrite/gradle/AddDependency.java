@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.gradle.trait.JvmTestSuite;
@@ -247,13 +248,25 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         boolean configurationKnown = resolvedConfigurations.stream()
                                 .anyMatch(c -> gp.getConfiguration(c) != null);
                         if (configurationKnown) {
+                            Set<String> allConfigurations = new HashSet<>(resolvedConfigurations);
                             GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
                             gradleConfigurationFilter.removeTransitiveConfigurations();
                             gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
                             if (Boolean.TRUE.equals(acceptTransitive)) {
                                 gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
                             }
-                            resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                            // Re-add configurations where the dependency exists, so AddDependencyVisitor
+                            // can upgrade the version if the existing one is lower (matching Maven's behavior).
+                            if (version != null) {
+                                for (String cfg : allConfigurations) {
+                                    if (!resolvedConfigurations.contains(cfg)) {
+                                        GradleDependencyConfiguration gdc = gp.getConfiguration(cfg);
+                                        if (gdc != null && gdc.findRequestedDependency(groupId, artifactId) != null) {
+                                            resolvedConfigurations.add(cfg);
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         if (resolvedConfigurations.isEmpty()) {
