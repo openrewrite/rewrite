@@ -15,11 +15,15 @@
  */
 package org.openrewrite.yaml;
 
-import org.openrewrite.Cursor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     Map<String, Yaml> anchorValues = new HashMap<>();
@@ -43,15 +47,51 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     public Yaml visitAlias(Yaml.Alias alias, P p) {
         Yaml.Alias al = (Yaml.Alias) super.visitAlias(alias, p);
         Yaml anchorVal = anchorValues.get(al.getAnchor().getKey());
-        // JsonPathMatcher visits without maintaining a cursor, and only compares values, so it needs no re-indentation
-        Cursor parent = getCursor().getParent();
-        if (parent != null && anchorVal instanceof Yaml.Mapping &&
+        // formatting reads its style from the enclosing Documents; callers that visit without them,
+        // like JsonPathMatcher, only compare values, so they need no re-indentation
+        if (getCursor().firstEnclosing(Yaml.Documents.class) != null && anchorVal instanceof Yaml.Mapping &&
             ((Yaml.Mapping) anchorVal).getOpeningBracePrefix() == null) {
             // the anchor's entries are indented for where the anchor is, so they move to where the alias is
-            return autoFormat(anchorVal, p, parent);
+            return autoFormat(anchorVal, p, getCursor().getParentOrThrow());
         } else if (anchorVal != null) {
             return anchorVal;
         }
         return al;
+    }
+
+    static boolean hasResolvableAlias(Yaml yaml) {
+        Set<String> anchors = new HashSet<>();
+        AtomicBoolean found = new AtomicBoolean();
+        new YamlIsoVisitor<Integer>() {
+            @Override
+            public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
+                return found.get() ? (Yaml) tree : super.visit(tree, p);
+            }
+
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
+                if (mapping.getAnchor() != null) {
+                    anchors.add(mapping.getAnchor().getKey());
+                }
+                return super.visitMapping(mapping, p);
+            }
+
+            @Override
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
+                if (scalar.getAnchor() != null) {
+                    anchors.add(scalar.getAnchor().getKey());
+                }
+                return scalar;
+            }
+
+            @Override
+            public Yaml.Alias visitAlias(Yaml.Alias alias, Integer p) {
+                if (anchors.contains(alias.getAnchor().getKey())) {
+                    found.set(true);
+                }
+                return alias;
+            }
+        }.visit(yaml, 0);
+        return found.get();
     }
 }

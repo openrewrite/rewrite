@@ -451,4 +451,19 @@ class CoalescePropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+              """
+          )
+        );
+    }
 }
