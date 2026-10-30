@@ -866,7 +866,16 @@ class TestDataTables:
     def test_adding_an_assertion_leaves_the_original_spec_alone(self):
         spec = RecipeSpec(recipe=_finding_names(), type_attribution=False)
         spec.data_table(_FOUND_NAMES, lambda rows: None)
-        assert spec.data_table_assertions == {}
+        assert spec.data_table_assertions == []
+
+    def test_every_assertion_on_a_table_runs(self):
+        first: List[List[_FoundName]] = []
+        second: List[List[_FoundName]] = []
+        spec = (RecipeSpec(recipe=_finding_names(), type_attribution=False)
+                .data_table(_FOUND_NAMES, first.append)
+                .data_table("org.openrewrite.test.FoundNames", second.append))
+        spec.rewrite_run(python("a = 1\n"))
+        assert first == second == [[_FoundName("a")]]
 
 
 class TestExtraCycles:

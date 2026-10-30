@@ -20,7 +20,7 @@ import ast
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 from rewrite import (
@@ -33,7 +33,7 @@ from rewrite import (
     Recipe,
     TreeVisitor,
 )
-from rewrite.data_table import DATA_TABLE_STORE, DataTable, InMemoryDataTableStore
+from rewrite.data_table import DATA_TABLE_STORE, DataTable, InMemoryDataTableStore, Row
 from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
@@ -45,8 +45,6 @@ from .well_formed import assert_well_formed
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
     from rewrite.python.tree import CompilationUnit
-
-Row = TypeVar("Row")
 
 
 class NoopRecipe(Recipe):
@@ -183,8 +181,8 @@ class RecipeSpec:
     # of them.
     expected_cycles_that_make_changes: Optional[int] = None
 
-    # Assertions on the rows the first cycle writes to each data table, by table name
-    data_table_assertions: Dict[str, Callable[[List[Any]], None]] = field(default_factory=dict)
+    # Assertions on the rows the first cycle writes to a data table, each with the name of its table
+    data_table_assertions: List[Tuple[str, Callable[[List[Any]], None]]] = field(default_factory=list)
 
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return replace(self, recipe=recipe)
@@ -216,7 +214,7 @@ class RecipeSpec:
             assertion: Called with the rows the recipe wrote to the table
         """
         name = table if isinstance(table, str) else table.name
-        return replace(self, data_table_assertions={**self.data_table_assertions, name: assertion})
+        return replace(self, data_table_assertions=[*self.data_table_assertions, (name, assertion)])
 
     def rewrite_run(self, *source_specs: SourceSpec) -> None:
         """
@@ -311,7 +309,7 @@ class RecipeSpec:
 
     def _expect_data_tables(self, store: InMemoryDataTableStore) -> None:
         written = store.get_data_tables()
-        for name, assertion in self.data_table_assertions.items():
+        for name, assertion in self.data_table_assertions:
             data_table = next((dt for dt in written if dt.name == name), None)
             if data_table is None:
                 found = list(dict.fromkeys(dt.name for dt in written))
