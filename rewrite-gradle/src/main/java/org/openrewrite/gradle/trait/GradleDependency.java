@@ -918,6 +918,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }));
         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
             updated = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                if (!(arg instanceof G.MapEntry)) {
+                    return arg;
+                }
                 G.MapEntry entry = (G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
                     //noinspection DataFlowIssue
@@ -1003,7 +1006,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1070,7 +1073,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedTemplate));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1148,7 +1151,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1215,7 +1218,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedTemplate));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1290,7 +1293,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString collapsed = gstring.withStrings(singletonList(newLiteral));
-                    updated = m.withArguments(singletonList(collapsed));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> collapsed));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1335,7 +1338,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                 mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), versionEntry))));
                     } else {
                         // Map entries as separate arguments
-                        updated = m.withArguments(ListUtils.concat(m.getArguments(), versionEntry));
+                        updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionEntry));
                     }
                 }
             }
@@ -1361,7 +1364,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (!versionFound) {
                 // Add a new version assignment
                 J.Assignment versionAssignment = createVersionAssignment(newVersion);
-                updated = m.withArguments(ListUtils.concat(m.getArguments(), versionAssignment));
+                updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionAssignment));
             }
         } else if (firstArg instanceof K.StringTemplate) {
             // For StringTemplate, we convert to a simple string literal with the new version
@@ -1376,7 +1379,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(template.getDelimiter() + replacement + template.getDelimiter())
                             .withPrefix(template.getPrefix());
-                    updated = m.withArguments(singletonList(newLiteral));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> newLiteral));
                 }
             }
         }
@@ -1417,6 +1420,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         String quotedVersion = quote + newVersion + quote;
         return new J.Literal(randomId(), declaredVersion.getPrefix(), declaredVersion.getMarkers(),
                 newVersion, quotedVersion, null, JavaType.Primitive.String);
+    }
+
+    private static List<Expression> insertBeforeTrailingClosure(List<Expression> arguments, Expression argument) {
+        int last = arguments.size() - 1;
+        return ListUtils.insert(arguments, argument, arguments.get(last) instanceof J.Lambda ? last : last + 1);
     }
 
     private static String quoteOf(List<? extends Expression> arguments) {
