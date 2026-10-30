@@ -20,7 +20,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from rewrite import ExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor, random_id
+from dataclasses import dataclass, field
+
+from rewrite import (ExecutionContext, InMemoryExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor,
+                     random_id)
+from rewrite.data_table import DATA_TABLE_STORE, DataTable, column
 from rewrite.execution import Result
 from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
@@ -564,6 +568,8 @@ def _marking_calls(marker: Callable[[], Marker], rename: Optional[str] = None) -
         def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
             mi = super().visit_method_invocation(mi, ctx)
             if rename is not None:
+                if mi.name.simple_name == rename:
+                    return mi
                 mi = mi.replace(name=mi.name.replace(simple_name=rename))
             return mi.replace(markers=mi.markers.add(marker()))
 
@@ -686,7 +692,7 @@ class TestGeneratedSources:
     COMPAT = 'def helper():\n    return None\n'
 
     @staticmethod
-    def _recipe(file_name="pkg/_helper.py", contents=None):
+    def _recipe(file_name="pkg/_helper.py", contents=None, again=False):
         contents = contents if contents is not None else TestGeneratedSources.COMPAT
 
         class Generates(ScanningRecipe[Set[str]]):
@@ -714,7 +720,7 @@ class TestGeneratedSources:
                 return Scan()
 
             def generate(self, acc: Set[str], ctx: ExecutionContext) -> List[SourceFile]:
-                if not acc:
+                if not acc or (file_name in acc and not again):
                     return []
                 import ast
 
@@ -773,3 +779,146 @@ class TestGeneratedSources:
                 python("import os", path=Path("pkg/client.py")),
                 python(None, None, path=Path("pkg/_helper.py")),
             )
+
+
+def _renaming_one_step(*names: str) -> Recipe:
+    """A recipe that renames each name in ``names`` to the one after it, a single step per run."""
+
+    class RenameOneStep(PythonVisitor[ExecutionContext]):
+        def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+            if ident.simple_name in names[:-1]:
+                return ident.replace(simple_name=names[names.index(ident.simple_name) + 1])
+            return ident
+
+    return from_visitor(RenameOneStep())
+
+
+@dataclass
+class _FoundName:
+    name: str = field(metadata=column("Name", "The name found"))
+
+
+_FOUND_NAMES = DataTable[_FoundName]("org.openrewrite.test.FoundNames", "Found names", "Names found.", _FoundName)
+
+
+class TestExtraCycles:
+    """The harness runs the recipe again on its own output, which has to change nothing."""
+
+    def test_a_recipe_that_changes_its_expected_result_again_fails(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\n", "b = 1\n", path=Path("a.py")))
+
+        assert str(failure.value).startswith(
+            "Expected recipe to complete in 1 cycle, but cycle 2 changed the sources again:\n"
+            "  a.py\n"
+            "Expected:\nb = 1\n\n\nActual:\nc = 1\n\n"
+        )
+
+    def test_expected_cycles_that_make_changes_compares_the_result_of_the_last_expected_cycle(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), expected_cycles_that_make_changes=2,
+                          type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "c = 1\n"))
+
+    def test_expected_cycles_that_make_changes_fails_a_recipe_that_settles_sooner(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), expected_cycles_that_make_changes=2,
+                          type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match="Expected recipe to complete in 2 cycles, but it settled after 1 cycle."):
+            spec.rewrite_run(python("b = 1\n", "c = 1\n"))
+
+    def test_expected_cycles_that_make_changes_0_fails_a_recipe_that_changes(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b"), expected_cycles_that_make_changes=0,
+                          type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match="Expected recipe to complete in 0 cycles, but cycle 1 changed"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_fewer_cycles_than_expected_to_make_changes_is_rejected(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), cycles=1, expected_cycles_that_make_changes=2,
+                          type_attribution=False)
+        with pytest.raises(ValueError, match="cycles=1 has to be at least 1 and at least"):
+            spec.rewrite_run(python("a = 1\n", "c = 1\n"))
+
+    def test_cycles_1_turns_the_check_off(self):
+        spec = RecipeSpec(recipe=_renaming_one_step("a", "b", "c"), cycles=1, type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+
+    def test_a_recipe_that_changes_the_lst_again_without_changing_the_text_fails(self):
+        class Upper(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                return ident.replace(id=random_id(), simple_name=ident.simple_name.upper())
+
+        spec = RecipeSpec(recipe=from_visitor(Upper()), type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match="  a.py, whose LST it changed without changing the printed source"):
+            spec.rewrite_run(python("a = 1\n", "A = 1\n", path=Path("a.py")))
+
+    def test_a_recipe_that_generates_a_file_again_fails(self):
+        with pytest.raises(AssertionError, match="  pkg/_helper.py, which it generated"):
+            RecipeSpec(recipe=TestGeneratedSources._recipe(again=True)).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, TestGeneratedSources.COMPAT, path=Path("pkg/_helper.py")),
+            )
+
+    def test_data_tables_are_written_by_the_first_cycle_only(self):
+        class FindNames(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                _FOUND_NAMES.insert_row(ctx, _FoundName(ident.simple_name))
+                return ident.replace(markers=ident.markers.add(SearchResult(random_id(), None)))
+
+        ctx = InMemoryExecutionContext()
+        spec = RecipeSpec(recipe=from_visitor(FindNames()), execution_context=ctx, type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "/*~~>*/a = 1\n"))
+
+        assert len(list(ctx.get_message(DATA_TABLE_STORE).get_rows(_FOUND_NAMES.name))) == 1
+
+    def test_a_recipe_that_recognizes_its_output_only_by_the_shape_of_its_lst_fails_on_a_fresh_parse(self):
+        class QualifyCalls(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                if "." in mi.name.simple_name:
+                    return mi
+                return mi.replace(name=mi.name.replace(simple_name="os." + mi.name.simple_name))
+
+        spec = RecipeSpec(recipe=from_visitor(QualifyCalls()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", "os.foo()\n", path=Path("a.py")))
+
+        assert str(failure.value).startswith(
+            "Running the recipe on a fresh parse of its output changed the sources again:\n"
+            "  a.py\n"
+            "Expected:\nos.foo()\n\n\nActual:\nos.os.foo()\n\n"
+        )
+
+    def test_a_fresh_parse_keeps_what_the_source_file_carries_from_outside_its_text(self):
+        @lst_dataclass
+        class Loud(Marker):
+            _id: int | UUID
+
+        def loud(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(Loud(random_id())))
+
+        class Case(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                is_loud = self.cursor.first_enclosing_or_throw(CompilationUnit).markers.find_first(Loud) is not None
+                name = ident.simple_name
+                return ident.replace(simple_name=name.upper() if is_loud else name.lower())
+
+        spec = RecipeSpec(recipe=from_visitor(Case()), type_attribution=False)
+        spec.rewrite_run(python("hi = 1\n", "HI = 1\n", before_recipe=loud))
+
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_a_fresh_parse_is_type_attributed(self):
+        typed: List[bool] = []
+
+        class RenameToPrint(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                if mi.name.simple_name == "foo":
+                    return mi.replace(name=mi.name.replace(simple_name="print"))
+                method_type = mi.method_type
+                typed.append(method_type is not None and not isinstance(method_type.declaring_type, JavaType.Unknown))
+                return mi
+
+        RecipeSpec(recipe=from_visitor(RenameToPrint())).rewrite_run(python("foo()\n", "print()\n"))
+
+        assert typed == [False, True]
