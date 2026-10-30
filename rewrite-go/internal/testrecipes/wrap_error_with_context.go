@@ -67,6 +67,8 @@ func (v *wrapErrorWithContextVisitor) VisitReturn(ret *java.Return, p any) java.
 		return ret
 	}
 	golang.MaybeAddImport(v, "fmt", nil, false)
+	errArg := *ident
+	errArg.Prefix = java.SingleSpace
 	c := *ret
 	c.Expression = &java.MethodInvocation{
 		ID:     uuid.New(),
@@ -76,7 +78,7 @@ func (v *wrapErrorWithContextVisitor) VisitReturn(ret *java.Return, p any) java.
 		Arguments: java.Container[java.Expression]{
 			Elements: []java.RightPadded[java.Expression]{
 				{Element: &java.Literal{ID: uuid.New(), Source: `"` + v.funcName + `: %w"`}},
-				{Element: &java.Identifier{ID: uuid.New(), Prefix: java.SingleSpace, Name: "err"}},
+				{Element: &errArg},
 			},
 		},
 	}
