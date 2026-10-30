@@ -61,15 +61,18 @@ describe('AutoformatVisitor with Prettier', () => {
         )
     });
 
-    test('a file Prettier cannot format keeps its own layout', () => {
+    test('a file Prettier cannot format keeps its own layout', async () => {
         // A parser Prettier has no plugin for is what makes it throw over the whole file
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AutoformatVisitor(undefined,
             [prettierStyle(randomId(), {parser: 'no-such-parser'})]));
-        return spec.rewriteRun(
+        await spec.rewriteRun(
             //language=typescript
             typescript('const x   =   1+2\n\n\n\nconst  y=3')
         );
+        expect(warn).toHaveBeenCalledWith('Prettier formatting failed:',
+            expect.objectContaining({message: expect.stringContaining('no-such-parser')}));
     });
 
     test('subtree formatting with Prettier applies Prettier defaults', async () => {

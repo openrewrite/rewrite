@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,11 @@ import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 @SuppressWarnings("GroovyUnusedAssignment")
 class UpdateJavaCompatibilityTest implements RewriteTest {
+
+    private static GradleParser.Builder withAndroidGradlePlugin() {
+        return GradleParser.builder().buildscriptClasspathFromResources(new InMemoryExecutionContext(),
+          "gradle-base-services", "gradle-core-api", "gradle-api");
+    }
 
     @DocumentExample
     @Test
@@ -838,6 +844,126 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(JavaVersion.VERSION_17.majorVersion))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)).parser(withAndroidGradlePlugin()),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_17
+                      targetCompatibility JavaVersion.VERSION_17
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCallSourceOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, UpdateJavaCompatibility.CompatibilityType.source, null, null, null))
+            .parser(withAndroidGradlePlugin()),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_17
+                      targetCompatibility JavaVersion.VERSION_1_8
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  id("com.android.application")
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_1_8
+                      targetCompatibility = JavaVersion.VERSION_1_8
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id("com.android.application")
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_17
+                      targetCompatibility = JavaVersion.VERSION_17
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCallWithoutAndroidGradlePluginOnClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
                   }
               }
               """

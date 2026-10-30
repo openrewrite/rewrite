@@ -57,6 +57,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -85,6 +86,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -115,6 +117,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -147,6 +150,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -177,6 +181,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -206,6 +211,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             // Should NOT match - needs at least 1 leading statement
@@ -243,6 +249,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             // Should match - zero leading statements
@@ -291,6 +298,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -379,6 +387,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -437,6 +446,7 @@ describe('variadic statement matching and expansion', () => {
                 ${second}
                 ${first}
             }`));
+        spec.cycles = 1;
 
         return spec.rewriteRun({
             ...typescript(

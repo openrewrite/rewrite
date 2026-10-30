@@ -24,14 +24,17 @@ import {
     Pattern,
     pattern,
     rewrite,
+    sourceFileCache,
     template,
     typescript
 } from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 /** The first node of `kind` in `text`, with the cursor that reached it. */
 async function findFirst(text: string, kind: string): Promise<[J, Cursor]> {
-    const cu: SourceFile = await new JavaScriptParser().parseOne({text, sourcePath: "match.ts"});
+    const cu: SourceFile = await parser.parseOne({text, sourcePath: "match.ts"});
     let found: [J, Cursor] | undefined;
     const visitor = new class extends JavaScriptVisitor<ExecutionContext> {
         protected override async postVisit(node: J, ctx: ExecutionContext): Promise<J | undefined> {
@@ -139,6 +142,7 @@ describe('rewriting through a captured condition', () => {
                 return await negate.tryOn(this.cursor, iff) || super.visitIf(iff, p);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript

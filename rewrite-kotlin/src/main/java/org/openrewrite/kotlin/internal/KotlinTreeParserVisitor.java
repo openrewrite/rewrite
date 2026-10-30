@@ -320,13 +320,23 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             receiver = padRight(receiverExp, prefix(expression.findColonColon()));
         }
 
+        J.Identifier reference = expression.getCallableReference().accept(this, data).withPrefix(Space.EMPTY);
+        // Without a receiver, as in `::Original`, the name is the whole class name. It carries the class type, as
+        // the class name in Java's `Original::new` does, so that searches for uses of the class find it.
+        // In `Outer::Inner` the name is only part of the class name, so it keeps the constructor type.
+        // Typed as the class, ChangeType would rename it to `Outer::Target`.
+        if (expression.getReceiverExpression() == null &&
+                methodReferenceType != null && methodReferenceType.isConstructor()) {
+            reference = reference.withType(methodReferenceType.getDeclaringType());
+        }
+
         return new J.MemberReference(
                 randomId(),
                 deepPrefix(expression),
                 Markers.EMPTY,
                 receiver,
                 null,
-                padLeft(prefix(expression.getLastChild()), expression.getCallableReference().accept(this, data).withPrefix(Space.EMPTY)),
+                padLeft(prefix(expression.getLastChild()), reference),
                 type(expression),
                 methodReferenceType,
                 fieldReferenceType

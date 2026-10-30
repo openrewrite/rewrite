@@ -183,6 +183,8 @@ type serverConfig struct {
 	recipeInstallDir string
 }
 
+var testActivators []recipe.Activator
+
 func newServer(cfg serverConfig) *server {
 	var logOut io.Writer
 	if cfg.logFile != "" {
@@ -211,6 +213,7 @@ func newServer(cfg serverConfig) *server {
 
 	reg := recipe.NewRegistry()
 	reg.Activate(recipes.Activate)
+	reg.Activate(testActivators...)
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
@@ -307,6 +310,18 @@ func (s *server) closeMetrics() {
 	}
 }
 
+// remoteObjectCount counts the ids in both directions, as the single remoteObjects map of the
+// Java, JS, Python and C# peers does.
+func (s *server) remoteObjectCount() int {
+	n := len(s.remoteObjects)
+	for id := range s.reverseRemoteObjects {
+		if _, ok := s.remoteObjects[id]; !ok {
+			n++
+		}
+	}
+	return n
+}
+
 // recordMetric appends one row to the metrics CSV. Safe to call from
 // concurrent goroutines; rows are written under metricsMu so they don't
 // interleave. Errors are logged and dropped — metrics emission must never
@@ -335,7 +350,7 @@ func (s *server) recordMetric(method string, duration time.Duration, rpcErr *rpc
 		strconv.FormatUint(mem.HeapAlloc, 10),
 		strconv.FormatUint(mem.Sys, 10),
 		strconv.Itoa(len(s.localObjects)),
-		strconv.Itoa(len(s.remoteObjects)),
+		strconv.Itoa(s.remoteObjectCount()),
 		strconv.Itoa(s.localRefs.Len() + len(s.reverseRemoteRefs)),
 	}
 	if err := s.metricsWriter.Write(row); err != nil {
@@ -1451,6 +1466,7 @@ func (s *server) handleEvict(params json.RawMessage) bool {
 	}
 	delete(s.localObjects, req.ID)
 	delete(s.remoteObjects, req.ID)
+	delete(s.reverseRemoteObjects, req.ID)
 	if cp, ok := s.refCheckpoints[req.ID]; ok {
 		s.localRefs.RollbackTo(cp.localRefsNext)
 		for k := range s.reverseRemoteRefs {
@@ -2159,6 +2175,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
+	if phase != "edit" && phase != "scan" {
+		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
+	}
+
 	// Get the tree from Java via bidirectional RPC
 	s.captureRefCheckpoint(req.TreeID)
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
@@ -2169,30 +2189,7 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// Resolve ctx first because ScanningRecipe.InitialValue may need it.
 	ctx := s.resolveExecutionContext(req.PID)
 
-	// Get the visitor based on phase. For ScanningRecipe, both scan and edit
-	// phases need access to the accumulator; the accumulator is created
-	// lazily on the first scan visit.
-	var v recipe.TreeVisitor
-	switch phase {
-	case "edit":
-		if sr, ok := r.(recipe.ScanningRecipe); ok {
-			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			v = sr.EditorWithData(acc)
-		} else {
-			v = r.Editor()
-		}
-	case "scan":
-		sr, ok := r.(recipe.ScanningRecipe)
-		if !ok {
-			// scan visitor for a non-scanning recipe is a no-op
-			return &visitResponse{Modified: false}, nil
-		}
-		acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-		v = sr.Scanner(acc)
-	default:
-		return nil, &rpcError{Code: -32602, Message: "Unknown phase: " + phase}
-	}
-
+	v := s.instantiateVisitor(req.Visitor, ctx)
 	if v == nil {
 		return &visitResponse{Modified: false}, nil
 	}
@@ -2206,7 +2203,11 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
 	if after == nil {
-		after = before
+		if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			q.AfterVisits()
+		}
+		delete(s.localObjects, req.TreeID)
+		return &visitResponse{Modified: true}, nil
 	}
 	// Drain any after-visits queued via GoVisitor.DoAfterVisit during
 	// the main visit. Mirrors JavaVisitor's afterVisit drain — recipes
@@ -2219,12 +2220,8 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 
 	// Store the result — update both localObjects (for forward GetObject)
 	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
-	if after != nil {
-		s.localObjects[req.TreeID] = after
-		s.reverseRemoteObjects[req.TreeID] = after
-	} else {
-		delete(s.localObjects, req.TreeID)
-	}
+	s.localObjects[req.TreeID] = after
+	s.reverseRemoteObjects[req.TreeID] = after
 
 	return &visitResponse{Modified: modified}, nil
 }
@@ -2281,11 +2278,33 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 	case "scan":
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
-			return sr.Scanner(acc)
+			if scanner := sr.Scanner(acc); scanner != nil {
+				return &scanOnlyVisitor{scanner: scanner}
+			}
 		}
 		return nil
 	}
 	return nil
+}
+
+// scanOnlyVisitor runs a scanner for its effect on the accumulator and hands
+// back the tree it was given, as the Java and JS peers do: a scanner can
+// neither change nor delete a source file.
+type scanOnlyVisitor struct {
+	scanner recipe.TreeVisitor
+}
+
+func (v *scanOnlyVisitor) Visit(t java.Tree, p any) java.Tree {
+	if after := v.scanner.Visit(t, p); after != nil {
+		visitor.DrainAfterVisits(v.scanner, after, p)
+	}
+	return t
+}
+
+func (v *scanOnlyVisitor) SetCursor(c *visitor.Cursor) {
+	if ca, ok := v.scanner.(interface{ SetCursor(c *visitor.Cursor) }); ok {
+		ca.SetCursor(c)
+	}
 }
 
 // batchVisitRequest is the parameter type for BatchVisit.
@@ -2457,19 +2476,9 @@ func (s *server) handleGenerate(params json.RawMessage) (any, *rpcError) {
 		newID := uuid.New().String()
 		s.localObjects[newID] = t
 		resp.IDs = append(resp.IDs, newID)
-		resp.SourceFileTypes = append(resp.SourceFileTypes, sourceFileTypeFor(t))
+		resp.SourceFileTypes = append(resp.SourceFileTypes, rpc.JavaClassName(t))
 	}
 	return resp, nil
-}
-
-// sourceFileTypeFor returns the FQN Java expects for a Go-side tree.
-// Currently every Go source file is a CompilationUnit; expand if other
-// SourceFile types are added.
-func sourceFileTypeFor(t java.Tree) string {
-	if _, ok := t.(*golang.CompilationUnit); ok {
-		return "org.openrewrite.golang.tree.Go$CompilationUnit"
-	}
-	return ""
 }
 
 type traceGetObjectRequest struct {

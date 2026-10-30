@@ -125,6 +125,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     String description = "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
+                "Only what the project uses is retained: a managed version is copied in only for a dependency that this pom or one of its modules declares without a version, " +
+                "and a property only when the pom references it. " +
                 "Removes redundant dependency versions already managed by the new parent.";
 
     @Deprecated

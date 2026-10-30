@@ -160,6 +160,12 @@ def test_uses_type_with_check_assignability_matches_types_of_called_methods():
     assert _matches(uses_type("datetime.tzinfo", check_assignability=True).local_visitor, implicit_only)
 
 
+def test_uses_type_with_check_assignability_reads_a_call_whose_method_has_no_parameter_types():
+    # The constructor call of a class with no `__init__` is attributed a method type with no parameter types.
+    no_init = _parse_attributed("class Registry:\n    pass\n\nRegistry()\n")
+    assert not _matches(uses_type("decimal.Decimal", check_assignability=True).local_visitor, no_init)
+
+
 def test_uses_type_glob_that_covers_the_root_name_does_not_match_every_type():
     assert not _matches(uses_type("o*", check_assignability=True).local_visitor,
                         _parse_attributed("class MyError(ValueError):\n    pass\n"))

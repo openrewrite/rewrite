@@ -197,6 +197,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
+    public J visitExpressionStatement(K.ExpressionStatement expressionStatement, @Nullable Object ctx) {
+        if (expressionStatement == ctx || !(ctx instanceof K.ExpressionStatement)) {
+            return expressionStatement;
+        }
+
+        K.ExpressionStatement newExpressionStatement = (K.ExpressionStatement) ctx;
+        return expressionStatement.withExpression(visitAndCast(expressionStatement.getExpression(), newExpressionStatement.getExpression()));
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, @Nullable Object ctx) {
         if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
             return functionType;
@@ -347,6 +357,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             s = (K.SpreadArgument) temp;
         }
         return s.withExpression(visitAndCast(s.getExpression(), newSpreadArgument.getExpression()));
+    }
+
+    @Override
+    public J visitStatementExpression(K.StatementExpression statementExpression, @Nullable Object ctx) {
+        if (statementExpression == ctx || !(ctx instanceof K.StatementExpression)) {
+            return statementExpression;
+        }
+
+        K.StatementExpression newStatementExpression = (K.StatementExpression) ctx;
+        return statementExpression.withStatement(visitAndCast(statementExpression.getStatement(), newStatementExpression.getStatement()));
     }
 
     @Override

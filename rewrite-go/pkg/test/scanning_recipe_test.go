@@ -65,15 +65,20 @@ type externalImportScanner struct {
 }
 
 func (v *externalImportScanner) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	if cu.Imports != nil {
-		for _, rp := range cu.Imports.Elements {
-			path := importPath(rp.Element)
-			if isExternalImport(path) {
-				v.acc.paths[path] = true
-			}
+	v.acc.record(cu)
+	return cu
+}
+
+func (acc *importAccumulator) record(cu *golang.CompilationUnit) {
+	if cu.Imports == nil {
+		return
+	}
+	for _, rp := range cu.Imports.Elements {
+		path := importPath(rp.Element)
+		if isExternalImport(path) {
+			acc.paths[path] = true
 		}
 	}
-	return cu
 }
 
 func importPath(imp *java.Import) string {
@@ -171,16 +176,34 @@ func (r *generateBuildTag) Description() string {
 	return "Generates tools.go when the project imports any external module."
 }
 
+type buildTagAccumulator struct {
+	importAccumulator
+	toolsExists bool
+}
+
 func (r *generateBuildTag) InitialValue(*recipe.ExecutionContext) any {
-	return &importAccumulator{paths: map[string]bool{}}
+	return &buildTagAccumulator{importAccumulator: importAccumulator{paths: map[string]bool{}}}
 }
 
 func (r *generateBuildTag) Scanner(acc any) recipe.TreeVisitor {
-	return visitor.Init(&externalImportScanner{acc: acc.(*importAccumulator)})
+	return visitor.Init(&buildTagScanner{acc: acc.(*buildTagAccumulator)})
+}
+
+type buildTagScanner struct {
+	visitor.GoVisitor
+	acc *buildTagAccumulator
+}
+
+func (v *buildTagScanner) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	if cu.SourcePath == "tools.go" {
+		v.acc.toolsExists = true
+	}
+	v.acc.record(cu)
+	return cu
 }
 
 func (r *generateBuildTag) Generate(acc any, _ *recipe.ExecutionContext) []java.Tree {
-	if len(acc.(*importAccumulator).paths) == 0 {
+	if a := acc.(*buildTagAccumulator); a.toolsExists || len(a.paths) == 0 {
 		return nil
 	}
 	cu, err := parser.NewGoParser().Parse("tools.go", "package app\n")

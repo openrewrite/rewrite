@@ -55,6 +55,7 @@ describe('param() function', () => {
                 return literal;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript('const x = 7', 'const x = 7 + 1'),

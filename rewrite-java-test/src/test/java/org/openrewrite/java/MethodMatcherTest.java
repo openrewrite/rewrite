@@ -197,6 +197,18 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void singleWildcardTypeExcludesSubPackages() {
+        MethodMatcher singlePackage = new MethodMatcher("java.util.* *(..)");
+        assertTrue(singlePackage.matchesTargetType(build("java.util.List")));
+        assertTrue(singlePackage.matchesTargetType(build("java.util.Map$Entry")));
+        assertFalse(singlePackage.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+
+        MethodMatcher withSubPackages = new MethodMatcher("java.util..* *(..)");
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.List")));
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+    }
+
+    @Test
     void packagePrefixWithArrayDimensions() {
         JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
         assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*[])").matches(

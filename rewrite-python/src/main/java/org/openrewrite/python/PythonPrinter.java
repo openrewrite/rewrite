@@ -87,6 +87,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         beforeSyntax(async, p);
         p.append("async");
         visit(async.getStatement(), p);
+        afterSyntax(async, p);
         return async;
     }
 
@@ -105,6 +106,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         int operandStart = p.out.length();
         visit(await.getExpression(), p);
         separateKeywordFromOperand(p, operandStart);
+        afterSyntax(await, p);
         return await;
     }
 
@@ -253,6 +255,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
                 visit(condition, p);
             }
         }
+        afterSyntax(clause, p);
         return clause;
     }
 
@@ -261,6 +264,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         beforeSyntax(condition, p);
         p.append("if");
         visit(condition.getExpression(), p);
+        afterSyntax(condition, p);
         return condition;
     }
 
@@ -269,6 +273,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         beforeSyntax(del, p);
         p.append("del");
         visitRightPadded(del.getPadding().getTargets(), ",", p);
+        afterSyntax(del, p);
         return del;
     }
 
@@ -287,6 +292,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         visitSpace(errorFrom.getPadding().getFrom().getBefore(), p);
         p.append("from");
         visit(errorFrom.getFrom(), p);
+        afterSyntax(errorFrom, p);
         return errorFrom;
     }
 
@@ -297,6 +303,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
             p.append("*");
         }
         visit(exceptionType.getExpression(), p);
+        afterSyntax(exceptionType, p);
         return exceptionType;
     }
 
@@ -330,6 +337,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
                 p.append(delimiter.substring(quote));
             }
         }
+        afterSyntax(formattedString, p);
         return formattedString;
     }
 
@@ -364,6 +372,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
             visit(value.getFormat(), p);
         }
         p.append('}');
+        afterSyntax(value, p);
         return value;
     }
 
@@ -395,6 +404,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
             p.append("if");
             visit(guard.getElement(), p);
         }
+        afterSyntax(matchCase, p);
         return matchCase;
     }
 
@@ -449,6 +459,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
                 visitContainer("_", children, "", "", p);
                 break;
         }
+        afterSyntax(pattern, p);
         return pattern;
     }
 
@@ -475,6 +486,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         beforeSyntax(namedArgument, p);
         visit(namedArgument.getName(), p);
         visitLeftPadded("=", namedArgument.getPadding().getValue(), p);
+        afterSyntax(namedArgument, p);
         return namedArgument;
     }
 
@@ -503,6 +515,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
             p.append(':');
             visitRightPadded(step, p);
         }
+        afterSyntax(slice, p);
         return slice;
     }
 
@@ -610,6 +623,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
                 break;
         }
         visitRightPadded(variableScope.getPadding().getNames(), ",", p);
+        afterSyntax(variableScope, p);
         return variableScope;
     }
 
@@ -618,6 +632,7 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
         beforeSyntax(yieldFrom, p);
         p.append("from");
         visit(yieldFrom.getExpression(), p);
+        afterSyntax(yieldFrom, p);
         return yieldFrom;
     }
 

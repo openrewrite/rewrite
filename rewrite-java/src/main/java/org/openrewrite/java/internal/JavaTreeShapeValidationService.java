@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeShapeValidationService;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -29,8 +30,11 @@ import org.openrewrite.java.tree.Javadoc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 public class JavaTreeShapeValidationService implements TreeShapeValidationService {
     private static final Pattern PARSER_VERSION = Pattern.compile("\\.Java(\\d+)Parser\\b");
@@ -85,6 +89,35 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         JavaVersion version = sourceFile.getMarkers().findFirst(JavaVersion.class).orElse(null);
         return version == null || !parserVersion.find() ||
                version.getMajorVersion() <= Integer.parseInt(parserVersion.group(1));
+    }
+
+    @Override
+    public Parser.Builder untypedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // the copy's types are incomplete, so they stay out of a type factory the test's builder holds
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .classpath(emptyList())
+                .dependsOn(emptyList())
+                .typeAttribution(false)
+                .typeFactory(null);
+    }
+
+    @Override
+    public @Nullable String syntaxError(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, AtomicReference<@Nullable String>>() {
+            @Override
+            public Tree preVisit(Tree t, AtomicReference<@Nullable String> text) {
+                if (text.get() != null) {
+                    stopAfterPreVisit();
+                } else if (t instanceof J.Erroneous) {
+                    text.set(((J.Erroneous) t).getText());
+                    stopAfterPreVisit();
+                }
+                return t;
+            }
+        }.reduce(sourceFile, new AtomicReference<>()).get();
     }
 
     @Override

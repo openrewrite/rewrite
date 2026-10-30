@@ -32,6 +32,7 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
              static void foo(int n) {}
              static void foo(int n1, int n2) {}
              static void foo(int n1, int n2, int n3) {}
+             static void qux(int... ns) {}
              static void bar(String n) {}
              static void bar(String n1, String n2) {}
              static void bar(String n1, String n2, String n3) {}
@@ -58,6 +59,41 @@ class AddLiteralMethodArgumentTest implements RewriteTest {
             "class A {{ B.foo(0, 1); }}",
             "class A {{ B.foo(0, -1, 1); }}"
           )
+        );
+    }
+
+    @Test
+    void addToFirstArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new AddLiteralMethodArgument("B foo(int)", 0, -1, "int")),
+          java(
+            "class A {{ B.foo(1); }}",
+            "class A {{ B.foo(-1, 1); }}"
+          ),
+          java(
+            "class C {{ B.foo(\n    1); }}",
+            "class C {{ B.foo(\n    -1, 1); }}"
+          )
+        );
+    }
+
+    @Test
+    void addToVarargs() {
+        rewriteRun(
+          spec -> spec.recipe(new AddLiteralMethodArgument("B qux(int...)", 2, 2, "int"))
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            "class A {{ B.qux(0, 1); }}",
+            "class A {{ B.qux(0, 1, 2); }}"
+          )
+        );
+    }
+
+    @Test
+    void noArgumentsLeaveNoPositionBeyondTheFirst() {
+        rewriteRun(
+          spec -> spec.recipe(new AddLiteralMethodArgument("B foo()", 1, 1, "int")),
+          java("class A {{ B.foo(); }}")
         );
     }
 

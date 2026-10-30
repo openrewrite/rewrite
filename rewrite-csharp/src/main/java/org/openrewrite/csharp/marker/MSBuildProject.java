@@ -434,7 +434,7 @@ public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCod
 
         /**
          * NuGet packages this project depends on directly. Instances are shared with the
-         * owning {@link TargetFramework#getResolvedPackages()}.
+         * owning {@link TargetFramework#resolvedPackages}.
          */
         @Builder.Default
         List<ResolvedPackage> resolvedPackages = emptyList();

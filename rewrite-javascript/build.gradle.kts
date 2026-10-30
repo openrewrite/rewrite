@@ -1,8 +1,10 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.github.gradle.node.NodeExtension
+import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
+import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -117,17 +119,21 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
     workingDir = versionDir
 }
 
-val npmInstall = tasks.named("npmInstall")
+val npmInstall = tasks.named<NpmInstallTask>("npmInstall") {
+    // Every install would otherwise print an audit report, fetched from the registry, and a funding appeal
+    args.addAll("--no-audit", "--no-fund")
+}
 
-val npmTest = tasks.register<NpmTask>("npmTest") {
+// What npmInstall installed, without the caches vitest and vite keep in node_modules and rewrite on every test run
+val nodeModules = fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") }
+
+// What tsc type-checks and vitest runs, none of it from the Java side
+fun Task.typeScriptInputs() {
     dependsOn(npmInstall)
-    // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
-    // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
-    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
-    dependsOn(tasks.named("generateTestClasspath"))
-    // test/rpc/server.test.ts starts the built server
-    dependsOn("npmBuild")
-    inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
+    // Without the configuration cache Gradle runs one task of a project at a time. These wait for compileJava rather
+    // than hold it up, since rewrite-kotlin's compilation, and rewrite-gradle's tests after it, need its classes.
+    mustRunAfter(tasks.named("compileJava"))
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
@@ -137,24 +143,72 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
-        .withNormalizer(ClasspathNormalizer::class)
-    // the tests under test/rpc run against the Java classes that file lists, not only the list itself
-    inputs.files(tasks.named("compileJava").map { it.outputs.files })
-        .withNormalizer(ClasspathNormalizer::class)
-    inputs.files(configurations["runtimeClasspath"])
-        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(fileTree("rewrite/fixtures"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+val npmTypecheck = tasks.register<NpmTask>("npmTypecheck") {
+    typeScriptInputs()
+    // tsc emits nothing, so this file records that the inputs type-checked
+    val passed = layout.buildDirectory.file("npmTypecheck/passed")
+    outputs.file(passed)
+    outputs.cacheIf { true }
+    args = listOf("run", "--silent", "typecheck")
+    doLast {
+        passed.get().asFile.writeText("")
+    }
+}
+
+// Runs one of the projects vitest.config.mts divides the tests into
+fun NpmTask.vitest(vitestProject: String, junitXml: String) {
+    typeScriptInputs()
+    mustRunAfter(npmTypecheck)
+    // test/rpc/server.test.ts, for one, starts the built server
+    dependsOn("npmBuild")
     inputs.files(fileTree("src/integTest/resources/printer-parity"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.files("rewrite/build/test-results/vitest/junit.xml")
+    outputs.file("rewrite/$junitXml")
     outputs.cacheIf { true }
 
-    // -PverboseTests switches vitest to its full per-test reporter (see vitest.config.mts)
+    // vitest prints only failing tests and the summary, or with -PverboseTests every test (see vitest.config.mts)
     if (project.hasProperty("verboseTests")) {
         environment.put("VERBOSE_TESTS", "1")
+    } else {
+        environment.put("QUIET_TESTS", "1")
     }
 
-    args = listOf("run", "ci:test")
+    // npm exec prints no banner, and unlike `npm run --silent` leaves the loglevel of every npm a test runs alone.
+    // --no fails the task when vitest is missing from node_modules, where npm would otherwise download the latest one.
+    args = listOf("exec", "--no", "--", "vitest", "run", "--project", vitestProject, "--outputFile.junit=$junitXml")
+}
+
+val npmTestTypeScript = tasks.register<NpmTask>("npmTestTypeScript") {
+    vitest("typescript", "build/test-results/vitest/junit.xml")
+}
+
+// The classpath the tests of the java project start org.openrewrite.maven.rpc.JavaRewriteRpc on, which
+// generateTestClasspath writes to test-classpath.txt
+val javaRpcClasspath = files(configurations.named("runtimeClasspath"), configurations.named("testRuntimeClasspath"),
+    tasks.named("compileJava"), tasks.named("processResources"))
+
+val npmTestJava = tasks.register<NpmTask>("npmTestJava") {
+    vitest("java", "build/test-results/vitest-java/junit.xml")
+    // Generating the server's classpath here means devs running `./gradlew :rewrite-javascript:npmTest` get these
+    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
+    dependsOn(tasks.named("generateTestClasspath"))
+    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
+    // the tests run against the Java classes that file lists, not only the list itself
+    inputs.files(javaRpcClasspath)
+        .withNormalizer(ClasspathNormalizer::class)
+    // test/javascript/completeness.test.ts compares the TypeScript trees and visitors with the Java ones
+    inputs.files(fileTree("src/main/java"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+val npmTest = tasks.register("npmTest") {
+    description = "Type-checks the TypeScript and runs its tests."
+    dependsOn(npmTypecheck, npmTestTypeScript, npmTestJava)
 }
 
 tasks.named("check") {
@@ -162,27 +216,39 @@ tasks.named("check") {
 }
 
 val npmBuild = tasks.register<NpmTask>("npmBuild") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(file("rewrite/package.json"))
+    inputs.files("rewrite/package.json", "rewrite/tsconfig.json", "rewrite/tsconfig.build.json")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
 
+    // --silent drops the banner npm prints for each script. The postbuild's npm link sets its own loglevel, so a
+    // failure to link still says why.
+    args = listOf("run", "--silent", "build")
+}
+
+tasks.named("assemble") {
+    dependsOn(npmBuild)
+}
+
+// The version the jar embeds. On CI it changes with every commit, which would rerun npmBuild if that wrote it.
+val generateVersionTxt = tasks.register("generateVersionTxt") {
     val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
+    val version = datedSnapshotVersion
+    inputs.property("version", version)
     outputs.file(versionTxt)
     doLast {
-        versionTxt.writeText(datedSnapshotVersion)
+        versionTxt.writeText(version)
     }
-
-    args = listOf("run", "build")
 }
 
 // Because each of these sees rewrite-javascript-version.txt as an input
-listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+listOf("sourcesJar", "processResources", "licenseMain").forEach {
     tasks.named(it) {
-        dependsOn(npmBuild)
+        dependsOn(generateVersionTxt)
     }
 }
 
@@ -191,6 +257,10 @@ val npmPack = tasks.register<Tar>("npmPack") {
         into("package/src")
     }
     from(npmBuild) {
+        into("package/dist/")
+    }
+    // Published packages carry the version the jar embeds as dist/rewrite-javascript-version.txt
+    from(generateVersionTxt) {
         into("package/dist/")
     }
     from(npmVersion) {
@@ -209,7 +279,8 @@ val npmPack = tasks.register<Tar>("npmPack") {
 }
 
 val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -219,7 +290,7 @@ val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist-fixtures/"))
 
-    args = listOf("run", "build:fixtures")
+    args = listOf("run", "--silent", "build:fixtures")
 }
 
 testing {
@@ -308,7 +379,7 @@ tasks.named("publish") {
 fun cgpPublishToken(): String? =
     project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
 
-val npmPublishCgp by tasks.registering {
+val npmPublishCgp = tasks.register("npmPublishCgp") {
     group = "javascript"
     description = "Publish the npm tarball to the Code Genome Project"
 
@@ -360,7 +431,7 @@ if (cgpPublishToken() != null) {
 
 // Task to generate classpath file for Java RPC server testing (consumed by TS tests
 // in rewrite-javascript/rewrite/test/rpc/ that spawn org.openrewrite.maven.rpc.JavaRewriteRpc).
-val generateTestClasspath by tasks.registering {
+val generateTestClasspath = tasks.register("generateTestClasspath") {
     group = "javascript"
     description = "Generate classpath file for Java RPC server (used by TypeScript tests)"
 
@@ -378,45 +449,57 @@ val generateTestClasspath by tasks.registering {
     dependsOn(tasks.named("jar"))
 
     doLast {
-        val classpath = (
-            configurations.getByName("runtimeClasspath").files +
-            configurations.getByName("testRuntimeClasspath").files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+        outputFile.writeText(javaRpcClasspath.joinToString(File.pathSeparator) { it.absolutePath })
+        logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
+    // Test fixtures without a file extension, which the check has no header style for
+    excludes(listOf(
+        "**/npm-arborist/*-cases", "**/npm-arborist/*-dumps", "**/npm-arborist/*-shapes", "**/npm-arborist/*-tables",
+        "**/semver/fixtures-*", "**/semver/release-differences", "**/bun/hosted-git-info-valid", "**/bun/ini-cases",
+        "**/npm-resolver/gh-acme-private", "**/npm-resolver/jsr-*"
+    ))
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )
 }
 
-// The lock regeneration test fixtures (recorded package-manager output, ~18000 files including binary
-// tarballs) live in openrewrite/rewrite-javascript-lock-fixtures. The latest main is fetched once into
-// build/lock-fixtures and joins the test classpath; `clean` picks up newer fixtures.
+// The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
+// live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
+// Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
+val lockFixturesCommit = "8533f9639291673cad34703ed76178eb46bc72cf"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
+    inputs.property("commit", lockFixturesCommit)
     outputs.dir(lockFixturesDir)
-    onlyIf { !lockFixturesDir.get().dir("lock").asFile.exists() }
     doLast {
-        val archive = layout.buildDirectory.file("tmp/lock-fixtures-main.tar.gz").get().asFile
-        archive.parentFile.mkdirs()
-        uri("https://codeload.github.com/openrewrite/rewrite-javascript-lock-fixtures/tar.gz/refs/heads/main")
-            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
-        copy {
-            from(tarTree(resources.gzip(archive))) {
-                include("*/lock/**")
-                eachFile { path = path.substringAfter('/') }
-                includeEmptyDirs = false
+        val archiveDir = layout.buildDirectory.dir("tmp/lock-fixtures-archive").get().asFile
+        val archive = archiveDir.resolve("$lockFixturesCommit.tar.gz")
+        if (!archive.exists()) {
+            delete(archiveDir)
+            archiveDir.mkdirs()
+            val download = archiveDir.resolve("$lockFixturesCommit.tar.gz.part")
+            uri("https://codeload.github.com/openrewrite/rewrite-javascript-lock-fixtures/tar.gz/$lockFixturesCommit")
+                .toURL().openStream().use { input -> download.outputStream().use { input.copyTo(it) } }
+            Files.move(download.toPath(), archive.toPath())
+        }
+        delete(lockFixturesDir)
+        try {
+            copy {
+                from(tarTree(resources.gzip(archive))) {
+                    include("*/lock/**")
+                    eachFile { path = path.substringAfter('/') }
+                    includeEmptyDirs = false
+                }
+                into(lockFixturesDir)
             }
-            into(lockFixturesDir)
+        } catch (e: Exception) {
+            archive.delete()
+            throw e
         }
     }
 }

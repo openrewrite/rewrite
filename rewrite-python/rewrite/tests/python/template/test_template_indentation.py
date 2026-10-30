@@ -173,6 +173,8 @@ class _WrapIfInWith(Recipe):
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         class Visitor(PythonVisitor[ExecutionContext]):
             def visit_if(self, if_stmt: j.If, p: ExecutionContext) -> Optional[J]:
+                if self.cursor.first_enclosing(j.Try) is not None:
+                    return if_stmt
                 return _wrap_template.apply(self.cursor, values={'stmt': if_stmt})
 
         return Visitor()
