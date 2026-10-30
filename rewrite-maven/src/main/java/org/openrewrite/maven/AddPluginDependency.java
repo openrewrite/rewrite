@@ -25,13 +25,16 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.tree.Version;
-import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.xml.AddToTagVisitor.addToTag;
 import static org.openrewrite.xml.MapTagChildrenVisitor.mapTagChildren;
 
@@ -70,7 +73,7 @@ public class AddPluginDependency extends Recipe {
     String displayName = "Add Maven plugin dependencies";
 
     String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom. " +
-            "When a version is given, an existing dependency on the same or a newer version is left as is.";
+            "When the given version resolves, an existing dependency on the same or a newer version is left as is.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -122,10 +125,13 @@ public class AddPluginDependency extends Recipe {
                             .orElse(plugin);
                 }
                 if (!versionTag.isPresent()) {
-                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + version + "</version>");
-                    return (Xml.Tag) new AddToTagVisitor<>(dependency, newVersionTag,
-                            new MavenTagInsertionComparator(dependency.getChildren()))
-                            .visitNonNull(plugin, ctx, getCursor().getParentOrThrow());
+                    Xml.Tag artifactIdTag = dependency.getChild("artifactId").orElseThrow(IllegalStateException::new);
+                    Xml.Tag newVersionTag = Xml.Tag.build("<version>" + version + "</version>")
+                            .withPrefix(artifactIdTag.getPrefix());
+                    List<Content> content = new ArrayList<>(requireNonNull(dependency.getContent()));
+                    content.add(content.indexOf(artifactIdTag) + 1, newVersionTag);
+                    Xml.Tag updated = dependency.withContent(content);
+                    return mapTagChildren(plugin, dependencies, it -> it == dependency ? updated : it);
                 }
                 String existingValue = versionTag.get().getValue().orElse(null);
                 ResolvedPom pom = getResolutionResult().getPom();
@@ -136,30 +142,36 @@ public class AddPluginDependency extends Recipe {
                     new Version(existingVersion).compareTo(new Version(requestedVersion)) >= 0) {
                     return plugin;
                 }
-                // changeChildTagValue leaves a property owned by an in-repo parent to be changed in that parent.
-                // This recipe edits only poms that declare the plugin, so it replaces the reference with the version.
-                Xml.Tag updated = isPropertyOfInRepoParent(existingValue) ?
-                        (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), version).visitNonNull(dependency, ctx) :
-                        changeChildTagValue(dependency, "version", version, ctx);
+                // A requested property reference goes into the tag, not into the value of the existing property.
+                Xml.Tag updated = !version.contains("${") && isPropertyOfThisPom(existingValue) ?
+                        changeChildTagValue(dependency, "version", version, ctx) :
+                        (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), version).visitNonNull(dependency, ctx);
                 return mapTagChildren(plugin, dependencies, it -> it == dependency ? updated : it);
             }
 
-            private boolean isPropertyOfInRepoParent(@Nullable String value) {
+            /**
+             * Whether the version is a property this pom declares or inherits from an external parent,
+             * the only kind changeChildTagValue changes. A property an in-repo parent declares is changed
+             * in that parent's pom, which this recipe visits only when it declares the plugin too.
+             */
+            private boolean isPropertyOfThisPom(@Nullable String value) {
                 if (!isProperty(value)) {
                     return false;
                 }
                 String propertyName = value.substring(2, value.length() - 1);
-                if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                    return true;
+                }
+                if (!pom.getProperties().containsKey(propertyName)) {
                     return false;
                 }
-                MavenResolutionResult parent = getResolutionResult().getParent();
-                while (parent != null) {
+                for (MavenResolutionResult parent = getResolutionResult().getParent(); parent != null; parent = parent.getParent()) {
                     if (parent.getPom().getRequested().getProperties().containsKey(propertyName)) {
-                        return true;
+                        return false;
                     }
-                    parent = parent.getParent();
                 }
-                return false;
+                return true;
             }
         };
     }
