@@ -20,7 +20,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -423,6 +425,26 @@ class MethodDeclarationTest implements RewriteTest {
               @Suppress("UNUSED_PARAMETER")
               fun < T : Any ? > test( n : Optional <  T   &    Any > = Optional.empty < T > ( ) ) { }
               """
+          )
+        );
+    }
+
+    @Test
+    void commentBeforeExpressionBodyBelongsToTheExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              fun test() = /* keep */ check(true)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration test = (J.MethodDeclaration) cu.getStatements().getFirst();
+                K.Return return_ = (K.Return) test.getBody().getStatements().getFirst();
+                assertThat(return_.getPrefix().getComments()).isEmpty();
+                assertThat(return_.getExpression().getExpression().getPrefix().getComments())
+                  .singleElement()
+                  .extracting(c -> ((TextComment) c).getText())
+                  .isEqualTo(" keep ");
+            })
           )
         );
     }
