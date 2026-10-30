@@ -206,39 +206,6 @@ testing {
 // Go Test Support Tasks
 // ============================================
 
-// Configuration to collect classpath for the Java RPC server
-val javaRpcClasspath = configurations.create("javaRpcClasspath") {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    extendsFrom(configurations.getByName("runtimeClasspath"))
-}
-
-dependencies {
-    javaRpcClasspath(project(":rewrite-maven"))
-}
-
-// Task to generate classpath file for Java RPC server testing from Go
-val generateTestClasspath = tasks.register("generateTestClasspath") {
-    group = "golang"
-    description = "Generate classpath file for Java RPC server (used by Go tests)"
-
-    val outputFile = file("test-classpath.txt")
-    outputs.file(outputFile)
-
-    dependsOn(tasks.named("compileJava"))
-
-    doLast {
-        val classpath = (
-            javaRpcClasspath.files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
-        logger.info("Generated test classpath to ${outputFile.absolutePath}")
-    }
-}
-
 val junitXmlFile = file("build/test-results/gotest/junit.xml")
 
 val goTest = tasks.register<Exec>("goTest") {
@@ -253,8 +220,6 @@ val goTest = tasks.register<Exec>("goTest") {
         "--format", gotestFormat,
         "--", "-count=1", "./...")
 
-    dependsOn(generateTestClasspath)
-
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
         include("go.mod")
@@ -262,7 +227,15 @@ val goTest = tasks.register<Exec>("goTest") {
         exclude("build/**")
         exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(file("test-classpath.txt"))
+    inputs.files(fileTree(projectDir) {
+        include("**/testdata/**")
+        include("src/test/resources/**")
+        exclude("build/**")
+        exclude("vendor/**")
+    }).withPropertyName("goTestData").withPathSensitivity(PathSensitivity.RELATIVE)
+    // marker_guard_test.go and quote_test.go read these Java sources directly
+    inputs.files(listOf("rewrite-go", "rewrite-core", "rewrite-java").map { rootProject.file("$it/src/main/java") })
+        .withPropertyName("javaSources").withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }

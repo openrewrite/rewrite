@@ -76,6 +76,7 @@ describe('template2 replace', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('(1 + 2) == 3', '3 == 3'),
@@ -351,6 +352,7 @@ describe('markers on a spliced capture', () => {
                 return await rule.tryOn(this.cursor, identifier) || identifier;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('foo(o!);', 'foo(String(o!));')

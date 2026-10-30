@@ -57,7 +57,7 @@ public class AutoFormatVisitor<P> extends GolangVisitor<P> {
             return (J) defaultValue(null, p);
         }
         FormattingListener.beforeFormat(tree, stopAfter, getCursor());
-        return doFormat(tree, p, new Cursor(getCursor(), tree));
+        return doFormat(tree, p, getCursor());
     }
 
     private J doFormat(Tree tree, P p, Cursor cursor) {

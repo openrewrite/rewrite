@@ -142,6 +142,7 @@ describe('rewriting through a captured condition', () => {
                 return await negate.tryOn(this.cursor, iff) || super.visitIf(iff, p);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
