@@ -416,6 +416,30 @@ public class RewriteRuleTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// <c>x is null</c> matches <c>{x} == null</c>, and replacing it with <c>{x} is null</c> writes the
+    /// same code again.
+    /// </summary>
+    [Fact]
+    public void RewriteToTheSameCodeLeavesUnchanged()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FallbackWithManualVisitorRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var a = x is null;
+                        var b = y is not null;
+                    }
+                }
+                """
+            )
+        );
+    }
+
     [Fact]
     public void RewriteNoMatchLeavesUnchanged()
     {
@@ -591,13 +615,12 @@ public class RewriteRuleTests : RewriteTest
     public void PreservesNullConditionalOnElementAccess()
     {
         var x = Capture.Expression();
-        var i = Capture.Expression();
 
         RewriteRun(
             spec => spec.SetRecipe(new RewriteRecipe(
                 CSharpTemplate.Rewrite(
-                    CSharpPattern.Expression($"{x}[{i}]"),
-                    CSharpTemplate.Expression($"{x}[{i}]")))),
+                    CSharpPattern.Expression($"{x}[0]"),
+                    CSharpTemplate.Expression($"{x}[1]")))),
             CSharp(
                 """
                 class Test
@@ -613,7 +636,7 @@ public class RewriteRuleTests : RewriteTest
                 {
                     void M(int[]? arr)
                     {
-                        var n = arr?[0];
+                        var n = arr?[1];
                     }
                 }
                 """
