@@ -133,13 +133,14 @@ describe('LST element supertypes', () => {
         return implemented;
     }
 
+    const java = javaInterfaces();
+    const kinds = [...new Set<string>([...Object.values(J.Kind), ...Object.values(JS.Kind)])].filter(k => java.has(k));
+    const short = (kind: string) => kind.substring(kind.lastIndexOf(".") + 1);
+
     test.for([
         ["Statement", isStatement],
         ["Expression", isExpression],
     ] as const)("%s kinds are the ones whose Java class implements it", ([name, is]) => {
-        const java = javaInterfaces();
-        const kinds = [...new Set<string>([...Object.values(J.Kind), ...Object.values(JS.Kind)])].filter(k => java.has(k));
-        const short = (kind: string) => kind.substring(kind.lastIndexOf(".") + 1);
         expect(kinds.filter(k => is({kind: k} as J)).map(short).sort())
             .toEqual(kinds.filter(k => java.get(k)!.has(name)).map(short).sort());
     });

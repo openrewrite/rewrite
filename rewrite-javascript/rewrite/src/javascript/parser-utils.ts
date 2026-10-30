@@ -17,7 +17,7 @@ import * as ts from "typescript";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 
-const is_statements: string[] = [
+const is_statements = new Set<string>([
     J.Kind.Assert,
     J.Kind.Assignment,
     J.Kind.AssignmentOperation,
@@ -78,9 +78,9 @@ const is_statements: string[] = [
     JS.Kind.WithStatement,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+])
 
-const is_expressions: string[] = [
+const is_expressions = new Set<string>([
     J.Kind.AnnotatedType,
     J.Kind.Annotation,
     J.Kind.ArrayAccess,
@@ -157,14 +157,14 @@ const is_expressions: string[] = [
     JS.Kind.Void,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+])
 
 export function isStatement(statement: J):  statement is Statement {
-    return is_statements.includes(statement.kind);
+    return is_statements.has(statement.kind);
 }
 
 export function isExpression(expression: J):  expression is Expression {
-    return is_expressions.includes(expression.kind);
+    return is_expressions.has(expression.kind);
 }
 
 export function getNextSibling(node: ts.Node): ts.Node | undefined {
