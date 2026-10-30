@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashMap;
@@ -42,9 +43,12 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     public Yaml visitAlias(Yaml.Alias alias, P p) {
         Yaml.Alias al = (Yaml.Alias) super.visitAlias(alias, p);
         Yaml anchorVal = anchorValues.get(al.getAnchor().getKey());
-        if (anchorVal instanceof Yaml.Mapping && ((Yaml.Mapping) anchorVal).getOpeningBracePrefix() == null) {
+        // JsonPathMatcher visits without maintaining a cursor, and only compares values, so it needs no re-indentation
+        Cursor parent = getCursor().getParent();
+        if (parent != null && anchorVal instanceof Yaml.Mapping &&
+            ((Yaml.Mapping) anchorVal).getOpeningBracePrefix() == null) {
             // the anchor's entries are indented for where the anchor is, so they move to where the alias is
-            return autoFormat(anchorVal, p, getCursor().getParentOrThrow());
+            return autoFormat(anchorVal, p, parent);
         } else if (anchorVal != null) {
             return anchorVal;
         }

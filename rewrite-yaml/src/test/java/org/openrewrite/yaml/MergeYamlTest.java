@@ -4827,4 +4827,29 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$.job", "c: 3", false, null, null, null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+                c: 3
+              """
+          )
+        );
+    }
 }
