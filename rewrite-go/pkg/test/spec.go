@@ -34,7 +34,6 @@ import (
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 type SourceSpec struct {
@@ -44,6 +43,7 @@ type SourceSpec struct {
 	Markers     []java.Marker                                  // markers attached to the parsed source after parse
 	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional assertion callback on the recipe's result (.go files only)
 	generated   bool                                           // true for a file the recipe is expected to Generate (see Generated)
+	deleted     bool                                           // true for a file the recipe is expected to delete (see ExpectDeleted)
 }
 
 // Sources is the unit RewriteRun consumes. Single SourceSpecs and project
@@ -69,6 +69,14 @@ func (s SourceSpec) WithPath(p string) SourceSpec {
 // so it can read s.Markers off the cu and assert on resolved types.
 func (s SourceSpec) WithAfterRecipe(fn func(t *testing.T, cu *golang.CompilationUnit)) SourceSpec {
 	s.AfterRecipe = fn
+	return s
+}
+
+// ExpectDeleted returns a copy of s that expects the recipe to delete the
+// source file.
+func (s SourceSpec) ExpectDeleted() SourceSpec {
+	s.After = nil
+	s.deleted = true
 	return s
 }
 
@@ -499,6 +507,11 @@ type RecipeSpec struct {
 	ExpectedCyclesThatMakeChanges int
 	Recipe                        recipe.Recipe
 	MarkerPrinter                 printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
+	// ExecutionContext is the context every cycle of the recipe shares, by
+	// default a fresh one for each RewriteRun. Each RewriteRun installs a new
+	// in-memory DataTableStore on it, holding the rows of the first cycle.
+	ExecutionContext *recipe.ExecutionContext
+	dataTables       []dataTableExpectation
 }
 
 func NewRecipeSpec() *RecipeSpec {
@@ -511,6 +524,13 @@ func NewRecipeSpec() *RecipeSpec {
 
 func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	spec.Recipe = r
+	return spec
+}
+
+// WithExecutionContext sets the context the recipe runs with; see
+// RecipeSpec.ExecutionContext.
+func (spec *RecipeSpec) WithExecutionContext(ctx *recipe.ExecutionContext) *RecipeSpec {
+	spec.ExecutionContext = ctx
 	return spec
 }
 
@@ -564,6 +584,10 @@ type recipeRun struct {
 	genSpecs              []SourceSpec
 	generated             []java.Tree
 	cyclesThatMadeChanges int
+	dataTables            recipe.DataTableStore
+	// freshParseContext holds the messages the ExecutionContext started with,
+	// for the run on a fresh parse of the output.
+	freshParseContext *recipe.ExecutionContext
 	// unsettled is the first cycle after the expected ones that changed anything.
 	unsettled *cycleChanges
 }
@@ -607,6 +631,7 @@ func (spec *RecipeSpec) afterRecipe(t *testing.T, run *recipeRun) {
 			gs.AfterRecipe(t, cu)
 		}
 	}
+	spec.checkDataTables(t, run.dataTables)
 }
 
 // parseAndApply parses every source and applies the recipe over its cycles
@@ -671,7 +696,23 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) *recipeRu
 // nothing or the cycles run out, keeping the output of the expected cycles and
 // noting the first later cycle that changed anything.
 func (spec *RecipeSpec) runCycles(run *recipeRun) {
+	ctx := spec.ExecutionContext
+	if ctx == nil {
+		ctx = recipe.NewExecutionContext()
+	}
+	run.freshParseContext = recipe.NewExecutionContext()
+	for _, k := range ctx.MessageKeys() {
+		v, _ := ctx.GetMessage(k)
+		run.freshParseContext.PutMessage(k, v)
+	}
+	run.freshParseContext.PutMessage(recipe.DataTableStoreKey, discardingStore{})
+	run.dataTables = recipe.NewInMemoryDataTableStore()
+	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
+	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
+		if cycle == 2 {
+			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})
+		}
 		var live []java.Tree
 		var slots []*java.Tree
 		for i := range run.parsed {
@@ -681,10 +722,12 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 			}
 		}
 		for i := range run.generated {
-			live = append(live, run.generated[i])
-			slots = append(slots, &run.generated[i])
+			if run.generated[i] != nil {
+				live = append(live, run.generated[i])
+				slots = append(slots, &run.generated[i])
+			}
 		}
-		results, generated := spec.applyOnce(live)
+		results, generated := runCycle(spec.Recipe, live, ctx)
 		changes := changesOf(live, results, generated)
 		if len(changes) == 0 {
 			return
@@ -699,17 +742,6 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 		}
 		run.generated = append(run.generated, generated...)
 	}
-}
-
-func (spec *RecipeSpec) applyOnce(trees []java.Tree) ([]java.Tree, []java.Tree) {
-	if recipeIsScanning(spec.Recipe) {
-		return runScanningLifecycle(spec.Recipe, trees)
-	}
-	results := make([]java.Tree, len(trees))
-	for k, tr := range trees {
-		results[k] = runRecipe(spec.Recipe, tr)
-	}
-	return results, nil
 }
 
 func changesOf(before, after, generated []java.Tree) []change {
@@ -764,6 +796,11 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	if spec.cycles() > spec.expectedCycles() {
 		spec.expectStableOnFreshParse(t, run)
 	}
+	if t.Failed() {
+		return
+	}
+
+	spec.expectDataTablesWritten(t, run.dataTables)
 }
 
 // expectNoFurtherChanges reports whether it found changes to fail t with.
@@ -777,6 +814,10 @@ func (spec *RecipeSpec) expectNoFurtherChanges(t testing.TB, changes []change, h
 	for _, c := range changes {
 		if c.before == nil {
 			fmt.Fprintf(&found, "  %s, which it generated\n", sourcePathOf(c.after))
+			continue
+		}
+		if c.after == nil {
+			fmt.Fprintf(&found, "  %s, which it deleted\n", sourcePathOf(c.before))
 			continue
 		}
 		expected, actual := printTree(c.before, mp), printTree(c.after, mp)
@@ -813,14 +854,18 @@ func (spec *RecipeSpec) expectStableOnFreshParse(t testing.TB, run *recipeRun) {
 			external = append(external, ps.spec.Markers)
 		}
 	}
-	finals = append(finals, run.generated...)
-	external = append(external, make([][]java.Marker, len(run.generated))...)
+	for _, g := range run.generated {
+		if g != nil {
+			finals = append(finals, g)
+			external = append(external, nil)
+		}
+	}
 
 	sources := freshParse(finals, external)
 	if sources == nil {
 		return
 	}
-	results, generated := spec.applyOnce(sources)
+	results, generated := runCycle(spec.Recipe, sources, run.freshParseContext)
 	spec.expectNoFurtherChanges(t, changesOf(sources, results, generated),
 		"Running the recipe on a fresh parse of its output changed", true)
 }
@@ -1009,7 +1054,7 @@ func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		assert.Falsef(t, src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
+		assert.Falsef(t, src.deleted || src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		return
 	}
 
@@ -1019,7 +1064,17 @@ func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	}
 
 	if ps.result == nil {
-		assert.Nil(t, src.After, "recipe returned nil (deleted source file) but expected an after state")
+		switch {
+		case src.deleted:
+		case src.After == nil || *src.After == src.Before:
+			t.Errorf("The recipe deleted a source file %q that was not expected to change", src.Path)
+		default:
+			t.Errorf("The recipe deleted a source file %q but should have changed it instead", src.Path)
+		}
+		return
+	}
+	if src.deleted {
+		t.Errorf("Expected the recipe to delete %q", src.Path)
 		return
 	}
 
@@ -1107,92 +1162,6 @@ func sourcePathOf(t java.Tree) string {
 		return sp.GetSourcePath()
 	}
 	return ""
-}
-
-func recipeIsScanning(r recipe.Recipe) bool {
-	if _, ok := r.(recipe.ScanningRecipe); ok {
-		return true
-	}
-	for _, sub := range r.RecipeList() {
-		if recipeIsScanning(sub) {
-			return true
-		}
-	}
-	return false
-}
-
-func runScanningLifecycle(r recipe.Recipe, trees []java.Tree) ([]java.Tree, []java.Tree) {
-	ctx := recipe.NewExecutionContext()
-
-	working := append([]java.Tree{}, trees...)
-	nExisting := len(working)
-
-	var walk func(r recipe.Recipe)
-	walk = func(r recipe.Recipe) {
-		if sr, ok := r.(recipe.ScanningRecipe); ok {
-			acc := sr.InitialValue(ctx)
-			if scanner := sr.Scanner(acc); scanner != nil {
-				for _, tr := range working {
-					if tr != nil {
-						scanner.Visit(tr, ctx)
-					}
-				}
-			}
-			for _, g := range sr.Generate(acc, ctx) {
-				if g != nil {
-					working = append(working, g)
-				}
-			}
-			if editor := sr.EditorWithData(acc); editor != nil {
-				applyEditorAcross(editor, working, ctx)
-			}
-		} else if editor := r.Editor(); editor != nil {
-			applyEditorAcross(editor, working, ctx)
-		}
-		for _, sub := range r.RecipeList() {
-			walk(sub)
-		}
-	}
-	walk(r)
-
-	return working[:nExisting], working[nExisting:]
-}
-
-func applyEditorAcross(editor recipe.TreeVisitor, trees []java.Tree, ctx *recipe.ExecutionContext) {
-	for i, tr := range trees {
-		if tr == nil {
-			continue
-		}
-		result := editor.Visit(tr, ctx)
-		if result != nil {
-			tr = result
-		}
-		trees[i] = visitor.DrainAfterVisits(editor, tr, ctx)
-	}
-}
-
-func runRecipe(r recipe.Recipe, t java.Tree) java.Tree {
-	ctx := recipe.NewExecutionContext()
-
-	// Apply this recipe's own editor, then drain any queued after-visits
-	// (e.g. ImportService.AddImportVisitor inserted via DoAfterVisit).
-	if editor := r.Editor(); editor != nil {
-		result := editor.Visit(t, ctx)
-		if result != nil {
-			t = result
-		}
-		t = visitor.DrainAfterVisits(editor, t, ctx)
-	}
-
-	// Apply sub-recipes
-	for _, sub := range r.RecipeList() {
-		result := runRecipe(sub, t)
-		if result != nil {
-			t = result
-		}
-	}
-
-	return t
 }
 
 func showDiff(t testing.TB, expected, actual string) {
