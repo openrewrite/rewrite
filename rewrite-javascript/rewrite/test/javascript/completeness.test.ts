@@ -15,6 +15,9 @@
  */
 import fs = require('fs');
 import path = require('path');
+import {J} from "../../src/java";
+import {JS} from "../../src/javascript";
+import {isExpression, isStatement} from "../../src/javascript/parser-utils";
 
 
 function readFileToString(relativePath: string): string {
@@ -96,4 +99,48 @@ describe('JS LST element tree', () => {
 
         expect(rpcTsMethods).toEqual(visitorJavascriptMethods);
     })
+});
+
+describe('LST element supertypes', () => {
+    const supertypes: Record<string, string[]> = {Loop: ["Statement"], MethodCall: ["Expression"]};
+
+    function javaInterfaces(): Map<string, Set<string>> {
+        const implemented = new Map<string, Set<string>>();
+        for (const [prefix, file] of [
+            ["org.openrewrite.java.tree.J", "../../../rewrite-java/src/main/java/org/openrewrite/java/tree/J.java"],
+            ["org.openrewrite.javascript.tree.JS", "../../src/main/java/org/openrewrite/javascript/tree/JS.java"],
+            ["org.openrewrite.javascript.tree.JSX", "../../src/main/java/org/openrewrite/javascript/tree/JSX.java"],
+        ]) {
+            const enclosing: string[] = [];
+            for (const line of readFileToString(file).split("\n")) {
+                const m = line.match(/^( *)(?:(?:public|static|final|abstract) )*(?:class|interface) (\w+)[^{]*?(?:implements ([^{]+))?\{/);
+                if (!m) {
+                    continue;
+                }
+                const depth = m[1].length / 4;
+                enclosing.splice(depth, enclosing.length, m[2]);
+                if (depth > 0 && m[3]) {
+                    const closure = new Set<string>();
+                    const pending = m[3].split(",").map(s => s.trim().replace(/<.*/, ""));
+                    for (let next = pending.pop(); next; next = pending.pop()) {
+                        closure.add(next);
+                        pending.push(...supertypes[next] ?? []);
+                    }
+                    implemented.set(`${prefix}$${enclosing.slice(1).join("$")}`, closure);
+                }
+            }
+        }
+        return implemented;
+    }
+
+    test.for([
+        ["Statement", isStatement],
+        ["Expression", isExpression],
+    ] as const)("%s kinds are the ones whose Java class implements it", ([name, is]) => {
+        const java = javaInterfaces();
+        const kinds = [...new Set<string>([...Object.values(J.Kind), ...Object.values(JS.Kind)])].filter(k => java.has(k));
+        const short = (kind: string) => kind.substring(kind.lastIndexOf(".") + 1);
+        expect(kinds.filter(k => is({kind: k} as J)).map(short).sort())
+            .toEqual(kinds.filter(k => java.get(k)!.has(name)).map(short).sort());
+    });
 });
