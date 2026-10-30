@@ -57,6 +57,12 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
         return al;
     }
 
+    /// Whether this visitor would replace any alias in `yaml` with its anchor's value, answered without
+    /// building the replaced tree. Only aliases of anchored mappings and scalars count; an alias of an
+    /// anchored sequence is left in place by this visitor, so it does not.
+    ///
+    /// @param yaml the tree to search, in document order so that each anchor precedes its aliases
+    /// @return `true` if at least one alias would be replaced
     static boolean hasResolvableAlias(Yaml yaml) {
         return new ReplaceAliasWithAnchorValueVisitor<AtomicBoolean>() {
             @Override
