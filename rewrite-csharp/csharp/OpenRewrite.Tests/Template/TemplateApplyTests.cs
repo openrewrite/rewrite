@@ -585,7 +585,7 @@ public class TemplateApplyTests : RewriteTest
         // left = Binary(||, true, false), right = true
         // Template {left} && {right} should produce (true || false) && true
         RewriteRun(
-            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()),
+            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()).SetCycles(1),
             CSharp(
                 "class C { void M() { var x = true || false || true; } }",
                 "class C { void M() { var x = (true || false) && true; } }"
