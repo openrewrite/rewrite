@@ -60,24 +60,28 @@ func (spec *RecipeSpec) expectDataTablesWritten(t testing.TB, store recipe.DataT
 		if len(rowsOf(store, e.table)) > 0 {
 			continue
 		}
-		name := e.table.Descriptor().Name
-		var found []string
-		if store != nil {
-			seen := map[string]bool{}
-			for _, dt := range store.GetDataTables() {
-				if n := dt.Descriptor().Name; !seen[n] {
-					seen[n] = true
-					found = append(found, n)
-				}
-			}
+		message := "No data table named " + e.table.Descriptor().Name
+		if found := dataTableNames(store); len(found) > 0 {
+			message += "\nFound data tables: " + strings.Join(found, ", ")
 		}
-		if len(found) == 0 {
-			t.Errorf("No data table named %s", name)
-			continue
-		}
-		sort.Strings(found)
-		t.Errorf("No data table named %s\nFound data tables: %s", name, strings.Join(found, ", "))
+		t.Error(message)
 	}
+}
+
+func dataTableNames(store recipe.DataTableStore) []string {
+	if store == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var names []string
+	for _, dt := range store.GetDataTables() {
+		if n := dt.Descriptor().Name; !seen[n] {
+			seen[n] = true
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (spec *RecipeSpec) checkDataTables(t *testing.T, store recipe.DataTableStore) {

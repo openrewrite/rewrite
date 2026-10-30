@@ -46,8 +46,6 @@ var unwrittenFiles = recipe.NewDataTable[visitedFile](
 	[]recipe.ColumnDescriptor{{Name: "path", DisplayName: "Path", Description: "The path of the source file."}},
 )
 
-// recordVisits writes a row for every source file it visits, in every cycle,
-// and marks each source file once.
 type recordVisits struct {
 	recipe.Base
 }

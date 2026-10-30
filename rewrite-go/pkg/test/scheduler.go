@@ -106,6 +106,9 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 		}
 		after := editor.Visit(tr, ctx)
 		if after == nil {
+			if q, ok := editor.(visitor.AfterVisitsProvider); ok {
+				q.AfterVisits()
+			}
 			return nil
 		}
 		tr = visitor.DrainAfterVisits(editor, after, ctx)

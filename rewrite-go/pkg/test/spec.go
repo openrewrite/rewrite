@@ -585,6 +585,9 @@ type recipeRun struct {
 	generated             []java.Tree
 	cyclesThatMadeChanges int
 	dataTables            recipe.DataTableStore
+	// freshParseContext holds the messages the ExecutionContext started with,
+	// for the run on a fresh parse of the output.
+	freshParseContext *recipe.ExecutionContext
 	// unsettled is the first cycle after the expected ones that changed anything.
 	unsettled *cycleChanges
 }
@@ -697,6 +700,12 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 	if ctx == nil {
 		ctx = recipe.NewExecutionContext()
 	}
+	run.freshParseContext = recipe.NewExecutionContext()
+	for _, k := range ctx.MessageKeys() {
+		v, _ := ctx.GetMessage(k)
+		run.freshParseContext.PutMessage(k, v)
+	}
+	run.freshParseContext.PutMessage(recipe.DataTableStoreKey, discardingStore{})
 	run.dataTables = recipe.NewInMemoryDataTableStore()
 	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
 	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
@@ -845,14 +854,18 @@ func (spec *RecipeSpec) expectStableOnFreshParse(t testing.TB, run *recipeRun) {
 			external = append(external, ps.spec.Markers)
 		}
 	}
-	finals = append(finals, run.generated...)
-	external = append(external, make([][]java.Marker, len(run.generated))...)
+	for _, g := range run.generated {
+		if g != nil {
+			finals = append(finals, g)
+			external = append(external, nil)
+		}
+	}
 
 	sources := freshParse(finals, external)
 	if sources == nil {
 		return
 	}
-	results, generated := runCycle(spec.Recipe, sources, recipe.NewExecutionContext())
+	results, generated := runCycle(spec.Recipe, sources, run.freshParseContext)
 	spec.expectNoFurtherChanges(t, changesOf(sources, results, generated),
 		"Running the recipe on a fresh parse of its output changed", true)
 }
@@ -1041,7 +1054,7 @@ func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		assert.Falsef(t, src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
+		assert.Falsef(t, src.deleted || src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		return
 	}
 

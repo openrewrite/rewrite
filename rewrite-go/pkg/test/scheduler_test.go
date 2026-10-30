@@ -83,7 +83,6 @@ func (v *sawAScanner) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	return ident
 }
 
-// searchResultOnce marks a source file that has no search result yet.
 type searchResultOnce struct {
 	visitor.GoVisitor
 	description func(p any) string
@@ -96,8 +95,6 @@ func (v *searchResultOnce) VisitCompilationUnit(cu *golang.CompilationUnit, p an
 	return cu.WithMarkers(java.FoundSearchResult(cu.Markers, v.description(p)))
 }
 
-// tally counts on the execution context the source files it visits, and
-// reports the count on each.
 type tally struct {
 	recipe.Base
 	count, report bool
@@ -277,4 +274,55 @@ func TestNotDeletingASourceFileExpectedToBeDeletedFails(t *testing.T) {
 
 	// then
 	assert.Equal(t, []string{`Expected the recipe to delete "a.go"`}, got)
+}
+
+const keepBKey = "org.openrewrite.golang.test.keepB"
+
+type renameBToCUnlessKept struct {
+	recipe.Base
+}
+
+func (r *renameBToCUnlessKept) Name() string {
+	return "org.openrewrite.golang.test.RenameBToCUnlessKept"
+}
+func (r *renameBToCUnlessKept) DisplayName() string {
+	return "Rename `b` to `c` unless told to keep it"
+}
+func (r *renameBToCUnlessKept) Description() string {
+	return "Renames `b` to `c` unless the execution context says to keep `b`."
+}
+
+func (r *renameBToCUnlessKept) Editor() recipe.TreeVisitor {
+	return visitor.Init(&bToCRenamer{})
+}
+
+type bToCRenamer struct {
+	visitor.GoVisitor
+}
+
+func (v *bToCRenamer) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	if _, keep := p.(*recipe.ExecutionContext).GetMessage(keepBKey); keep || ident.Name != "b" {
+		return ident
+	}
+	return ident.WithName("c")
+}
+
+func TestFreshParseRunSeesTheMessagesTheExecutionContextStartedWith(t *testing.T) {
+	ctx := recipe.NewExecutionContext()
+	ctx.PutMessage(keepBKey, true)
+	NewRecipeSpec().
+		WithRecipe(&recipeList{recipes: []recipe.Recipe{
+			&renameIdentifiers{rename: renameAToB},
+			&renameBToCUnlessKept{},
+		}}).
+		WithExecutionContext(ctx).
+		RewriteRun(t, Golang(`
+			package main
+
+			func a() {}
+		`, `
+			package main
+
+			func b() {}
+		`))
 }
