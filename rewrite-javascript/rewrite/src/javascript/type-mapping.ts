@@ -53,6 +53,11 @@ type BoundVariable = ts.VariableDeclaration & {name: ts.Identifier};
 /** A declaration whose name is a function's name: a function declaration, or a variable bound to a function. */
 type FunctionNaming = ts.FunctionDeclaration | BoundVariable;
 
+/** The statement holding a declaration. A variable's is the parent of its declaration list. */
+function declaringStatement(declaration: ts.FunctionDeclaration | ts.VariableDeclaration): ts.Node {
+    return ts.isVariableDeclaration(declaration) ? declaration.parent.parent : declaration;
+}
+
 /** An expression whose value is the value of the expression it wraps. */
 function isTransparentExpression(node: ts.Node): node is ts.ParenthesizedExpression | ts.AsExpression |
     ts.SatisfiesExpression | ts.TypeAssertion | ts.NonNullExpression {
@@ -846,14 +851,19 @@ export class JavaScriptTypeMapping {
      * function such as `parseInt` has none.
      */
     private parsedFunctionDeclaration(symbol: ts.Symbol): FunctionNaming | undefined {
-        const declaration = symbol.valueDeclaration;
+        const declaration = (symbol.flags & ts.SymbolFlags.Alias ? this.checker.getAliasedSymbol(symbol) : symbol)
+            .valueDeclaration;
         if (!declaration || declaration.getSourceFile().isDeclarationFile) {
             return undefined;
         }
         if (ts.isFunctionDeclaration(declaration)) {
             return declaration;
         }
-        if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) {
+        // A named function expression's own name, as a recursive call spells it.
+        if (ts.isFunctionExpression(declaration)) {
+            return this.boundVariable(declaration);
+        }
+        if (!ts.isVariableDeclaration(declaration) || !declaration.initializer || !ts.isIdentifier(declaration.name)) {
             return undefined;
         }
         let initializer: ts.Expression = declaration.initializer;
@@ -861,7 +871,7 @@ export class JavaScriptTypeMapping {
             initializer = initializer.expression;
         }
         return ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer) ?
-            this.boundVariable(initializer) : undefined;
+            declaration as BoundVariable : undefined;
     }
 
     private boundVariable(fn: ts.ArrowFunction | ts.FunctionExpression): BoundVariable | undefined {
@@ -893,8 +903,7 @@ export class JavaScriptTypeMapping {
     }
 
     private functionOwner(declaration: FunctionNaming): Type.FullyQualified {
-        const namespace = this.enclosingNamespace(ts.isVariableDeclaration(declaration) ?
-            declaration.parent.parent : declaration);
+        const namespace = this.enclosingNamespace(declaringStatement(declaration));
         return namespace ?
             this.moduleType(this.namespaceName(namespace)) :
             this.sourceModuleType(declaration.getSourceFile());
@@ -909,8 +918,9 @@ export class JavaScriptTypeMapping {
             return false;
         }
         if (ts.isFunctionDeclaration(declaration) || ts.isVariableDeclaration(declaration)) {
-            const statement = ts.isVariableDeclaration(declaration) ? declaration.parent.parent : declaration;
-            return ts.isSourceFile(statement.parent) || ts.isModuleBlock(statement.parent);
+            const statement = declaringStatement(declaration);
+            return (ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement)) &&
+                (ts.isSourceFile(statement.parent) || ts.isModuleBlock(statement.parent));
         }
         return ts.isMethodDeclaration(declaration) &&
             !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
@@ -1251,7 +1261,7 @@ export class JavaScriptTypeMapping {
                 }
                 moduleSpecifier ??= binding?.module;
 
-                naming = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
+                naming = this.parsedFunctionDeclaration(symbol);
                 if (naming) {
                     declaringType = this.functionOwner(naming);
                     methodName = naming.name ? naming.name.text : "<anonymous>";

@@ -391,7 +391,6 @@ async function locate(sourceFile: SourceFile): Promise<{ located: Located[], pri
     return {located: printer.located, printed: capture.out};
 }
 
-// `type` also names fields that hold no Type, so a slot counts only when it is empty or typed.
 /** An arrow function is listed only where it declares a function, as its lambda carries its type. */
 function isListed(node: J, all: boolean): boolean {
     if (node.kind === JS.Kind.ArrowFunction) {
@@ -400,6 +399,7 @@ function isListed(node: J, all: boolean): boolean {
     return all ? hasTypeSlot(node) : DEFAULT_KINDS.has(node.kind);
 }
 
+// `type` also names fields that hold no Type, so a slot counts only when it is empty or typed.
 function hasTypeSlot(node: J): boolean {
     return TYPE_SLOTS.some(slot => slot in node &&
         ((node as any)[slot] === undefined || Type.isType((node as any)[slot])));

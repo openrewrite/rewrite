@@ -2348,21 +2348,23 @@ describe('JavaScript type mapping', () => {
             `
                 export const arrow = (n: number): number => n;
                 export const expr = function (n: number): number { return n; };
-                export const named = function inner(n: number): number { return n; };
+                export const named = function inner(n: number): number { return n ? inner(n - 1) : n; };
                 export const cast = ((n: number) => n) as (n: number) => number;
                 export const callbacks = [() => 1];
                 arrow(1);
                 function scoped(): void { var local = function (): void {}; local(); }
+                for (let step = (i: number): number => i + 1, i = 0; i < 1; i = step(i)) {}
             `,
             //@formatter:off
             `
                 export const arrow = /*~~(src/util#arrow static)~~>*/(n: number): number => n;
                 export const expr = /*~~(src/util#expr static)~~>*/function (n: number): number { return n; };
-                export const named = /*~~(src/util#named static)~~>*/function inner(n: number): number { return n; };
+                export const named = /*~~(src/util#named static)~~>*/function inner(n: number): number { return n ? /*~~(src/util#named static)~~>*/inner(n - 1) : n; };
                 export const cast = (/*~~(src/util#cast static)~~>*/(n: number) => n) as (n: number) => number;
                 export const callbacks = [() => 1];
                 /*~~(src/util#arrow static)~~>*/arrow(1);
                 /*~~(src/util#scoped static)~~>*/function scoped(): void { var local = /*~~(src/util#local)~~>*/function (): void {}; /*~~(src/util#local)~~>*/local(); }
+                for (let step = /*~~(src/util#step)~~>*/(i: number): number => i + 1, i = 0; i < 1; i = /*~~(src/util#step)~~>*/step(i)) {}
             `
             //@formatter:on
         );
@@ -2370,7 +2372,7 @@ describe('JavaScript type mapping', () => {
         const main = typescript(
             `
                 import {arrow, expr as e, named, cast} from '../src/util';
-                import * as u from '../src/util';
+                import * as u from '../src';
                 arrow(1);
                 e(1);
                 named(1);
@@ -2380,21 +2382,23 @@ describe('JavaScript type mapping', () => {
             //@formatter:off
             `
                 import {arrow, expr as e, named, cast} from '../src/util';
-                import * as u from '../src/util';
+                import * as u from '../src';
                 /*~~(src/util#arrow static)~~>*/arrow(1);
                 /*~~(src/util#expr static)~~>*/e(1);
                 /*~~(src/util#named static)~~>*/named(1);
                 /*~~(src/util#cast static)~~>*/cast(1);
-                /*~~(src/util#cast static)~~>*/u.cast(1);
+                /*~~(src/index#cast static)~~>*/u.cast(1);
             `
             //@formatter:on
         );
         main.path = 'test/main.ts';
+        const barrel = typescript(`export * from './util';`);
+        barrel.path = 'src/index.ts';
         await withDir(async repo => {
             fs.writeFileSync(path.join(repo.path, 'tsconfig.json'), '{"include": ["src"]}');
             fs.mkdirSync(path.join(repo.path, 'test'));
             fs.writeFileSync(path.join(repo.path, 'test/tsconfig.json'), '{"extends": "../tsconfig.json", "include": ["."]}');
-            await spec.rewriteRun(npm(repo.path, util, main));
+            await spec.rewriteRun(npm(repo.path, util, barrel, main));
         }, {unsafeCleanup: true});
     });
 
