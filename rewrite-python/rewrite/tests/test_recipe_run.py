@@ -94,7 +94,7 @@ class _AppendToLiteral(PythonVisitor[ExecutionContext]):
         self._suffix = suffix
 
     def visit_literal(self, literal: j.Literal, p: ExecutionContext) -> j.J:
-        if isinstance(literal.value, str) and literal.value_source:
+        if isinstance(literal.value, str) and literal.value_source and not literal.value.endswith(self._suffix):
             new_value = literal.value + self._suffix
             quote = literal.value_source[0]
             return literal.replace(value=new_value, value_source=f"{quote}{new_value}{quote}")

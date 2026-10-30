@@ -4502,4 +4502,329 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+                  inputs:
+                    input1: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfMappingsFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - component: awesome-component@1.0
+              """,
+            false,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - remote: 'https://example.com/ci.yml' # An awesome comment about this!
+                - component: awesome-component@1.0
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingToSequenceOfScalars() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("insertIntoCommentedSequenceOptions")
+    void keepInlineCommentWhenInsertingIntoSequence(MergeYaml.InsertMode insertMode, String insertProperty) {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              stages:
+                - test
+              """,
+            false,
+            null,
+            null,
+            insertMode,
+            insertProperty,
+            null
+          )),
+          yaml(
+            """
+              stages:
+                - build # An awesome comment about this!
+                - deploy
+              """,
+            """
+              stages:
+                - build # An awesome comment about this!
+                - test
+                - deploy
+              """
+          )
+        );
+    }
+
+    static Stream<Arguments> insertIntoCommentedSequenceOptions() {
+        return Stream.of(
+          arguments(After, "build"),
+          arguments(Before, "deploy")
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenAppendingSeveralEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              a:
+                y: 2
+                z: 3
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              a:
+                x: 1 # An awesome comment about this!
+              b: 2
+              """,
+            """
+              a:
+                x: 1 # An awesome comment about this!
+                y: 2
+                z: 3
+              b: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppending() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentWhenMergingIntoLastSequenceEntryAndAppendingFollowedByKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - name: a
+                  y: 2
+                - name: b
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+              stages:
+                - build
+              """,
+            """
+              include:
+                - name: a
+                  x: 1 # An awesome comment about this!
+                  y: 2
+                - name: b
+              stages:
+                - build
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].tags",
+            //language=yaml
+            """
+              - y
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  tags:
+                    - x
+                    - y
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveCommentOfFollowingSequenceEntryWhenAppendingToMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.include[*].cfg",
+            //language=yaml
+            """
+              y: 2
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                - name: b # An awesome comment about this!
+              """,
+            """
+              include:
+                - name: a
+                  cfg:
+                    x: 1
+                    y: 2
+                - name: b # An awesome comment about this!
+              """
+          )
+        );
+    }
 }

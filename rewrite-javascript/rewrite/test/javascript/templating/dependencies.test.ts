@@ -389,6 +389,7 @@ describe('template dependencies integration', () => {
                 return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -409,6 +410,7 @@ describe('template dependencies integration', () => {
                 return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript('const result = 1 + 2;', 'const result = 2 + 1;')

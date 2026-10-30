@@ -73,7 +73,7 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 		}
 		// Code a recipe writes brings along the syntax markers the parser gives it.
 		printed := printTree(after, printer.SanitizedMarkerPrinter)
-		if fresh := reparse(sourcePath, printed); fresh != nil {
+		if fresh := reparse(parser.NewGoParser(), sourcePath, printed); fresh != nil {
 			parsedToo := map[placement]bool{}
 			addPlacements(parsedToo, fresh)
 			kept := unexplained[:0]
@@ -105,7 +105,7 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 	}
 	for _, g := range generated {
 		if g != nil {
-			check(generatedSourcePath(g), nil, g)
+			check(sourcePathOf(g), nil, g)
 		}
 	}
 	if found.Len() == 0 {
@@ -115,9 +115,9 @@ func addedMarkersFailure(parsed []parsedSource, generated []java.Tree) string {
 		found.String() + addedMarkersAdvice
 }
 
-// reparse parses source as the harness parses a file at sourcePath, returning nil
-// when it does not parse.
-func reparse(sourcePath, source string) (t java.Tree) {
+// reparse parses source with p as the harness parses a file at sourcePath,
+// returning nil when it does not parse.
+func reparse(p *parser.GoParser, sourcePath, source string) (t java.Tree) {
 	// A parser panic would abort the whole test binary, not just this test.
 	defer func() {
 		if recover() != nil {
@@ -126,7 +126,7 @@ func reparse(sourcePath, source string) (t java.Tree) {
 	}()
 	switch {
 	case strings.HasSuffix(sourcePath, ".go"):
-		if cu, err := parser.NewGoParser().Parse(sourcePath, source); err == nil {
+		if cu, err := p.Parse(sourcePath, source); err == nil {
 			return cu
 		}
 	case path.Base(sourcePath) == "go.mod":

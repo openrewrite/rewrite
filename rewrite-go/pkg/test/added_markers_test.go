@@ -18,6 +18,7 @@ package test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/uuid"
@@ -65,10 +66,16 @@ func (v *callMarker) VisitMethodInvocation(mi *java.MethodInvocation, p any) jav
 		return mi
 	}
 	cu, _ := visitor.FirstEnclosing[*golang.CompilationUnit](v.Cursor())
+	marker := v.recipe.marker(cu)
+	for _, m := range mi.Markers.Entries() {
+		if reflect.TypeOf(m) == reflect.TypeOf(marker) {
+			return mi
+		}
+	}
 	if v.recipe.rename != "" {
 		mi = mi.WithName(mi.Name.WithName(v.recipe.rename))
 	}
-	return mi.WithMarkers(java.AddMarker(mi.Markers, v.recipe.marker(cu)))
+	return mi.WithMarkers(java.AddMarker(mi.Markers, marker))
 }
 
 func visitedMarker(*golang.CompilationUnit) java.Marker { return visited{Ident: uuid.New()} }
@@ -98,13 +105,14 @@ func (r *recorder) Errorf(format string, args ...any) {
 	r.failures = append(r.failures, fmt.Sprintf(format, args...))
 }
 
+func (r *recorder) Failed() bool { return len(r.failures) > 0 || r.TB.Failed() }
+
 // failures runs sources through spec as RewriteRun does, returning what it
 // reports about the recipe's results rather than failing t.
 func failures(t *testing.T, spec *RecipeSpec, sources ...Sources) []string {
 	t.Helper()
-	parsed, genSpecs, generated := spec.parseAndApply(t, sources)
 	r := &recorder{TB: t}
-	spec.verify(r, parsed, genSpecs, generated)
+	spec.verify(r, spec.parseAndApply(t, sources))
 	return r.failures
 }
 

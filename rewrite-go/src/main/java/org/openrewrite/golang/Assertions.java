@@ -53,12 +53,12 @@ public final class Assertions {
         return go;
     }
 
-    public static SourceSpecs go(@Nullable String before, String after) {
+    public static SourceSpecs go(@Nullable String before, @Nullable String after) {
         return go(before, after, s -> {
         });
     }
 
-    public static SourceSpecs go(@Nullable String before, String after,
+    public static SourceSpecs go(@Nullable String before, @Nullable String after,
                                        Consumer<SourceSpec<Go.CompilationUnit>> spec) {
         SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
         spec.accept(go);
@@ -77,12 +77,12 @@ public final class Assertions {
         return goMod;
     }
 
-    public static SourceSpecs goMod(@Nullable String before, String after) {
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after) {
         return goMod(before, after, s -> {
         });
     }
 
-    public static SourceSpecs goMod(@Nullable String before, String after,
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after,
                                     Consumer<SourceSpec<GoMod>> spec) {
         SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, s -> after);
         goMod.path("go.mod");
@@ -102,12 +102,12 @@ public final class Assertions {
         return goSum;
     }
 
-    public static SourceSpecs goSum(@Nullable String before, String after) {
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after) {
         return goSum(before, after, s -> {
         });
     }
 
-    public static SourceSpecs goSum(@Nullable String before, String after,
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after,
                                     Consumer<SourceSpec<GoSum>> spec) {
         SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, s -> after);
         goSum.path("go.sum");

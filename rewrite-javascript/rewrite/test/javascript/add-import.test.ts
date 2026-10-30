@@ -31,6 +31,7 @@ import {
     prettierStyle,
     RemoveImport,
     SpacesStyle,
+    StyleKind,
     Template,
     tsx,
     typescript
@@ -169,6 +170,9 @@ function createAddImportWithTemplateVisitor(
 
 /** Marks a file the way parsing a project whose .prettierrc was picked up marks it. */
 function withPrettierStyle(cu: JS.CompilationUnit, config: Record<string, unknown>, ignored = false): JS.CompilationUnit {
+    if (cu.markers.markers.some(m => m.kind === StyleKind.PrettierStyle)) {
+        return cu;
+    }
     return {
         ...cu,
         markers: {...cu.markers, markers: [...cu.markers.markers, prettierStyle(randomId(), config, undefined, ignored)]}
@@ -1154,6 +1158,26 @@ describe('AddImport visitor', () => {
             );
         });
 
+        test('should not add import for a module member a dynamic import binds locally', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'writeFile'}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export async function write() {
+                            const {writeFile} = await import('fs');
+                            writeFile('test.txt', '', () => {});
+                            readFile('test.txt', () => {});
+                        }
+                    `
+                )
+            );
+        });
+
         test('should detect usage in field access', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({ module: "fs" }));
@@ -1429,6 +1453,7 @@ describe('AddImport visitor', () => {
                     return result;
                 }
             });
+            spec.cycles = 1;
 
             //language=tsx
             await withDir(async (repo) => {
@@ -1989,6 +2014,7 @@ describe('AddImport visitor', () => {
             // This tests that type attribution correctly detects usage of object types (not just methods).
             // The AddImport visitor will merge the z import into the existing ZodError import from zod.
             spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+            spec.cycles = 1;
 
             //language=typescript
             await withDir(async (repo) => {
@@ -2006,6 +2032,88 @@ describe('AddImport visitor', () => {
                             `,
                             `
                                 import {z, ZodError} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should add import for zod z when no other zod import exists (with onlyIfReferenced)', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(createForceRemoveFirstImportThenAddVisitor("zod", "z"));
+            spec.cycles = 1;
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `,
+                            `
+                                import {z} from 'zod';
+
+                                function example() {
+                                    const schema = z.string();
+                                }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test.each([
+            `import * as z from 'zod';`,
+            `import z from 'zod';`,
+            `import {ZodError} from 'zod'; import * as z from 'zod';`
+        ])('should not add import for zod z already bound by %s (with onlyIfReferenced)', async (existingImport) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "zod", member: "z", onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                ${existingImport}
 
                                 function example() {
                                     const schema = z.string();
@@ -2124,6 +2232,79 @@ describe('AddImport visitor', () => {
                 );
             }, {unsafeCleanup: true});
         });
+
+        test.each([
+            [`top level`, `
+                const {z} = await import('zod');
+                export const s = z.string();
+            `],
+            [`a function`, `
+                export async function schema() {
+                    const {z} = await import('zod');
+                    return z.string();
+                }
+            `]
+        ])('should not add import for zod z bound by a dynamic import at %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'z', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(source),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not add import for a zod member only read through a namespace', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'string', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ZodError} from 'zod';
+                                import * as zz from 'zod';
+
+                                export const s = zz.string();
+                                export const e = ZodError;
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
     });
 
     describe('multiple maybeAddImport calls for same module', () => {
@@ -2200,7 +2381,7 @@ describe('AddImport visitor', () => {
                     };
 
                     // Add the NamedStyles marker to the compilation unit
-                    let result: JS.CompilationUnit = {
+                    let result: JS.CompilationUnit = cu.markers.markers.some(m => m.kind === MarkersKind.NamedStyles) ? cu : {
                         ...cu,
                         markers: {
                             ...cu.markers,
@@ -2922,7 +3103,7 @@ describe('AddImport visitor', () => {
                         alias: 'B',
                         onlyIfReferenced: false
                     }).visit(cu, p) as JS.CompilationUnit;
-                    added = (result.statements[1].element as JS.Import).moduleSpecifier!.element as J.Literal;
+                    added ??= (result.statements[1].element as JS.Import).moduleSpecifier!.element as J.Literal;
                     return result;
                 }
             }());
@@ -3278,11 +3459,14 @@ describe('AddImport visitor', () => {
 
         test('a namespace or type declaration shadows an import just as a value declaration does', async () => {
             const spec = new RecipeSpec();
-            const bound: string[] = [];
+            let bound: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!);
-                    bound.push(maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!);
+                    const answers = [
+                        maybeAddImport(this, {module: 'm', member: 'join', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'n', member: 'shape', onlyIfReferenced: false})!
+                    ];
+                    bound ??= answers;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -3308,15 +3492,20 @@ describe('AddImport visitor', () => {
 
         test('a second request for the same binding gets the name the first settled on', async () => {
             const spec = new RecipeSpec();
-            const quoted: string[] = [];
-            const preferred: string[] = [];
+            let quoted: string[] | undefined;
+            let preferred: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!);
-                    quoted.push(maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!);
-
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!);
-                    preferred.push(maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!);
+                    const readFile = [
+                        maybeAddImport(this, {module: 'fs', member: 'readFile', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'fs', member: 'readFile', quoteStyle: '"', onlyIfReferenced: false})!
+                    ];
+                    const theming = [
+                        maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Theming', onlyIfReferenced: false})!,
+                        maybeAddImport(this, {module: 'theme', member: 'default', preferredName: 'Th', onlyIfReferenced: false})!
+                    ];
+                    quoted ??= readFile;
+                    preferred ??= theming;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -3341,12 +3530,15 @@ describe('AddImport visitor', () => {
 
         test('a name bound through any binding pattern is occupied without answering for the module', async () => {
             const spec = new RecipeSpec();
-            const bound: (string | undefined)[] = [];
+            let bound: (string | undefined)[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                    bound.push(maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}));
-                    bound.push(maybeAddImport(this, {module: 'p', member: 'default', preferredName: 'e', onlyIfReferenced: false}));
+                    const answers = [
+                        maybeAddImport(this, {module: 'm', member: 'b', onlyIfReferenced: false}),
+                        maybeAddImport(this, {module: 'other', preferredName: 'z', onlyIfReferenced: false}),
+                        maybeAddImport(this, {module: 'p', member: 'default', preferredName: 'e', onlyIfReferenced: false})
+                    ];
+                    bound ??= answers;
                     return super.visitJsCompilationUnit(cu, p);
                 }
             });
@@ -3412,6 +3604,7 @@ describe('AddImport visitor', () => {
                     return super.visitMethodInvocation(method, p);
                 }
             });
+            spec.cycles = 1;
 
             await spec.rewriteRun(
                 typescript(
@@ -3466,11 +3659,20 @@ describe('AddImport visitor', () => {
 
         test('one binding serves every site, so a name any of them shadows is taken', async () => {
             const spec = new RecipeSpec();
-            const bound: string[] = [];
+            let bound: string[] | undefined;
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                private sites: string[] = [];
+
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    this.sites = [];
+                    const visited = await super.visitJsCompilationUnit(cu, p);
+                    bound ??= this.sites;
+                    return visited;
+                }
+
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                     if ((method.name as J.Identifier)?.simpleName === 'anchor') {
-                        bound.push(maybeAddImport(this,
+                        this.sites.push(maybeAddImport(this,
                             {module: 'sap/base/util/merge', member: 'merge', onlyIfReferenced: false})!);
                     }
                     return super.visitMethodInvocation(method, p);
