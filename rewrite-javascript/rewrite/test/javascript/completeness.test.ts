@@ -145,3 +145,30 @@ describe('LST element supertypes', () => {
             .toEqual(kinds.filter(k => java.get(k)!.has(name)).map(short).sort());
     });
 });
+
+describe('visitor dispatch', () => {
+    function dispatch(files: string[], methodStart: RegExp): Map<string, string[]> {
+        const calls = new Map<string, string[]>();
+        for (const file of files) {
+            const source = readFileToString(file);
+            const starts = [...source.matchAll(methodStart)];
+            starts.forEach((start, i) => {
+                const body = source.substring(start.index!, starts[i + 1]?.index ?? source.length);
+                calls.set(start[1], ["visitStatement", "visitExpression"].filter(m => body.includes(`${m}(`)));
+            });
+        }
+        return calls;
+    }
+
+    test("a visit method calls visitStatement and visitExpression wherever the Java visitor does", () => {
+        const java = dispatch([
+            "../../../rewrite-java/src/main/java/org/openrewrite/java/JavaVisitor.java",
+            "../../src/main/java/org/openrewrite/javascript/JavaScriptVisitor.java",
+        ], /^ {4}public (?:<[^>]+> )?[\w.<>?]+ (visit\w+)\(/gm);
+        const ts = dispatch(["java/visitor.ts", "javascript/visitor.ts"],
+            /^ {4}(?:protected|public|override)[\w ]* async (visit\w+)[(<]/gm);
+        const missing = [...java].flatMap(([method, calls]) =>
+            calls.filter(call => !ts.get(method)?.includes(call)).map(call => `${method} -> ${call}`));
+        expect(missing).toEqual([]);
+    });
+});

@@ -111,6 +111,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(as_, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.As) {
+            return expression;
+        }
+        as_ = expression as JS.As;
+
         const updates: any = {
             prefix: await this.visitSpace(as_.prefix, p),
             markers: await this.visitMarkers(as_.markers, p),
@@ -138,6 +144,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitJsxTag(element: JSX.Tag, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(element, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.JsxTag) {
+            return expression;
+        }
+        element = expression as JSX.Tag;
+
         const updates: any = {
             prefix: await this.visitSpace(element.prefix, p),
             markers: await this.visitMarkers(element.markers, p),
@@ -174,6 +186,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(expr, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.JsxEmbeddedExpression) {
+            return expression;
+        }
+        expr = expression as JSX.EmbeddedExpression;
+
         const updates: any = {
             prefix: await this.visitSpace(expr.prefix, p),
             markers: await this.visitMarkers(expr.markers, p),
@@ -455,6 +473,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitBinaryExtensions(jsBinary: JS.Binary, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(jsBinary, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.Binary) {
+            return expression;
+        }
+        jsBinary = expression as JS.Binary;
+
         const updates: any = {
             prefix: await this.visitSpace(jsBinary.prefix, p),
             markers: await this.visitMarkers(jsBinary.markers, p),
@@ -504,6 +528,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(keysRemapping, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.MappedTypeKeysRemapping) {
+            return statement;
+        }
+        keysRemapping = statement as JS.MappedType.KeysRemapping;
+
         const updates: any = {
             prefix: await this.visitSpace(keysRemapping.prefix, p),
             markers: await this.visitMarkers(keysRemapping.markers, p),
@@ -514,6 +544,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(mappedTypeParameter, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.MappedTypeParameter) {
+            return statement;
+        }
+        mappedTypeParameter = statement as JS.MappedType.Parameter;
+
         const updates: any = {
             prefix: await this.visitSpace(mappedTypeParameter.prefix, p),
             markers: await this.visitMarkers(mappedTypeParameter.markers, p),
@@ -767,6 +803,18 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(assignmentOperation, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.AssignmentOperation) {
+            return expression;
+        }
+        assignmentOperation = expression as JS.AssignmentOperation;
+
+        const statement = await this.visitStatement(assignmentOperation, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.AssignmentOperation) {
+            return statement;
+        }
+        assignmentOperation = statement as JS.AssignmentOperation;
+
         const updates: any = {
             prefix: await this.visitSpace(assignmentOperation.prefix, p),
             markers: await this.visitMarkers(assignmentOperation.markers, p),
@@ -796,6 +844,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(indexType, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.IndexedAccessTypeIndexType) {
+            return expression;
+        }
+        indexType = expression as JS.IndexedAccessType.IndexType;
+
         const updates: any = {
             prefix: await this.visitSpace(indexType.prefix, p),
             markers: await this.visitMarkers(indexType.markers, p),
@@ -989,6 +1043,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitForOfLoop(forOfLoop: JS.ForOfLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(forOfLoop, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ForOfLoop) {
+            return statement;
+        }
+        forOfLoop = statement as JS.ForOfLoop;
+
         const updates: any = {
             prefix: await this.visitSpace(forOfLoop.prefix, p),
             markers: await this.visitMarkers(forOfLoop.markers, p),
@@ -999,6 +1059,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(forInLoop, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ForInLoop) {
+            return statement;
+        }
+        forInLoop = statement as JS.ForInLoop;
+
         const updates: any = {
             prefix: await this.visitSpace(forInLoop.prefix, p),
             markers: await this.visitMarkers(forInLoop.markers, p),
@@ -1027,6 +1093,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(typeLiteral, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeLiteral) {
+            return expression;
+        }
+        typeLiteral = expression as JS.TypeLiteral;
+
         const updates: any = {
             prefix: await this.visitSpace(typeLiteral.prefix, p),
             markers: await this.visitMarkers(typeLiteral.markers, p),
@@ -1037,6 +1109,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(arrayBindingPattern, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.ArrayBindingPattern) {
+            return expression;
+        }
+        arrayBindingPattern = expression as JS.ArrayBindingPattern;
+
         const updates: any = {
             prefix: await this.visitSpace(arrayBindingPattern.prefix, p),
             markers: await this.visitMarkers(arrayBindingPattern.markers, p),
@@ -1099,6 +1177,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitNamedExports(namedExports: JS.NamedExports, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(namedExports, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.NamedExports) {
+            return expression;
+        }
+        namedExports = expression as JS.NamedExports;
+
         const updates: any = {
             prefix: await this.visitSpace(namedExports.prefix, p),
             markers: await this.visitMarkers(namedExports.markers, p),
@@ -1109,6 +1193,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(exportSpecifier, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.ExportSpecifier) {
+            return expression;
+        }
+        exportSpecifier = expression as JS.ExportSpecifier;
+
         const updates: any = {
             prefix: await this.visitSpace(exportSpecifier.prefix, p),
             markers: await this.visitMarkers(exportSpecifier.markers, p),
