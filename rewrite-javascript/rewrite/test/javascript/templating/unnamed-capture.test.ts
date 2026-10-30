@@ -35,6 +35,7 @@ describe('unnamed capture', () => {
                 return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript

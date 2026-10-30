@@ -519,6 +519,45 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     }
 
     @Test
+    void noVersionDowngradeThroughPropertyReferences() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(17)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <maven.compiler.source>25</maven.compiler.source>
+                  <maven.compiler.target>25</maven.compiler.target>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.15.0</version>
+                      <configuration>
+                        <source>${maven.compiler.source}</source>
+                        <target>${maven.compiler.target}</target>
+                        <parameters>true</parameters>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void reusesJavaVersionVariableIfDefinedInParentPom() {
         rewriteRun(
           //language=xml

@@ -590,4 +590,42 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterKeepsItsComments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("foo".equals(method.getSimpleName())) {
+                      return JavaTemplate.builder("bar(#{any(int)})")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      foo(/* keep */ 1);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      bar(/* keep */ 1);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

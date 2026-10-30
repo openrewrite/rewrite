@@ -1017,6 +1017,50 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void transitiveDependencyIsDeclaredUnlessAcceptTransitive() {
+        @Language("groovy")
+        String before = """
+          plugins {
+              id 'java-library'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              implementation "com.fasterxml.jackson.core:jackson-databind:2.12.0"
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.core", "jackson-core", "2.12.0", null,
+            "implementation", null, null, null, null, null)),
+          buildGradle(
+            before,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-core:2.12.0"
+                  implementation "com.fasterxml.jackson.core:jackson-databind:2.12.0"
+              }
+              """
+          )
+        );
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.core", "jackson-core", "2.12.0", null,
+            "implementation", null, null, null, null, true)),
+          buildGradle(before)
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"api", "compileOnly"})
     void addDependencyToConfiguration(String configuration) {

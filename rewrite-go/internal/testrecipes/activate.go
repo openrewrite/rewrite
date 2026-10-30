@@ -23,4 +23,7 @@ func Activate(r *recipe.Registry) {
 
 	r.Register(&RenameXToFlag{}, golangCategory)
 	r.Register(&WrapErrorWithContext{}, golangCategory)
+	r.Register(&DeleteSourceFile{}, golangCategory)
+	r.Register(&GenerateSourceFile{}, golangCategory)
+	r.Register(&MoveSourceFile{}, golangCategory)
 }
