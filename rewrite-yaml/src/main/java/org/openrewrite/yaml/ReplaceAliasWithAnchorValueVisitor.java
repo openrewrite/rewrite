@@ -61,23 +61,22 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
 
     static boolean hasResolvableAlias(Yaml yaml) {
         Set<String> anchors = new HashSet<>();
-        AtomicBoolean found = new AtomicBoolean();
-        new YamlIsoVisitor<Integer>() {
+        return new YamlIsoVisitor<AtomicBoolean>() {
             @Override
-            public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
-                return found.get() ? (Yaml) tree : super.visit(tree, p);
+            public @Nullable Yaml visit(@Nullable Tree tree, AtomicBoolean found) {
+                return found.get() ? (Yaml) tree : super.visit(tree, found);
             }
 
             @Override
-            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, AtomicBoolean found) {
                 if (mapping.getAnchor() != null) {
                     anchors.add(mapping.getAnchor().getKey());
                 }
-                return super.visitMapping(mapping, p);
+                return super.visitMapping(mapping, found);
             }
 
             @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, AtomicBoolean found) {
                 if (scalar.getAnchor() != null) {
                     anchors.add(scalar.getAnchor().getKey());
                 }
@@ -85,13 +84,12 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
             }
 
             @Override
-            public Yaml.Alias visitAlias(Yaml.Alias alias, Integer p) {
+            public Yaml.Alias visitAlias(Yaml.Alias alias, AtomicBoolean found) {
                 if (anchors.contains(alias.getAnchor().getKey())) {
                     found.set(true);
                 }
                 return alias;
             }
-        }.visit(yaml, 0);
-        return found.get();
+        }.reduce(yaml, new AtomicBoolean()).get();
     }
 }
