@@ -1352,6 +1352,77 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getParameters().size() != 1) {
+                      return method;
+                  }
+                  return KotlinTemplate.builder("a: Int, b: String = \"b\"")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replaceParameters());
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun test(a: String) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun test(a: Int, b: String = "b") {
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceTypeParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                  if (c.getTypeParameters() == null || c.getTypeParameters().get(0).getBounds() != null) {
+                      return c;
+                  }
+                  return KotlinTemplate.builder("T : Any")
+                    .build()
+                    .apply(updateCursor(c), c.getCoordinates().replaceTypeParameters());
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getTypeParameters() == null || method.getTypeParameters().get(0).getBounds() != null) {
+                      return method;
+                  }
+                  return KotlinTemplate.builder("U : CharSequence")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replaceTypeParameters());
+              }
+          })),
+          kotlin(
+            """
+              class Test<T> {
+                  fun <U> test(u: U) {
+                  }
+              }
+              """,
+            """
+              class Test<T : Any> {
+                  fun <U : CharSequence> test(u: U) {
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
     void keepCommentOfExpressionBodyPassedAsParameter() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
