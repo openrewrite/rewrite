@@ -507,6 +507,11 @@ type RecipeSpec struct {
 	ExpectedCyclesThatMakeChanges int
 	Recipe                        recipe.Recipe
 	MarkerPrinter                 printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
+	// ExecutionContext is the context every cycle of the recipe shares, by
+	// default a fresh one for each RewriteRun. Each RewriteRun installs a new
+	// in-memory DataTableStore on it, holding the rows of the first cycle.
+	ExecutionContext *recipe.ExecutionContext
+	dataTables       []dataTableExpectation
 }
 
 func NewRecipeSpec() *RecipeSpec {
@@ -519,6 +524,13 @@ func NewRecipeSpec() *RecipeSpec {
 
 func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	spec.Recipe = r
+	return spec
+}
+
+// WithExecutionContext sets the context the recipe runs with; see
+// RecipeSpec.ExecutionContext.
+func (spec *RecipeSpec) WithExecutionContext(ctx *recipe.ExecutionContext) *RecipeSpec {
+	spec.ExecutionContext = ctx
 	return spec
 }
 
@@ -572,6 +584,7 @@ type recipeRun struct {
 	genSpecs              []SourceSpec
 	generated             []java.Tree
 	cyclesThatMadeChanges int
+	dataTables            recipe.DataTableStore
 	// unsettled is the first cycle after the expected ones that changed anything.
 	unsettled *cycleChanges
 }
@@ -615,6 +628,7 @@ func (spec *RecipeSpec) afterRecipe(t *testing.T, run *recipeRun) {
 			gs.AfterRecipe(t, cu)
 		}
 	}
+	spec.checkDataTables(t, run.dataTables)
 }
 
 // parseAndApply parses every source and applies the recipe over its cycles
@@ -679,8 +693,17 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) *recipeRu
 // nothing or the cycles run out, keeping the output of the expected cycles and
 // noting the first later cycle that changed anything.
 func (spec *RecipeSpec) runCycles(run *recipeRun) {
-	ctx := recipe.NewExecutionContext()
+	ctx := spec.ExecutionContext
+	if ctx == nil {
+		ctx = recipe.NewExecutionContext()
+	}
+	run.dataTables = recipe.NewInMemoryDataTableStore()
+	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
+	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
+		if cycle == 2 {
+			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})
+		}
 		var live []java.Tree
 		var slots []*java.Tree
 		for i := range run.parsed {
@@ -764,6 +787,11 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	if spec.cycles() > spec.expectedCycles() {
 		spec.expectStableOnFreshParse(t, run)
 	}
+	if t.Failed() {
+		return
+	}
+
+	spec.expectDataTablesWritten(t, run.dataTables)
 }
 
 // expectNoFurtherChanges reports whether it found changes to fail t with.
