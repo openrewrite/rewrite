@@ -20,9 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
@@ -60,32 +58,15 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     }
 
     static boolean hasResolvableAlias(Yaml yaml) {
-        Set<String> anchors = new HashSet<>();
-        return new YamlIsoVisitor<AtomicBoolean>() {
+        return new ReplaceAliasWithAnchorValueVisitor<AtomicBoolean>() {
             @Override
             public @Nullable Yaml visit(@Nullable Tree tree, AtomicBoolean found) {
                 return found.get() ? (Yaml) tree : super.visit(tree, found);
             }
 
             @Override
-            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, AtomicBoolean found) {
-                if (mapping.getAnchor() != null) {
-                    anchors.add(mapping.getAnchor().getKey());
-                }
-                return super.visitMapping(mapping, found);
-            }
-
-            @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, AtomicBoolean found) {
-                if (scalar.getAnchor() != null) {
-                    anchors.add(scalar.getAnchor().getKey());
-                }
-                return scalar;
-            }
-
-            @Override
-            public Yaml.Alias visitAlias(Yaml.Alias alias, AtomicBoolean found) {
-                if (anchors.contains(alias.getAnchor().getKey())) {
+            public Yaml visitAlias(Yaml.Alias alias, AtomicBoolean found) {
+                if (anchorValues.containsKey(alias.getAnchor().getKey())) {
                     found.set(true);
                 }
                 return alias;

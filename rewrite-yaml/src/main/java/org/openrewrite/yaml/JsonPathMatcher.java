@@ -128,7 +128,7 @@ public class JsonPathMatcher {
             Tree tree = c.getValue();
             if (tree instanceof Yaml.Document) {
                 resolved = resolvedAliases(c, (Yaml.Document) tree);
-                deque.addFirst(resolved.getOrDefault(tree, tree));
+                deque.addFirst(tree);
                 break;
             }
             deque.addFirst(tree);
