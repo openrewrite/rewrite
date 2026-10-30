@@ -17,6 +17,8 @@
 package testrecipes
 
 import (
+	"github.com/google/uuid"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -67,13 +69,14 @@ func (v *wrapErrorWithContextVisitor) VisitReturn(ret *java.Return, p any) java.
 	golang.MaybeAddImport(v, "fmt", nil, false)
 	c := *ret
 	c.Expression = &java.MethodInvocation{
+		ID:     uuid.New(),
 		Prefix: java.SingleSpace,
-		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt"}},
-		Name:   &java.Identifier{Name: "Errorf"},
+		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{ID: uuid.New(), Name: "fmt"}},
+		Name:   &java.Identifier{ID: uuid.New(), Name: "Errorf"},
 		Arguments: java.Container[java.Expression]{
 			Elements: []java.RightPadded[java.Expression]{
-				{Element: &java.Literal{Source: `"` + v.funcName + `: %w"`}},
-				{Element: &java.Identifier{Prefix: java.SingleSpace, Name: "err"}},
+				{Element: &java.Literal{ID: uuid.New(), Source: `"` + v.funcName + `: %w"`}},
+				{Element: &java.Identifier{ID: uuid.New(), Prefix: java.SingleSpace, Name: "err"}},
 			},
 		},
 	}
