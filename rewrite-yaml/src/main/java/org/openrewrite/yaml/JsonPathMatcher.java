@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -38,6 +39,7 @@ import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.disjoint;
+import static java.util.Collections.emptyMap;
 
 /**
  * Provides methods for matching the given cursor location to a specified JsonPath expression.
@@ -48,6 +50,8 @@ import static java.util.Collections.disjoint;
  */
 @EqualsAndHashCode
 public class JsonPathMatcher {
+
+    private static final String RESOLVED_ALIASES = JsonPathMatcher.class.getName() + ".RESOLVED_ALIASES";
 
     private final String jsonPath;
     private JsonPathParser.@Nullable JsonPathContext parsed;
@@ -118,24 +122,12 @@ public class JsonPathMatcher {
 
     private static List<Tree> resolvedAncestors(Cursor cursor) {
         ArrayDeque<Tree> deque = new ArrayDeque<>();
-        Map<Tree, Tree> resolved = new IdentityHashMap<>();
-        for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
-            Tree tree = (Tree) it.next();
+        Map<Tree, Tree> resolved = emptyMap();
+        for (Iterator<Cursor> it = cursor.getPathAsCursors(c -> c.getValue() instanceof Tree); it.hasNext(); ) {
+            Cursor c = it.next();
+            Tree tree = c.getValue();
             if (tree instanceof Yaml.Document) {
-                tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
-                    @Override
-                    public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
-                        // NOTE: not calling `super.visit()` for performance reasons
-                        if (tree instanceof Yaml) {
-                            Yaml updated = ((Yaml) tree).acceptYaml(this, p);
-                            if (updated != tree) {
-                                resolved.put(tree, updated);
-                            }
-                            return updated;
-                        }
-                        return (Yaml) tree;
-                    }
-                }.visitNonNull(tree, 0);
+                resolved = resolvedAliases(c, (Yaml.Document) tree);
                 deque.addFirst(tree);
                 break;
             }
@@ -151,6 +143,41 @@ public class JsonPathMatcher {
             }
         }
         return list;
+    }
+
+    // matching runs for every visited node, so resolve each document's aliases once per visit rather than per match
+    private static Map<Tree, Tree> resolvedAliases(Cursor documentCursor, Yaml.Document document) {
+        ResolvedAliases cached = documentCursor.getMessage(RESOLVED_ALIASES);
+        if (cached == null || cached.document != document) {
+            cached = new ResolvedAliases(document, resolveAliases(document));
+            documentCursor.putMessage(RESOLVED_ALIASES, cached);
+        }
+        return cached.resolved;
+    }
+
+    private static Map<Tree, Tree> resolveAliases(Yaml.Document document) {
+        Map<Tree, Tree> resolved = new IdentityHashMap<>();
+        new ReplaceAliasWithAnchorValueVisitor<Integer>() {
+            @Override
+            public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
+                // NOTE: not calling `super.visit()` for performance reasons
+                if (tree instanceof Yaml) {
+                    Yaml updated = ((Yaml) tree).acceptYaml(this, p);
+                    if (updated != tree) {
+                        resolved.put(tree, updated);
+                    }
+                    return updated;
+                }
+                return (Yaml) tree;
+            }
+        }.visitNonNull(document, 0);
+        return resolved;
+    }
+
+    @Value
+    private static class ResolvedAliases {
+        Yaml.Document document;
+        Map<Tree, Tree> resolved;
     }
 
     private JsonPathParser.JsonPathContext parse() {
