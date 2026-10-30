@@ -123,6 +123,8 @@ public class RewriteRpcProcess extends Thread {
     @Nullable
     private IOException startupFailure;
 
+    private volatile @Nullable IOException stderrRedirectFailure;
+
     private final AtomicBoolean shutDown = new AtomicBoolean();
 
     private RewriteRpcProcess(Builder builder) {
@@ -189,7 +191,7 @@ public class RewriteRpcProcess extends Thread {
             // parent-side file handle after process termination, preventing deletion
             // of the log file.  Instead we drain stderr in a daemon thread.
             Process p = pb.start();
-            stderrDrainThread = drainStderr(p, stderrRedirect);
+            stderrDrainThread = drainStderr(p, openStderrRedirect());
             // Publish process last so its volatile write also releases stderrDrainThread.
             process = p;
         } catch (IOException e) {
@@ -199,30 +201,57 @@ public class RewriteRpcProcess extends Thread {
         }
     }
 
-    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect) {
+    private @Nullable OutputStream openStderrRedirect() {
+        if (stderrRedirect == null) {
+            return null;
+        }
+        try {
+            Path parent = stderrRedirect.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            return Files.newOutputStream(stderrRedirect, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            stderrRedirectFailure = e;
+            return null;
+        }
+    }
+
+    private Thread drainStderr(Process process, @Nullable OutputStream log) {
         Thread thread = new Thread(() -> {
             byte[] buf = new byte[8192];
+            OutputStream out = log;
             try (InputStream stderr = process.getErrorStream()) {
-                if (stderrRedirect != null) {
-                    try (OutputStream out = Files.newOutputStream(stderrRedirect,
-                            StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-                        int n;
-                        while ((n = stderr.read(buf)) != -1) {
+                int n;
+                while ((n = stderr.read(buf)) != -1) {
+                    if (out != null) {
+                        try {
                             out.write(buf, 0, n);
+                        } catch (IOException e) {
+                            // Keep draining: closing the pipe would kill the peer on its next write to stderr.
+                            stderrRedirectFailure = e;
+                            closeQuietly(out);
+                            out = null;
                         }
-                    }
-                } else {
-                    //noinspection StatementWithEmptyBody
-                    while (stderr.read(buf) != -1) {
-                        // discard
                     }
                 }
             } catch (IOException ignored) {
+            } finally {
+                closeQuietly(out);
             }
         }, "rpc-stderr-drain");
         thread.setDaemon(true);
         thread.start();
         return thread;
+    }
+
+    private static void closeQuietly(@Nullable OutputStream out) {
+        if (out != null) {
+            try {
+                out.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
@@ -247,7 +276,10 @@ public class RewriteRpcProcess extends Thread {
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
-            if (stderrRedirect != null) {
+            IOException redirectFailure = stderrRedirectFailure;
+            if (redirectFailure != null) {
+                message += "\nStderr log " + stderrRedirect + " could not be written: " + redirectFailure;
+            } else if (stderrRedirect != null) {
                 message += "\nSee stderr log: " + stderrRedirect;
             }
             return new IllegalStateException(message.trim());

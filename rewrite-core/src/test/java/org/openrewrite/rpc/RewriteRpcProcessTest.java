@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -173,6 +174,56 @@ class RewriteRpcProcessTest {
                 assertThatThrownBy(process::start)
                         .isInstanceOf(UncheckedIOException.class)
                         .hasMessageContaining(missing));
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void peerSurvivesWritingToStderrWhenTheLogDirectoryIsMissing(@TempDir Path tempDir) throws Exception {
+        // given
+        Path log = tempDir.resolve("deleted").resolve("rpc.log");
+        RewriteRpcProcess peer = RewriteRpcProcess.forLanguage("test")
+                .command("sh", "-c", "sleep 1; echo warning >&2")
+                .stderrRedirect(log)
+                .build();
+
+        try {
+            // when
+            peer.start();
+            assertThat(peer.process.waitFor(30, TimeUnit.SECONDS)).isTrue();
+
+            // then
+            assertThat(peer.process.exitValue()).isZero();
+            peer.shutdown();
+            assertThat(log).content().isEqualTo("warning\n");
+        } finally {
+            peer.shutdown();
+        }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    void peerSurvivesWritingToStderrWhenTheLogCannotBeOpened(@TempDir Path tempDir) throws Exception {
+        // given
+        Path notADirectory = Files.createFile(tempDir.resolve("file"));
+        Path log = notADirectory.resolve("rpc.log");
+        RewriteRpcProcess peer = RewriteRpcProcess.forLanguage("test")
+                .command("sh", "-c", "sleep 1; echo warning >&2; exit 3")
+                .stderrRedirect(log)
+                .build();
+
+        try {
+            // when
+            peer.start();
+            assertThat(peer.process.waitFor(30, TimeUnit.SECONDS)).isTrue();
+
+            // then
+            assertThat(peer.process.exitValue()).isEqualTo(3);
+            assertThat(peer.getLivenessCheck())
+                    .hasMessageContaining("exit code 3")
+                    .hasMessageContaining("Stderr log " + log + " could not be written");
+        } finally {
+            peer.shutdown();
+        }
     }
 
     /**
