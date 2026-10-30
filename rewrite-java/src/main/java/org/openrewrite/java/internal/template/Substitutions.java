@@ -63,6 +63,15 @@ public class Substitutions {
                 new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
     }
 
+    public boolean isParameter(J j) {
+        for (Object parameter : parameters) {
+            if (parameter instanceof J && ((J) parameter).getId().equals(j.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
         typeVariables.addAll(generics.values());

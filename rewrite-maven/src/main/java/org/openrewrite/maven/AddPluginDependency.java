@@ -22,6 +22,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -64,7 +66,8 @@ public class AddPluginDependency extends Recipe {
 
     String displayName = "Add Maven plugin dependencies";
 
-    String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
+    String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom. " +
+            "When a version is given, an existing dependency on the same or a newer version is left as is.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -97,6 +100,17 @@ public class AddPluginDependency extends Recipe {
                         .findAny();
                 if (maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
                     return plugin;
+                }
+                if (maybeExistingDependency.isPresent() && version != null) {
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String existingVersion = maybeExistingDependency.get().getChildValue("version")
+                            .map(pom::getValue)
+                            .orElse(null);
+                    String requestedVersion = pom.getValue(version);
+                    if (existingVersion != null && requestedVersion != null &&
+                        new Version(existingVersion).compareTo(new Version(requestedVersion)) >= 0) {
+                        return plugin;
+                    }
                 }
                 if (maybeExistingDependency.isPresent()) {
                     plugin = mapTagChildren(plugin, dependencies, it -> {
