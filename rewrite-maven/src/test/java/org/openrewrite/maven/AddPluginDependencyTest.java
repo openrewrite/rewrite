@@ -203,7 +203,7 @@ class AddPluginDependencyTest implements RewriteTest {
     }
 
     @Test
-    void keepExistingDependencyVersionUnlessOlder() {
+    void keepSameOrNewerExistingDependencyVersion() {
         rewriteRun(
           pomXml(
             """
