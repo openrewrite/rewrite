@@ -541,16 +541,17 @@ public class ResolvedPom implements Heavyweight {
 
         private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
+            boolean fromAncestor = pomAncestry.size() > 1;
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());
-                    mergePlugins(profile.getPlugins());
+                    mergePluginManagement(profile.getPluginManagement(), fromAncestor);
+                    mergePlugins(profile.getPlugins(), fromAncestor);
                 }
             }
 
-            mergePluginManagement(pom.getPluginManagement());
-            mergePlugins(pom.getPlugins());
+            mergePluginManagement(pom.getPluginManagement(), fromAncestor);
+            mergePlugins(pom.getPlugins(), fromAncestor);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -800,12 +801,12 @@ public class ResolvedPom implements Heavyweight {
             );
         }
 
-        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins, boolean fromAncestor) {
             Map<PluginKey, Plugin> pluginMap = new HashMap<>();
             plugins.forEach(p -> pluginMap.put(getPluginKey(p), p));
 
             for (Plugin incomingPlugin : incomingPlugins) {
-                if ("false".equals(incomingPlugin.getInherited())) {
+                if (fromAncestor && "false".equals(incomingPlugin.getInherited())) {
                     continue;
                 }
                 Plugin plugin = pluginMap.get(getPluginKey(incomingPlugin));
@@ -818,25 +819,25 @@ public class ResolvedPom implements Heavyweight {
             }
         }
 
-        private void mergePlugins(List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (plugins == null || plugins.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     plugins = new ArrayList<>();
                 }
-                mergePlugins(plugins, incomingPlugins);
+                mergePlugins(plugins, incomingPlugins, fromAncestor);
             }
         }
 
-        private void mergePluginManagement(List<Plugin> incomingPlugins) {
+        private void mergePluginManagement(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (pluginManagement == null || pluginManagement.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     pluginManagement = new ArrayList<>();
                 }
-                mergePlugins(pluginManagement, incomingPlugins);
+                mergePlugins(pluginManagement, incomingPlugins, fromAncestor);
             }
         }
 
