@@ -859,7 +859,8 @@ export class JavaScriptTypeMapping {
         if (ts.isFunctionDeclaration(declaration)) {
             return declaration;
         }
-        // A named function expression's own name, as a recursive call spells it.
+        // `inner` in `const named = function inner() { inner(); }` resolves to the function expression,
+        // which `named` names.
         if (ts.isFunctionExpression(declaration)) {
             return this.boundVariable(declaration);
         }

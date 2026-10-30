@@ -145,7 +145,10 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
-        /** The function an arrow bound to a variable declares, as a function expression's declaration does. */
+        /**
+         * The method an arrow declares when a variable names it, as `const half = (n) => n / 2` declares `half`.
+         * Absent for any other arrow.
+         */
         readonly methodType?: Type.Method;
     }
 

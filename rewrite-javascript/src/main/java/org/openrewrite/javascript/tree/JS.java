@@ -410,7 +410,8 @@ public interface JS extends J {
         TypeTree returnTypeExpression;
 
         /**
-         * The function an arrow bound to a variable declares, as a function expression's declaration does.
+         * The method an arrow declares when a variable names it, as {@code const half = (n) => n / 2} declares
+         * {@code half}. Absent for any other arrow.
          */
         JavaType.@Nullable Method methodType;
 
