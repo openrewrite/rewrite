@@ -1085,6 +1085,46 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyUpgradesExistingOnSiblingConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "api")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void transitiveDependencyIsDeclaredUnlessAcceptTransitive() {
         @Language("groovy")
         String before = """

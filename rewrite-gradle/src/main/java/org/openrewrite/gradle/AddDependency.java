@@ -255,13 +255,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             if (Boolean.TRUE.equals(acceptTransitive)) {
                                 gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
                             }
-                            // Re-add configurations where the dependency exists, so AddDependencyVisitor
-                            // can upgrade the version if the existing one is lower (matching Maven's behavior).
+                            // Re-add configurations where the dependency exists (directly or on a
+                            // sibling that feeds into the same resolution classpath), so
+                            // AddDependencyVisitor can upgrade the version if needed.
                             if (version != null) {
                                 for (String cfg : allConfigurations) {
                                     if (!resolvedConfigurations.contains(cfg)) {
                                         GradleDependencyConfiguration gdc = gp.getConfiguration(cfg);
-                                        if (gdc != null && gdc.findRequestedDependency(groupId, artifactId) != null) {
+                                        if (gdc != null && dependencyExistsOnConfigOrSibling(gp, gdc)) {
                                             resolvedConfigurations.add(cfg);
                                         }
                                     }
@@ -305,5 +306,27 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 })
         );
+    }
+
+    private boolean dependencyExistsOnConfigOrSibling(GradleProject gp, GradleDependencyConfiguration gdc) {
+        if (gdc.findRequestedDependency(groupId, artifactId) != null) {
+            return true;
+        }
+        // Check sibling declaration configs that share resolution classpaths
+        for (GradleDependencyConfiguration resolvable : gp.configurationsExtendingFrom(gdc, true)) {
+            if (!resolvable.isCanBeResolved()) {
+                continue;
+            }
+            for (GradleDependencyConfiguration sibling : gp.getNameToConfiguration().values()) {
+                if (sibling == gdc || sibling.isCanBeResolved()) {
+                    continue;
+                }
+                if (gp.configurationsExtendingFrom(sibling, true).contains(resolvable) &&
+                        sibling.findRequestedDependency(groupId, artifactId) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
