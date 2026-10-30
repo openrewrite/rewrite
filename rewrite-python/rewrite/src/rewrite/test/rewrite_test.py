@@ -20,7 +20,7 @@ import ast
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, TYPE_CHECKING, Union
 from uuid import uuid4
 
 from rewrite import (
@@ -33,7 +33,7 @@ from rewrite import (
     Recipe,
     TreeVisitor,
 )
-from rewrite.data_table import DATA_TABLE_STORE
+from rewrite.data_table import DATA_TABLE_STORE, DataTable, InMemoryDataTableStore
 from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
@@ -45,6 +45,8 @@ from .well_formed import assert_well_formed
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
     from rewrite.python.tree import CompilationUnit
+
+Row = TypeVar("Row")
 
 
 class NoopRecipe(Recipe):
@@ -181,6 +183,9 @@ class RecipeSpec:
     # of them.
     expected_cycles_that_make_changes: Optional[int] = None
 
+    # Assertions on the rows the first cycle writes to each data table, by table name
+    data_table_assertions: Dict[str, Callable[[List[Any]], None]] = field(default_factory=dict)
+
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return replace(self, recipe=recipe)
 
@@ -191,6 +196,27 @@ class RecipeSpec:
         if len(recipes) == 1:
             return self.with_recipe(recipes[0])
         return self.with_recipe(_CompositeRecipe(list(recipes)))
+
+    def data_table(
+        self, table: Union[str, DataTable[Row]], assertion: Callable[[List[Row]], None],
+    ) -> "RecipeSpec":
+        """
+        Assert on the rows the first cycle of each ``rewrite_run`` writes to a data table,
+        failing the run when the recipe wrote none.
+
+        Example:
+            def expect_usages(rows: List[DeprecatedUsage]) -> None:
+                assert rows == [DeprecatedUsage("a.py", "foo")]
+
+            spec = RecipeSpec(recipe=FindDeprecatedUsages()).data_table(
+                FindDeprecatedUsages.table, expect_usages)
+
+        Args:
+            table: The data table, or its fully qualified name
+            assertion: Called with the rows the recipe wrote to the table
+        """
+        name = table if isinstance(table, str) else table.name
+        return replace(self, data_table_assertions={**self.data_table_assertions, name: assertion})
 
     def rewrite_run(self, *source_specs: SourceSpec) -> None:
         """
@@ -249,6 +275,8 @@ class RecipeSpec:
                 f"cycles={cycles} has to be at least 1 and at least "
                 f"expected_cycles_that_make_changes={expected_cycles}"
             )
+        data_tables = InMemoryDataTableStore()
+        self.execution_context.put_message(DATA_TABLE_STORE, data_tables)
         results, unsettled = self._run_cycles(source_files, cycles, expected_cycles)
         if self.check_reporting_markers_only:
             assert_no_added_markers(source_files, results, self._reparse)
@@ -279,6 +307,17 @@ class RecipeSpec:
             )
         if cycles > expected_cycles:
             self._expect_stable_on_fresh_parse(specs, all_parsed, results)
+        self._expect_data_tables(data_tables)
+
+    def _expect_data_tables(self, store: InMemoryDataTableStore) -> None:
+        written = store.get_data_tables()
+        for name, assertion in self.data_table_assertions.items():
+            data_table = next((dt for dt in written if dt.name == name), None)
+            if data_table is None:
+                found = list(dict.fromkeys(dt.name for dt in written))
+                raise AssertionError(f"No data table named {name}"
+                                     + (f"\nFound data tables: {', '.join(found)}" if found else ""))
+            assertion(list(store.get_rows(name, data_table.group)))
 
     def _run_cycles(
         self, sources: List[SourceFile], cycles: int, expected_cycles: int,

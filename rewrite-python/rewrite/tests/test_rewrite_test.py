@@ -801,6 +801,74 @@ class _FoundName:
 _FOUND_NAMES = DataTable[_FoundName]("org.openrewrite.test.FoundNames", "Found names", "Names found.", _FoundName)
 
 
+def _finding_names(mark: bool = False) -> Recipe:
+    class FindNames(PythonVisitor[ExecutionContext]):
+        def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+            _FOUND_NAMES.insert_row(ctx, _FoundName(ident.simple_name))
+            return ident.replace(markers=ident.markers.add(SearchResult(random_id(), None))) if mark else ident
+
+    return from_visitor(FindNames())
+
+
+class TestDataTables:
+    """A spec asserts on the rows a recipe writes to its data tables."""
+
+    def test_the_assertion_receives_the_rows_of_the_table(self):
+        seen: List[List[_FoundName]] = []
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False).data_table(_FOUND_NAMES, seen.append)
+        spec.rewrite_run(python("a = b\n"))
+        assert seen == [[_FoundName("a"), _FoundName("b")]]
+
+    def test_a_table_is_found_by_its_name(self):
+        seen: List[List[_FoundName]] = []
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False).data_table(
+            "org.openrewrite.test.FoundNames", seen.append)
+        spec.rewrite_run(python("a = 1\n"))
+        assert seen == [[_FoundName("a")]]
+
+    def test_only_the_rows_of_the_first_cycle_are_asserted_on(self):
+        seen: List[List[_FoundName]] = []
+        spec = RecipeSpec(recipe=_finding_names(mark=True), type_attribution=False).data_table(
+            _FOUND_NAMES, seen.append)
+        spec.rewrite_run(python("a = 1\n", "/*~~>*/a = 1\n"))
+        assert seen == [[_FoundName("a")]]
+
+    def test_each_run_asserts_on_its_own_rows(self):
+        seen: List[List[_FoundName]] = []
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False).data_table(_FOUND_NAMES, seen.append)
+        spec.rewrite_run(python("a = 1\n"))
+        spec.rewrite_run(python("b = 1\n"))
+        assert seen == [[_FoundName("a")], [_FoundName("b")]]
+
+    def test_a_failing_assertion_fails_the_run(self):
+        def expect_b(rows: List[_FoundName]) -> None:
+            assert rows == [_FoundName("b")]
+
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False).data_table(_FOUND_NAMES, expect_b)
+        with pytest.raises(AssertionError, match="_FoundName\\(name='a'\\)"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_table_the_recipe_did_not_write_fails_the_run(self):
+        spec = RecipeSpec(type_attribution=False).data_table(_FOUND_NAMES, lambda rows: None)
+        with pytest.raises(AssertionError, match="^No data table named org.openrewrite.test.FoundNames$"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_missing_table_lists_the_tables_the_recipe_wrote(self):
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False).data_table(
+            "org.openrewrite.test.Missing", lambda rows: None)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = b\n"))
+        assert str(failure.value) == (
+            "No data table named org.openrewrite.test.Missing\n"
+            "Found data tables: org.openrewrite.test.FoundNames"
+        )
+
+    def test_adding_an_assertion_leaves_the_original_spec_alone(self):
+        spec = RecipeSpec(recipe=_finding_names(), type_attribution=False)
+        spec.data_table(_FOUND_NAMES, lambda rows: None)
+        assert spec.data_table_assertions == {}
+
+
 class TestExtraCycles:
     """The harness runs the recipe again on its own output, which has to change nothing."""
 
@@ -862,13 +930,8 @@ class TestExtraCycles:
             )
 
     def test_data_tables_are_written_by_the_first_cycle_only(self):
-        class FindNames(PythonVisitor[ExecutionContext]):
-            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
-                _FOUND_NAMES.insert_row(ctx, _FoundName(ident.simple_name))
-                return ident.replace(markers=ident.markers.add(SearchResult(random_id(), None)))
-
         ctx = InMemoryExecutionContext()
-        spec = RecipeSpec(recipe=from_visitor(FindNames()), execution_context=ctx, type_attribution=False)
+        spec = RecipeSpec(recipe=_finding_names(mark=True), execution_context=ctx, type_attribution=False)
         spec.rewrite_run(python("a = 1\n", "/*~~>*/a = 1\n"))
 
         assert len(list(ctx.get_message(DATA_TABLE_STORE).get_rows(_FOUND_NAMES.name))) == 1
