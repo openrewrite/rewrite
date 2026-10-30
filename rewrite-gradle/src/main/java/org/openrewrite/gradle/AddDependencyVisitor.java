@@ -103,28 +103,20 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
 
-            Dependency existingDep = gdc.findRequestedDependency(groupId, artifactId);
-            if (existingDep != null) {
-                // Dependency already exists — upgrade the version if the requested version is newer
+            // Check if the dependency already exists on this configuration or a related one
+            // that feeds into the same resolution classpath (e.g. implementation vs api both
+            // feed into compileClasspath). This avoids adding duplicate declarations and instead
+            // upgrades the existing one if the requested version is newer.
+            GradleDependencyConfiguration existingConfig = findConfigurationWithDependency(gdc);
+            if (existingConfig != null) {
                 if (resolvedVersion != null && !resolvedVersion.startsWith("$")) {
-                    String existingVersion = existingDep.getVersion();
-                    if (existingVersion == null) {
-                        // Fall back to checking resolved dependencies in resolvable configurations
-                        for (GradleDependencyConfiguration ext : gradleProject.configurationsExtendingFrom(gdc, true)) {
-                            if (ext.isCanBeResolved()) {
-                                org.openrewrite.maven.tree.ResolvedDependency rd = ext.findResolvedDependency(groupId, artifactId);
-                                if (rd != null) {
-                                    existingVersion = rd.getVersion();
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    String existingVersion = resolveExistingVersion(existingConfig);
                     if (existingVersion != null &&
                             new Version(resolvedVersion).compareTo(new Version(existingVersion)) > 0) {
                         String upgradeVersion = resolvedVersion;
+                        String existingConfigName = existingConfig.getName();
                         sourceFile = (JavaSourceFile) new GradleDependency.Matcher()
-                                .configuration(configuration)
+                                .configuration(existingConfigName)
                                 .groupId(groupId)
                                 .artifactId(artifactId)
                                 .asVisitor(dep -> dep.withDeclaredVersion(upgradeVersion).getTree())
@@ -132,7 +124,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                         if (sourceFile != tree) {
                             sourceFile = org.openrewrite.gradle.internal.AddDependencyVisitor.addDependency(
                                     sourceFile,
-                                    gradleProject.getConfiguration(configuration),
+                                    gradleProject.getConfiguration(existingConfigName),
                                     new GroupArtifactVersion(groupId, artifactId, resolvedVersion),
                                     classifier,
                                     ctx
@@ -160,6 +152,58 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             return sourceFile;
         }
         return (J) tree;
+    }
+
+    /**
+     * Find the configuration where the dependency is already declared. Checks the target
+     * configuration first, then sibling declaration configurations that share resolution
+     * classpaths (e.g. api and implementation both feed into compileClasspath).
+     */
+    private @Nullable GradleDependencyConfiguration findConfigurationWithDependency(GradleDependencyConfiguration targetConfig) {
+        // Check exact configuration first
+        if (targetConfig.findRequestedDependency(groupId, artifactId) != null) {
+            return targetConfig;
+        }
+        // Check sibling configurations: find resolvable configs that extend from the target,
+        // then look at what other declaration configs also feed into those same resolvable configs
+        for (GradleDependencyConfiguration resolvable : gradleProject.configurationsExtendingFrom(targetConfig, true)) {
+            if (!resolvable.isCanBeResolved()) {
+                continue;
+            }
+            // Check all declaration configs that feed into this resolvable config
+            for (GradleDependencyConfiguration sibling : gradleProject.getNameToConfiguration().values()) {
+                if (sibling == targetConfig || sibling.isCanBeResolved()) {
+                    continue;
+                }
+                // Check if this sibling feeds into the same resolvable config
+                if (gradleProject.configurationsExtendingFrom(sibling, true).contains(resolvable) &&
+                        sibling.findRequestedDependency(groupId, artifactId) != null) {
+                    return sibling;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve the existing version of the dependency from the given configuration.
+     * First checks the requested dependency version, then falls back to resolved
+     * dependencies in resolvable extending configurations.
+     */
+    private @Nullable String resolveExistingVersion(GradleDependencyConfiguration existingConfig) {
+        Dependency existingDep = existingConfig.findRequestedDependency(groupId, artifactId);
+        if (existingDep != null && existingDep.getVersion() != null) {
+            return existingDep.getVersion();
+        }
+        for (GradleDependencyConfiguration ext : gradleProject.configurationsExtendingFrom(existingConfig, true)) {
+            if (ext.isCanBeResolved()) {
+                org.openrewrite.maven.tree.ResolvedDependency rd = ext.findResolvedDependency(groupId, artifactId);
+                if (rd != null) {
+                    return rd.getVersion();
+                }
+            }
+        }
+        return null;
     }
 
     public enum DependencyModifier {
