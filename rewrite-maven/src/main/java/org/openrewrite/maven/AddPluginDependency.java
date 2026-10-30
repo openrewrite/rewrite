@@ -132,6 +132,7 @@ public class AddPluginDependency extends Recipe {
                 String existingVersion = pom.getValue(existingValue);
                 String requestedVersion = pom.getValue(version);
                 if (existingVersion != null && requestedVersion != null &&
+                    !requestedVersion.contains("${") &&
                     new Version(existingVersion).compareTo(new Version(requestedVersion)) >= 0) {
                     return plugin;
                 }
