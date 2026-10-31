@@ -1348,6 +1348,198 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6468")
+    @Test
+    void preconditionAddsDependencyOnlyToMatchingChild() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.maven.AddDependencyForDeclaredJunit
+              displayName: Add a dependency to modules that declare junit
+              description: Test.
+              preconditions:
+                - org.openrewrite.maven.search.FindDependency:
+                    groupId: junit
+                    artifactId: junit
+                    version: 4.13.2
+              recipeList:
+                - org.openrewrite.maven.AddDependency:
+                    groupId: com.google.guava
+                    artifactId: guava
+                    version: 29.0-jre
+              """,
+            "org.openrewrite.maven.AddDependencyForDeclaredJunit"
+          ),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project2",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6468")
+    @Test
+    void preconditionAddsDependencyToPomOnlyModule() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.maven.AddDependencyWhenModuleHasJunit
+              displayName: Add a dependency to modules that have junit
+              description: Test.
+              preconditions:
+                - org.openrewrite.maven.search.ModuleHasDependency:
+                    groupIdPattern: junit
+                    artifactIdPattern: junit
+              recipeList:
+                - org.openrewrite.maven.AddDependency:
+                    groupId: com.google.guava
+                    artifactId: guava
+                    version: 29.0-jre
+              """,
+            "org.openrewrite.maven.AddDependencyWhenModuleHasJunit"
+          ),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>scripts</module>
+                    </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("scripts",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>scripts</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>scripts</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
     @Test
     void rawVisitorDoesNotDuplicate() {
         rewriteRun(
