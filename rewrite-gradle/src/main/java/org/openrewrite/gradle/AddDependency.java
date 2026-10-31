@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.gradle.trait.JvmTestSuite;
@@ -247,13 +248,26 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         boolean configurationKnown = resolvedConfigurations.stream()
                                 .anyMatch(c -> gp.getConfiguration(c) != null);
                         if (configurationKnown) {
+                            Set<String> allConfigurations = new HashSet<>(resolvedConfigurations);
                             GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
                             gradleConfigurationFilter.removeTransitiveConfigurations();
                             gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
                             if (Boolean.TRUE.equals(acceptTransitive)) {
                                 gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
                             }
-                            resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                            // Re-add configurations where the dependency exists (directly or on a
+                            // sibling that feeds into the same resolution classpath), so
+                            // AddDependencyVisitor can upgrade the version if needed.
+                            if (version != null) {
+                                for (String cfg : allConfigurations) {
+                                    if (!resolvedConfigurations.contains(cfg)) {
+                                        GradleDependencyConfiguration gdc = gp.getConfiguration(cfg);
+                                        if (gdc != null && dependencyExistsOnConfigOrSibling(gp, gdc)) {
+                                            resolvedConfigurations.add(cfg);
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         if (resolvedConfigurations.isEmpty()) {
@@ -292,5 +306,27 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 })
         );
+    }
+
+    private boolean dependencyExistsOnConfigOrSibling(GradleProject gp, GradleDependencyConfiguration gdc) {
+        if (gdc.findRequestedDependency(groupId, artifactId) != null) {
+            return true;
+        }
+        // Check sibling declaration configs that share resolution classpaths
+        for (GradleDependencyConfiguration resolvable : gp.configurationsExtendingFrom(gdc, true)) {
+            if (!resolvable.isCanBeResolved()) {
+                continue;
+            }
+            for (GradleDependencyConfiguration sibling : gp.getNameToConfiguration().values()) {
+                if (sibling == gdc || sibling.isCanBeResolved()) {
+                    continue;
+                }
+                if (gp.configurationsExtendingFrom(sibling, true).contains(resolvable) &&
+                        sibling.findRequestedDependency(groupId, artifactId) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
