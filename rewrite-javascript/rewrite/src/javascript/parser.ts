@@ -2539,7 +2539,8 @@ export class JavaScriptParserVisitor {
                 body: this.convert(node.body),
                 type: this.mapType(node)
             },
-            returnTypeExpression: this.mapTypeInfo(node)
+            returnTypeExpression: this.mapTypeInfo(node),
+            methodType: this.mapMethodType(node)
         };
     }
 

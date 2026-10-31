@@ -105,7 +105,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             modifiers: await mapAsync(arrowFunction.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             typeParameters: arrowFunction.typeParameters && await this.visitDefined<J.TypeParameters>(arrowFunction.typeParameters, p),
             lambda: await this.visitDefined<J.Lambda>(arrowFunction.lambda, p),
-            returnTypeExpression: arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p)
+            returnTypeExpression: arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p),
+            methodType: await this.visitType(arrowFunction.methodType, p) as Type.Method | undefined
         };
         return updateIfChanged(arrowFunction, updates);
     }

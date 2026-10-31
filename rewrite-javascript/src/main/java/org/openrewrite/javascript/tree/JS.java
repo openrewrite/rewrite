@@ -409,6 +409,12 @@ public interface JS extends J {
         @Nullable
         TypeTree returnTypeExpression;
 
+        /**
+         * The method an arrow declares when a variable names it, as {@code const half = (n) => n / 2} declares
+         * {@code half}. Absent for any other arrow.
+         */
+        JavaType.@Nullable Method methodType;
+
         @Override
         public @Nullable JavaType getType() {
             return lambda.getType();
