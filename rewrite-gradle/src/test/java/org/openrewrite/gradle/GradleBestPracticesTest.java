@@ -129,7 +129,7 @@ class GradleBestPracticesTest implements RewriteTest {
             //language=properties
             """
               org.gradle.caching=true
-              org.gradle.jvmargs=-Xmx2g
+              org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
               org.gradle.parallel=true
               project.name=myproject
               """,
