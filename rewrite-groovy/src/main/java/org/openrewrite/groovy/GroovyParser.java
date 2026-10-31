@@ -29,6 +29,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.internal.NegativeCachingGroovyClassLoader;
+import org.openrewrite.groovy.marker.JenkinsLibraries;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
@@ -180,6 +181,12 @@ public class GroovyParser implements Parser {
                                 m = m.add(warning);
                             }
                             gcu = gcu.withMarkers(m);
+                        }
+                        if (isJenkinsfile(input.getPath().toFile().getName())) {
+                            List<JenkinsLibraries.Library> libraries = JenkinsLibraryCollector.collect(ast);
+                            if (!libraries.isEmpty()) {
+                                gcu = gcu.withMarkers(gcu.getMarkers().add(new JenkinsLibraries(Tree.randomId(), libraries)));
+                            }
                         }
                         pctx.getParsingListener().parsed(compiled.getInput(), gcu);
                         return requirePrintEqualsInput(gcu, input, relativeTo, ctx);

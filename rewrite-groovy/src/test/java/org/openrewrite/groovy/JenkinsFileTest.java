@@ -17,8 +17,15 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.marker.JenkinsLibraries;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
+import java.util.List;
+
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class JenkinsFileTest implements RewriteTest {
@@ -190,5 +197,125 @@ class JenkinsFileTest implements RewriteTest {
             spec -> spec.path("Jenkinsfile")
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void libraryAnnotationOnUnderscore() {
+        rewriteRun(
+          groovy(
+            """
+              @Library(['my-pipeline-library', 'my-jenkins-library@feature/x']) _
+              sbPipeline()
+              """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(cu -> assertThat(libraries(cu))
+                .containsExactly("my-pipeline-library", "my-jenkins-library@feature/x"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void libraryAnnotationWithNamedValue() {
+        rewriteRun(
+          groovy(
+            """
+              @Library(value = 'my-pipeline-library@1.2.0', changelog = false) _
+              sbPipeline()
+              """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(cu -> assertThat(libraries(cu)).containsExactly("my-pipeline-library@1.2.0"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void libraryAnnotationOnImport() {
+        rewriteRun(
+          // The parser keeps an annotation on an import in that import's prefix
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          groovy(
+            """
+              @Library('my-pipeline-library') import com.acme.Deployer
+              new Deployer(this).deploy()
+              """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(cu -> assertThat(libraries(cu)).containsExactly("my-pipeline-library"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void libraryStep() {
+        rewriteRun(
+          groovy(
+            """
+              library 'my-pipeline-library@2.0'
+              library identifier: 'my-jenkins-library@main', retriever: modernSCM([$class: 'GitSCMSource', remote: 'https://example.com/lib.git'])
+              node {
+                  library('nested-library').com.acme.Deployer.new(this)
+              }
+              """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(cu -> assertThat(libraries(cu))
+                .containsExactly("my-pipeline-library@2.0", "my-jenkins-library@main", "nested-library"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void jenkinsfileVariant() {
+        rewriteRun(
+          groovy(
+            """
+              @Library('my-pipeline-library') _
+              sbPipeline()
+              """,
+            spec -> spec.path("ci/Jenkinsfile.release")
+              .afterRecipe(cu -> assertThat(libraries(cu)).containsExactly("my-pipeline-library"))
+          )
+        );
+    }
+
+    @Test
+    void noMarkerWithoutLiteralLibraries() {
+        rewriteRun(
+          groovy(
+            """
+              library "my-pipeline-library@${env.BRANCH_NAME}"
+              helper.library 'not-a-step'
+              sh 'make'
+              """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(cu -> assertThat(cu.getMarkers().findFirst(JenkinsLibraries.class)).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void noMarkerOutsideJenkinsfiles() {
+        rewriteRun(
+          groovy(
+            """
+              @interface Library { String value() }
+              @Library('other') class Example {}
+              library 'other'
+              """,
+            spec -> spec.path("src/main/groovy/Example.groovy")
+              .afterRecipe(cu -> assertThat(cu.getMarkers().findFirst(JenkinsLibraries.class)).isEmpty())
+          )
+        );
+    }
+
+    private static List<String> libraries(SourceFile cu) {
+        return cu.getMarkers().findFirst(JenkinsLibraries.class)
+          .map(marker -> marker.getLibraries().stream()
+            .map(library -> library.getVersion() == null ? library.getName() : library.getName() + "@" + library.getVersion())
+            .collect(toList()))
+          .orElseThrow();
     }
 }
