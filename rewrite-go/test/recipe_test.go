@@ -27,6 +27,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -222,8 +223,42 @@ func TestRegistryReflectConstructor(t *testing.T) {
 	require.True(t, ok, "expected to find recipe")
 
 	// Constructor auto-derived from prototype via reflection
-	instance := found.Constructor(nil)
+	instance, err := found.Constructor(nil)
+	require.NoError(t, err)
 	assert.Equal(t, "org.openrewrite.golang.test.RenameFooToBar", instance.Name(), "unexpected name")
+}
+
+func TestRegistryBindsOptionsArrivingAsStrings(t *testing.T) {
+	reg := recipe.NewRegistry()
+	reg.Activate(func(r *recipe.Registry) {
+		r.Register(&golang.AddImport{}, recipe.CategoryDescriptor{DisplayName: "Go"})
+	})
+
+	found, ok := reg.FindRecipe("org.openrewrite.golang.AddImport")
+	require.True(t, ok, "expected to find recipe")
+
+	instance, err := found.Constructor(map[string]any{
+		"packagePath":      "strings",
+		"alias":            "s",
+		"onlyIfReferenced": "true",
+	})
+	require.NoError(t, err)
+
+	addImport, ok := instance.(*golang.AddImport)
+	require.True(t, ok, "expected an *AddImport")
+	assert.Equal(t, "strings", addImport.PackagePath)
+	require.NotNil(t, addImport.Alias)
+	assert.Equal(t, "s", *addImport.Alias)
+	assert.True(t, addImport.OnlyIfReferenced)
+
+	instance, err = found.Constructor(map[string]any{"packagePath": "strings", "onlyIfReferenced": "false"})
+	require.NoError(t, err)
+	assert.False(t, instance.(*golang.AddImport).OnlyIfReferenced)
+
+	_, err = found.Constructor(map[string]any{"packagePath": "strings", "onlyIfReferenced": "yes"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "org.openrewrite.golang.AddImport")
+	assert.Contains(t, err.Error(), "onlyIfReferenced")
 }
 
 func TestFencedMarkerPrinting(t *testing.T) {
