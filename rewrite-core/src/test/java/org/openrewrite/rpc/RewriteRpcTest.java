@@ -54,6 +54,7 @@ import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.rpc.request.PrepareRecipeResponse;
 import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -498,6 +499,27 @@ class RewriteRpcTest implements RewriteTest {
         Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
+    }
+
+    @Test
+    void delegatesToRecipeOnClasspathButNotInMarketplace() {
+        assertThat(marketplace.findRecipe("org.openrewrite.FindSourceFiles")).isNull();
+        Recipe recipe = client.recipeFromPrepareResponse(delegatingResponse("org.openrewrite.FindSourceFiles",
+          Map.of("filePattern", "**/*.txt")));
+        assertThat(recipe).isInstanceOf(FindSourceFiles.class);
+        assertThat(((FindSourceFiles) recipe).getFilePattern()).isEqualTo("**/*.txt");
+    }
+
+    @Test
+    void delegatesToUnknownRecipeFails() {
+        assertThatThrownBy(() -> client.recipeFromPrepareResponse(delegatingResponse("org.example.DoesNotExist", emptyMap())))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("org.example.DoesNotExist");
+    }
+
+    private static PrepareRecipeResponse delegatingResponse(String recipeName, Map<String, Object> options) {
+        return new PrepareRecipeResponse("id", null, "edit:id", emptyList(), null, emptyList(),
+          new PrepareRecipeResponse.DelegatesTo(recipeName, options), null, null);
     }
 
     @Test
