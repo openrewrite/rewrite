@@ -2456,6 +2456,204 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9169")
+    @Test
+    void addDependencyNoLongerTransitiveAfterPropertyChangeInParent() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePropertyValue("quarkus-cxf.version", "3.39.0", null, null),
+            addDependency("io.quarkus:quarkus-jackson:3.39.1", "com.fasterxml.jackson..*", true)
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>org.acme</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <quarkus-cxf.version>3.38.0</quarkus-cxf.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                      <version>${quarkus-cxf.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.acme</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <quarkus-cxf.version>3.39.0</quarkus-cxf.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                      <version>${quarkus-cxf.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            srcMainJava(
+              java(
+                """
+                  import com.fasterxml.jackson.databind.ObjectMapper;
+                  class A {
+                      ObjectMapper mapper;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.acme</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.acme</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-jackson</artifactId>
+                      <version>3.39.1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotAddDependencyMadeTransitiveByPropertyChangeInParent() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePropertyValue("quarkus-cxf.version", "3.38.0", null, null),
+            addDependency("io.quarkus:quarkus-jackson:3.39.1", "com.fasterxml.jackson..*", true)
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>org.acme</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <quarkus-cxf.version>3.39.0</quarkus-cxf.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                      <version>${quarkus-cxf.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.acme</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <quarkus-cxf.version>3.38.0</quarkus-cxf.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                      <version>${quarkus-cxf.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            srcMainJava(
+              java(
+                """
+                  import com.fasterxml.jackson.databind.ObjectMapper;
+                  class A {
+                      ObjectMapper mapper;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.acme</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.quarkiverse.cxf</groupId>
+                      <artifactId>quarkus-cxf</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }

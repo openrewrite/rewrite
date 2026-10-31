@@ -220,6 +220,18 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
             @Override
+            public @Nullable Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Xml.Document) {
+                    Xml.Document refreshed = UpdateMavenModel.refreshIfAncestorUpdated((Xml.Document) tree, ctx);
+                    if (refreshed != tree) {
+                        Xml visited = super.visit(refreshed, ctx);
+                        return visited == refreshed ? (Xml) tree : visited;
+                    }
+                }
+                return super.visit(tree, ctx);
+            }
+
+            @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml maven = super.visitDocument(document, ctx);
 
