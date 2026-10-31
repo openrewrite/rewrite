@@ -25,14 +25,19 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
@@ -2625,6 +2630,67 @@ class MergeYamlTest implements RewriteTest {
                 - local: other.yml
                 - component: a@1
               """
+          )
+        );
+    }
+
+    @Test
+    void mergeSequenceWithScalarAndMappingEntriesDoesNotDuplicateScalars() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              include:
+                - local.yml
+                - extra.yml
+                - component: a@1
+              """,
+            null,
+            "component",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              include:
+                - local.yml
+                - local: other.yml
+              """,
+            """
+              include:
+                - local.yml
+                - local: other.yml
+                - extra.yml
+                - component: a@1
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeFirstElementKeepsCommentWithEntryInCrlfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first",
+            null
+          )),
+          yaml(
+            "# Comment about first\r\nfirst: value\r\n",
+            "A: a\r\n# Comment about first\r\nfirst: value\r\n",
+            spec -> spec.mapBeforeRecipe(docs -> docs.withMarkers(docs.getMarkers().add(
+              new NamedStyles(randomId(), "crlf", "CRLF", null, emptySet(), singletonList(new GeneralFormatStyle(true))))))
           )
         );
     }

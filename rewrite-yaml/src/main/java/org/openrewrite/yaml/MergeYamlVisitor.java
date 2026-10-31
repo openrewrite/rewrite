@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
@@ -66,7 +67,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private static final String REMOVE_ENTRY_PREFIX = "org.openrewrite.yaml.MergeYamlVisitor.removeEntryPrefix";
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
-    private static final Pattern BLANK_LINE = Pattern.compile("\\R[ \\t]*\\R");
+    private static final Pattern BLANK_LINE = Pattern.compile("(?>\\R)[ \\t]*(?>\\R)");
 
     private final Yaml existing;
     private final Yaml incoming;
@@ -196,16 +197,16 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private boolean keyMatches(Yaml.Mapping m1, Yaml.Mapping m2) {
-        Optional<String> nameToAdd = m2.getEntries().stream()
-                .filter(e -> objectIdentifyingProperty != null && objectIdentifyingProperty.equals(e.getKey().getValue()))
-                .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
-                .findAny();
-
-        return nameToAdd.map(nameToAddValue -> m1.getEntries().stream()
-                        .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
-                        .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
-                        .anyMatch(existingName -> existingName.equals(nameToAddValue)))
+        return identifyingValues(m2).findAny()
+                .map(nameToAdd -> identifyingValues(m1).anyMatch(nameToAdd::equals))
                 .orElse(false);
+    }
+
+    private Stream<String> identifyingValues(Yaml.Mapping mapping) {
+        return mapping.getEntries().stream()
+                .filter(e -> objectIdentifyingProperty != null && objectIdentifyingProperty.equals(e.getKey().getValue()))
+                .filter(e -> e.getValue() instanceof Yaml.Scalar)
+                .map(e -> ((Yaml.Scalar) e.getValue()).getValue());
     }
 
     private Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
@@ -258,13 +259,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 Yaml.Mapping.Entry afterInsertEntry = mutatedEntries.ls.get(mutatedEntries.lastNewlyAddedItemIndex + 1);
 
                 // Check if merge is done on the very first key of the yaml file
-                if (mutatedEntries.firstNewlyAddedItemIndex == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Document &&
-                        ((Yaml.Mapping) ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getBlock()).getEntries().equals(((Yaml.Mapping) existing).getEntries())) {
-                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                Cursor parent = getCursor().getParentOrThrow();
+                if (mutatedEntries.firstNewlyAddedItemIndex == 0 && parent.getValue() instanceof Yaml.Document &&
+                        ((Yaml.Mapping) ((Yaml.Document) parent.getValue()).getBlock()).getEntries().equals(((Yaml.Mapping) existing).getEntries())) {
+                    Yaml.Document document = parent.getValue();
                     String leading = afterInsertEntry.getPrefix();
                     if (!document.isExplicit()) {
                         leading = document.getPrefix() + leading;
-                        getCursor().getParentOrThrow().putMessage(REMOVE_DOCUMENT_PREFIX, true);
+                        parent.putMessage(REMOVE_DOCUMENT_PREFIX, true);
                     }
                     String header = documentHeader(leading, document.isExplicit());
                     mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, mutatedEntries.ls.get(0).withPrefix(header));
@@ -437,7 +439,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
 
         List<Yaml.Sequence.Entry> mutatedEntries = map(s2.getEntries(), entry -> {
-            if (!(entry.getBlock() instanceof Yaml.Mapping)) {
+            if (entry.getBlock() instanceof Yaml.Scalar) {
+                return containsScalar(s1, ((Yaml.Scalar) entry.getBlock()).getValue()) ? null : entry;
+            } else if (!(entry.getBlock() instanceof Yaml.Mapping)) {
                 return entry;
             }
             Yaml.Mapping incomingMapping = (Yaml.Mapping) entry.getBlock();
@@ -474,6 +478,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }).ls;
 
         return s1.withEntries(keepInlineCommentOnItsLine(s1, entries));
+    }
+
+    private static boolean containsScalar(Yaml.Sequence sequence, String value) {
+        return sequence.getEntries().stream().anyMatch(entry ->
+                entry.getBlock() instanceof Yaml.Scalar && value.equals(((Yaml.Scalar) entry.getBlock()).getValue()));
     }
 
     /// An inline comment is stored on the prefix of the element that follows it, so inserting entries
@@ -615,11 +624,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     /// that entry: the line break closing an explicit `---` marker, and comments up to the last blank line,
     /// which describe the file rather than the entry.
     private static String documentHeader(String leading, boolean explicit) {
-        int markerEnd = 0;
-        if (explicit) {
-            Matcher lineBreak = LINE_BREAK.matcher(leading);
-            markerEnd = lineBreak.find() ? lineBreak.end() : 0;
-        }
+        Matcher lineBreak = LINE_BREAK.matcher(leading);
+        int markerEnd = explicit && lineBreak.find() ? lineBreak.end() : 0;
         int headerEnd = markerEnd;
         Matcher blankLine = BLANK_LINE.matcher(leading);
         while (blankLine.find()) {
