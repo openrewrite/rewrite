@@ -1557,10 +1557,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
                 dependency = parseDependency(singletonList(((J.Binary) argument).getLeft()));
             } else if (argument instanceof J.MethodInvocation) {
-                if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
-                        "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                    dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
-                } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
+                J.MethodInvocation helper = (J.MethodInvocation) argument;
+                if ("platform".equals(helper.getSimpleName()) ||
+                        "enforcedPlatform".equals(helper.getSimpleName())) {
+                    dependency = parseDependency(helper.getArguments());
+                } else if ("kotlin".equals(helper.getSimpleName())) {
+                    dependency = parseKotlinHelperDependency(helper);
+                } else if ("project".equals(helper.getSimpleName())) {
                     // project dependencies are not yet supported
                     return null;
                 }
@@ -1625,6 +1628,24 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
          */
         private static ResolvedDependency withRequested(ResolvedDependency resolved, Dependency requested) {
             return resolved.withRequested(resolved.getRequested().withGav(requested.getGav()));
+        }
+
+        private @Nullable Dependency parseKotlinHelperDependency(J.MethodInvocation helper) {
+            List<Expression> arguments = helper.getArguments();
+            if (arguments.isEmpty() || !(arguments.get(0) instanceof J.Literal) ||
+                    !(((J.Literal) arguments.get(0)).getValue() instanceof String)) {
+                return null;
+            }
+            String module = (String) ((J.Literal) arguments.get(0)).getValue();
+
+            String version = null;
+            if (arguments.size() > 1 && arguments.get(1) instanceof J.Literal &&
+                    ((J.Literal) arguments.get(1)).getValue() instanceof String) {
+                version = (String) ((J.Literal) arguments.get(1)).getValue();
+            }
+            return Dependency.builder()
+                    .gav(new GroupArtifactVersion("org.jetbrains.kotlin", "kotlin-" + module, version))
+                    .build();
         }
 
         private @Nullable Dependency parseDependency(List<Expression> arguments) {
