@@ -111,7 +111,9 @@ public class SetupCfgParser implements Parser {
                 return sf;
             }
 
-            List<Dependency> deps = declaredDependencies(resolvedDeps, text.getText(), env);
+            DependencyManifest.Requirements setupCfg = DependencyManifest.ofSetupCfg(text.getText(), null);
+            List<Dependency> deps = declaredDependencies(resolvedDeps, setupCfg.getRoots(), env);
+            List<String> requiresPython = setupCfg.getRequiresPython();
 
             PythonResolutionResult marker = new PythonResolutionResult(
                     randomId(),
@@ -120,7 +122,7 @@ public class SetupCfgParser implements Parser {
                     null,
                     null,
                     text.getSourcePath().toString(),
-                    null,
+                    requiresPython.isEmpty() ? null : requiresPython.get(0),
                     null,
                     emptyList(),
                     deps,
@@ -142,8 +144,7 @@ public class SetupCfgParser implements Parser {
      * instead, and then they are the requirements the env was installed from. For an env made elsewhere,
      * they are its packages that no other package depends on.
      */
-    private static List<Dependency> declaredDependencies(List<ResolvedDependency> resolved, String setupCfg, Path env) {
-        List<String> declared = DependencyManifest.ofSetupCfg(setupCfg, null).getRoots();
+    private static List<Dependency> declaredDependencies(List<ResolvedDependency> resolved, List<String> declared, Path env) {
         if (declared.isEmpty()) {
             List<String> installed = DependencyWorkspace.installedRequirements(env);
             if (installed == null) {

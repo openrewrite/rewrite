@@ -357,8 +357,24 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, manifest, env, ctx);
+        String requiresPython = DependencyManifest.requiresPython(projectPath);
         // Manifests first, so a consumer can read the resolved dependencies before the sources.
-        return Stream.concat(manifestStream, rpcStream);
+        return Stream.concat(manifestStream, rpcStream).map(sf -> withRequiresPython(sf, requiresPython));
+    }
+
+    /**
+     * A marker whose own file declares no Python versions, such as a requirements file's, gets the ones
+     * another of the project's manifests declares.
+     */
+    private static SourceFile withRequiresPython(SourceFile sourceFile, @Nullable String requiresPython) {
+        if (requiresPython == null) {
+            return sourceFile;
+        }
+        return sourceFile.getMarkers().findFirst(PythonResolutionResult.class)
+                .filter(marker -> marker.getRequiresPython() == null)
+                .<SourceFile>map(marker -> sourceFile.withMarkers(
+                        sourceFile.getMarkers().setByType(marker.withRequiresPython(requiresPython))))
+                .orElse(sourceFile);
     }
 
     /**
