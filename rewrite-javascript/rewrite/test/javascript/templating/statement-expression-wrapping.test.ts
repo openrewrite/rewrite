@@ -180,4 +180,27 @@ describe('Statement Expression Wrapping', () => {
             }
         });
     });
+
+    it('should wrap an expression the parser does not take as a statement when replacing a call statement', () => {
+        const spec = new RecipeSpec();
+        const arg = capture('arg');
+        const pat = pattern`applyTheme(${arg})`;
+        const tmpl = template`${arg} as unknown as string`;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const match = await pat.match(method, this.cursor);
+                return match ? tmpl.apply(method, this.cursor, {values: match}) : method;
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript('applyTheme(svc);', 'svc as unknown as string;'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const statement = cu.statements[0].element;
+                expect(statement.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((statement as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.As);
+            }
+        });
+    });
 });

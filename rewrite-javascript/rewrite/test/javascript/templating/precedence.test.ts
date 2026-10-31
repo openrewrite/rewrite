@@ -501,9 +501,16 @@ describe('template precedence', () => {
                 after: template`class A extends ${x} {}`
             })));
             //language=javascript
-            return spec.rewriteRun(javascript(
-                `const a = base(p || q);`,
-                `const a = class A extends (p || q) {\n};`));
+            return spec.rewriteRun({
+                ...javascript(
+                    `const a = base(p || q);`,
+                    `const a = class A extends (p || q) {\n};`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    const a = (cu.statements[0].element as J.VariableDeclarations).variables[0].element;
+                    const classA = (a.initializer!.element as JS.StatementExpression).statement as J.ClassDeclaration;
+                    expect(classA.extends!.element.kind).toBe(JS.Kind.TypeTreeExpression);
+                }
+            });
         });
     });
 

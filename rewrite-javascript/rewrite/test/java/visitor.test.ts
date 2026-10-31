@@ -39,7 +39,7 @@ describe('visitor', () => {
         );
 
         // test
-        expect(global).toEqual("/org.openrewrite.java.tree.J$ClassDeclaration/org.openrewrite.java.tree.J$Empty/org.openrewrite.java.tree.J$MethodInvocation");
+        expect(global).toEqual("/org.openrewrite.java.tree.J$ClassDeclaration/org.openrewrite.java.tree.J$Block/org.openrewrite.java.tree.J$Empty/org.openrewrite.java.tree.J$MethodInvocation");
     });
 
     test('call visitExpression for subclasses', async () => {

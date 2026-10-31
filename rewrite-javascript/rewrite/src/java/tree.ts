@@ -267,7 +267,7 @@ export namespace J {
         }
     }
 
-    export interface Block extends J {
+    export interface Block extends J, Statement {
         readonly kind: typeof Kind.Block;
         readonly static: RightPadded<boolean>;
         readonly statements: RightPadded<Statement>[];
@@ -426,7 +426,7 @@ export namespace J {
         }
     }
 
-    export interface Import extends J {
+    export interface Import extends J, Statement {
         readonly kind: typeof Kind.Import;
         readonly static: LeftPadded<boolean>;
         readonly qualid: FieldAccess;
@@ -442,7 +442,7 @@ export namespace J {
         readonly modifier?: Modifier;
     }
 
-    export interface DeconstructionPattern extends J, TypedTree {
+    export interface DeconstructionPattern extends J, Expression, TypedTree {
         readonly kind: typeof Kind.DeconstructionPattern;
         readonly deconstructor: Expression;
         readonly nested: Container<J>;
@@ -490,7 +490,7 @@ export namespace J {
         readonly codePoint: string;
     }
 
-    export interface MemberReference extends J, MethodCall {
+    export interface MemberReference extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.MemberReference;
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
@@ -499,7 +499,7 @@ export namespace J {
         readonly variableType?: Type.Variable;
     }
 
-    export interface MethodDeclaration extends J, TypedTree {
+    export interface MethodDeclaration extends J, Statement, TypedTree {
         readonly kind: typeof Kind.MethodDeclaration;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
@@ -515,7 +515,7 @@ export namespace J {
         readonly methodType?: Type.Method;
     }
 
-    export interface MethodInvocation extends J, TypedTree, MethodCall {
+    export interface MethodInvocation extends J, Statement, TypedTree, MethodCall {
         readonly kind: typeof Kind.MethodInvocation;
         readonly select?: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
@@ -567,7 +567,7 @@ export namespace J {
         readonly type?: Type;
     }
 
-    export interface NewClass extends J, TypedTree, MethodCall {
+    export interface NewClass extends J, Statement, TypedTree, MethodCall {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
@@ -583,13 +583,13 @@ export namespace J {
         readonly typeTree: RightPadded<TypeTree>;
     }
 
-    export interface Package extends J {
+    export interface Package extends J, Statement {
         readonly kind: typeof Kind.Package;
         readonly expression: Expression;
         readonly annotations?: Annotation[];
     }
 
-    export interface ParameterizedType extends J, TypeTree {
+    export interface ParameterizedType extends J, TypeTree, Expression {
         readonly kind: typeof Kind.ParameterizedType;
         readonly class: NameTree;
         readonly typeParameters?: Container<Expression>;
@@ -711,7 +711,7 @@ export namespace J {
         }
     }
 
-    export interface VariableDeclarations extends J, TypedTree {
+    export interface VariableDeclarations extends J, Statement, TypedTree {
         readonly kind: typeof Kind.VariableDeclarations;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
@@ -721,7 +721,7 @@ export namespace J {
     }
 
     export namespace VariableDeclarations {
-        export interface NamedVariable extends J {
+        export interface NamedVariable extends J, NameTree {
             readonly kind: typeof Kind.NamedVariable;
             readonly name: VariableDeclarator;
             readonly dimensionsAfterName: LeftPadded<Space>[];
