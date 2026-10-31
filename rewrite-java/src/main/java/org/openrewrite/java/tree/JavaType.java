@@ -37,6 +37,12 @@ import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 
+/**
+ * The type attribution of an LST element.
+ * <p>
+ * Types compare by identity, so two instances that describe the same type are not {@code equals}.
+ * Compare types with {@link TypeUtils#isOfType(JavaType, JavaType)}.
+ */
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
@@ -631,14 +637,6 @@ public interface JavaType {
             return this;
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Class)) return false;
-            Class aClass = (Class) o;
-            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                   getTypeParameters().equals(aClass.getTypeParameters());
-        }
 
         @Override
         public String toString() {
@@ -989,13 +987,6 @@ public interface JavaType {
             return type.getSupertype();
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Parameterized)) return false;
-            Parameterized that = (Parameterized) o;
-            return Objects.equals(getType(), that.getType()) && getTypeParameters().equals(that.getTypeParameters());
-        }
 
         @Override
         public String toString() {
@@ -1077,16 +1068,6 @@ public interface JavaType {
             return this;
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof GenericTypeVariable)) return false;
-            GenericTypeVariable that = (GenericTypeVariable) o;
-            List<JavaType> bounds = getBounds(), thatBounds = that.getBounds();
-            return name.equals(that.name) && variance == that.variance &&
-                   (variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty() ||
-                    !bounds.isEmpty() && bounds.equals(thatBounds));
-        }
 
         @Override
         public String toString() {
@@ -1154,13 +1135,6 @@ public interface JavaType {
             return this;
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Array)) return false;
-            Array array = (Array) o;
-            return Objects.equals(getElemType(), array.getElemType());
-        }
 
         @Override
         public String toString() {
@@ -1664,16 +1638,6 @@ public interface JavaType {
             return (flagsBitMap & EXTENSION_METHOD_FLAG) != 0;
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Method)) return false;
-            Method method = (Method) o;
-            return Objects.equals(name, method.name) &&
-                   Objects.equals(getDeclaringType(), method.getDeclaringType()) &&
-                   Objects.equals(getReturnType(), method.getReturnType()) &&
-                   getParameterTypes().equals(method.getParameterTypes());
-        }
 
         @Override
         public String toString() {
@@ -1796,13 +1760,6 @@ public interface JavaType {
             return this;
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Variable)) return false;
-            Variable variable = (Variable) o;
-            return Objects.equals(name, variable.name) && Objects.equals(getOwner(), variable.getOwner());
-        }
 
         @Override
         public String toString() {
