@@ -1027,6 +1027,29 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void classToPrimitiveKeepsClassAsDeclaringType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
+          java(
+            """
+              class A {
+                  int hash(Integer foo) {
+                      return foo.hashCode();
+                  }
+              }
+              """,
+            """
+              class A {
+                  int hash(int foo) {
+                      return foo.hashCode();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void classToStringKeyword() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
