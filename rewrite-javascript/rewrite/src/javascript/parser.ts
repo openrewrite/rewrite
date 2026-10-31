@@ -638,16 +638,10 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
-            let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
-            if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
-                last = last.getLastToken(this.sourceFile);
-            }
-            return this.rightPadded(j, this.semicolonPrefix(n), (_ => {
-                return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers;
-            })?.(n));
+            return this.rightPadded(j, this.semicolonPrefix(n), this.trailingSemicolon(n) ? markers({
+                kind: J.Markers.Semicolon,
+                id: randomId()
+            }) : emptyMarkers);
         });
     }
 
@@ -843,7 +837,17 @@ export class JavaScriptParserVisitor {
         };
     }
 
+    private trailingSemicolon(statement: ts.Statement): boolean {
+        while (ts.isLabeledStatement(statement)) {
+            statement = statement.statement;
+        }
+        return statement.getChildAt(statement.getChildCount(this.sourceFile) - 1, this.sourceFile)?.kind === ts.SyntaxKind.SemicolonToken;
+    }
+
     private semicolonPrefix = (node: ts.Node) => {
+        while (ts.isLabeledStatement(node)) {
+            node = node.statement;
+        }
         let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
         if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement)) {
             last = last.getLastToken(this.sourceFile);
@@ -3129,8 +3133,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitIfStatement(node: ts.IfStatement): J.If {
-        const semicolonAfterThen = (node.thenStatement.getChildAt(node.thenStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
-        const semicolonAfterElse = (node.elseStatement?.getChildAt(node.elseStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
+        const semicolonAfterThen = this.trailingSemicolon(node.thenStatement);
+        const semicolonAfterElse = node.elseStatement && this.trailingSemicolon(node.elseStatement);
         return {
             kind: J.Kind.If,
             id: randomId(),
@@ -3170,7 +3174,7 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             body: this.rightPadded(this.visit(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                this.trailingSemicolon(node.statement) ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers),
@@ -3203,7 +3207,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                this.trailingSemicolon(node.statement) ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3251,7 +3255,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                this.trailingSemicolon(node.statement) ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3289,7 +3293,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                this.trailingSemicolon(node.statement) ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
@@ -3369,7 +3373,7 @@ export class JavaScriptParserVisitor {
                 body: this.rightPadded(
                     this.convert(node.statement),
                     this.semicolonPrefix(node.statement),
-                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                    this.trailingSemicolon(node.statement) ? markers({
                         kind: J.Markers.Semicolon,
                         id: randomId()
                     }) : emptyMarkers
@@ -3424,7 +3428,7 @@ export class JavaScriptParserVisitor {
             body: this.rightPadded(
                 this.convert(node.statement),
                 this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                this.trailingSemicolon(node.statement) ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
                 }) : emptyMarkers
