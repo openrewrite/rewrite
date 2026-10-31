@@ -250,7 +250,8 @@ public class GroovyParserVisitor {
                 }
                 addEmptyStatements(statements);
                 JRightPadded<Statement> statement = convertTopLevelStatement(unit, entry.getValue());
-                if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
+                if (statements.isEmpty() && pkg == null &&
+                    (statement.getElement() instanceof J.Import || statement.getElement() instanceof G.AnnotatedImport)) {
                     prefix = statement.getElement().getPrefix();
                     statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
                 }
@@ -3606,6 +3607,7 @@ public class GroovyParserVisitor {
             return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
+            List<J.Annotation> annotations = visitAndGetAnnotations(importNode, new RewriteGroovyClassVisitor(unit));
             Space importPrefix = sourceBefore("import");
             JLeftPadded<Boolean> statik = importNode.isStatic() ? padLeft(sourceBefore("static"), true) : padLeft(EMPTY, false);
             Space space = whitespace();
@@ -3614,7 +3616,13 @@ public class GroovyParserVisitor {
             if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
-            return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
+            J.Import anImport = new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias);
+            if (annotations.isEmpty()) {
+                return maybeSemicolon(anImport);
+            }
+            Space prefix = annotations.get(0).getPrefix();
+            annotations.set(0, annotations.get(0).withPrefix(EMPTY));
+            return maybeSemicolon(new G.AnnotatedImport(randomId(), prefix, Markers.EMPTY, annotations, anImport));
         }
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node, new RewriteGroovyClassVisitor(unit));
@@ -4704,7 +4712,9 @@ public class GroovyParserVisitor {
                 }
 
                 if (packageEnd < importSource.length() && importSource.charAt(packageEnd) == '*') {
-                    ImportNode node = new ImportNode(staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1)).getType());
+                    ImportNode original = staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1));
+                    ImportNode node = new ImportNode(original.getType());
+                    node.addAnnotations(original.getAnnotations());
                     node.setLineNumber(lineNo);
                     node.setColumnNumber(importIndex + 1);
                     completeStaticStarImports.add(node);

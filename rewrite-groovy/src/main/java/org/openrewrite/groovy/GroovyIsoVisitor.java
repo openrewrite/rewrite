@@ -23,6 +23,11 @@ import org.openrewrite.java.tree.Statement;
 public class GroovyIsoVisitor<P> extends GroovyVisitor<P> {
 
     @Override
+    public G.AnnotatedImport visitAnnotatedImport(G.AnnotatedImport annotatedImport, P p) {
+        return (G.AnnotatedImport) super.visitAnnotatedImport(annotatedImport, p);
+    }
+
+    @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, P p) {
         return (G.CompilationUnit) super.visitCompilationUnit(cu, p);
     }

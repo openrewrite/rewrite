@@ -43,6 +43,23 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
     }
 
     @Override
+    public J visitAnnotatedImport(G.AnnotatedImport annotatedImport, @Nullable Object ctx) {
+        if (annotatedImport == ctx || !(ctx instanceof G.AnnotatedImport)) {
+            return annotatedImport;
+        }
+        G.AnnotatedImport formatted = (G.AnnotatedImport) ctx;
+        G.AnnotatedImport a = annotatedImport;
+        a = a.withPrefix(visitSpace(a.getPrefix(), GSpace.Location.ANNOTATED_IMPORT_PREFIX, formatted.getPrefix()));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), formatted.getMarkers()));
+        a = a.withLeadingAnnotations(ListUtils.map(a.getLeadingAnnotations(), (index, annotation) ->
+                visitAndCast(annotation, formatted.getLeadingAnnotations().get(index))));
+        // The Java formatting passes treat this as an import prefix, not as an annotation separator.
+        J.Import formattedImport = formatted.getImportDeclaration()
+                .withPrefix(a.getImportDeclaration().getPrefix());
+        return a.withImportDeclaration(visitAndCast(a.getImportDeclaration(), formattedImport));
+    }
+
+    @Override
     public J visitCompilationUnit(G.CompilationUnit cu, @Nullable Object ctx) {
         if (cu == ctx || !(ctx instanceof G.CompilationUnit)) {
             return cu;

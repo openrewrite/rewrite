@@ -51,6 +51,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitAnnotatedImport(G.AnnotatedImport annotatedImport, PrintOutputCapture<P> p) {
+        beforeSyntax(annotatedImport, GSpace.Location.ANNOTATED_IMPORT_PREFIX, p);
+        visit(annotatedImport.getLeadingAnnotations(), p);
+        visit(annotatedImport.getImportDeclaration(), p);
+        afterSyntax(annotatedImport, p);
+        return annotatedImport;
+    }
+
+    @Override
     public J visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
         if (cu.getShebang() != null) {
             p.append(cu.getShebang());

@@ -31,6 +31,24 @@ class AutoFormatVisitorTest implements RewriteTest {
     }
 
     @Test
+    void preserveAnnotatedImportSeparator() {
+        rewriteRun(
+          groovy("@Deprecated import java.util.List"),
+          groovy("@Deprecated\nimport java.util.Set")
+        );
+    }
+
+    @Test
+    void formatImportAnnotationArguments() {
+        rewriteRun(
+          groovy(
+            "@SuppressWarnings( 'unused' ) import java.util.List",
+            "@SuppressWarnings('unused') import java.util.List"
+          )
+        );
+    }
+
+    @Test
     void tupleDeclaration() {
         rewriteRun(
           groovy(

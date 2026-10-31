@@ -25,6 +25,7 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
 import org.openrewrite.groovy.service.GroovySourceFileStatementService;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -66,6 +67,35 @@ public interface G extends J {
     @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
+    }
+
+    /**
+     * An import with Groovy annotations, which are not supported by Java imports.
+     */
+    @ToString
+    @Getter
+    @With
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class AnnotatedImport implements G, Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Space prefix;
+        Markers markers;
+        List<J.Annotation> leadingAnnotations;
+        J.Import importDeclaration;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitAnnotatedImport(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
     }
 
     @ToString
@@ -186,10 +216,8 @@ public interface G extends J {
         @Override
         @Transient
         public List<Import> getImports() {
-            return statements.stream()
+            return getPadding().getImports().stream()
                     .map(JRightPadded::getElement)
-                    .filter(J.Import.class::isInstance)
-                    .map(J.Import.class::cast)
                     .collect(toList());
         }
 
@@ -286,7 +314,8 @@ public interface G extends J {
                         .collect(toList());
                 int insertionIdx = 0;
                 for (JRightPadded<Statement> statement : statements) {
-                    if (!(statement.getElement() instanceof J.Import)) {
+                    if (!(statement.getElement() instanceof J.Import) &&
+                        !(statement.getElement() instanceof AnnotatedImport)) {
                         break;
                     }
                     insertionIdx++;
@@ -315,21 +344,41 @@ public interface G extends J {
             @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
+                // Import recipes format the space before the whole annotated import, not the gap after its annotations.
                 //noinspection unchecked
                 return t.statements.stream()
-                        .filter(s -> s.getElement() instanceof J.Import)
-                        .map(s -> (JRightPadded<J.Import>) (Object) s)
+                        .filter(s -> s.getElement() instanceof J.Import || s.getElement() instanceof AnnotatedImport)
+                        .map(s -> s.getElement() instanceof AnnotatedImport ?
+                                new JRightPadded<>(((AnnotatedImport) s.getElement()).getImportDeclaration()
+                                        .withPrefix(s.getElement().getPrefix()),
+                                        s.getAfter(), s.getMarkers()) :
+                                (JRightPadded<J.Import>) (Object) s)
                         .collect(toList());
             }
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
+                imports = preserveAnnotatedImports(imports);
                 List<JRightPadded<Statement>> statements = t.statements.stream()
-                        .filter(s -> !(s.getElement() instanceof J.Import))
+                        .filter(s -> !(s.getElement() instanceof J.Import) &&
+                                     !(s.getElement() instanceof AnnotatedImport))
                         .collect(toList());
                 //noinspection unchecked
                 statements.addAll(0, imports.stream()
-                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .map(i -> {
+                            for (JRightPadded<Statement> original : t.statements) {
+                                if (original.getElement() instanceof AnnotatedImport) {
+                                    AnnotatedImport annotated = (AnnotatedImport) original.getElement();
+                                    if (annotated.getImportDeclaration().getId().equals(i.getElement().getId())) {
+                                        return original.withElement(annotated.withPrefix(i.getElement().getPrefix())
+                                                .withImportDeclaration(i.getElement()
+                                                        .withPrefix(annotated.getImportDeclaration().getPrefix())))
+                                                .withAfter(i.getAfter()).withMarkers(i.getMarkers());
+                                    }
+                                }
+                            }
+                            return (JRightPadded<Statement>) (Object) i;
+                        })
                         .collect(toList()));
 
                 List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
@@ -338,13 +387,55 @@ public interface G extends J {
                 } else {
                     boolean hasChanges = false;
                     for (int i = 0; i < originalImports.size(); i++) {
-                        if (originalImports.get(i) != imports.get(i)) {
+                        JRightPadded<Import> original = originalImports.get(i);
+                        JRightPadded<Import> replacement = imports.get(i);
+                        J.Import before = original.getElement();
+                        J.Import after = replacement.getElement();
+                        if ((before != after &&
+                            (!before.getId().equals(after.getId()) || before.getPrefix() != after.getPrefix() ||
+                             before.getMarkers() != after.getMarkers() || before.getQualid() != after.getQualid() ||
+                             before.getPadding().getStatic() != after.getPadding().getStatic() ||
+                             before.getPadding().getAlias() != after.getPadding().getAlias())) ||
+                            original.getAfter() != replacement.getAfter() ||
+                            original.getMarkers() != replacement.getMarkers()) {
                             hasChanges = true;
                             break;
                         }
                     }
                     return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 }
+            }
+
+            private List<JRightPadded<Import>> preserveAnnotatedImports(List<JRightPadded<Import>> imports) {
+                return ListUtils.flatMap(imports, replacement -> {
+                    J.Import star = replacement.getElement();
+                    if (!"*".equals(star.getQualid().getSimpleName()) || t.getImports().stream().anyMatch(i ->
+                            i.getId().equals(star.getId()))) {
+                        return replacement;
+                    }
+                    List<JRightPadded<Import>> retained = new ArrayList<>();
+                    for (JRightPadded<Statement> statement : t.statements) {
+                        if (!(statement.getElement() instanceof AnnotatedImport)) {
+                            continue;
+                        }
+                        AnnotatedImport annotated = (AnnotatedImport) statement.getElement();
+                        J.Import original = annotated.getImportDeclaration();
+                        boolean sameGroup = original.isStatic() == star.isStatic() &&
+                                (star.isStatic() ? original.getTypeName().equals(star.getTypeName()) :
+                                        original.getPackageName().equals(star.getPackageName()));
+                        if (sameGroup && original.getAlias() == null && imports.stream().noneMatch(i ->
+                                i.getElement().getId().equals(original.getId()))) {
+                            // Folding replaces import IDs. Keep annotated imports explicit so their effects survive.
+                            retained.add(new JRightPadded<>(original.withPrefix(annotated.getPrefix()),
+                                    statement.getAfter(), statement.getMarkers()));
+                        }
+                    }
+                    if (retained.isEmpty()) {
+                        return replacement;
+                    }
+                    retained.add(replacement.withElement(star.withPrefix(Space.format("\n"))));
+                    return retained;
+                });
             }
 
             public List<JRightPadded<Statement>> getStatements() {
