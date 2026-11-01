@@ -65,6 +65,12 @@ public sealed class Validations
     /// </summary>
     public bool ExecutionContextUnchanged { get; init; } = true;
 
+    /// <summary>
+    /// Whether a ScanningRecipe's scanner is validated to make no edits, which the scanning phase discards.
+    /// Default: enabled.
+    /// </summary>
+    public bool NoEditsInScanningPhase { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 

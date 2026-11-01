@@ -24,8 +24,11 @@ namespace OpenRewrite.Test;
 /// </summary>
 internal sealed class RunChecks : IRunObserver
 {
+    private readonly Validations _validations;
+
     public RunChecks(Validations validations)
     {
+        _validations = validations;
         Ctx = validations.ExecutionContextUnchanged ? new UnchangedExecutionContext(this) : new ExecutionContext();
     }
 
@@ -43,4 +46,16 @@ internal sealed class RunChecks : IRunObserver
     }
 
     public void Running(Recipe recipe) => Recipe = recipe;
+
+    public void Scanned(Recipe recipe, SourceFile source, Tree? scanned)
+    {
+        if (_validations.NoEditsInScanningPhase && !ReferenceEquals(source, scanned))
+        {
+            Assert.Fail(
+                "Record what the scanner finds in the accumulator, and make the edits in GetVisitor(acc).\n" +
+                $"{recipe.Name}'s scanner {(scanned == null ? "deleted" : "changed")} {source.SourcePath}, and the " +
+                "scanning phase discards edits. A scanner that reuses an editing visitor opts out with " +
+                "spec.SetValidations(new Validations { NoEditsInScanningPhase = false }).");
+        }
+    }
 }

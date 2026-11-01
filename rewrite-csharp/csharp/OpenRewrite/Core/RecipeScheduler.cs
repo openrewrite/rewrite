@@ -45,7 +45,8 @@ public static class RecipeScheduler
                 {
                     if (r is IScanningRecipe scanning)
                     {
-                        scanning.Scanner(state.Accumulator(scanning)).Visit(s, ctx);
+                        var scanned = scanning.Scanner(state.Accumulator(scanning)).Visit(s, ctx);
+                        state.Observer?.Scanned(r, s, scanned);
                     }
                     return s;
                 });
@@ -194,6 +195,9 @@ public static class RecipeScheduler
 /// </summary>
 internal interface IRunObserver
 {
-    /// <summary>Called before the scheduler calls into <paramref name="recipe"/> for a source file or a phase.</summary>
+    /// <summary>Called before the scheduler calls into <paramref name="recipe"/>.</summary>
     void Running(Recipe recipe);
+
+    /// <summary>Called with what a scanner returned for <paramref name="source"/>, which the scan discards.</summary>
+    void Scanned(Recipe recipe, SourceFile source, Tree? scanned);
 }
