@@ -40,6 +40,7 @@ from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
 
+from .accumulators import AccumulatorContents
 from .added_markers import assert_no_added_markers
 from .spec import SourceSpec, AfterRecipeText, dedent
 from .well_formed import assert_well_formed
@@ -176,6 +177,10 @@ class RecipeSpec:
     # Whether to fail a ScanningRecipe whose scanner changes a tree, which the scanning phase discards
     check_no_edits_in_scanning_phase: bool = True
 
+    # Whether to fail a ScanningRecipe whose accumulator keeps trees, cursors or other objects
+    # too expensive to keep in memory all cycle
+    check_lightweight_accumulators: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
@@ -235,8 +240,8 @@ class RecipeSpec:
         3. Validates parse/print idempotence if enabled
         4. Runs the recipe for ``expected_cycles_that_make_changes`` cycles, each on the
            output of the one before
-        5. Checks that the recipe left the execution context unchanged and added no markers
-           for its own use, if enabled
+        5. Checks that the recipe left the execution context unchanged, kept no trees in its
+           accumulators and added no markers for its own use, if enabled
         6. Compares results with expected "after" states
         7. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
 
@@ -288,6 +293,7 @@ class RecipeSpec:
         checks = _RunChecks()
         results, unsettled = self._run_cycles(source_files, cycles, expected_cycles, checks)
         self._expect_execution_context_unchanged(checks)
+        checks.accumulators.assert_none_found()
         if self.check_reporting_markers_only:
             assert_no_added_markers(source_files, results, self._reparse)
 
@@ -318,6 +324,7 @@ class RecipeSpec:
         if cycles > expected_cycles:
             self._expect_stable_on_fresh_parse(specs, all_parsed, results, checks)
             self._expect_execution_context_unchanged(checks)
+            checks.accumulators.assert_none_found()
         self._expect_data_tables(data_tables)
 
     def _expect_data_tables(self, store: InMemoryDataTableStore) -> None:
@@ -333,7 +340,11 @@ class RecipeSpec:
     def _recipe_context(self, later_cycle: bool, checks: _RunChecks) -> ExecutionContext:
         """The context of one run of the recipe, which the checks that watch the run look through."""
         ctx = _LaterCycleContext(self.execution_context) if later_cycle else self.execution_context
-        messages = {ExecutionContext.SCANNING_MUTATION_VALIDATION: self.check_no_edits_in_scanning_phase}
+        messages = {
+            ExecutionContext.SCANNING_MUTATION_VALIDATION: self.check_no_edits_in_scanning_phase,
+            ExecutionContext.ACCUMULATOR_INSPECTION:
+                checks.accumulators.inspect if self.check_lightweight_accumulators else None,
+        }
         return _CheckedContext(ctx, messages, checks.context_puts if self.check_execution_context_unchanged else None)
 
     def _expect_execution_context_unchanged(self, checks: _RunChecks) -> None:
@@ -800,6 +811,7 @@ class _RunChecks:
 
     # Each message the recipe put on the execution context, with where it first put it.
     context_puts: Dict[str, str] = field(default_factory=dict)
+    accumulators: AccumulatorContents = field(default_factory=AccumulatorContents)
 
 
 class _CheckedContext(DelegatingExecutionContext):

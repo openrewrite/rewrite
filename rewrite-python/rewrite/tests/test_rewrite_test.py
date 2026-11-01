@@ -15,22 +15,22 @@
 """Tests for the Python test harness."""
 
 from pathlib import Path
-from typing import Callable, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 from uuid import UUID, uuid4
 
 import pytest
 
 from dataclasses import dataclass, field
 
-from rewrite import (ExecutionContext, InMemoryExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor,
-                     random_id)
+from rewrite import (Cursor, ExecutionContext, InMemoryExecutionContext, Recipe, ScanningRecipe, SourceFile,
+                     TreeVisitor, random_id)
 from rewrite.data_table import DATA_TABLE_STORE, DataTable, column
 from rewrite.execution import Result
 from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
 from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
-from rewrite.python.markers import Quoted
+from rewrite.python.markers import PythonResolutionResult, Quoted
 from rewrite.python.visitor import PythonVisitor
 from rewrite.java.tree import Identifier, MethodInvocation, Yield
 from rewrite.python.tree import Await, CompilationUnit
@@ -1136,4 +1136,144 @@ class TestNoEditsInScanningPhase:
     def test_check_turned_off_passes(self):
         spec = RecipeSpec(recipe=_renaming_scanned_files(scanner_edits=True), check_no_edits_in_scanning_phase=False,
                           type_attribution=False)
+        spec.rewrite_run(python("a = 1\n"))
+
+
+def _keeping(initial: Callable[[], Any], scanned: Optional[Callable[[Any, CompilationUnit, Cursor], None]] = None,
+             edited: Optional[Callable[[Any, CompilationUnit], None]] = None) -> Recipe:
+    """A recipe whose accumulator starts as ``initial()``, and that ``scanned`` and ``edited`` add to."""
+
+    class Keeps(ScanningRecipe[Any]):
+        @property
+        def name(self) -> str:
+            return "org.openrewrite.test.Keeps"
+
+        @property
+        def display_name(self) -> str:
+            return "Keep things"
+
+        @property
+        def description(self) -> str:
+            return "Keep things in the accumulator."
+
+        def initial_value(self, ctx: ExecutionContext) -> Any:
+            return initial()
+
+        def scanner(self, acc: Any) -> TreeVisitor:
+            class Scan(PythonVisitor[ExecutionContext]):
+                def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                    if scanned is not None:
+                        scanned(acc, cu, self.cursor)
+                    return cu
+
+            return Scan()
+
+        def editor_with_data(self, acc: Any) -> TreeVisitor:
+            class Edit(PythonVisitor[ExecutionContext]):
+                def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                    if edited is not None:
+                        edited(acc, cu)
+                    return cu
+
+            return Edit()
+
+    return Keeps()
+
+
+class TestLightweightAccumulators:
+    """The harness rejects a ScanningRecipe whose accumulator keeps trees and what reaches them."""
+
+    def test_a_source_file_kept_while_scanning_fails(self):
+        @dataclass
+        class Scanned:
+            source_files: Dict[str, SourceFile] = field(default_factory=dict)
+
+        def keep(acc: Scanned, cu: CompilationUnit, cursor: Cursor) -> None:
+            acc.source_files[str(cu.source_path)] = cu
+
+        spec = RecipeSpec(recipe=_keeping(Scanned, keep), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\n", path=Path("a.py")))
+
+        assert str(failure.value) == (
+            "A ScanningRecipe's accumulator should keep the values the recipe needs, such as source paths, names and "
+            "ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts or "
+            "PythonResolutionResult markers:\n"
+            "  org.openrewrite.test.Keeps keeps\n"
+            "    Scanned.source_files['a.py'] -> CompilationUnit a.py, after scanning\n"
+            "An accumulator stays in memory from the first source file scanned until the cycle ends, so what it keeps "
+            "for each source file adds up over a large repository, and a PythonResolutionResult reaches the resolved "
+            "dependencies of a whole project. A recipe that must keep such an object opts out with "
+            "RecipeSpec(check_lightweight_accumulators=False)."
+        )
+
+    def test_a_cursor_kept_fails(self):
+        spec = RecipeSpec(recipe=_keeping(list, lambda acc, cu, cursor: acc.append(cursor)), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    list\[0\] -> Cursor, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_source_file_kept_while_editing_fails(self):
+        spec = RecipeSpec(recipe=_keeping(list, edited=lambda acc, cu: acc.append(cu)), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    list\[0\] -> CompilationUnit a.py, after editing\n"):
+            spec.rewrite_run(python("a = 1\n", path=Path("a.py")))
+
+    def test_a_tree_kept_in_a_slot_fails(self):
+        class Index:
+            __slots__ = ("_statements",)
+
+            def __init__(self) -> None:
+                self._statements: List[J] = []
+
+        def keep(acc: Index, cu: CompilationUnit, cursor: Cursor) -> None:
+            acc._statements.extend(cu.statements)
+
+        spec = RecipeSpec(recipe=_keeping(Index, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    Index._statements\[0\] -> Assignment, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_collection_of_the_recipes_own_is_read_without_running_its_code(self):
+        class Index(dict):
+            def items(self):
+                raise AssertionError("the walk ran the accumulator's own code")
+
+            def __iter__(self):
+                raise AssertionError("the walk ran the accumulator's own code")
+
+        def keep(acc: Index, cu: CompilationUnit, cursor: Cursor) -> None:
+            acc[str(cu.source_path)] = cu
+
+        spec = RecipeSpec(recipe=_keeping(Index, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    Index\['a.py'\] -> CompilationUnit a.py, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n", path=Path("a.py")))
+
+    def test_a_python_resolution_result_kept_fails(self):
+        resolution = PythonResolutionResult(random_id(), "demo", "1.0", None, None, "pyproject.toml", None, None,
+                                            [], [], {}, {}, [], [], [], None, None)
+
+        def with_resolution(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(resolution))
+
+        def keep(acc: Dict[Any, Any], cu: CompilationUnit, cursor: Cursor) -> None:
+            acc[cu.source_path] = cu.markers.find_first(PythonResolutionResult)
+
+        spec = RecipeSpec(recipe=_keeping(dict, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    dict\[a.py\] -> PythonResolutionResult, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n", path=Path("a.py"), before_recipe=with_resolution))
+
+    def test_values_pass(self):
+        def keep(acc: Dict[Any, Any], cu: CompilationUnit, cursor: Cursor) -> None:
+            statement = cu.statements[0]
+            acc[(str(cu.source_path), cu.id)] = {
+                "path": cu.source_path,
+                "names": [type(statement).__name__],
+                "marker": SearchResult(random_id(), "found"),
+                "type": JavaType.Primitive.Int,
+            }
+
+        spec = RecipeSpec(recipe=_keeping(dict, keep), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n"))
+
+    def test_check_turned_off_passes(self):
+        spec = RecipeSpec(recipe=_keeping(list, lambda acc, cu, cursor: acc.append(cu)),
+                          check_lightweight_accumulators=False, type_attribution=False)
         spec.rewrite_run(python("a = 1\n"))
