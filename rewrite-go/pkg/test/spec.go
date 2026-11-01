@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -509,6 +510,9 @@ type RecipeSpec struct {
 	// parser makes of the text it prints, such as a java.Literal and not a
 	// java.Identifier for `1`.
 	CheckParserShapedTrees bool
+	// CheckMinimalFormatting asserts that the recipe auto-formats only what it
+	// changed, not a whole source file that existed before the run.
+	CheckMinimalFormatting bool
 	// Cycles is how many times the recipe runs, each run on the output of the one
 	// before, by default one more than ExpectedCyclesThatMakeChanges and at least
 	// two. The cycles after the expected ones, and a run on a fresh parse of the
@@ -537,6 +541,7 @@ func NewRecipeSpec() *RecipeSpec {
 		CheckReportingMarkersOnly:      true,
 		CheckUnchangedTreeIdentity:     true,
 		CheckParserShapedTrees:         true,
+		CheckMinimalFormatting:         true,
 	}
 }
 
@@ -607,9 +612,10 @@ type recipeRun struct {
 	// for the run on a fresh parse of the output.
 	freshParseContext *recipe.ExecutionContext
 	// unsettled is the first cycle after the expected ones that changed anything.
-	unsettled *cycleChanges
-	checks    *runChecks
-	output    *outputParse
+	unsettled  *cycleChanges
+	checks     *runChecks
+	formatting *formattingScope
+	output     *outputParse
 }
 
 type cycleChanges struct {
@@ -734,6 +740,10 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 		noEditsInScanningPhase:    spec.CheckNoEditsInScanningPhase,
 		lightweightAccumulators:   spec.CheckLightweightAccumulators,
 	}
+	if spec.CheckMinimalFormatting {
+		run.formatting = newFormattingScope(run.parsed)
+		defer format.ListenToFormatting(run.formatting.onFormat)()
+	}
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
 		if cycle == 2 {
 			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})
@@ -836,7 +846,12 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 		return
 	}
 
-	// Pass 5: the recipe's output is the tree the parser makes of the text it prints.
+	// Pass 5: the recipe formats only what it changed, and its output is the tree
+	// the parser makes of the text it prints.
+	if failure := run.formatting.failure(spec.Recipe, run.parsed); failure != "" {
+		t.Error(failure)
+		return
+	}
 	if spec.Recipe != nil && spec.CheckParserShapedTrees {
 		if failure := treeShapesFailure(run.parseOutput()); failure != "" {
 			t.Error(failure)

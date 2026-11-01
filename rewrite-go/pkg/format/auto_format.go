@@ -55,6 +55,7 @@ func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
 	}
+	beforeFormat(t, v.stopAfter, v.Cursor())
 	for _, member := range []visitor.AfterVisitor{
 		NewMinimumViableSpacingVisitor(v.stopAfter),
 		NewDocCommentVisitor(v.stopAfter),
