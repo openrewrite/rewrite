@@ -1151,6 +1151,13 @@ describe("rewrite test", () => {
             return sut.rewriteRun(typescript(`const a = '\\uD83D';`, `const a = "\\uD83D";`));
         });
 
+        test("an output that holds a bare yield passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = nullByHand(null);
+            return sut.rewriteRun(typescript(`function* g() { yield; const a = 0; }`,
+                `function* g() { yield; const a = null; }`));
+        });
+
         test("checkParserShapedTrees turns the check off", () => {
             const sut = new RecipeSpec();
             sut.recipe = nullByHand("null");
@@ -1326,6 +1333,27 @@ describe("rewrite test", () => {
                 }
             });
             return sut.rewriteRun(typescript(`class A {\n  m() {\n  }\n}`, `class A {\n    m() {\n    }\n}`));
+        });
+
+        test("a class formatted with its body set aside passes in a file that holds a bare yield", () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends RenameAndFormat {
+                protected override async visitClassDeclaration(c: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
+                    const visited = await super.visitClassDeclaration(c, p) as J.ClassDeclaration;
+                    if (visited === c) {
+                        return visited;
+                    }
+                    const header = {...visited, body: {...visited.body, statements: []}} as J.ClassDeclaration;
+                    const formatted = await autoFormat(header, p, undefined, this.cursor.parent);
+                    return {...formatted, body: visited.body} as J.ClassDeclaration;
+                }
+            }("call"));
+            const generator = `\nfunction* g() {\n    yield;\n}\n`;
+
+            // when, then
+            return sut.rewriteRun(typescript(`class A {\n    m() {\n        foo();\n    }\n}\n${generator}`,
+                `class A {\n    m() {\n        bar();\n    }\n}\n${generator}`));
         });
 
         test("checkMinimalFormatting turns the check off", () => {
