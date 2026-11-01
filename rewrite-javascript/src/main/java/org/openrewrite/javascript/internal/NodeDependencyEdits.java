@@ -557,6 +557,19 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             for (Path lock : new TreeMap<>(scan.lockToPackage).keySet()) {
                 Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, lock));
                 Regeneration regeneration = importer == null ? null : regeneration(ctx, importer);
+                // A successful root install does not validate an edit made from a nested importer. Yarn may
+                // reject that directory even though it resolves to the same lock (an unregistered workspace).
+                for (Path candidate : NodeDependencyScan.lockImporters(scan, lock)) {
+                    Decision decision = decisions.get(candidate);
+                    if (captured(candidate) == null || decision == null || decision.withdrawn || !decision.edits()) {
+                        continue;
+                    }
+                    Regeneration candidateResult = regeneration(ctx, candidate);
+                    if (candidateResult.result != null && !candidateResult.result.isSuccess()) {
+                        regeneration = candidateResult;
+                        break;
+                    }
+                }
                 LockFileRegeneration.Result result = regeneration == null ? null : regeneration.result;
                 if (result == null) {
                     continue;
