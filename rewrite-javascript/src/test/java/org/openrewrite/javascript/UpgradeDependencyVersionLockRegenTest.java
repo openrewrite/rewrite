@@ -98,7 +98,7 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
     }
 
     @Test
-    void aBumpWhoseLockCannotBeRegeneratedKeepsTheEditAndWarns() {
+    void aBumpWhoseLockCannotBeRegeneratedLeavesTheManifestAndWarns() {
         String pkgBefore = "{\n" +
                 "  \"name\": \"npm-lock-v3\",\n" +
                 "  \"version\": \"1.0.0\",\n" +
@@ -118,7 +118,7 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"is-odd\": \"3.0.1\"")
+                            assertThat(actual).endsWith(pkgBefore.trim())
                               .contains("npm rejects this edit (E404)");
                             return actual;
                         }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isPresent())),

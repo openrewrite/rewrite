@@ -90,6 +90,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private final Map<Path, NodeDependencyScan.Manifest> visitedManifests = new HashMap<>();
     private final Map<Path, String> left = new LinkedHashMap<>();
     private final Map<Path, Regeneration> regenerations = new HashMap<>();
+    private final Map<Path, LockFileRegeneration.Failure> rejectedLocks = new HashMap<>();
+    private final Map<Path, LockFileRegeneration.Failure> rejectedEdits = new HashMap<>();
     private final Set<Path> warnedStale = new HashSet<>();
     private final Set<Path> generated = new HashSet<>();
     private final Map<Path, Map<String, String>> editedManifests = new HashMap<>();
@@ -180,6 +182,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 decide(ctx, project, null);
             }
         }
+        rejectFailedEdits(ctx);
         List<SourceFile> created = new ArrayList<>();
         for (ManagedFile file : managed.values()) {
             if (file != null && file.created) {
@@ -301,6 +304,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 }
             }
         }
+        rejectFailedEdits(ctx);
         SourceFile out = managedOut(file, sf);
         String leftAs = out == sf ? text : print(out);
         left.put(p, leftAs);
@@ -313,6 +317,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         visited.put(p, at.getText());
         visitedManifests.put(p, at);
         decide(ctx, p, p);
+        rejectFailedEdits(ctx);
         Decision decision = decisions.get(p);
         SourceFile out = sf;
         if (decision != null && !decision.withdrawn && (decision.manifestEdit != null || holdsCatalogEdits(p))) {
@@ -327,6 +332,10 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 out = warn(out, "lock regeneration failed: " + r.result.getErrorMessage());
             }
         }
+        LockFileRegeneration.Failure rejection = rejectedEdits.get(p);
+        if (rejection != null) {
+            failure(ctx, p, rejection);
+        }
         for (String warning : decision == null ? Collections.<String>emptySet() : decision.warnings) {
             out = warn(out, warning);
         }
@@ -338,6 +347,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Path p = sf.getSourcePath();
         String text = print(sf);
         visited.put(p, text);
+        LockFileRegeneration.Failure rejected = rejectedLocks.get(p);
+        if (rejected != null) {
+            SourceFile out = warn(sf, "lock regeneration failed; dependency edits were not made: " +
+                                      rejected.getDetail());
+            left.put(p, text);
+            return out;
+        }
         Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, p));
         LockFileRegeneration.Result result = importer == null ? null : regeneration(ctx, importer).result;
         SourceFile out = sf;
@@ -458,6 +474,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private void install(Decision decision) {
         version++;
         decisions.put(decision.path, decision);
+        rejectedEdits.remove(decision.path);
         rebuild();
     }
 
@@ -531,6 +548,48 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
     }
 
+    // A lock and the manifest/catalog edits it installs are one change. Validate them before creating or writing
+    // files, and cancel every decision sharing a failed lock or an edited settings file that it reads.
+    private void rejectFailedEdits(ExecutionContext ctx) {
+        boolean cancelled;
+        do {
+            cancelled = false;
+            for (Path lock : new TreeMap<>(scan.lockToPackage).keySet()) {
+                Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, lock));
+                Regeneration regeneration = importer == null ? null : regeneration(ctx, importer);
+                LockFileRegeneration.Result result = regeneration == null ? null : regeneration.result;
+                if (result == null) {
+                    continue;
+                }
+                if (result.isSuccess()) {
+                    rejectedLocks.remove(lock);
+                    continue;
+                }
+                LockFileRegeneration.Failure failure = requireNonNull(result.getFailure());
+                rejectedLocks.put(lock, failure);
+                for (Decision decision : decisions.values()) {
+                    if (!decision.edits()) {
+                        continue;
+                    }
+                    ManagedFile file = decision.fileEdits.isEmpty() ? null : managedOf(decision.path);
+                    if (!lock.equals(NodeDependencyScan.lockFor(scan, decision.path)) &&
+                        (file == null || !regeneration.readFiles.contains(file.path))) {
+                        continue;
+                    }
+                    decision.editNothing();
+                    decision.warn("lock regeneration failed; dependency edits were not made: " + failure.getDetail());
+                    rejectedEdits.put(decision.path, failure);
+                    cancelled = true;
+                }
+                if (cancelled) {
+                    version++;
+                    rebuild();
+                    break;
+                }
+            }
+        } while (cancelled);
+    }
+
     // importer's regeneration from the revisions before this recipe and this cycle's edits, again when they change
     private Regeneration regeneration(ExecutionContext ctx, Path importer) {
         NodeDependencyScan.ProjectState ps = requireNonNull(scan.projects.get(importer));
@@ -550,7 +609,10 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                                              ps.capturedLockContent == null ? null :
                 PackageJsonHelper.regenerateLockContent(PackageJsonHelper.refreshMarker(after),
                         ps.capturedLockContent, files, changed, ctx);
-        Regeneration r = new Regeneration(inputs, result, files.getPackageManager());
+        Set<Path> readFiles = new HashSet<>(files.getManifests().keySet());
+        readFiles.addAll(files.getPackageManagerFiles().keySet());
+        readFiles.addAll(edited.keySet());
+        Regeneration r = new Regeneration(inputs, result, files.getPackageManager(), readFiles);
         regenerations.put(importer, r);
         return r;
     }
@@ -1162,15 +1224,17 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private static final class Regeneration {
         final List<Object> inputs;
         final LockFileRegeneration.@Nullable Result result;
+        final Set<Path> readFiles;
 
         // the package manager that installs the manifest where its marker names another; null for the marker's
         final @Nullable PackageManager installs;
 
         Regeneration(List<Object> inputs, LockFileRegeneration.@Nullable Result result,
-                     @Nullable PackageManager installs) {
+                     @Nullable PackageManager installs, Set<Path> readFiles) {
             this.inputs = inputs;
             this.result = result;
             this.installs = installs;
+            this.readFiles = readFiles;
         }
     }
 
