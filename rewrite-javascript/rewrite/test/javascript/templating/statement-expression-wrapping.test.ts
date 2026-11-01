@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
+import {capture, javascript, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {foundSearchResult} from '../../../src/markers';
@@ -237,6 +237,21 @@ describe('Statement Expression Wrapping', () => {
             ),
             afterRecipe: expectParserShaped
         });
+    });
+
+    it('should wrap an expression that replaces the statement of a with statement', () => {
+        const spec = new RecipeSpec();
+        const operand = capture('operand');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitUnary(unary: J.Unary, p: any): Promise<J | undefined> {
+                const match = await pattern`!${operand}`.match(unary, this.cursor);
+                return match ? template`${operand}`.apply(unary, this.cursor, {values: match}) :
+                    super.visitUnary(unary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(javascript('with (o) !x;', 'with (o) x;'));
     });
 
     it('should make a statement that replaces the expression of an expression statement the statement itself', () => {

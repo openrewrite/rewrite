@@ -770,7 +770,8 @@ function expectsStatement(parentTree: J, childId: string): boolean {
         parentTree.kind === J.Kind.Label ||
         parentTree.kind === J.Kind.WhileLoop ||
         parentTree.kind === JS.Kind.CompilationUnit ||
-        parentTree.kind === JS.Kind.ForInLoop;
+        parentTree.kind === JS.Kind.ForInLoop ||
+        parentTree.kind === JS.Kind.WithStatement;
 }
 
 /** Whether the code opens with `{`, which is a block where a statement goes and an object literal elsewhere. */
