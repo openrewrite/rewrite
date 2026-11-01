@@ -57,6 +57,25 @@ describe('object literals in templates and patterns', () => {
         );
     });
 
+    test('a template opening with `{` in place of a case label is an object literal', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                // A call is a statement too, so only its slot says what the code opening with `{` is
+                return method.name.simpleName === 'key' ? template`{k: 1}`.apply(method, this.cursor) :
+                    super.visitMethodInvocation(method, p);
+            }
+        });
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'switch (x) {\n    case key():\n        break;\n}',
+                'switch (x) {\n    case {k: 1}:\n        break;\n}'
+            )
+        );
+    });
+
     test('a template opening with `{` in place of a function body is a block', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
