@@ -71,6 +71,19 @@ func TestProbeThatPassedIsNotRunAgain(t *testing.T) {
 	assert.Equal(t, 1, declaringNone)
 }
 
+func TestProbeOfAMissingFileThatFailedIsNotRunAgain(t *testing.T) {
+	forgetProbes(t)
+	// given a scanning recipe that failed its probe without go.mod in an earlier test
+	spec := NewRecipeSpec().WithRecipe(&reportInternalImports{})
+	require.Len(t, failures(t, spec, internalImportsProject()), 1)
+
+	// when another test runs it
+	got := failures(t, spec, internalImportsProject())
+
+	// then that test does not probe it again
+	assert.Empty(t, got)
+}
+
 func TestRecipeIsProbedAfterTheAfterRecipeCallbacks(t *testing.T) {
 	forgetProbes(t)
 	// given a recipe that counts the files it meets that declare nothing, which only its probe gives it
