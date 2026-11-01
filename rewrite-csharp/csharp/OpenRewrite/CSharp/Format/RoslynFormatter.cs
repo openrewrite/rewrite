@@ -35,6 +35,7 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu)
     {
+        FormattingListener.BeforeFormat(cu, null, null);
         return Format(cu, targetSubtree: null, stopAfter: null);
     }
 

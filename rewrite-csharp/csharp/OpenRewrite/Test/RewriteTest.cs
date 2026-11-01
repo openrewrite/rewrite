@@ -188,9 +188,14 @@ public abstract class RewriteTest
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             var checks = new RunChecks(validations);
             var runCtx = checks.Ctx;
+            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe) : null;
             try
             {
-                var run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
+                CycleRun run;
+                using (formatting?.Install())
+                {
+                    run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
+                }
                 var results = run.Changes;
 
                 if (inputMarkers != null)
@@ -238,6 +243,7 @@ public abstract class RewriteTest
                 {
                     ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, fresh, checks);
                 }
+                formatting?.AssertFormattedOnlyWhatChanged(results);
                 if (validations.ParserShapedTrees && fresh != null)
                 {
                     TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);

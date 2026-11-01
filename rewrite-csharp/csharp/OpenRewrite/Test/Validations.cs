@@ -83,6 +83,12 @@ public sealed class Validations
     /// </summary>
     public bool ParserShapedTrees { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to format only what it changed, not a whole source file, namespace or class
+    /// that existed before the run. Default: enabled.
+    /// </summary>
+    public bool MinimalFormatting { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
