@@ -481,9 +481,15 @@ export class TemplateEngine {
      * Converts a Type instance to a TypeScript type string.
      *
      * @param type The Type instance
+     * @param enclosing The types that `type` is a type argument or element type of
      * @returns A TypeScript type string
      */
-    private static typeToString(type: Type): string {
+    private static typeToString(type: Type, enclosing: Type[] = []): string {
+        // A recursive type, such as `type A = Array<A>`, is any where it holds itself
+        if (enclosing.includes(type)) {
+            return 'any';
+        }
+
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
@@ -518,8 +524,16 @@ export class TemplateEngine {
         // Handle Type.Array - render component type plus []
         if (type.kind === Type.Kind.Array) {
             const arrayType = type as Type.Array;
-            const componentTypeString = this.typeToString(arrayType.elemType);
+            const componentTypeString = this.typeToString(arrayType.elemType, [...enclosing, type]);
             return `${componentTypeString}[]`;
+        }
+
+        // An array, a map or any other generic type, with its type arguments
+        if (type.kind === Type.Kind.Parameterized) {
+            const parameterized = type as Type.Parameterized;
+            const base = this.typeToString(parameterized.type);
+            return base === 'any' || parameterized.typeParameters.length === 0 ? base :
+                `${base}<${parameterized.typeParameters.map(t => this.typeToString(t, [...enclosing, type])).join(', ')}>`;
         }
 
         // For other types, return 'any' as a fallback
