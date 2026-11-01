@@ -1241,9 +1241,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         const updates: any = {
             prefix: await this.visitSpace(aYield.prefix, p),
-            markers: await this.visitMarkers(aYield.markers, p),
-            value: await this.visitDefined(aYield.value, p) as Expression
+            markers: await this.visitMarkers(aYield.markers, p)
         };
+        // a bare `yield` has no value
+        if (aYield.value) {
+            updates.value = await this.visitDefined(aYield.value, p) as Expression;
+        }
         return updateIfChanged(aYield, updates);
     }
 
