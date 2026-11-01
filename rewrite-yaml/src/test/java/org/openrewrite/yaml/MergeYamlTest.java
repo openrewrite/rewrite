@@ -48,6 +48,21 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
 class MergeYamlTest implements RewriteTest {
 
     @Test
+    void identicalMappingDoesNotChangeTree() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "spring:\n  http:\n    client:\n      factory: jdk", false, null, null, null, null, null)),
+          yaml(
+            """
+              spring:
+                http:
+                  client:
+                    factory: jdk # Keep the configured factory
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveNestedTrailingCommentBeforeMultipleRootSiblings() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml("$.a.tracing", "export:\n  endpoint: url", false, null, null, null, null, null)),
