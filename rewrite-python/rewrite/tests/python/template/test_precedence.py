@@ -133,6 +133,25 @@ def test_a_bare_tuple_survives_a_subscript_but_not_a_call():
     ))
 
 
+def test_a_parenthesized_tuple_or_generator_is_the_one_the_parser_reads():
+    kinds = []
+
+    def first_argument(cu):
+        kinds.append(type(cu.statements[0].assignment.arguments[0]).__name__)
+
+    RecipeSpec(recipe=_rule("d[{x}]", "f({x})")).rewrite_run(python(
+        "a = d[p, q]\n",
+        "a = f((p, q))\n",
+        after_recipe=first_argument,
+    ))
+    RecipeSpec(recipe=_rule("collect({x})", "sorted({x}, reverse=True)")).rewrite_run(python(
+        "a = collect(v for v in vs)\n",
+        "a = sorted((v for v in vs), reverse=True)\n",
+        after_recipe=first_argument,
+    ))
+    assert kinds == ["CollectionLiteral", "ComprehensionExpression"]
+
+
 def test_a_bare_generator_survives_only_as_a_call_s_sole_argument():
     RecipeSpec(recipe=_rule("collect({x})", "list({x})")).rewrite_run(python(
         "a = collect(v for v in vs)\n",

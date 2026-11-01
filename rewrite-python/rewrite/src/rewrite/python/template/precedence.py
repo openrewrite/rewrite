@@ -270,8 +270,14 @@ def maybe_parenthesize(parent: Optional[J], child_id: UUID, expression: J) -> J:
     return expression
 
 
-def parenthesize(expression: Expression) -> j.Parentheses:
-    """Wraps in `J.Parentheses`, moving the prefix out so the surrounding whitespace survives."""
+def parenthesize(expression: Expression) -> Expression:
+    """Parenthesizes as the parser reads the parenthesized text: a bare tuple or generator gets back its own
+    parentheses, and anything else is wrapped in `J.Parentheses` with the prefix moved out."""
+    if isinstance(expression, py.CollectionLiteral) and _omits_parentheses(expression.padding.elements):
+        elements = expression.padding.elements
+        return expression.padding.replace(_elements=elements.replace(markers=_with_parentheses(elements.markers)))
+    if isinstance(expression, py.ComprehensionExpression) and _omits_parentheses(expression):
+        return expression.replace(markers=_with_parentheses(expression.markers))
     return j.Parentheses(
         _id=random_id(),
         _prefix=expression.prefix,
@@ -318,6 +324,10 @@ def _binary_slot(parent, child_id: UUID) -> Optional[SlotConstraints]:
 
 def _omits_parentheses(node) -> bool:
     return node is not None and any(isinstance(m, OmitParentheses) for m in node.markers.markers)
+
+
+def _with_parentheses(markers: Markers) -> Markers:
+    return markers.replace(markers=[m for m in markers.markers if not isinstance(m, OmitParentheses)])
 
 
 def _is_dot_adjacent_number(expression: J) -> bool:
