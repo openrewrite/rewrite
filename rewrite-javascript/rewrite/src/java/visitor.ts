@@ -221,6 +221,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (!expression?.kind || expression.kind !== J.Kind.Binary) {
             return expression;
         }
+        const given = this.cursor;
+        if (expression !== binary && given.value === binary) {
+            // the operands are visited under the binary that holds them, where a template reads their slots
+            this.cursor = new Cursor(expression, given.parent);
+            given.messages.forEach((value, key) => this.cursor.messages.set(key, value));
+        }
         binary = expression as J.Binary;
 
         const updates = {
@@ -231,6 +237,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             right: await this.visitDefined(binary.right, p) as Expression,
             type: await this.visitType(binary.type, p)
         };
+        if (this.cursor !== given) {
+            // what follows reads the cursor of the binary it was given, as for every other tree
+            this.cursor.messages.forEach((value, key) => given.messages.set(key, value));
+            this.cursor = given;
+        }
         return updateIfChanged(binary, updates);
     }
 
@@ -1241,9 +1252,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         const updates: any = {
             prefix: await this.visitSpace(aYield.prefix, p),
-            markers: await this.visitMarkers(aYield.markers, p),
-            value: await this.visitDefined(aYield.value, p) as Expression
+            markers: await this.visitMarkers(aYield.markers, p)
         };
+        // a bare `yield` has no value
+        if (aYield.value) {
+            updates.value = await this.visitDefined(aYield.value, p) as Expression;
+        }
         return updateIfChanged(aYield, updates);
     }
 

@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {javascript, JavaScriptVisitor, JS, RewriteRule} from "../../../src/javascript";
 import {capture, pattern, rewrite, template} from "../../../src/javascript";
-import {J} from "../../../src/java";
+import {Expression, J} from "../../../src/java";
 
 /** Applies `rule` to every `marker(...)` call, keeping each test's rewrite to one trigger point. */
 function onCall(rule: RewriteRule) {
@@ -592,6 +592,26 @@ describe('template precedence', () => {
             return spec.rewriteRun(javascript(
                 `const a = outer(n).toString();`,
                 `const a = (n + 1).toString();`));
+        });
+
+        test('when the result replaces the binary visitExpression returned', () => {
+            const x = capture(), y = capture();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rewrite(() => ({before: pattern`${x} * ${y}`, after: template`${y} * ${x}`}))
+                        .tryOn(this.cursor, expression) || expression;
+                }
+
+                override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                    const visited = await super.visitBinary(binary, p) as J.Binary;
+                    return await rewrite(() => ({before: pattern`${x} * ${y}`, after: template`${x} + ${y}`}))
+                        .tryOn(this.cursor, visited) || visited;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = z - x * y;`,
+                `const a = z - (y + x);`));
         });
 
         test('the parentheses the source already had are kept', () => {
