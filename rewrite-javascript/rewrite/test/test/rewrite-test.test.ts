@@ -1,6 +1,6 @@
-import {fromVisitor, RecipeSpec} from "../../src/test";
+import {fromVisitor, RecipeSpec, SourceSpec} from "../../src/test";
 import {text} from "../../src/text";
-import {json} from "../../src/json";
+import {json, Json, JsonVisitor} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
 import {ReplacedText} from "../../fixtures/replaced-text";
 import {ScanningEditor} from "../../fixtures/scanning-editor";
@@ -9,6 +9,7 @@ import {
     DATA_TABLE_STORE,
     ExecutionContext,
     InMemoryDataTableStore,
+    isParseError,
     noopVisitor,
     Option,
     Recipe,
@@ -751,6 +752,118 @@ describe("rewrite test", () => {
 
             // when, then
             return sut.rewriteRun({...text("original", "changed"), beforeRecipe: team});
+        });
+    });
+
+    describe("unparsed sources", () => {
+        class ChangeApplicationJson extends Recipe {
+            name = "org.openrewrite.test.change-application-json";
+            displayName = "Change `application.json`";
+            description = "Changes the values of `application.json`.";
+
+            @Option({displayName: "Checked", description: "Whether the recipe checks the kind of source file."})
+            checked!: boolean;
+
+            constructor(options: { checked: boolean }) {
+                super(options);
+            }
+
+            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                return changeApplicationJson(this.checked);
+            }
+        }
+
+        // Reads the value of application.json as a JSON document's, before checking that it is one unless `checked`
+        function changeApplicationJson(checked: boolean): TreeVisitor<any, ExecutionContext> {
+            const changeValues = new class extends JsonVisitor<ExecutionContext> {
+                protected override async visitLiteral(literal: Json.Literal, _p: ExecutionContext): Promise<Json | undefined> {
+                    return literal.value === "value" ? {...literal, source: '"changed"', value: "changed"} as Json.Literal : literal;
+                }
+            };
+            return new class extends TreeVisitor<any, ExecutionContext> {
+                protected override async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                    this.stopAfterPreVisit();
+                    if (!tree.sourcePath?.endsWith("application.json") || checked && tree.kind !== Json.Kind.Document) {
+                        return tree;
+                    }
+                    const document = tree as Json.Document;
+                    return document.value.kind === Json.Kind.Object ? changeValues.visit(document, ctx) : document;
+                }
+            };
+        }
+
+        const applicationJson = (): SourceSpec<Json.Document> => ({
+            ...json(`{"key": "value"}`, `{"key": "changed"}`),
+            path: "application.json",
+            beforeRecipe: (document: Json.Document) => withMarker(document, {kind: "my.Team", id: randomId()})
+        });
+
+        test("a recipe that casts a file it can't edit fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new ChangeApplicationJson({checked: false});
+
+            // when
+            const run = sut.rewriteRun(applicationJson());
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Check the kind of source file before casting it, so that the recipe leaves a file it can't edit " +
+                "unchanged instead of throwing.\n" +
+                "org.openrewrite.test.change-application-json threw when application.json was a ParseError (a file " +
+                "its parser failed on) with the markers of the test's source (Team):\n" +
+                "    TypeError: Cannot read properties of undefined (reading 'kind')\n" +
+                "        at TreeVisitor.preVisit (test/test/rewrite-test.test.ts:");
+            await expect(run).rejects.toThrow("  - don't catch the exception to make this pass");
+        });
+
+        test("a recipe that casts a file read as plain text fails", async () => {
+            // given
+            class SkipParseErrors extends Recipe {
+                name = "org.openrewrite.test.skip-parse-errors";
+                displayName = "Skip parse errors";
+                description = "Changes the values of `application.json` unless it failed to parse.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    const change = changeApplicationJson(false);
+                    return new class extends TreeVisitor<any, ExecutionContext> {
+                        protected override async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                            this.stopAfterPreVisit();
+                            return isParseError(tree) ? tree : change.visit(tree, ctx);
+                        }
+                    };
+                }
+            }
+            const sut = new RecipeSpec();
+            sut.recipe = new SkipParseErrors();
+
+            // when
+            const run = sut.rewriteRun(applicationJson());
+
+            // then
+            await expect(run).rejects.toThrow(
+                "org.openrewrite.test.skip-parse-errors threw when application.json was a PlainText (a file read " +
+                "as plain text) with the markers of the test's source (Team):\n");
+        });
+
+        test("a recipe that checks the kind of source file passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new ChangeApplicationJson({checked: true});
+            return sut.rewriteRun(applicationJson());
+        });
+
+        test("a recipe a test declares inline is not probed", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new class extends Recipe {
+                name = "org.openrewrite.test.change-application-json-inline";
+                displayName = "Change `application.json` inline";
+                description = "Changes the values of `application.json`.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return changeApplicationJson(false);
+                }
+            };
+            return sut.rewriteRun(applicationJson());
         });
     });
 

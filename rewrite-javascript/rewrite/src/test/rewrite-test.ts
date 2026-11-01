@@ -31,6 +31,7 @@ import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
 import * as path from "path";
 import {AccumulatorContents} from "./accumulator-contents";
 import {EmptySources} from "./empty-sources";
+import {UnparsedSources} from "./unparsed-sources";
 import {RpcRecipe} from "../rpc/recipe";
 import {DelegatingRecipe} from "../rpc/java-recipe";
 
@@ -270,6 +271,8 @@ export class RecipeSpec {
         if (changeset.some(r => r.before && r.after !== r.before) && await isProbed(this.recipe)) {
             await new EmptySources(this.recipe, changeset)
                 .assertNoneThrow(allParsed, this.executionContext, this.recipeExecutionContext, cycles);
+            await new UnparsedSources(this.recipe, changeset)
+                .assertNoneThrow(allParsed.map(([_, sourceFile]) => sourceFile), this.recipeExecutionContext, cycles);
         }
     }
 
