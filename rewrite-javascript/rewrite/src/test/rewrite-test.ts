@@ -85,8 +85,8 @@ export class RecipeSpec {
     checkNoEditsInScanningPhase: boolean = true
 
     /**
-     * Fails a run whose ScanningRecipe's accumulator keeps a tree, cursor, visitor, execution context or dependency
-     * model, which would stay in memory all cycle.
+     * Fails a run whose ScanningRecipe's accumulator keeps a tree, cursor, visitor, execution context, dependency model
+     * or other type given to registerHeavyweight, which would stay in memory all cycle.
      */
     checkLightweightAccumulators: boolean = true
 
