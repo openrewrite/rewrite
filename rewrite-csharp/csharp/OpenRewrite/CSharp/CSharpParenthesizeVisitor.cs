@@ -196,6 +196,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     // -----------------------------------------------------------------------
 
     private const int ShiftPrecedence = 8;
+    private const int SwitchPrecedence = 11;
+    private const int RangePrecedence = 12;
     private const int UnaryPrecedence = 13;
     private const int PrimaryPrecedence = 14;
 
@@ -255,9 +257,9 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     }
 
     /// <summary>
-    /// Whether <paramref name="expr"/> binds looser than its slot allows: a cast takes a unary expression, and a
-    /// member access or element access a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep
-    /// their parentheses.
+    /// Whether <paramref name="expr"/> binds looser than its slot allows: a cast, <c>await</c> and a range take a
+    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access or
+    /// element access a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep their parentheses.
     /// </summary>
     private bool NeedsParenthesesInSlot(Expression expr)
     {
@@ -265,12 +267,21 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         int? required = parent switch
         {
             TypeCast cast when cast.Expression.Id == expr.Id => UnaryPrecedence,
+            AwaitExpression aw when aw.Expression.Id == expr.Id => UnaryPrecedence,
+            RangeExpression range when range.Start?.Element.Id == expr.Id || range.End?.Id == expr.Id =>
+                UnaryPrecedence,
+            SwitchExpression sw when sw.ExpressionPadded.Element.Id == expr.Id => RangePrecedence,
+            WithExpression we when we.Target.Id == expr.Id => SwitchPrecedence,
             FieldAccess fa when fa.Target.Id == expr.Id => PrimaryPrecedence,
             MethodInvocation mi when mi.Select?.Element.Id == expr.Id => PrimaryPrecedence,
             ArrayAccess aa when aa.Indexed.Id == expr.Id => PrimaryPrecedence,
             _ => null
         };
         if (required == null)
+            return false;
+        // x as T ends in a type, so the parser applies a switch or a with after it to all of x as T
+        if (expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } &&
+            parent is SwitchExpression or WithExpression)
             return false;
         var precedence = expr switch
         {

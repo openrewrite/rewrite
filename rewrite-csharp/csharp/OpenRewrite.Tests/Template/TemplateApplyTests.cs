@@ -807,6 +807,47 @@ public class TemplateApplyTests : RewriteTest
         AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
     }
 
+    /// <summary>
+    /// <c>await</c> and a range take a unary operand, a switch expression a range, and a with expression a switch
+    /// expression.
+    /// </summary>
+    [Theory]
+    [InlineData("", "..y", "x + 1", "(x + 1)..y")]
+    [InlineData("x..", "", "y - 1", "x..(y - 1)")]
+    [InlineData("x..", "", "^1", "x..^1")]
+    [InlineData("", " switch { _ => 0 }", "x + 1", "(x + 1) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x..y", "x..y switch { _ => 0 }")]
+    [InlineData("", " with { P = 1 }", "x ?? y", "(x ?? y) with { P = 1 }")]
+    [InlineData("", " switch { _ => 0 }", "x as Foo", "x as Foo switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo", "(x is Foo) switch { _ => 0 }")]
+    [InlineData("", " with { P = 1 }", "x as R", "x as R with { P = 1 }")]
+    [InlineData("", "..y", "x as Foo", "(x as Foo)..y")]
+    public void CaptureAsOperandOfAwaitRangeSwitchOrWithMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    [Theory]
+    [InlineData("b ?? c", "await (b ?? c)")]
+    [InlineData("(Task)b", "await (Task)b")]
+    [InlineData("b.Result", "await b.Result")]
+    public void CaptureAsOperandOfAwaitMatchesFreshParse(string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression(captured) }, null);
+
+        var result = CSharpTemplate.Expression($"await {a}")
+            .Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal(expected, printed);
+        // In a method that isn't async, await (b ?? c) would call a method named await
+        var reparsed = FindFirst<NamedVariable>(Parse($"class C {{ async void M() {{ var v = {printed}; }} }}"))!;
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, reparsed.Initializer!.Element));
+    }
+
     [Fact]
     public void ReplacementAsReceiverKeepsItsParentheses()
     {
