@@ -145,7 +145,11 @@ func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit,
 		elements := eachPadded(cu.Imports.Elements, func(rp java.RightPadded[*java.Import]) java.RightPadded[*java.Import] {
 			if block := java.FindMarker[golang.ImportBlock](rp.Element.Markers); block != nil {
 				grouped = block.Grouped
-				block.Before = v.reindentSpace(block.Before)
+				if before := v.reindentSpace(block.Before); !java.SpaceEqual(before, block.Before) {
+					reindented := *block
+					reindented.Before = before
+					rp.Element = rp.Element.WithMarkers(withImportBlock(rp.Element.Markers, reindented))
+				}
 			}
 			if grouped {
 				v.depth++
@@ -164,6 +168,17 @@ func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit,
 		}
 	}
 	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
+// withImportBlock replaces the ImportBlock marker among m's entries with block.
+func withImportBlock(m java.Markers, block golang.ImportBlock) java.Markers {
+	entries := append([]java.Marker(nil), m.Entries()...)
+	for i, e := range entries {
+		if _, isBlock := e.(golang.ImportBlock); isBlock {
+			entries[i] = block
+		}
+	}
+	return java.MakeMarkers(m.GetID(), entries)
 }
 
 // VisitDeclarationBlock indents the specs of a `var (…)` or `const (…)` group.
