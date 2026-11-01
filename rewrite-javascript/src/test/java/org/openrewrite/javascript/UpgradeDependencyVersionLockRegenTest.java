@@ -43,6 +43,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.test.SourceSpecs.text;
 
 /**
  * Native lock regeneration for a version bump over a stubbed {@link HttpSender}, each lock byte-identical to the one
@@ -94,6 +95,43 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 packageLock(resource("lock/npm/v3/before"), resource("lock/npm/v3/after"),
                         s -> s.noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("successful regeneration must not warn").isEmpty()))
+        );
+    }
+
+    @Test
+    void aRejectedProjectDoesNotCancelAnIndependentSuccessfulLockUpdate() {
+        routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
+        String before = """
+          {
+            "name": "npm-lock-v3",
+            "version": "1.0.0",
+            "dependencies": {
+              "is-odd": "3.0.0"
+            }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx)
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getSourcePath()).isEqualTo("bad/package.json"))),
+          packageJson(before, before.replace("3.0.0", "3.0.1"),
+            nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
+            spec -> spec.path("good/package.json")),
+          packageLock(resource("lock/npm/v3/before"), resource("lock/npm/v3/after"),
+            spec -> spec.path("good/package-lock.json").noTrim()),
+          packageJson(before, null, nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
+            spec -> spec.path("bad/package.json").after(actual -> {
+                assertThat(actual).contains("lock regeneration failed").endsWith(before.trim());
+                return actual;
+            })),
+          packageLock(resource("lock/npm/v3/before"), null,
+            spec -> spec.path("bad/package-lock.json").after(actual -> {
+                assertThat(actual).contains("lock regeneration failed");
+                return actual;
+            })),
+          text("registry=https://missing.example/\n", spec -> spec.path("bad/.npmrc"))
         );
     }
 
