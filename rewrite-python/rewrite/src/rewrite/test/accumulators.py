@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Find the objects too expensive to keep all cycle, such as trees, that ScanningRecipe accumulators keep.
+"""Find the Heavyweight objects, such as trees, that ScanningRecipe accumulators keep.
 
 An accumulator lives from the first source file scanned until the cycle ends. The walk reads attributes and the
 contents of built-in collections, and runs none of the recipe's own code.
@@ -30,19 +30,14 @@ from pathlib import PurePath
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from uuid import UUID
 
-from rewrite import Cursor, ExecutionContext, Recipe, SourceFile, Tree, TreeVisitor
+from rewrite import Cursor, ExecutionContext, Heavyweight, Recipe, SourceFile, Tree, TreeVisitor
 from rewrite.java.support_types import JavaType
 from rewrite.markers import Marker
-from rewrite.python.markers import PythonResolutionResult
 
 # Beyond this many objects in one accumulator the walk stops descending.
 _MAX_OBJECTS = 100_000
 _MAX_PATHS = 5
 _KEY_OR_INDEX = re.compile(r"\[[^\]]*]")
-
-# Trees and what reaches them, and the resolved dependencies of a whole project.
-_HEAVYWEIGHT = (Tree, Cursor, TreeVisitor, ExecutionContext, PythonResolutionResult,
-                PythonResolutionResult.ResolvedDependency)
 
 # A recipe lives for the whole run anyway, and type attribution refers to no tree.
 _LEAVES = (str, bytes, bytearray, int, float, complex, type, Enum, PurePath, UUID, Recipe, JavaType, types.ModuleType)
@@ -69,8 +64,8 @@ class AccumulatorContents:
         if not self._findings:
             return
         lines = ["A ScanningRecipe's accumulator should keep the values the recipe needs, such as source paths, names "
-                 "and ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts, "
-                 "PythonResolutionResult markers or their resolved dependencies:"]
+                 "and ids, and no Heavyweight objects, such as trees (a CompilationUnit or any node in it), cursors, "
+                 "visitors, execution contexts, PythonResolutionResult markers and their resolved dependencies:"]
         for recipe, findings in self._findings.items():
             lines.append(f"  {recipe} keeps")
             for shown, (path, what, when) in enumerate(findings.values()):
@@ -80,8 +75,8 @@ class AccumulatorContents:
                 lines.append(f"    {path} -> {what}, {when}")
         lines.append("An accumulator stays in memory from the first source file scanned until the cycle ends, so what "
                      "it keeps for each source file adds up over a large repository, and a PythonResolutionResult or "
-                     "a resolved dependency reaches the dependencies of a whole project. A recipe that must keep such "
-                     "an object opts out with RecipeSpec(check_lightweight_accumulators=False).")
+                     "a resolved dependency reaches the dependencies of a whole project. A recipe that must keep a "
+                     "Heavyweight object opts out with RecipeSpec(check_lightweight_accumulators=False).")
         raise AssertionError("\n".join(lines))
 
 
@@ -119,7 +114,7 @@ def _heavyweight(acc: Any) -> List[Tuple[str, str]]:
 
     def visit(value: Any, parent: Optional[_Node], step: Any) -> None:
         nonlocal budget
-        if isinstance(value, _HEAVYWEIGHT):
+        if isinstance(value, Heavyweight):
             found.append((_Node(value, parent, step).path(), _describe(value)))
         elif _walks(value) and budget > 0 and id(value) not in visited:
             budget -= 1

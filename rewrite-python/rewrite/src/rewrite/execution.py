@@ -5,13 +5,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, List, Optional
 
+from .heavyweight import Heavyweight
 from .tree import SourceFile
 
 if TYPE_CHECKING:
     from .visitor import TreeVisitor, Cursor
 
 
-class ExecutionContext(ABC):
+class ExecutionContext(Heavyweight, ABC):
     REQUIRE_PRINT_EQUALS_INPUT: ClassVar[str] = "org.openrewrite.requirePrintEqualsInput"
     CHARSET: ClassVar[str] = "org.openrewrite.parser.charset"
     # Set by a test harness to fail a ScanningRecipe whose scanner changes the tree it scans.

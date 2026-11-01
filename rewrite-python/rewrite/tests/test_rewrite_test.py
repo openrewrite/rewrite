@@ -22,8 +22,8 @@ import pytest
 
 from dataclasses import dataclass, field
 
-from rewrite import (Cursor, ExecutionContext, InMemoryExecutionContext, Recipe, RecipeRunException, ScanningRecipe,
-                     SourceFile, Tree, TreeVisitor, option, random_id)
+from rewrite import (Cursor, ExecutionContext, Heavyweight, InMemoryExecutionContext, Recipe, RecipeRunException,
+                     ScanningRecipe, SourceFile, TreeVisitor, option, random_id)
 from rewrite.data_table import DATA_TABLE_STORE, DataTable, column
 from rewrite.execution import Result
 from rewrite.markers import Marker, Markers, SearchResult
@@ -1200,20 +1200,45 @@ class TestLightweightAccumulators:
 
         assert str(failure.value) == (
             "A ScanningRecipe's accumulator should keep the values the recipe needs, such as source paths, names and "
-            "ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts, "
-            "PythonResolutionResult markers or their resolved dependencies:\n"
+            "ids, and no Heavyweight objects, such as trees (a CompilationUnit or any node in it), cursors, visitors, "
+            "execution contexts, PythonResolutionResult markers and their resolved dependencies:\n"
             "  org.openrewrite.test.Keeps keeps\n"
             "    Scanned.source_files['a.py'] -> CompilationUnit a.py, after scanning\n"
             "An accumulator stays in memory from the first source file scanned until the cycle ends, so what it keeps "
             "for each source file adds up over a large repository, and a PythonResolutionResult or a resolved "
-            "dependency reaches the dependencies of a whole project. A recipe that must keep such an object opts out "
-            "with RecipeSpec(check_lightweight_accumulators=False)."
+            "dependency reaches the dependencies of a whole project. A recipe that must keep a Heavyweight object "
+            "opts out with RecipeSpec(check_lightweight_accumulators=False)."
         )
 
     def test_a_cursor_kept_fails(self):
         spec = RecipeSpec(recipe=_keeping(list, lambda acc, cu, cursor: acc.append(cursor)), type_attribution=False)
         with pytest.raises(AssertionError, match=r"    list\[0\] -> Cursor, after scanning\n"):
             spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_visitor_and_an_execution_context_kept_fail(self):
+        def keep(acc: List[Any], cu: CompilationUnit, cursor: Cursor) -> None:
+            acc.extend([_RenameA(), InMemoryExecutionContext()])
+
+        spec = RecipeSpec(recipe=_keeping(list, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    list\[0\] -> TreeVisitor, after scanning\n"
+                                                 r"    list\[1\] -> ExecutionContext, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_a_type_a_recipe_library_tags_heavyweight_fails(self):
+        @lst_dataclass
+        class Classpath(Marker, Heavyweight):
+            _id: int | UUID
+            _jars: List[str]
+
+        def with_classpath(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(Classpath(random_id(), ["a.jar"])))
+
+        def keep(acc: Dict[Any, Any], cu: CompilationUnit, cursor: Cursor) -> None:
+            acc["classpath"] = cu.markers.find_first(Classpath)
+
+        spec = RecipeSpec(recipe=_keeping(dict, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    dict\['classpath'\] -> Classpath, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n", before_recipe=with_classpath))
 
     def test_a_source_file_kept_while_editing_fails(self):
         spec = RecipeSpec(recipe=_keeping(list, edited=lambda acc, cu: acc.append(cu)), type_attribution=False)

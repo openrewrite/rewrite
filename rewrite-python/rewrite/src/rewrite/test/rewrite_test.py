@@ -180,8 +180,7 @@ class RecipeSpec:
     # Whether to fail a ScanningRecipe whose scanner changes a tree, which the scanning phase discards
     check_no_edits_in_scanning_phase: bool = True
 
-    # Whether to fail a ScanningRecipe whose accumulator keeps trees, cursors or other objects
-    # too expensive to keep in memory all cycle
+    # Whether to fail a ScanningRecipe whose accumulator keeps trees, cursors or other Heavyweight objects
     check_lightweight_accumulators: bool = True
 
     # Whether to fail a recipe whose output holds nodes the parser builds differently from the
