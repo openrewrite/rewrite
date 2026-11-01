@@ -2052,9 +2052,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherArrow = other as JS.ArrowFunction;
 
-        // Compare all properties reflectively except lambda (handled specially below)
+        // Compare all properties reflectively except lambda (handled specially below). An arrow's
+        // methodType follows the variable naming it, which is not part of the arrow's shape.
         for (const key of Object.keys(arrowFunction)) {
-            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'lambda') {
+            if (key.startsWith('_') || key === 'id' || key === 'markers' || key === 'lambda' || key === 'methodType') {
                 continue;
             }
 

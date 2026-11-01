@@ -60,6 +60,13 @@ describe("type report", () => {
         ].join("\n"));
     });
 
+    test("lists an arrow function as a declaration where it declares a function", async () => {
+        const report = await buildTypeReport(await parse("const half = (n: number) => [n].map(m => m / 2);"));
+
+        expect(report.entries.filter(e => e.kind === "JS.ArrowFunction").map(e => `${e.source}  ${e.type}`))
+            .toEqual(["(n: number) =>  t half(number) -> Array<double>"]);
+    });
+
     test("places a node at its first character, past a prefix printed inside its visit", async () => {
         const report = await buildTypeReport(await parse(`import * as  fs from "fs";`), {all: true});
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
@@ -254,6 +254,26 @@ function greet(): string { return "hello"; }
         expect(matchFound).toBe(true);
         expect(capturedName).toBeDefined();
         expect((capturedName as J.Identifier).simpleName).toBe('greet');
+    });
+
+    test('strict mode matches an arrow whether or not a variable names it', async () => {
+        const pat = pattern`(n: number): number => ${capture('body')}`.configure({lenientTypeMatching: false});
+        let matches = 0;
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitArrowFunction(arrowFunction: JS.ArrowFunction, _p: any): Promise<J | undefined> {
+                if (await pat.match(arrowFunction, this.cursor)) {
+                    matches++;
+                }
+                return arrowFunction;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(`const half = (n: number): number => n / 2;\n[1].map((n: number): number => n / 2);`)
+        );
+
+        expect(matches).toBe(2);
     });
 
     test('strict mode with aliased import should match based on type', async () => {

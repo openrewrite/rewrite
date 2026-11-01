@@ -80,6 +80,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(arrowFunction, JS.ArrowFunction::getTypeParameters, el -> visit(el, q));
         q.getAndSend(arrowFunction, JS.ArrowFunction::getLambda, el -> visit(el, q));
         q.getAndSend(arrowFunction, JS.ArrowFunction::getReturnTypeExpression, el -> visit(el, q));
+        q.getAndSend(arrowFunction, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
         return arrowFunction;
     }
 
