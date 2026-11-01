@@ -351,7 +351,7 @@ class RecipeSpec:
         self._expect_no_throw_on_other_sources(source_files, results, cycles)
 
     def _expect_no_throw_on_other_sources(self, sources: List[SourceFile], results: List[Result], cycles: int) -> None:
-        """Run the recipe on the kinds of source a repository holds besides those the test gives it."""
+        """Run the recipe where a repository differs from the test: on an empty file, and without a file it changed."""
         changed = {r._before.id for r in results if r._before is not None and r._before is not r._after}
         if not changed or _is_test_scaffolding(self.recipe):
             return
