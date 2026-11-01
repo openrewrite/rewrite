@@ -34,7 +34,7 @@ final class ZipArchive {
     private static final int S_IFREG = 0100000;
     private static final int S_IFLNK = 0120000;
 
-    private static final class Entry {
+    static final class Entry {
         int mode;
         byte[] data;
 
@@ -93,6 +93,10 @@ final class ZipArchive {
             throw new AlreadyExists("symlink '" + target + "' -> '/" + path + "'");
         }
         entries.put(path, new Entry(S_IFLNK | 0777, target.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    byte[] toByteArray(Object level) {
+        return Integer.valueOf(0).equals(level) ? toByteArray() : new Libzip().archive(entries, level);
     }
 
     byte[] toByteArray() {
