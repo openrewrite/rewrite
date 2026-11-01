@@ -26,20 +26,23 @@ import (
 // RecipeRunCycle does: every scanning recipe scans every source before any
 // recipe generates, every recipe generates before any edits, and each source
 // then goes through every recipe in turn. A nil result for an existing source
-// is its deletion; generated files the cycle deleted are left out.
-func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext) ([]java.Tree, []java.Tree) {
+// is its deletion; generated files the cycle deleted are left out. checks, when
+// not nil, records how the recipes behave as they run.
+func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext, checks *runChecks) ([]java.Tree, []java.Tree) {
 	recipes := recipeStack(r)
 	accs := make([]any, len(recipes))
 	for i, rc := range recipes {
 		if sr, ok := rc.(recipe.ScanningRecipe); ok {
+			done := checks.watch(rc, ctx)
 			accs[i] = sr.InitialValue(ctx)
+			done("while creating its accumulator")
 		}
 	}
 
 	for _, tr := range trees {
 		for i, rc := range recipes {
 			if sr, ok := rc.(recipe.ScanningRecipe); ok {
-				scan(sr, accs[i], tr, ctx)
+				checks.scan(sr, accs[i], tr, ctx)
 			}
 		}
 	}
@@ -51,9 +54,12 @@ func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext) 
 			continue
 		}
 		for _, g := range generated {
-			scan(sr, accs[i], g, ctx)
+			checks.scan(sr, accs[i], g, ctx)
 		}
-		for _, g := range sr.Generate(accs[i], ctx) {
+		done := checks.watch(rc, ctx)
+		gen := sr.Generate(accs[i], ctx)
+		done("while generating")
+		for _, g := range gen {
 			if g != nil {
 				generated = append(generated, g)
 			}
@@ -62,11 +68,11 @@ func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext) 
 
 	results := make([]java.Tree, len(trees))
 	for k, tr := range trees {
-		results[k] = edit(recipes, accs, tr, ctx)
+		results[k] = edit(recipes, accs, tr, ctx, checks)
 	}
 	var kept []java.Tree
 	for _, g := range generated {
-		if g = edit(recipes, accs, g, ctx); g != nil {
+		if g = edit(recipes, accs, g, ctx, checks); g != nil {
 			kept = append(kept, g)
 		}
 	}
@@ -93,8 +99,10 @@ func scan(sr recipe.ScanningRecipe, acc any, tr java.Tree, ctx *recipe.Execution
 	}
 }
 
-func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.ExecutionContext) java.Tree {
+func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.ExecutionContext, checks *runChecks) java.Tree {
 	for i, rc := range recipes {
+		done := checks.watch(rc, ctx)
+		where := "while editing " + sourcePathOf(tr)
 		var editor recipe.TreeVisitor
 		if sr, ok := rc.(recipe.ScanningRecipe); ok {
 			editor = sr.EditorWithData(accs[i])
@@ -102,6 +110,7 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 			editor = rc.Editor()
 		}
 		if editor == nil {
+			done(where)
 			continue
 		}
 		after := editor.Visit(tr, ctx)
@@ -109,9 +118,37 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 			if q, ok := editor.(visitor.AfterVisitsProvider); ok {
 				q.AfterVisits()
 			}
+			done(where)
 			return nil
 		}
 		tr = visitor.DrainAfterVisits(editor, after, ctx)
+		done(where)
 	}
 	return tr
+}
+
+// runChecks are the checks RewriteRun makes of how a recipe behaves while it
+// runs, with what they found.
+type runChecks struct {
+	executionContextUnchanged bool
+	contextChanges            []contextChange
+}
+
+// scan runs the scanner of sr on tr as the checks watch it.
+func (c *runChecks) scan(sr recipe.ScanningRecipe, acc any, tr java.Tree, ctx *recipe.ExecutionContext) {
+	done := c.watch(sr, ctx)
+	scan(sr, acc, tr, ctx)
+	done("while scanning " + sourcePathOf(tr))
+}
+
+// failures describes what the checks found, one failure per check.
+func (c *runChecks) failures() []string {
+	if c == nil {
+		return nil
+	}
+	var failures []string
+	if len(c.contextChanges) > 0 {
+		failures = append(failures, contextChangesFailure(c.contextChanges))
+	}
+	return failures
 }

@@ -486,6 +486,9 @@ func ValidateSpaces(root java.Tree) []string {
 
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
+	// CheckExecutionContextUnchanged asserts that a recipe puts no message on the
+	// ExecutionContext, which every recipe and source file in a run shares.
+	CheckExecutionContextUnchanged bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
 	// report, such as search results and markup: a marker type turning up where
 	// neither the sources it was given nor a fresh parse of its output have one
@@ -516,9 +519,10 @@ type RecipeSpec struct {
 
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
-		CheckParsePrintIdempotence: true,
-		CheckReportingMarkersOnly:  true,
-		CheckUnchangedTreeIdentity: true,
+		CheckParsePrintIdempotence:     true,
+		CheckExecutionContextUnchanged: true,
+		CheckReportingMarkersOnly:      true,
+		CheckUnchangedTreeIdentity:     true,
 	}
 }
 
@@ -590,6 +594,7 @@ type recipeRun struct {
 	freshParseContext *recipe.ExecutionContext
 	// unsettled is the first cycle after the expected ones that changed anything.
 	unsettled *cycleChanges
+	checks    *runChecks
 }
 
 type cycleChanges struct {
@@ -709,6 +714,7 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 	run.dataTables = recipe.NewInMemoryDataTableStore()
 	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
 	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
+	run.checks = &runChecks{executionContextUnchanged: spec.CheckExecutionContextUnchanged}
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
 		if cycle == 2 {
 			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})
@@ -727,7 +733,7 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 				slots = append(slots, &run.generated[i])
 			}
 		}
-		results, generated := runCycle(spec.Recipe, live, ctx)
+		results, generated := runCycle(spec.Recipe, live, ctx, run.checks)
 		changes := changesOf(live, results, generated)
 		if len(changes) == 0 {
 			return
@@ -769,6 +775,12 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	if expected := spec.expectedCycles(); expected > 1 && run.cyclesThatMadeChanges < expected {
 		t.Errorf("Expected recipe to complete in %s, but it settled after %s. Lower ExpectedCyclesThatMakeChanges.",
 			pluralCycles(expected), pluralCycles(run.cyclesThatMadeChanges))
+		return
+	}
+	if failures := run.checks.failures(); len(failures) > 0 {
+		for _, failure := range failures {
+			t.Error(failure)
+		}
 		return
 	}
 
@@ -865,7 +877,7 @@ func (spec *RecipeSpec) expectStableOnFreshParse(t testing.TB, run *recipeRun) {
 	if sources == nil {
 		return
 	}
-	results, generated := runCycle(spec.Recipe, sources, run.freshParseContext)
+	results, generated := runCycle(spec.Recipe, sources, run.freshParseContext, nil)
 	spec.expectNoFurtherChanges(t, changesOf(sources, results, generated),
 		"Running the recipe on a fresh parse of its output changed", true)
 }
