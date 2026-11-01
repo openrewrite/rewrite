@@ -376,4 +376,22 @@ class MigrateArchiveClassifierTest implements RewriteTest {
         );
     }
 
+    @Test
+    void allowGradleProvidedAntFilterWildcardImport() {
+        rewriteRun(buildGradle(
+          """
+            import org.apache.tools.ant.filters.*
+            task docs(type: Jar) {
+                classifier = 'docs'
+            }
+            """,
+          """
+            import org.apache.tools.ant.filters.*
+            task docs(type: Jar) {
+                archiveClassifier = 'docs'
+            }
+            """
+        ));
+    }
+
 }

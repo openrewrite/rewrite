@@ -240,7 +240,8 @@ public class MigrateArchiveClassifier extends Recipe {
             String imported = anImport.getQualid().printTrimmed();
             if (anImport.getAlias() != null && simple.equals(anImport.getAlias().getSimpleName()) ||
                 (imported.endsWith("." + simple) || imported.endsWith(".*")) &&
-                !qualified.equals(imported) && !"org.gradle.api.tasks.bundling.*".equals(imported)) {
+                !qualified.equals(imported) && !"org.gradle.api.tasks.bundling.*".equals(imported) &&
+                !"org.apache.tools.ant.filters.*".equals(imported)) {
                 return false;
             }
         }
