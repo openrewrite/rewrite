@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
@@ -74,6 +75,52 @@ class RetainVersionsModulesTest implements RewriteTest {
                     <version>%s</version>
                   </dependency>
                   <dependency>""".formatted(version).indent(6).stripTrailing());
+    }
+
+    @Test
+    void propertyBasedBomRetainsDirectDependencyVersion() {
+        String before = PARENT.replace("org.springframework.boot", "org.springframework.cloud")
+          .replace("spring-boot-dependencies", "spring-cloud-dependencies")
+          .replace("  <dependencyManagement>", "  <properties>\n    <cloud.version>2023.0.2</cloud.version>\n  </properties>\n  <dependencyManagement>")
+          .replace("<version>4.1.0</version>", "<version>${cloud.version}</version>")
+          .replace("</project>", """
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.security</groupId>
+                  <artifactId>spring-security-rsa</artifactId>
+                </dependency>
+              </dependencies>
+            </project>""");
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies",
+            "2025.1.4", null, true, singletonList("org.springframework.security:spring-security-rsa"))),
+          pomXml(before, before.replace("<cloud.version>2023.0.2</cloud.version>", "<cloud.version>2025.1.4</cloud.version>")
+            .replace("      <artifactId>spring-security-rsa</artifactId>", "      <artifactId>spring-security-rsa</artifactId>\n      <version>1.1.3</version>"))
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void nestedImportedBomRetainsManagementForChild(boolean childFirst, boolean propertyVersion) {
+        String parentPom = PARENT.replace("org.springframework.boot", "org.springframework.cloud")
+          .replace("spring-boot-dependencies", "spring-cloud-dependencies").replace("4.1.0", "2023.0.2");
+        String expected = upgradedParent("1.1.3").replace("org.springframework.boot", "org.springframework.cloud")
+          .replace("spring-boot-dependencies", "spring-cloud-dependencies").replace("4.2.0-RC1", "2025.1.4")
+          .replace("org.codehaus.janino", "org.springframework.security").replace("<artifactId>janino</artifactId>", "<artifactId>spring-security-rsa</artifactId>");
+        if (propertyVersion) {
+            parentPom = parentPom.replace("  <dependencyManagement>", "  <properties>\n    <cloud.version>2023.0.2</cloud.version>\n  </properties>\n  <dependencyManagement>")
+              .replace("<version>2023.0.2</version>", "<version>${cloud.version}</version>");
+            expected = expected.replace("  <dependencyManagement>", "  <properties>\n    <cloud.version>2025.1.4</cloud.version>\n  </properties>\n  <dependencyManagement>")
+              .replace("<version>2025.1.4</version>", "<version>${cloud.version}</version>");
+        }
+        SourceSpecs parent = pomXml(parentPom, expected);
+        SourceSpecs child = mavenProject("child", pomXml(CHILD.replace("org.codehaus.janino", "org.springframework.security")
+          .replace("<artifactId>janino</artifactId>", "<artifactId>spring-security-rsa</artifactId>")));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies",
+            "2025.1.4", null, true, singletonList("org.springframework.security:spring-security-rsa"))),
+          childFirst ? new SourceSpecs[]{child, parent} : new SourceSpecs[]{parent, child}
+        );
     }
 
     @ParameterizedTest
