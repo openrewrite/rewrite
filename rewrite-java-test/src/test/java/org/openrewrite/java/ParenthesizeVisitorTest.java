@@ -349,6 +349,8 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean d = (obj instanceof String) ? true : false;
                       String e = (obj instanceof String) + "";
                       String f = "" + (obj instanceof String);
+                      String g = String.valueOf((obj instanceof String));
+                      Boolean h = new Boolean((obj instanceof String));
                   }
               }
               """,
@@ -361,6 +363,8 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean d = obj instanceof String ? true : false;
                       String e = (obj instanceof String) + "";
                       String f = "" + (obj instanceof String);
+                      String g = String.valueOf(obj instanceof String);
+                      Boolean h = new Boolean(obj instanceof String);
                   }
               }
               """

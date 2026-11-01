@@ -318,6 +318,46 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void instanceofParameterAsArgumentNeedsNoParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"isString".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("String.valueOf(#{any(boolean)})", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  Object test(Object o) {
+                      return isString(o instanceof String);
+                  }
+
+                  static boolean isString(boolean value) {
+                      return value;
+                  }
+              }
+              """,
+            """
+              class A {
+                  Object test(Object o) {
+                      return String.valueOf(o instanceof String);
+                  }
+
+                  static boolean isString(boolean value) {
+                      return value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {

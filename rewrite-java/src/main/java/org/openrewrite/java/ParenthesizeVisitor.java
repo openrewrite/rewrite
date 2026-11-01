@@ -223,10 +223,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.InstanceOf i = (J.InstanceOf) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (needsParentheses(i, parent.getValue()) ||
-            parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass ||
-            parent.getValue() instanceof J.TypeCast) {
+        if (needsParentheses(i, parent.getValue()) || parent.getValue() instanceof J.TypeCast) {
             return parenthesize(i);
         }
 
