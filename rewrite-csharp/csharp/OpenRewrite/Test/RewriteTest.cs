@@ -188,7 +188,7 @@ public abstract class RewriteTest
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             var checks = new RunChecks(validations);
             var runCtx = checks.Ctx;
-            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe) : null;
+            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
             try
             {
                 CycleRun run;

@@ -55,11 +55,28 @@ public class MinimalFormattingTests : RewriteTest
         Assert.StartsWith(
             "Format only what the recipe changed, not the whole class, namespace or file around it. These calls " +
             "auto-formatted a whole file, namespace or class that existed before the run, with no stopAfter:\n" +
-            "  MinimalFormattingTests.RenameFooThenFormat.Visitor.VisitCompilationUnit(MinimalFormattingTests.cs:",
+            "  OpenRewrite.Tests.Core.MinimalFormattingTests+RenameFooThenFormat:\n" +
+            "    MinimalFormattingTests.RenameFooThenFormat.Visitor.VisitCompilationUnit(MinimalFormattingTests.cs:",
             failure.Message);
-        Assert.Contains(") called AutoFormat on\n    all of source.cs\nThat rewrites the whitespace", failure.Message);
+        Assert.Contains(") called AutoFormat on\n      all of source.cs\nThat rewrites the whitespace", failure.Message);
         Assert.EndsWith("opts out with spec.SetValidations(new Validations { MinimalFormatting = false }).",
             failure.Message);
+    }
+
+    /// <summary>The failure names the recipe of a composite that asked for the format.</summary>
+    [Fact]
+    public void FormattingTheWholeFileInARecipeListFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new Composite(new RenameFooThenFormat(Format.File))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        ));
+
+        Assert.Contains(
+            "\n  OpenRewrite.Tests.Core.MinimalFormattingTests+RenameFooThenFormat:\n" +
+            "    MinimalFormattingTests.RenameFooThenFormat.Visitor.VisitCompilationUnit(MinimalFormattingTests.cs:",
+            failure.Message);
+        Assert.DoesNotContain("+Composite", failure.Message);
     }
 
     [Fact]
@@ -71,9 +88,9 @@ public class MinimalFormattingTests : RewriteTest
         ));
 
         Assert.Contains(
-            "\n  MinimalFormattingTests.RenameFooThenFormat.Visitor.VisitClassDeclaration(MinimalFormattingTests.cs:",
+            "\n    MinimalFormattingTests.RenameFooThenFormat.Visitor.VisitClassDeclaration(MinimalFormattingTests.cs:",
             failure.Message);
-        Assert.Contains(") called MaybeAutoFormat on\n    class `C` of source.cs\n", failure.Message);
+        Assert.Contains(") called MaybeAutoFormat on\n      class `C` of source.cs\n", failure.Message);
     }
 
     [Fact]
@@ -84,7 +101,9 @@ public class MinimalFormattingTests : RewriteTest
             CSharp(Calls("Foo"), Calls("Bar"))
         ));
 
-        Assert.Contains("\n  A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on\n    all of source.cs\n",
+        Assert.Contains(
+            "\n  OpenRewrite.Tests.Core.MinimalFormattingTests+RenameFooThenFormat:\n" +
+            "    A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on\n      all of source.cs\n",
             failure.Message);
     }
 
@@ -97,7 +116,9 @@ public class MinimalFormattingTests : RewriteTest
             CSharp(Calls("Foo"), Calls("Bar"))
         ));
 
-        Assert.Contains("\n  A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on\n    all of source.cs\n",
+        Assert.Contains(
+            "\n  OpenRewrite.Tests.Core.MinimalFormattingTests+BehindAPrecondition:\n" +
+            "    A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on\n      all of source.cs\n",
             failure.Message);
     }
 
@@ -148,7 +169,7 @@ public class MinimalFormattingTests : RewriteTest
             CSharp(Calls("Foo"), Calls("Bar"))
         ));
 
-        Assert.Contains(") called MaybeAutoFormat on\n    class `C` of source.cs\n", failure.Message);
+        Assert.Contains(") called MaybeAutoFormat on\n      class `C` of source.cs\n", failure.Message);
     }
 
     [Fact]

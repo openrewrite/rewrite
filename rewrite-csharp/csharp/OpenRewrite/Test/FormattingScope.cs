@@ -28,7 +28,7 @@ namespace OpenRewrite.Test;
 /// Finds recipes that auto-format a whole source file, namespace or class that existed before the run. Test inputs
 /// are usually formatted already, so the reformatting this causes on real code rarely shows in an expected output.
 /// </summary>
-internal sealed class FormattingScope(Recipe recipe) : FormattingListener
+internal sealed class FormattingScope(Recipe recipe, RunChecks checks) : FormattingListener
 {
     private const int SnippetLength = 60;
 
@@ -64,7 +64,7 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
         }
         // CSharpVisitor.AutoFormat formats a subtree after the visit, as the visit leaves it
         var deferred = tree is not SourceFile && frames.Take(i).Any(IsCSharpVisitorAutoFormat);
-        _requests.Add(new Request(tree, sourceFile.Id,
+        _requests.Add(new Request(tree, sourceFile.Id, (checks.Recipe ?? recipe).Name,
             CallSite(frames[i], caller, frames[Math.Max(i - 1, 0)], afterVisit), Describe(tree), deferred));
     }
 
@@ -83,7 +83,7 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
             }
         }
         var treesByFile = new Dictionary<SourceFile, Dictionary<Guid, J>>(ReferenceEqualityComparer.Instance);
-        var found = new Dictionary<string, List<string>>();
+        var found = new Dictionary<string, Dictionary<string, List<string>>>();
         foreach (var request in _requests)
         {
             if (!resultsByBefore.TryGetValue(request.SourceFileId, out var result) || OnlyWhitespaceChanged(result))
@@ -102,9 +102,13 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
             }
             if (!HoldsNoneOfItsChildren(original, formatted))
             {
-                if (!found.TryGetValue(request.CallSite, out var targets))
+                if (!found.TryGetValue(request.Recipe, out var callSites))
                 {
-                    found[request.CallSite] = targets = [];
+                    found[request.Recipe] = callSites = new Dictionary<string, List<string>>();
+                }
+                if (!callSites.TryGetValue(request.CallSite, out var targets))
+                {
+                    callSites[request.CallSite] = targets = [];
                 }
                 var target = $"{request.Target} of {before.SourcePath}";
                 if (!targets.Contains(target))
@@ -306,17 +310,21 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
         return capture.ToString();
     }
 
-    private static string Message(Dictionary<string, List<string>> found)
+    private static string Message(Dictionary<string, Dictionary<string, List<string>>> found)
     {
         var message = new StringBuilder(
             "Format only what the recipe changed, not the whole class, namespace or file around it. These calls " +
             "auto-formatted a whole file, namespace or class that existed before the run, with no stopAfter:\n");
-        foreach (var (callSite, targets) in found)
+        foreach (var (recipeName, callSites) in found)
         {
-            message.Append("  ").Append(callSite).Append('\n');
-            foreach (var target in targets)
+            message.Append("  ").Append(recipeName).Append(":\n");
+            foreach (var (callSite, targets) in callSites)
             {
-                message.Append("    ").Append(target).Append('\n');
+                message.Append("    ").Append(callSite).Append('\n');
+                foreach (var target in targets)
+                {
+                    message.Append("      ").Append(target).Append('\n');
+                }
             }
         }
         return message
@@ -334,6 +342,8 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
             .ToString();
     }
 
+    /// <param name="Recipe">The name of the recipe the scheduler was running.</param>
     /// <param name="Deferred">Whether the tree is formatted once the visit is done, as the visit leaves it.</param>
-    private sealed record Request(Tree Tree, Guid SourceFileId, string CallSite, string Target, bool Deferred);
+    private sealed record Request(Tree Tree, Guid SourceFileId, string Recipe, string CallSite, string Target,
+        bool Deferred);
 }
