@@ -303,6 +303,9 @@ def _binary_slot(parent, child_id: UUID) -> Optional[SlotConstraints]:
     if not is_left and _id_of(parent.right) != child_id:
         return None
 
+    if parent.operator == py.Binary.Type.StringConcatenation:
+        # Adjacent strings make one atom, and `'a' ('b')` is a call rather than `'a' 'b'`
+        return None
     if precedence == Precedence.COMPARISON:
         # Comparisons chain rather than associate, so `(a < b) < c` and `a < b < c` differ
         return SlotConstraints(precedence + 1)

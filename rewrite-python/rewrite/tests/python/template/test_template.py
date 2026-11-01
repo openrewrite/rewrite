@@ -1050,6 +1050,36 @@ class _AwaitYieldFrom(Recipe):
         return Visitor()
 
 
+class _ReplaceLiteral(Recipe):
+    def __init__(self, literal: str, replacement: str):
+        self._literal = literal
+        self._replacement = replacement
+
+    @property
+    def name(self) -> str:
+        return "test.ReplaceLiteral"
+
+    @property
+    def display_name(self) -> str:
+        return "Replace a literal"
+
+    @property
+    def description(self) -> str:
+        return "Replaces a literal, found by its source text, with a template."
+
+    def editor(self):
+        tmpl = template(self._replacement)
+        source = self._literal
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_literal(self, literal, p):
+                literal = super().visit_literal(literal, p)
+                if not isinstance(literal, j.Literal) or literal.value_source != source:
+                    return literal
+                return tmpl.apply(self.cursor)
+        return Visitor()
+
+
 class TestTemplateApplySlotShape:
     """The tree `apply` leaves behind has the node kinds a parse of the printed result has."""
 
@@ -1088,3 +1118,8 @@ class TestTemplateApplySlotShape:
 
     def test_replaced_right_operand_of_the_same_operator_is_parenthesized(self):
         self._run_recipe(_DeMorganRecipe(), "result = z and not (x or y)", "result = z and (not x and not y)")
+
+    def test_replaced_string_of_a_concatenation_stays_bare(self):
+        self._run_recipe(_ReplaceLiteral("'b'", "'c'"), "a = 'a' 'b'", "a = 'a' 'c'")
+
+        self._run_recipe(_ReplaceLiteral("'b'", "'d'"), "a = 'a' 'b' 'c'", "a = 'a' 'd' 'c'")
