@@ -17,7 +17,7 @@
 import {ExecutionContext, randomId} from "../../src";
 import {Expression, J, Statement} from "../../src/java";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {JavaScriptParser, JavaScriptVisitor, typescript} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../src/javascript";
 
 describe('visitor', () => {
     test('call visitStatement for subclasses', async () => {
@@ -92,5 +92,36 @@ describe('visitor', () => {
 
         // test
         expect(parents.map(parent => parent.id)).toEqual([replacement!.id, replacement!.id]);
+    });
+
+    test('restore the cursor of the given binary once the operands are visited', async () => {
+        // given
+        const cu = await new JavaScriptParser().parseOne({text: 'const x = 3 + 4;', sourcePath: 'binary.ts'});
+        const after: [J, string][] = [];
+        const CustomVisitor = class extends JavaScriptVisitor<undefined> {
+            protected async visitExpression(expression: Expression): Promise<J | undefined> {
+                return expression.kind === J.Kind.Binary ? {...expression as J.Binary, id: randomId()} : expression;
+            }
+
+            protected async visitBinary(binary: J.Binary, p: undefined): Promise<J | undefined> {
+                const visited = await super.visitBinary(binary, p);
+                after.push([this.cursor.value, this.cursor.messages.get('operand')]);
+                return visited;
+            }
+
+            protected async visitLiteral(literal: J.Literal): Promise<J | undefined> {
+                this.cursor.parentTree()!.messages.set('operand', literal.valueSource);
+                return literal;
+            }
+        }
+
+        // when
+        await new CustomVisitor().visit(cu, undefined);
+
+        // test
+        const declarations = (cu as JS.CompilationUnit).statements[0].element as J.VariableDeclarations;
+        expect(after).toHaveLength(1);
+        expect(after[0][0]).toBe(declarations.variables[0].element.initializer!.element);
+        expect(after[0][1]).toBe('4');
     });
 });
