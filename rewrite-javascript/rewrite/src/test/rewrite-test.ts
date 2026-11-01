@@ -25,6 +25,7 @@ import {isParseError, ParseErrorKind} from "../parse-error";
 import {Marker, Markers, MarkersKind, ParseExceptionResult} from "../markers";
 import {isNamedStyles} from "../style";
 import {JavaScriptVisitor} from "../javascript";
+import {listenToFormatting} from "../javascript/format";
 import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J, Type} from "../java";
 import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
@@ -273,7 +274,7 @@ export class RecipeSpec {
         const formattingScope = this.checkMinimalFormatting ? new FormattingScope(this.recipe) : undefined;
         const run = () => this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile), cycles, expectedCycles,
             runContext);
-        const {changeset, unsettled} = formattingScope ? await formattingScope.listen(run) : await run();
+        const {changeset, unsettled} = formattingScope ? await listenToFormatting(formattingScope, run) : await run();
         contextWrites?.assertNone(this.recipe);
 
         this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);

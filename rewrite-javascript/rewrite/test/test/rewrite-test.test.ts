@@ -1551,5 +1551,14 @@ describe("rewrite test", () => {
             const module = path.resolve(__dirname, "../../dist", first);
             execFileSync(process.execPath, ["-e", `require(${JSON.stringify(module)})`], {stdio: "pipe"});
         });
+
+        // These reach the harness while javascript/format is still loading, so the harness needs nothing of it to load
+        test.each(["javascript/add-import.js", "javascript/amd.js", "javascript/binding.js",
+            "javascript/format/format.js", "javascript/format/index.js", "javascript/recipes/auto-format.js",
+            "javascript/recipes/index.js", "javascript/rpc.js", "javascript/templating/template.js"])(
+            "the package loads with the internal module %s first", first => {
+                const module = path.resolve(__dirname, "../../dist", first);
+                execFileSync(process.execPath, ["-e", `require(${JSON.stringify(module)})`], {stdio: "pipe"});
+            });
     });
 });

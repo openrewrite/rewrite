@@ -21,7 +21,7 @@ import {TreePrinters} from "../print";
 import {UUID} from "../uuid";
 import {J} from "../java";
 import {JavaScriptVisitor} from "../javascript";
-import {FormattingListener} from "../javascript/format";
+import type {FormattingListener} from "../javascript/format";
 
 interface Request {
     readonly tree: Tree
@@ -33,15 +33,14 @@ interface Request {
  * Finds recipes that auto-format a whole source file or class that existed before the run. Test inputs are usually
  * formatted already, so the reformatting this causes on real code rarely shows in an expected output.
  */
-export class FormattingScope extends FormattingListener {
+export class FormattingScope implements FormattingListener {
     private readonly requests: Request[] = [];
     private readonly requested = new Set<Tree>();
 
     constructor(private readonly recipe: Recipe) {
-        super();
     }
 
-    protected onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void {
+    onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void {
         if (stopAfter || !isWhole(tree) || this.requested.has(tree)) {
             return;
         }

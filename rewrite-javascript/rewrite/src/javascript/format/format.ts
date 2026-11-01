@@ -61,20 +61,16 @@ export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor):
  * Hears about each request to auto-format a tree made while it listens, so that a test harness can check that a
  * recipe formats only what it changed.
  */
-export abstract class FormattingListener {
-    private static readonly current = new AsyncLocalStorage<FormattingListener>();
-
+export interface FormattingListener {
     /** AutoformatVisitor calls this before it formats `tree`, stopping after `stopAfter` when it is given. */
-    static beforeFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void {
-        FormattingListener.current.getStore()?.onFormat(tree, stopAfter, cursor);
-    }
+    onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+}
 
-    protected abstract onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+const formattingListener = new AsyncLocalStorage<FormattingListener>();
 
-    /** Runs `run`, hearing about the formatting it requests. */
-    listen<T>(run: () => Promise<T>): Promise<T> {
-        return FormattingListener.current.run(this, run);
-    }
+/** Runs `run`, telling `listener` about the formatting it requests. */
+export function listenToFormatting<T>(listener: FormattingListener, run: () => Promise<T>): Promise<T> {
+    return formattingListener.run(listener, run);
 }
 
 /**
@@ -98,7 +94,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        FormattingListener.beforeFormat(tree, this.stopAfter, cursor);
+        formattingListener.getStore()?.onFormat(tree, this.stopAfter, cursor);
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
             const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
