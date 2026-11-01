@@ -816,6 +816,17 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             markers: await this.visitMarkers(typeTreeExpression.markers, p),
             expression: await this.visitDefined<Expression>(typeTreeExpression.expression, p)
         }));
+        // The parser wraps no type tree, so a visit that makes the expression one drops the wrapper
+        const visited: J = updates.expression;
+        if (visited !== typeTreeExpression.expression && (visited.kind === J.Kind.Identifier ||
+            visited.kind === J.Kind.FieldAccess || visited.kind === J.Kind.ArrayType ||
+            visited.kind === J.Kind.ParameterizedType)) {
+            return {
+                ...visited,
+                prefix: concatenated(updates.prefix, visited.prefix),
+                markers: withOuterMarkers(updates.markers, visited.markers)
+            };
+        }
         return updateIfChanged(typeTreeExpression, updates);
     }
 

@@ -287,6 +287,29 @@ describe('Statement Expression Wrapping', () => {
         );
     });
 
+    it('should make a type tree that replaces the expression of a type tree expression the type tree itself', () => {
+        const spec = new RecipeSpec();
+        const object = capture('object');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTypeTreeExpression(typeTree: JS.TypeTreeExpression, p: any): Promise<J | undefined> {
+                return super.visitTypeTreeExpression(foundSearchResult(typeTree, 'found'), p);
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+                const match = await pattern`${object}['bar']`.match(arrayAccess, this.cursor);
+                return match ? template`${object}.bar`.apply(arrayAccess, this.cursor, {values: match}) :
+                    super.visitArrayAccess(arrayAccess, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            typescript(`new foo['bar']();`, 'new /*~~(found)~~>*/foo.bar();'),
+            typescript(`new  foo['bar'];`, 'new  /*~~(found)~~>*/foo.bar;'),
+            typescript(`class A extends foo['bar'] {\n}`, 'class A extends /*~~(found)~~>*/foo.bar {\n}')
+        );
+    });
+
     it('should keep the markers of the expression statement a statement takes the place of', () => {
         const spec = new RecipeSpec();
         const object = capture('object');
