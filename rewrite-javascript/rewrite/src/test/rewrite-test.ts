@@ -19,7 +19,7 @@ import {noopVisitor, TreeVisitor} from "../visitor";
 import {Parser} from "../parser";
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, rootCursor, SourceFile} from "../tree";
-import {Result, scheduleRun} from "../run";
+import {ACCUMULATOR_LISTENER, Result, scheduleRun} from "../run";
 import {mapAsync, trimIndent} from "../util";
 import {isParseError, ParseErrorKind} from "../parse-error";
 import {Marker, Markers, MarkersKind, ParseExceptionResult} from "../markers";
@@ -29,6 +29,7 @@ import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J, Type} from "../java";
 import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
 import * as path from "path";
+import {AccumulatorContents} from "./accumulator-contents";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -48,6 +49,7 @@ interface RecipeSpecConfiguration {
     checkReportingMarkersOnly: boolean;
     checkExecutionContextUnchanged: boolean;
     checkNoEditsInScanningPhase: boolean;
+    checkLightweightAccumulators: boolean;
     cycles?: number;
     expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
@@ -73,6 +75,12 @@ export class RecipeSpec {
 
     /** Fails a run whose ScanningRecipe's scanner edits a tree, which the scanning phase discards. */
     checkNoEditsInScanningPhase: boolean = true
+
+    /**
+     * Fails a run whose ScanningRecipe's accumulator keeps a tree, cursor, visitor, execution context or dependency
+     * model, which would stay in memory all cycle.
+     */
+    checkLightweightAccumulators: boolean = true
 
     /**
      * The cycles to run, by default one more than {@link expectedCyclesThatMakeChanges} and at least two. The
@@ -128,6 +136,7 @@ export class RecipeSpec {
             checkReportingMarkersOnly: this.checkReportingMarkersOnly,
             checkExecutionContextUnchanged: this.checkExecutionContextUnchanged,
             checkNoEditsInScanningPhase: this.checkNoEditsInScanningPhase,
+            checkLightweightAccumulators: this.checkLightweightAccumulators,
             cycles: this.cycles,
             expectedCyclesThatMakeChanges: this.expectedCyclesThatMakeChanges,
             recipe: this.recipe,
@@ -233,6 +242,8 @@ export class RecipeSpec {
         this.recipeExecutionContext.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
         this.recipeExecutionContext.messages[ExecutionContext.SCANNING_MUTATION_VALIDATION] =
             this.checkNoEditsInScanningPhase;
+        const accumulatorContents = this.checkLightweightAccumulators ? new AccumulatorContents() : undefined;
+        this.recipeExecutionContext.messages[ACCUMULATOR_LISTENER] = accumulatorContents?.listener;
         const contextWrites = this.checkExecutionContextUnchanged ? new ExecutionContextWrites() : undefined;
         const runContext = (ctx: ExecutionContext) => contextWrites?.watch(ctx) ?? ctx;
         const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;
@@ -243,6 +254,7 @@ export class RecipeSpec {
 
         this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);
         this.checkReportingMarkersOnly && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
+        accumulatorContents?.assertNoneFound();
         await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
         await this.expectGeneratedFiles(flattenedSpecs, changeset);
         if (unsettled) {

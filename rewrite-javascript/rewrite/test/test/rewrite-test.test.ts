@@ -4,12 +4,26 @@ import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
 import {ReplacedText} from "../../fixtures/replaced-text";
 import {ScanningEditor} from "../../fixtures/scanning-editor";
-import {DATA_TABLE_STORE, ExecutionContext, InMemoryDataTableStore, Recipe, ScanningRecipe, SourceFile, TreeVisitor} from "../../src";
+import {
+    Cursor,
+    DATA_TABLE_STORE,
+    ExecutionContext,
+    InMemoryDataTableStore,
+    noopVisitor,
+    Recipe,
+    ScanningRecipe,
+    SourceFile,
+    TreeVisitor
+} from "../../src";
 import {emptyMarkers, findMarker, foundSearchResult, Marker, Markers, MarkersKind} from "../../src/markers";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 import {J} from "../../src/java";
-import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../src/javascript";
+import {JavaScriptParser, JavaScriptVisitor, JS, NodeResolutionResultKind, typescript} from "../../src/javascript";
+
+function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
+    return {...t, markers: {...t.markers, markers: [...t.markers.markers, marker]}};
+}
 
 describe("rewrite test", () => {
     test("a recipe that makes no changes", async () => {
@@ -518,6 +532,127 @@ describe("rewrite test", () => {
         });
     });
 
+    describe("lightweight accumulators", () => {
+        // Keeps whatever `keep` takes from each text it scans, or edits, in its accumulator
+        class Keep<A> extends ScanningRecipe<A> {
+            name = "org.openrewrite.test.keep";
+            displayName = "Keep";
+            description = "Keeps what its visitor is given in its accumulator.";
+
+            constructor(private readonly initial: () => A,
+                        private readonly keep: (acc: A, text: PlainText, cursor: Cursor) => void,
+                        private readonly whileEditing: boolean = false) {
+                super();
+            }
+
+            initialValue(_ctx: ExecutionContext): A {
+                return this.initial();
+            }
+
+            async scanner(acc: A): Promise<TreeVisitor<any, ExecutionContext>> {
+                return this.whileEditing ? noopVisitor() : this.keeper(acc);
+            }
+
+            async editorWithData(acc: A): Promise<TreeVisitor<any, ExecutionContext>> {
+                return this.whileEditing ? this.keeper(acc) : noopVisitor();
+            }
+
+            private keeper(acc: A): TreeVisitor<any, ExecutionContext> {
+                const keep = this.keep;
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                        keep(acc, text, this.cursor);
+                        return text;
+                    }
+                };
+            }
+        }
+
+        test("a source file kept in the accumulator fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({sourceFiles: new Map<string, PlainText>()}),
+                (acc, text) => acc.sourceFiles.set(text.sourcePath, text));
+
+            // when
+            const run = sut.rewriteRun({...text("foo"), path: "foo.txt"});
+
+            // then
+            await expect(run).rejects.toThrow(
+                "A ScanningRecipe's accumulator should keep the values the recipe needs, such as package names, " +
+                "versions, paths and ids, and no heavyweight objects, such as trees, cursors, visitors, execution " +
+                "contexts and dependency models:\n" +
+                "  org.openrewrite.test.keep keeps\n" +
+                "    acc.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning\n");
+            await expect(run).rejects.toThrow(
+                "A recipe that must keep a heavyweight object opts out with spec.checkLightweightAccumulators = false.");
+        });
+
+        test("a cursor kept in the accumulator fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => [] as Cursor[], (acc, _text, cursor) => acc.push(cursor));
+            await expect(sut.rewriteRun(text("foo"))).rejects.toThrow("    acc[0] -> Cursor, after scanning\n");
+        });
+
+        test("a dependency model kept in the accumulator fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({resolution: undefined as Marker | undefined}),
+                (acc, text) => acc.resolution = findMarker(text, NodeResolutionResultKind));
+            await expect(sut.rewriteRun({
+                ...text("foo"),
+                beforeRecipe: (sourceFile: PlainText) => withMarker(sourceFile, {kind: NodeResolutionResultKind, id: randomId()})
+            })).rejects.toThrow("    acc.resolution -> NodeResolutionResult, after scanning\n");
+        });
+
+        test("a source file kept while editing fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => [] as PlainText[], (acc, text) => acc.push(text), true);
+            await expect(sut.rewriteRun({...text("foo"), path: "foo.txt"}))
+                .rejects.toThrow("    acc[0] -> PlainText foo.txt, after editing\n");
+        });
+
+        test("a collection of the accumulator's own is read without running its code", async () => {
+            // given
+            const ownCode = () => {
+                throw new Error("The check ran code of the accumulator's own");
+            };
+            class Index extends Map<string, PlainText> {
+                override forEach = ownCode;
+                override entries = ownCode;
+                override [Symbol.iterator] = ownCode;
+            }
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({files: new Index(), get broken(): never { return ownCode(); }}),
+                (acc, text) => Map.prototype.set.call(acc.files, text.sourcePath, text));
+
+            // when
+            const run = sut.rewriteRun({...text("foo"), path: "foo.txt"});
+
+            // then
+            await expect(run).rejects.toThrow("    acc.files[foo.txt] -> PlainText foo.txt, after scanning\n");
+        });
+
+        test("values and small markers kept in the accumulator pass", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({paths: [] as string[], markers: [] as Markers[]}),
+                (acc, text) => {
+                    acc.paths.push(text.sourcePath);
+                    acc.markers.push(text.markers);
+                });
+            return sut.rewriteRun({
+                ...text("foo"),
+                beforeRecipe: (sourceFile: PlainText) => withMarker(sourceFile, {kind: "my.Team", id: randomId()})
+            });
+        });
+
+        test("checkLightweightAccumulators turns the check off", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => [] as PlainText[], (acc, text) => acc.push(text));
+            sut.checkLightweightAccumulators = false;
+            return sut.rewriteRun(text("foo"));
+        });
+    });
+
     test("a spec returns to its suite configuration between tests", () => {
         // Independent of whether the harness already switched tracking on
         RecipeSpec.trackSuiteConfiguration();
@@ -533,6 +668,7 @@ describe("rewrite test", () => {
         sut.checkReportingMarkersOnly = false;
         sut.checkExecutionContextUnchanged = false;
         sut.checkNoEditsInScanningPhase = false;
+        sut.checkLightweightAccumulators = false;
         sut.cycles = 1;
         sut.expectedCyclesThatMakeChanges = 3;
         RecipeSpec.restoreSuiteConfiguration();
@@ -543,15 +679,12 @@ describe("rewrite test", () => {
         expect(sut.checkReportingMarkersOnly).toBe(true);
         expect(sut.checkExecutionContextUnchanged).toBe(true);
         expect(sut.checkNoEditsInScanningPhase).toBe(true);
+        expect(sut.checkLightweightAccumulators).toBe(true);
         expect(sut.cycles).toBeUndefined();
         expect(sut.expectedCyclesThatMakeChanges).toBeUndefined();
     });
 
     describe("added markers", () => {
-        function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
-            return {...t, markers: {...t.markers, markers: [...t.markers.markers, marker]}};
-        }
-
         // Renames foo() to bar(), and tags what it renamed
         const renameAndTag = () => fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
