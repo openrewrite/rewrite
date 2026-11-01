@@ -489,6 +489,9 @@ type RecipeSpec struct {
 	// CheckExecutionContextUnchanged asserts that a recipe puts no message on the
 	// ExecutionContext, which every recipe and source file in a run shares.
 	CheckExecutionContextUnchanged bool
+	// CheckNoEditsInScanningPhase asserts that the scanner of a ScanningRecipe
+	// returns each tree it visits unchanged, as the scanning phase discards edits.
+	CheckNoEditsInScanningPhase bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
 	// report, such as search results and markup: a marker type turning up where
 	// neither the sources it was given nor a fresh parse of its output have one
@@ -521,6 +524,7 @@ func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence:     true,
 		CheckExecutionContextUnchanged: true,
+		CheckNoEditsInScanningPhase:    true,
 		CheckReportingMarkersOnly:      true,
 		CheckUnchangedTreeIdentity:     true,
 	}
@@ -714,7 +718,10 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 	run.dataTables = recipe.NewInMemoryDataTableStore()
 	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
 	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
-	run.checks = &runChecks{executionContextUnchanged: spec.CheckExecutionContextUnchanged}
+	run.checks = &runChecks{
+		executionContextUnchanged: spec.CheckExecutionContextUnchanged,
+		noEditsInScanningPhase:    spec.CheckNoEditsInScanningPhase,
+	}
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
 		if cycle == 2 {
 			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})

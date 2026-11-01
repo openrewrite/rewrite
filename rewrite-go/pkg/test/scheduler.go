@@ -89,14 +89,17 @@ func recipeStack(r recipe.Recipe) []recipe.Recipe {
 	return recipes
 }
 
-func scan(sr recipe.ScanningRecipe, acc any, tr java.Tree, ctx *recipe.ExecutionContext) {
+// scan runs the scanner of sr on tr, returning what the scanner made of it.
+func scan(sr recipe.ScanningRecipe, acc any, tr java.Tree, ctx *recipe.ExecutionContext) java.Tree {
 	scanner := sr.Scanner(acc)
 	if scanner == nil {
-		return
+		return tr
 	}
-	if after := scanner.Visit(tr, ctx); after != nil {
-		visitor.DrainAfterVisits(scanner, after, ctx)
+	after := scanner.Visit(tr, ctx)
+	if after != nil {
+		after = visitor.DrainAfterVisits(scanner, after, ctx)
 	}
+	return after
 }
 
 func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.ExecutionContext, checks *runChecks) java.Tree {
@@ -131,14 +134,19 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 // runs, with what they found.
 type runChecks struct {
 	executionContextUnchanged bool
+	noEditsInScanningPhase    bool
 	contextChanges            []contextChange
+	scannerEdits              []scannerEdit
 }
 
 // scan runs the scanner of sr on tr as the checks watch it.
 func (c *runChecks) scan(sr recipe.ScanningRecipe, acc any, tr java.Tree, ctx *recipe.ExecutionContext) {
 	done := c.watch(sr, ctx)
-	scan(sr, acc, tr, ctx)
+	after := scan(sr, acc, tr, ctx)
 	done("while scanning " + sourcePathOf(tr))
+	if c != nil && c.noEditsInScanningPhase && after != tr {
+		c.scannerEdited(scannerEdit{recipe: sr.Name(), sourcePath: sourcePathOf(tr), deleted: after == nil})
+	}
 }
 
 // failures describes what the checks found, one failure per check.
@@ -149,6 +157,9 @@ func (c *runChecks) failures() []string {
 	var failures []string
 	if len(c.contextChanges) > 0 {
 		failures = append(failures, contextChangesFailure(c.contextChanges))
+	}
+	if len(c.scannerEdits) > 0 {
+		failures = append(failures, scannerEditsFailure(c.scannerEdits))
 	}
 	return failures
 }
