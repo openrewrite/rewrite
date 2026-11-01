@@ -12,6 +12,7 @@ import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, i
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
+import ts from "typescript";
 
 export type QuoteChar = "'" | '"';
 
@@ -562,7 +563,8 @@ function claimedName(v: unknown): string | undefined {
 /**
  * The parser lifts surrogate pairs out of `valueSource` into `unicodeEscapes` and, when it does,
  * sets `value` to the quoted source (`parser.ts` `mapLiteral`), so neither field alone is the
- * module name. Reuniting them and stripping the quotes yields it for either shape of literal.
+ * module name. Reuniting them and reading the quoted text as the language does yields it for
+ * either shape of literal.
  */
 export function moduleNameOf(module: string | J.Literal): string {
     if (typeof module === 'string') {
@@ -579,6 +581,13 @@ export function moduleNameOf(module: string | J.Literal): string {
         cut = escape.valueSourceIndex;
     }
     restored += source.slice(cut);
+    // an escape such as `\u00dc` names the character it spells
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, restored);
+    const token = scanner.scan();
+    if ((token === ts.SyntaxKind.StringLiteral || token === ts.SyntaxKind.NoSubstitutionTemplateLiteral) &&
+        scanner.getTokenEnd() === restored.length) {
+        return scanner.getTokenValue();
+    }
     const quote = restored.charAt(0);
     return (quote === "'" || quote === '"' || quote === '`') && restored.endsWith(quote) && restored.length > 1
         ? restored.slice(1, -1)
