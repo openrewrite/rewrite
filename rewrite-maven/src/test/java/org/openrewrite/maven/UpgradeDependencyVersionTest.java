@@ -2403,6 +2403,96 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
     @Nested
     class RetainVersions {
+        @Test
+        void retainDependencyUsedOnlyInChildOfBomImporter() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies",
+                "4.2.0-RC1", null, true, singletonList("org.codehaus.janino:*"))),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>4.1.0</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.codehaus.janino</groupId>
+                          <artifactId>janino</artifactId>
+                          <version>3.1.12</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-dependencies</artifactId>
+                          <version>4.2.0-RC1</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pom -> {
+                    var result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(result.getPom().getManagedVersion("org.codehaus.janino", "janino", null, null))
+                      .isEqualTo("3.1.12");
+                    assertThat(result.getModules()).singleElement().satisfies(module ->
+                      assertThat(module.findDependencies("org.codehaus.janino", "janino", null))
+                        .isNotEmpty().allSatisfy(dependency -> assertThat(dependency.getVersion()).isEqualTo("3.1.12")));
+                })
+              ),
+              mavenProject("child",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.codehaus.janino</groupId>
+                          <artifactId>janino</artifactId>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
         @DocumentExample
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
