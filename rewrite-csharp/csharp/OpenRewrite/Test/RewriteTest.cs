@@ -197,6 +197,7 @@ public abstract class RewriteTest
                 {
                     AddedMarkersCheck.Verify(inputMarkers, results);
                 }
+                checks.AssertLightweightAccumulators();
 
                 foreach (var afterRecipe in recipeSpec.AfterRecipe)
                 {

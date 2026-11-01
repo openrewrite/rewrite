@@ -71,6 +71,12 @@ public sealed class Validations
     /// </summary>
     public bool NoEditsInScanningPhase { get; init; } = true;
 
+    /// <summary>
+    /// Whether a ScanningRecipe's accumulator is validated to keep values, such as paths, names and ids, and no trees,
+    /// cursors, visitors or other objects that would stay in memory all cycle. Default: enabled.
+    /// </summary>
+    public bool LightweightAccumulators { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 

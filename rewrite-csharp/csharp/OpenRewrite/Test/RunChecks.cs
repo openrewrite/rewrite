@@ -25,10 +25,12 @@ namespace OpenRewrite.Test;
 internal sealed class RunChecks : IRunObserver
 {
     private readonly Validations _validations;
+    private readonly AccumulatorContents? _accumulators;
 
     public RunChecks(Validations validations)
     {
         _validations = validations;
+        _accumulators = validations.LightweightAccumulators ? new AccumulatorContents() : null;
         Ctx = validations.ExecutionContextUnchanged ? new UnchangedExecutionContext(this) : new ExecutionContext();
     }
 
@@ -58,4 +60,13 @@ internal sealed class RunChecks : IRunObserver
                 "spec.SetValidations(new Validations { NoEditsInScanningPhase = false }).");
         }
     }
+
+    public void ScanningEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators) =>
+        _accumulators?.Check(accumulators, "after scanning");
+
+    public void EditingEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators) =>
+        _accumulators?.Check(accumulators, "after editing");
+
+    /// <summary>Fails for what the accumulators kept in the cycles so far that is too large to keep.</summary>
+    public void AssertLightweightAccumulators() => _accumulators?.AssertNoneFound();
 }

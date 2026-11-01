@@ -51,6 +51,7 @@ public static class RecipeScheduler
                     return s;
                 });
             }
+            state.Observer?.ScanningEnded(state.Accumulators);
 
             // Phase 2: Collect generated files
             var generated = RecurseRecipeList(recipe, new List<SourceFile>(), state, (r, g) =>
@@ -74,6 +75,7 @@ public static class RecipeScheduler
                     results.Add(new Result(null, after));
                 }
             }
+            state.Observer?.EditingEnded(state.Accumulators);
         }
         else
         {
@@ -167,6 +169,8 @@ public static class RecipeScheduler
         private readonly Dictionary<Recipe, List<Recipe>> _recipeLists = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<IScanningRecipe, object> _accumulators = new(ReferenceEqualityComparer.Instance);
 
+        public IReadOnlyDictionary<IScanningRecipe, object> Accumulators => _accumulators;
+
         public List<Recipe> SubRecipes(Recipe recipe)
         {
             if (!_recipeLists.TryGetValue(recipe, out var subRecipes))
@@ -200,4 +204,10 @@ internal interface IRunObserver
 
     /// <summary>Called with what a scanner returned for <paramref name="source"/>, which the scan discards.</summary>
     void Scanned(Recipe recipe, SourceFile source, Tree? scanned);
+
+    /// <summary>Called with the accumulator of each scanning recipe once every scanner has run.</summary>
+    void ScanningEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators);
+
+    /// <summary>Called with the accumulator of each scanning recipe once every editor has run.</summary>
+    void EditingEnded(IReadOnlyDictionary<IScanningRecipe, object> accumulators);
 }
