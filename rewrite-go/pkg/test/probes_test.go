@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 // forgetProbes lets t probe as though no other test had, restoring what the
@@ -67,6 +68,23 @@ func TestProbeThatPassedIsNotRunAgain(t *testing.T) {
 	spec.RewriteRun(t, firstFunctionA())
 
 	// then that test does not run it on an empty file again
+	assert.Equal(t, 1, declaringNone)
+}
+
+func TestRecipeIsProbedAfterTheAfterRecipeCallbacks(t *testing.T) {
+	forgetProbes(t)
+	// given a recipe that counts the files it meets that declare nothing, which only its probe gives it
+	declaringNone := 0
+	spec := NewRecipeSpec().WithRecipe(&renameFirstFunction{checked: true, declaringNone: &declaringNone})
+
+	// when a test with an AfterRecipe callback runs it
+	seenByAfterRecipe := -1
+	spec.RewriteRun(t, firstFunctionA().WithAfterRecipe(func(*testing.T, *golang.CompilationUnit) {
+		seenByAfterRecipe = declaringNone
+	}))
+
+	// then the callback runs before the probe
+	assert.Equal(t, 0, seenByAfterRecipe)
 	assert.Equal(t, 1, declaringNone)
 }
 

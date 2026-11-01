@@ -632,7 +632,8 @@ type change struct {
 // RewriteRun parses each source, checks parse-print idempotence, attaches
 // any markers contributed by project wrappers (GoProject), and (if
 // configured) applies a recipe and checks the result, then hands each source's
-// final tree to its AfterRecipe callback when every check passed. Accepts both bare
+// final tree to its AfterRecipe callback when every check passed, before it
+// runs the recipe on sources the test does not give it. Accepts both bare
 // SourceSpec values and project wrappers like GoProject — they both
 // implement Sources.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
@@ -641,6 +642,9 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	spec.verify(t, run)
 	if !t.Failed() {
 		spec.afterRecipe(t, run)
+	}
+	if !t.Failed() {
+		spec.expectOtherSourcesHandled(t, run)
 	}
 }
 
@@ -855,11 +859,14 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	if spec.Recipe != nil && spec.CheckParserShapedTrees {
 		if failure := treeShapesFailure(run.parseOutput(), run.checks); failure != "" {
 			t.Error(failure)
-			return
 		}
 	}
+}
 
-	// Pass 6: the recipe copes with sources the test does not give it.
+// expectOtherSourcesHandled is Pass 6: the recipe copes with sources the test
+// does not give it.
+func (spec *RecipeSpec) expectOtherSourcesHandled(t testing.TB, run *recipeRun) {
+	t.Helper()
 	spec.expectEmptySourcesHandled(t, run)
 	if t.Failed() {
 		return
