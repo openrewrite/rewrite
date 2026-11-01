@@ -358,6 +358,10 @@ class ScanningRecipe(Recipe, Generic[T], ABC):
     This is useful for recipes that need global information, like
     finding all usages of a method before deciding which to change.
 
+    The accumulator stays in memory until the cycle ends, so it should
+    hold values such as coordinates, paths and ids, not trees or other
+    Heavyweight objects.
+
     Example:
         @dataclass
         class RemoveUnusedMethods(ScanningRecipe[set[str]]):
