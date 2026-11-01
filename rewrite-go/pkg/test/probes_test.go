@@ -115,6 +115,27 @@ func TestRecipeWithOtherOptionsIsProbedAgain(t *testing.T) {
 		"golang.CompilationUnit at test.go holding only `package main`")
 }
 
+func TestRecipeIsProbedAgainOnAnotherKindOfSource(t *testing.T) {
+	forgetProbes(t)
+	// given a recipe that passed its probe of an empty go.mod in an earlier test
+	spec := NewRecipeSpec().WithRecipe(&recipeList{recipes: []recipe.Recipe{
+		&reportInternalImports{checked: true}, &renameFirstFunction{},
+	}})
+	require.Empty(t, failures(t, spec, GoMod(`
+		module example.com/app
+	`, `
+		/*~~(example.com/app)~~>*/module example.com/app
+	`)))
+
+	// when another test runs it on a Go file
+	got := failures(t, spec, firstFunctionA())
+
+	// then that test probes it on an empty Go file
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "org.openrewrite.golang.test.RecipeList panicked when run on a "+
+		"golang.CompilationUnit at test.go holding only `package main`")
+}
+
 func TestRecipeIsNotProbedOnceItsProbesTookTwentySeconds(t *testing.T) {
 	forgetProbes(t)
 	// given a recipe whose probes have taken more than 20 seconds, with any options
