@@ -33,7 +33,7 @@ from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
 from rewrite.python.markers import PythonResolutionResult, Quoted
 from rewrite.python.visitor import PythonVisitor
-from rewrite.java.tree import Assignment, Identifier, MethodInvocation, Yield
+from rewrite.java.tree import Assignment, Identifier, Literal, MethodInvocation, Yield
 from rewrite.python.tree import Await, CompilationUnit
 from rewrite.java import J, JavaType, Space
 from rewrite.utils import lst_dataclass
@@ -953,7 +953,8 @@ class TestExtraCycles:
                     return mi
                 return mi.replace(name=mi.name.replace(simple_name="os." + mi.name.simple_name))
 
-        spec = RecipeSpec(recipe=from_visitor(QualifyCalls()), type_attribution=False)
+        # The parser makes a field access of the name the recipe writes, which the shape check would report first.
+        spec = RecipeSpec(recipe=from_visitor(QualifyCalls()), check_parser_shaped_trees=False, type_attribution=False)
         with pytest.raises(AssertionError) as failure:
             spec.rewrite_run(python("foo()\n", "os.foo()\n", path=Path("a.py")))
 
@@ -1535,3 +1536,65 @@ class TestUnparsedSources:
     def test_an_ad_hoc_recipe_is_not_probed(self):
         spec = RecipeSpec(recipe=from_visitor(_RenameInPythonFiles().editor()), type_attribution=False)
         spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+
+
+class _NoneAsName(PythonVisitor[ExecutionContext]):
+    """Replaces the literal ``1`` with a name that prints as ``None``, which the parser makes a literal of."""
+
+    def visit_literal(self, literal: Literal, ctx: ExecutionContext) -> J:
+        if literal.value != 1:
+            return literal
+        return Identifier(random_id(), literal.prefix, Markers.EMPTY, [], "None", None, None)
+
+
+class TestParserShapedTrees:
+    """The harness rejects a recipe whose output holds nodes the parser builds differently from the text they print."""
+
+    def test_a_name_where_the_parser_makes_a_literal_fails(self):
+        spec = RecipeSpec(recipe=from_visitor(_NoneAsName()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("x = 1\n", "x = None\n", path=Path("a.py")))
+
+        assert str(failure.value) == (
+            "Write code with a template (rewrite.python.template) or the Python parser, or build the nodes the way "
+            "the parser builds the text they print.\n"
+            "The output of org.openrewrite.adhoc holds nodes that the parser makes differently of the same text:\n"
+            "  a.py:\n"
+            "    `None` is a J.Identifier where the parser makes a J.Literal\n"
+            "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that parsed "
+            "code never holds. If the output is meant to differ from parsed code, opt out with "
+            "RecipeSpec(check_parser_shaped_trees=False)."
+        )
+
+    def test_a_dotted_name_where_the_parser_makes_a_field_access_fails(self):
+        class QualifyCalls(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                if mi.name.simple_name != "foo":
+                    return mi
+                return mi.replace(name=mi.name.replace(simple_name="os.getcwd"))
+
+        spec = RecipeSpec(recipe=from_visitor(QualifyCalls()), type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match=r"\n    `os.getcwd\(\)` holds J.Identifier where the parser makes J.Identifier, "
+                                 r"J.Identifier\n"):
+            spec.rewrite_run(python("foo()\n", "os.getcwd()\n"))
+
+    def test_output_that_does_not_parse_fails(self):
+        class Unspeakable(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                return ident.replace(simple_name="not valid") if ident.simple_name == "a" else ident
+
+        spec = RecipeSpec(recipe=from_visitor(Unspeakable()), type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match="\n    the text it prints doesn't parse: cannot assign to expression on line 1, "
+                                 "`not valid = 1`\n"):
+            spec.rewrite_run(python("a = 1\n", "not valid = 1\n"))
+
+    def test_output_the_parser_builds_the_same_passes(self):
+        spec = RecipeSpec(recipe=from_visitor(_RenameA()), type_attribution=False)
+        spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n"))
+
+    def test_check_turned_off_passes(self):
+        spec = RecipeSpec(recipe=from_visitor(_NoneAsName()), check_parser_shaped_trees=False,
+                          type_attribution=False)
+        spec.rewrite_run(python("x = 1\n", "x = None\n"))

@@ -33,7 +33,8 @@ def test_statement_without_prefix():
             print('a')
             """
         ),
-        spec=RecipeSpec()
+        # The visitor leaves indentation to TabsAndIndentsVisitor, so the copy prints outside the body it is in.
+        spec=RecipeSpec(check_parser_shaped_trees=False)
         .with_recipes(
             from_visitor(DuplicateMethod()),
             from_visitor(MinimumViableSpacingVisitor())
@@ -47,7 +48,8 @@ def test_statement_without_prefix_in_a_crlf_file():
             "def foo():\r\n    print('a')\r\n",
             "def foo():\r\n    print('a')\r\nprint('a')\r\n",
         ),
-        spec=RecipeSpec()
+        # The visitor leaves indentation to TabsAndIndentsVisitor, so the copy prints outside the body it is in.
+        spec=RecipeSpec(check_parser_shaped_trees=False)
         .with_recipes(
             from_visitor(DuplicateMethod()),
             from_visitor(MinimumViableSpacingVisitor())

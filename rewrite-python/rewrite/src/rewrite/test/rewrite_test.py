@@ -44,6 +44,7 @@ from .accumulators import AccumulatorContents
 from .added_markers import assert_no_added_markers
 from .probes import assert_none_throw_on_empty, assert_none_throw_on_unparsed
 from .spec import SourceSpec, AfterRecipeText, dedent
+from .tree_shapes import problems as shape_problems
 from .well_formed import assert_well_formed
 
 if TYPE_CHECKING:
@@ -182,6 +183,10 @@ class RecipeSpec:
     # too expensive to keep in memory all cycle
     check_lightweight_accumulators: bool = True
 
+    # Whether to fail a recipe whose output holds nodes the parser builds differently from the
+    # text they print, such as an identifier where the parser builds a literal
+    check_parser_shaped_trees: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
@@ -244,8 +249,9 @@ class RecipeSpec:
         5. Checks that the recipe left the execution context unchanged, kept no trees in its
            accumulators and added no markers for its own use, if enabled
         6. Compares results with expected "after" states
-        7. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
-        8. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
+        7. Checks that a fresh parse of the output builds the nodes the recipe built, if enabled
+        8. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
+        9. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
            its parser failed on, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
@@ -324,8 +330,13 @@ class RecipeSpec:
                 changes,
                 f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but cycle {cycle} changed",
             )
+        reparsed: Dict[int, Union[SourceFile, str]] = {}
+        if self.check_parser_shaped_trees or cycles > expected_cycles:
+            reparsed = self._reparse_output(specs, all_parsed, results)
+        if self.check_parser_shaped_trees:
+            self._expect_parser_shaped(results, reparsed)
         if cycles > expected_cycles:
-            self._expect_stable_on_fresh_parse(specs, all_parsed, results, checks)
+            self._expect_stable_on_fresh_parse(results, reparsed, checks)
             self._expect_execution_context_unchanged(checks)
             checks.accumulators.assert_none_found()
         self._expect_data_tables(data_tables)
@@ -450,22 +461,18 @@ class RecipeSpec:
                 "expected_cycles_that_make_changes.",
             ]))
 
-    def _expect_stable_on_fresh_parse(
+    def _reparse_output(
         self,
         specs: List[SourceSpec],
         parsed: List[Tuple[SourceSpec, SourceFile]],
         results: List[Result],
-        checks: _RunChecks,
-    ) -> None:
-        """Run the recipe once more on a fresh parse of its output.
-
-        Code that the next run reads is parsed from the printed output, not the LST this run
-        produced, and a recipe that recognizes its own output only by the shape of that LST
-        changes it again.
-        """
+    ) -> Dict[int, Union[SourceFile, str]]:
+        """A fresh parse of what each Python source of the recipe's output prints, by the ``id`` of that source, or
+        why the text isn't Python. A text the parser doesn't print back as it read it is the parser's to fix, and is
+        left out."""
         from rewrite.python.tree import CompilationUnit
         if not any(r._before is not r._after for r in results):
-            return
+            return {}
         finals = [r._after for r in results if r._after is not None]
 
         spec_of: Dict[int, SourceSpec] = {}
@@ -482,7 +489,7 @@ class RecipeSpec:
         others = [s for s in specs if s.kind != "python" and s.before is not None]
         texts.update({id(s): dedent(s.before) for s in others})
 
-        reparsed_by_final: Dict[int, SourceFile] = {}
+        reparsed_by_final: Dict[int, Union[SourceFile, str]] = {}
         with self._workspace([*reparse_specs.values(), *others], texts) as workspace:
             for sf in reparsable:
                 spec = reparse_specs[id(sf)]
@@ -492,14 +499,58 @@ class RecipeSpec:
                         workspace.ty_client,
                     )
                 except Exception:
+                    error = _syntax_error(workspace.text(spec))
+                    if error is not None:
+                        reparsed_by_final[id(sf)] = error
                     continue
                 if _print(reparsed, True) == workspace.text(spec):
                     # What the source file carries, like its styles, comes from outside its text.
                     reparsed_by_final[id(sf)] = reparsed.replace(markers=sf.markers)
-        if not reparsed_by_final:
+        return reparsed_by_final
+
+    def _expect_parser_shaped(self, results: List[Result], reparsed: Dict[int, Union[SourceFile, str]]) -> None:
+        found: List[str] = []
+        for result in results:
+            before, after = result._before, result._after
+            fresh = None if after is None or after is before else reparsed.get(id(after))
+            if after is None or fresh is None:
+                continue
+            printed = _print(after, True)
+            if not printed.strip() or before is not None and _print(before, True) == printed:
+                continue
+            problems = ([f"the text it prints doesn't parse: {fresh}"] if isinstance(fresh, str)
+                        else shape_problems(after, fresh))
+            if problems:
+                found.append(f"  {after.source_path}:")
+                found.extend(f"    {problem}" for problem in problems)
+        if found:
+            raise AssertionError(
+                "Write code with a template (rewrite.python.template) or the Python parser, or build the nodes the "
+                "way the parser builds the text they print.\n"
+                f"The output of {self.recipe.name} holds nodes that the parser makes differently of the same text:\n"
+                + "\n".join(found) + "\n"
+                "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that "
+                "parsed code never holds. If the output is meant to differ from parsed code, opt out with "
+                "RecipeSpec(check_parser_shaped_trees=False)."
+            )
+
+    def _expect_stable_on_fresh_parse(
+        self,
+        results: List[Result],
+        reparsed: Dict[int, Union[SourceFile, str]],
+        checks: _RunChecks,
+    ) -> None:
+        """Run the recipe once more on a fresh parse of its output.
+
+        Code that the next run reads is parsed from the printed output, not the LST this run
+        produced, and a recipe that recognizes its own output only by the shape of that LST
+        changes it again.
+        """
+        fresh = {key: sf for key, sf in reparsed.items() if not isinstance(sf, str)}
+        if not fresh:
             return
 
-        sources = [reparsed_by_final.get(id(sf), sf) for sf in finals]
+        sources = [fresh.get(id(r._after), r._after) for r in results if r._after is not None]
         ctx = self._recipe_context(True, checks)
         changes = [r for r in self.recipe.run(InMemoryLargeSourceSet(sources), ctx) if r._before is not r._after]
         self._expect_no_further_changes(
@@ -875,6 +926,18 @@ def _print(source_file: SourceFile, sanitized: bool = False) -> str:
     # Printed without search markers, which print as comments that are not Python.
     return source_file.print(Cursor(None, Cursor.ROOT_VALUE),
                              PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
+
+
+def _syntax_error(text: str) -> Optional[str]:
+    """Why ``text`` isn't Python, or None when it is."""
+    try:
+        ast.parse(text[1:] if text.startswith('\ufeff') else text)
+    except SyntaxError as e:
+        line = (e.text or "").strip()
+        return f"{e.msg} on line {e.lineno}" + (f", `{line}`" if line else "")
+    except ValueError as e:
+        return str(e)
+    return None
 
 
 def _in_workspace(path: Any) -> bool:
