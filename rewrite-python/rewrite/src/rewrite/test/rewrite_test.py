@@ -257,8 +257,8 @@ class RecipeSpec:
         7. Checks that the recipe auto-formatted only what it changed, if enabled
         8. Checks that a fresh parse of the output builds the nodes the recipe built, if enabled
         9. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
-        10. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
-            its parser failed on, where it has to raise nothing
+        10. Runs a recipe that changed a source on an empty file of its kind, and without the source, as when
+            its parser failed on it, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that

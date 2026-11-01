@@ -1457,39 +1457,6 @@ class TestEmptySources:
 
 
 @dataclass
-class _RenameInPythonFiles(Recipe):
-    """Renames ``a`` to ``b`` in each source whose path ends in .py, checking that it is a CompilationUnit when
-    ``checked``."""
-
-    checked: bool = field(default=False, metadata=option("Checked", "Check that the source is a CompilationUnit."))
-
-    @property
-    def name(self) -> str:
-        return "org.openrewrite.test.RenameInPythonFiles"
-
-    @property
-    def display_name(self) -> str:
-        return "Rename in Python files"
-
-    @property
-    def description(self) -> str:
-        return "Rename `a` in each source whose path ends in .py."
-
-    def editor(self) -> TreeVisitor:
-        checked = self.checked
-
-        class RenameInPythonFiles(TreeVisitor[Tree, ExecutionContext]):
-            def visit(self, tree, p, parent=None):
-                if not isinstance(tree, SourceFile) or not str(tree.source_path).endswith(".py"):
-                    return tree
-                if checked and not isinstance(tree, CompilationUnit):
-                    return tree
-                return _RenameA().visit(tree, p, parent) if tree.statements else tree
-
-        return RenameInPythonFiles()
-
-
-@dataclass
 class _RenameToSettingsName(ScanningRecipe[Dict[str, str]]):
     """Renames ``a`` to the name settings.py first assigns, checking that the scanner found one when ``checked``."""
 
@@ -1532,63 +1499,104 @@ class _RenameToSettingsName(ScanningRecipe[Dict[str, str]]):
         return Rename()
 
 
+class _DeclareSettingsName(ScanningRecipe[Dict[str, str]]):
+    """Renames ``a`` to ``b``, and generates names.py, which assigns the name settings.py first assigns to ``NAME``."""
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.test.DeclareSettingsName"
+
+    @property
+    def display_name(self) -> str:
+        return "Declare the settings name"
+
+    @property
+    def description(self) -> str:
+        return "Generate names.py, which assigns the name settings.py first assigns to `NAME`."
+
+    def initial_value(self, ctx: ExecutionContext) -> Dict[str, str]:
+        return {}
+
+    def scanner(self, acc: Dict[str, str]) -> TreeVisitor:
+        class Find(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                first = cu.statements[0]
+                acc[str(cu.source_path)] = first.variable.simple_name if isinstance(first, Assignment) else ""
+                return cu
+
+        return Find()
+
+    def generate(self, acc: Dict[str, str], ctx: ExecutionContext) -> List[SourceFile]:
+        if "names.py" in acc:
+            return []
+        import ast
+
+        from rewrite.python._parser_visitor import ParserVisitor
+
+        text = f'NAME = "{acc["settings.py"]}"\n'
+        return [ParserVisitor(text, None, None).visit_Module(ast.parse(text)).replace(source_path=Path("names.py"))]
+
+    def editor_with_data(self, acc: Dict[str, str]) -> TreeVisitor:
+        return _RenameA()
+
+
+def _settings_and_app() -> List[SourceSpec]:
+    return [python("debug = 1\na = 2\n", "debug = 1\ndebug = 2\n", path=Path("settings.py")),
+            python("a = 3\n", "debug = 3\n", path=Path("app.py"))]
+
+
 class TestUnparsedSources:
-    """The harness runs a recipe that changed a source with that source as a file its parser failed on, where the
-    recipe has to raise nothing."""
+    """The harness runs a recipe that changed a source without that source, as the recipe runs when the parser failed
+    on the file, where the recipe has to raise nothing."""
 
     @pytest.fixture(autouse=True)
     def _probe_again(self):
         # A probe runs once in a process, and each of these tests needs its own.
         probes._PROBED.clear()
 
-    def test_a_recipe_that_throws_on_a_file_its_parser_failed_on_fails(self):
-        @lst_dataclass
-        class BuildMetadata(Marker):
-            _id: int | UUID
-
-        def with_metadata(cu: CompilationUnit) -> CompilationUnit:
-            return cu.replace(markers=cu.markers.add(BuildMetadata(random_id())))
-
-        spec = RecipeSpec(recipe=_RenameInPythonFiles(), type_attribution=False)
+    def test_a_scanning_recipe_that_reads_what_its_scanner_did_not_find_fails(self):
+        spec = RecipeSpec(recipe=_RenameToSettingsName(), type_attribution=False)
         with pytest.raises(AssertionError) as failure:
-            spec.rewrite_run(python("a = 1\n", "b = 1\n", path=Path("a.py"), before_recipe=with_metadata))
+            spec.rewrite_run(*_settings_and_app())
 
         message = str(failure.value)
         assert message.startswith(
-            "Check the kind of source file before using it, so that the recipe leaves a file it can't edit unchanged "
-            "instead of throwing.\n"
-            "org.openrewrite.test.RenameInPythonFiles threw when a.py was a ParseError (a file its parser failed on) "
-            "with the markers of the test's source (BuildMetadata):\n"
-            "    AttributeError: 'ParseError' object has no attribute 'statements'\n"
-            "        at RenameInPythonFiles.visit (test_rewrite_test.py:"
+            "Check that the scanner found the files the recipe needs before using what it keeps of them, so that the "
+            "recipe changes nothing instead of throwing when one is missing.\n"
+            "org.openrewrite.test.RenameToSettingsName threw when settings.py was missing:\n"
+            "    KeyError: 'name'\n"
+            "        at Rename.visit_identifier (test_rewrite_test.py:"
         )
-        assert message.endswith("  - don't catch the exception to make this pass")
-        assert isinstance(failure.value.__cause__, AttributeError)
+        assert message.endswith(
+            "Besides the files the test gives it, a repository holds files the parser failed on. The host sends a "
+            "Python recipe only the Python files it parsed, so a file its parser failed on is simply not there for "
+            "the recipe.\n"
+            "  - when the scanner found no file of the kind the recipe needs, generate and change nothing, instead of "
+            "reading an empty accumulator\n"
+            "  - don't catch the exception to make this pass"
+        )
+        assert isinstance(failure.value.__cause__, RecipeRunException)
 
-    def test_a_recipe_that_checks_the_kind_of_source_file_passes(self):
-        spec = RecipeSpec(recipe=_RenameInPythonFiles(checked=True), type_attribution=False)
-        spec.rewrite_run(python("a = 1\n", "b = 1\n"))
-
-    def test_a_scanning_recipe_that_reads_what_its_scanner_did_not_find_fails(self):
-        spec = RecipeSpec(recipe=_RenameToSettingsName(), type_attribution=False)
-        with pytest.raises(AssertionError,
-                           match=r"RenameToSettingsName threw when settings.py was a ParseError \(a file its parser "
-                                 r"failed on\):\n    KeyError: 'name'\n"):
+    def test_a_scanning_recipe_that_generates_from_what_its_scanner_did_not_find_fails(self):
+        spec = RecipeSpec(recipe=_DeclareSettingsName(), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"DeclareSettingsName threw when settings.py was missing:\n"
+                                                 r"    KeyError: 'settings.py'\n"
+                                                 r"        at _DeclareSettingsName.generate \(test_rewrite_test.py:"):
             spec.rewrite_run(
-                python("debug = 1\na = 2\n", "debug = 1\ndebug = 2\n", path=Path("settings.py")),
-                python("a = 3\n", "debug = 3\n", path=Path("app.py")),
+                python("debug = 1\na = 2\n", "debug = 1\nb = 2\n", path=Path("settings.py")),
+                python(None, 'NAME = "debug"\n', path=Path("names.py")),
             )
 
     def test_a_scanning_recipe_that_checks_what_its_scanner_found_passes(self):
         spec = RecipeSpec(recipe=_RenameToSettingsName(checked=True), type_attribution=False)
-        spec.rewrite_run(
-            python("debug = 1\na = 2\n", "debug = 1\ndebug = 2\n", path=Path("settings.py")),
-            python("a = 3\n", "debug = 3\n", path=Path("app.py")),
-        )
+        spec.rewrite_run(*_settings_and_app())
 
-    def test_an_ad_hoc_recipe_is_not_probed(self):
-        spec = RecipeSpec(recipe=from_visitor(_RenameInPythonFiles().editor()), type_attribution=False)
-        spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+    def test_a_recipe_defined_in_a_test_function_is_not_probed(self):
+        class RenameToSettingsName(_RenameToSettingsName):
+            pass
+
+        spec = RecipeSpec(recipe=RenameToSettingsName(), type_attribution=False)
+        spec.rewrite_run(*_settings_and_app())
 
 
 class _NoneAsName(PythonVisitor[ExecutionContext]):

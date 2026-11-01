@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Run a recipe on sources its test doesn't give it, which repositories hold besides those the test does."""
+"""Run a recipe where a repository differs from its test: on an empty file, and without a file the parser failed on."""
 
 from __future__ import annotations
 
@@ -22,9 +22,8 @@ import traceback
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from rewrite import ExecutionContext, InMemoryLargeSourceSet, Recipe, RecipeRunException, SourceFile, random_id
-from rewrite.markers import Markers, ParseExceptionResult
-from rewrite.parser import ParseError
+from rewrite import ExecutionContext, InMemoryLargeSourceSet, Recipe, RecipeRunException, SourceFile
+from rewrite.markers import Markers
 
 # Probes of a recipe stop in this process once they have taken this long.
 _TIME_CAP_SECONDS = 20.0
@@ -73,26 +72,25 @@ def assert_none_throw_on_unparsed(
         context: Callable[[], ExecutionContext],
         cycles: int,
 ) -> None:
-    """Run the recipe with a source it changed in place of the file as a parse error, and fail if it throws there.
+    """Run the recipe without a source of each kind it changed, and fail if it throws there.
 
-    Java also puts a quark and plain text in the source's place, which Python has no counterpart of.
+    The host sends a Python recipe only the Python files it parsed, so to the recipe a file its parser failed on is
+    missing.
     """
     kinds: Set[type] = set()
     for before in sources:
-        if before.id not in changed or isinstance(before, ParseError) or type(before) in kinds:
+        if before.id not in changed or type(before) in kinds:
             continue
         kinds.add(type(before))
-        if not _first_probe(recipe, before, "parse error"):
+        if not _first_probe(recipe, before, "missing"):
             continue
         start = time.perf_counter()
         try:
-            unparsed = _parse_error(before)
-            thrown = None if unparsed is None else run(
-                recipe, [unparsed if source is before else source for source in sources], context(), cycles)
+            thrown = run(recipe, [source for source in sources if source is not before], context(), cycles)
         finally:
             _charge(recipe, time.perf_counter() - start)
-        if unparsed is not None and thrown is not None:
-            raise AssertionError(_unparsed_message(recipe, unparsed, thrown)) from thrown
+        if thrown is not None:
+            raise AssertionError(_unparsed_message(recipe, before, thrown)) from thrown
 
 
 def run(recipe: Recipe, sources: List[SourceFile], ctx: ExecutionContext, cycles: int) -> Optional[Exception]:
@@ -189,41 +187,22 @@ def _empty_message(recipe: Recipe, empty: SourceFile, thrown: Exception) -> str:
     )
 
 
-def _parse_error(before: SourceFile) -> Optional[ParseError]:
-    """The file ``before`` was parsed from, as the parse error a repository holds when the parser fails on it."""
-    try:
-        # These come from parsing the file itself.
-        kept = [marker for marker in before.markers.markers if not isinstance(marker, ParseExceptionResult)
-                and not type(marker).__name__.endswith("ResolutionResult")]
-        exception = ParseExceptionResult(random_id(), "PythonParser", "SyntaxError", "The file could not be parsed")
-        return ParseError(random_id(), before.markers.replace(markers=[*kept, exception]), before.source_path,
-                          before.file_attributes, before.charset_name, getattr(before, "charset_bom_marked", False),
-                          getattr(before, "checksum", None), before.print_all(), None)
-    except Exception:
-        return None
-
-
-def _unparsed_message(recipe: Recipe, unparsed: ParseError, thrown: Exception) -> str:
+def _unparsed_message(recipe: Recipe, missing: SourceFile, thrown: Exception) -> str:
     return (
-        "Check the kind of source file before using it, so that the recipe leaves a file it can't edit unchanged "
-        "instead of throwing.\n"
-        f"{recipe.name} threw when {unparsed.source_path} was a ParseError (a file its parser failed on)"
-        f"{_markers_of_the_test(unparsed.markers)}:\n"
+        "Check that the scanner found the files the recipe needs before using what it keeps of them, so that the "
+        "recipe changes nothing instead of throwing when one is missing.\n"
+        f"{recipe.name} threw when {missing.source_path} was missing:\n"
         f"{describe(thrown, '    ', recipe)}\n"
-        "Besides the files the test gives it, a repository holds files the parser failed on, at the same paths and "
-        "with the same markers as files the recipe edits.\n"
-        "  - visit with a PythonVisitor, whose is_acceptable skips other kinds of source file\n"
-        "  - in a TreeVisitor, check isinstance(tree, CompilationUnit) before using it as one, not the file's path "
-        "or markers\n"
-        "  - when the scanner found no file of the kind the recipe edits, generate and change nothing, instead of "
+        "Besides the files the test gives it, a repository holds files the parser failed on. The host sends a Python "
+        "recipe only the Python files it parsed, so a file its parser failed on is simply not there for the recipe.\n"
+        "  - when the scanner found no file of the kind the recipe needs, generate and change nothing, instead of "
         "reading an empty accumulator\n"
         "  - don't catch the exception to make this pass"
     )
 
 
 def _markers_of_the_test(markers: Markers) -> str:
-    names = list(dict.fromkeys(_type_name(type(marker)) for marker in markers.markers
-                               if not isinstance(marker, ParseExceptionResult)))
+    names = list(dict.fromkeys(_type_name(type(marker)) for marker in markers.markers))
     return f" with the markers of the test's source ({', '.join(names)})" if names else ""
 
 
