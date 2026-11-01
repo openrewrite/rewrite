@@ -231,9 +231,16 @@ public abstract class RewriteTest
                     ExpectNoFurtherChanges(changes,
                         $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
                 }
-                if (cycles > expectedCycles && results.Count > 0)
+                var fresh = results.Count > 0 && (cycles > expectedCycles || validations.ParserShapedTrees)
+                    ? ParseAgain(run.Finals, metadataReferences)
+                    : null;
+                if (cycles > expectedCycles && fresh != null)
                 {
-                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, metadataReferences, checks);
+                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, fresh, checks);
+                }
+                if (validations.ParserShapedTrees && fresh != null)
+                {
+                    TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
                 }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
             }
@@ -371,12 +378,13 @@ public abstract class RewriteTest
         }
     }
 
-    /// <summary>
-    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
-    /// recipe that recognizes its own output only by the shape of that LST changes it again.
-    /// </summary>
-    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
-        ImmutableArray<MetadataReference>? metadataReferences, RunChecks checks)
+    /// <param name="SyntaxTree">Roslyn's parse of the printed text.</param>
+    /// <param name="Unit">The LST of the printed text, or null when the parser doesn't print it back.</param>
+    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
+
+    /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
+    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals,
+        ImmutableArray<MetadataReference>? metadataReferences)
     {
         var units = finals.OfType<CompilationUnit>()
             .Select(unit =>
@@ -390,30 +398,46 @@ public abstract class RewriteTest
             : null;
 
         var parser = new CSharpParser();
-        var reparsedByFinal = new Dictionary<SourceFile, SourceFile>(ReferenceEqualityComparer.Instance);
+        var fresh = new Dictionary<SourceFile, FreshParse>(ReferenceEqualityComparer.Instance);
         foreach (var (unit, text, tree) in units)
         {
+            CompilationUnit? reparsed = null;
             try
             {
-                var reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
+                reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
                     semanticModel: compilation?.GetSemanticModel(tree));
-                if (PrintTree(reparsed, MarkerPrinter.Sanitized) == text)
+                if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
                 {
-                    // What the source file carries, like its styles, comes from outside its text
-                    reparsedByFinal[unit] = reparsed.WithMarkers(unit.Markers);
+                    reparsed = null;
                 }
             }
             catch (Exception)
             {
                 // A file that does not parse again keeps the LST the recipe produced
             }
+            fresh[unit] = new FreshParse(tree, reparsed);
         }
-        if (reparsedByFinal.Count == 0)
+        return fresh;
+    }
+
+    /// <summary>
+    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
+    /// recipe that recognizes its own output only by the shape of that LST changes it again.
+    /// </summary>
+    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
+        Dictionary<SourceFile, FreshParse> fresh, RunChecks checks)
+    {
+        if (!fresh.Values.Any(parse => parse.Unit != null))
         {
             return;
         }
 
-        var sources = finals.Select(f => reparsedByFinal.GetValueOrDefault(f, f)).ToList();
+        var sources = finals
+            .Select(f => fresh.TryGetValue(f, out var parse) && parse.Unit != null
+                // What the source file carries, like its styles, comes from outside its text
+                ? parse.Unit.WithMarkers(f.Markers)
+                : f)
+            .ToList();
         ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
             "Running the recipe on a fresh parse of its output changed", sanitized: true);
     }

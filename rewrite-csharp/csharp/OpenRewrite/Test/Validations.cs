@@ -77,6 +77,12 @@ public sealed class Validations
     /// </summary>
     public bool LightweightAccumulators { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to produce the tree that the parser makes of the text the recipe's output
+    /// prints, such as a Primitive and not an Identifier for <c>int</c>. Default: enabled.
+    /// </summary>
+    public bool ParserShapedTrees { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
