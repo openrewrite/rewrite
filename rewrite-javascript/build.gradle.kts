@@ -269,6 +269,16 @@ val npmPack = tasks.register<Tar>("npmPack") {
     from("rewrite/README.md") {
         into("package")
     }
+    // What package.json bundles, from what npmInstall installed, as npm pack would add it: an install of the package
+    // takes these from the package itself, never from a registry. Each has no dependencies of its own to bundle too.
+    dependsOn(npmInstall)
+    @Suppress("UNCHECKED_CAST")
+    ((groovy.json.JsonSlurper().parse(file("rewrite/package.json")) as Map<String, Any?>)["bundleDependencies"]
+            as List<String>?)?.forEach { name ->
+        from("rewrite/node_modules/$name") {
+            into("package/node_modules/$name")
+        }
+    }
 
     archiveBaseName = "openrewrite-rewrite"
     // Use version from JAR if available (second Gradle invocation), otherwise use generated version
