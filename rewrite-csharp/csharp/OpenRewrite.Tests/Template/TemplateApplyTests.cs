@@ -679,6 +679,67 @@ public class TemplateApplyTests : RewriteTest
         AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}"), captured, expected);
     }
 
+    /// <summary>
+    /// A conditional access keeps the members after a <c>!</c> in its chain, which parentheses would take out of it.
+    /// </summary>
+    [Theory]
+    [InlineData("x?.ToString()!.Length")]
+    [InlineData("x?.ToString()![0]")]
+    [InlineData("x?.ToString()!.Trim()")]
+    public void CaptureOfConditionalAccessWithNullForgivingKeepsItsChain(string captured)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"Console.WriteLine({a})"), captured,
+            $"Console.WriteLine({captured})");
+    }
+
+    /// <summary>
+    /// A cast takes a unary operand, and a member access or element access a primary one.
+    /// </summary>
+    [Theory]
+    [InlineData("(object)", "", "b + c", "(object)(b + c)")]
+    [InlineData("(object)", "", "b ? c : d", "(object)(b ? c : d)")]
+    [InlineData("(object)", "", "b..c", "(object)(b..c)")]
+    [InlineData("(object)", "", "-b", "(object)-b")]
+    [InlineData("(object)", "", "(int)b", "(object)(int)b")]
+    [InlineData("(object)", "", "b++", "(object)b++")]
+    [InlineData("(int)", "", "-b", "(int)-b")]
+    [InlineData("(Foo)", "", "-b", "(Foo)(-b)")]
+    [InlineData("(Foo.Bar)", "", "-1", "(Foo.Bar)(-1)")]
+    [InlineData("(Foo)", "", "!b", "(Foo)!b")]
+    [InlineData("", ".ToString()", "b + c", "(b + c).ToString()")]
+    [InlineData("", ".ToString()", "-b", "(-b).ToString()")]
+    [InlineData("", ".ToString()", "(int)b", "((int)b).ToString()")]
+    [InlineData("", ".ToString()", "b ?? c", "(b ?? c).ToString()")]
+    [InlineData("", ".ToString()", "b++", "b++.ToString()")]
+    [InlineData("", ".ToString()", "b.c[0]", "b.c[0].ToString()")]
+    [InlineData("", ".Length", "b as string", "(b as string).Length")]
+    [InlineData("", ".Count()", "from x in xs select x", "(from x in xs select x).Count()")]
+    [InlineData("", ".Result", "await t", "(await t).Result")]
+    [InlineData("(object)", "", "await t", "(object)await t")]
+    [InlineData("", "[0]", "b ? c : d", "(b ? c : d)[0]")]
+    public void CaptureAsOperandOfCastOrMemberAccessMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    [Fact]
+    public void ReplacementAsReceiverKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"Twice({a})"),
+                CSharpTemplate.Expression($"{a} + {a}")))),
+            CSharp(
+                "class C { int Twice(int i) => i + i; string M(int b) { return Twice(b).ToString(); } }",
+                "class C { int Twice(int i) => i + i; string M(int b) { return (b + b).ToString(); } }"
+            )
+        );
+    }
+
     [Fact]
     public void ReplacementAfterSignKeepsItsSign()
     {
