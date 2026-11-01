@@ -355,4 +355,25 @@ class MigrateArchiveClassifierTest implements RewriteTest {
             """
         ));
     }
+    @Test
+    void composedInGradle8Migration() {
+        rewriteRun(
+          spec -> spec.recipeFromResources("org.openrewrite.gradle.MigrateToGradle8"),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              task sourcesJar(type: Jar) {
+                  classifier = 'sources'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              task sourcesJar(type: Jar) {
+                  archiveClassifier = 'sources'
+              }
+              """
+          )
+        );
+    }
+
 }
