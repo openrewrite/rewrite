@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -184,6 +185,26 @@ func TestVisitorAndExecutionContextKeptInAnAccumulatorFail(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.Contains(t, got[0], "    test.seen.all[0] -> test.seeingVisitor, after scanning\n"+
 		"    test.seen.all[1] -> recipe.ExecutionContext, after scanning\n")
+}
+
+func TestPreconditionVisitorsKeptInAnAccumulatorFail(t *testing.T) {
+	// given a scanning recipe that keeps the SDK's visitors that embed no GoVisitor
+	spec := NewRecipeSpec().WithRecipe(&keepWhatItSees{keep: func(acc *seen, _ *seeingVisitor, _ java.Tree) {
+		acc.all = append(acc.all, preconditions.NewIsSourceFile("**/*.go"), preconditions.NewUsesType("fmt.Stringer"),
+			preconditions.NewUsesMethod("fmt.Println(..)"), preconditions.Check(preconditions.UsesType("fmt.Stringer"), nil))
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+	`))
+
+	// then each is reported
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    test.seen.all[0] -> preconditions.IsSourceFileVisitor, after scanning\n"+
+		"    test.seen.all[1] -> preconditions.UsesTypeVisitor, after scanning\n"+
+		"    test.seen.all[2] -> preconditions.UsesMethodVisitor, after scanning\n"+
+		"    test.seen.all[3] -> preconditions.CheckVisitor, after scanning\n")
 }
 
 func TestSourceFileKeptWhileEditingFails(t *testing.T) {
