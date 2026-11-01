@@ -369,6 +369,36 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void compoundAssignmentExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(int a, int b) {
+                      int c = (a += 1) + 1;
+                      boolean d = (b -= 2) > 0;
+                      int e = -(a *= 2);
+                      int f = a > b ? (a += 3) : (b -= 4);
+                      a = (b += 5);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(int a, int b) {
+                      int c = (a += 1) + 1;
+                      boolean d = (b -= 2) > 0;
+                      int e = -(a *= 2);
+                      int f = a > b ? (a += 3) : (b -= 4);
+                      a = b += 5;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void complexExpressions() {
         rewriteRun(
           java(
@@ -589,6 +619,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+                      int result10 = (a += b) + c;
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();
@@ -624,6 +655,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
+                      int result10 = (a += b) + c;
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();

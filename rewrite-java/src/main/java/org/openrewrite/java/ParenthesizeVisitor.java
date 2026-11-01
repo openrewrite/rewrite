@@ -49,6 +49,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
               newTree instanceof J.Unary ||
               newTree instanceof J.Ternary ||
               newTree instanceof J.Assignment ||
+              newTree instanceof J.AssignmentOperation ||
               newTree instanceof J.InstanceOf ||
               newTree instanceof J.TypeCast ||
               newTree instanceof J.SwitchExpression)) {
@@ -241,6 +242,26 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         J.Assignment a = (J.Assignment) j;
 
+        Cursor parent = getCursor().getParentTreeCursor();
+        if (parent.getValue() instanceof J.Binary ||
+            parent.getValue() instanceof J.Unary ||
+            parent.getValue() instanceof J.Ternary) {
+            return parenthesize(a);
+        }
+
+        return a;
+    }
+
+    @Override
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        J j = recursive ? super.visitAssignmentOperation(assignOp, p) : assignOp;
+        if (!(j instanceof J.AssignmentOperation)) {
+            return j;
+        }
+
+        J.AssignmentOperation a = (J.AssignmentOperation) j;
+
+        // a compound assignment binds as loosely as an assignment does
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Unary ||
