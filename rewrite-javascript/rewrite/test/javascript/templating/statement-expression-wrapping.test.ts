@@ -18,7 +18,6 @@ import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {foundSearchResult} from '../../../src/markers';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
-import {expectParserShaped} from '../../test-util';
 
 describe('Statement Expression Wrapping', () => {
     let parser: JavaScriptParser;
@@ -213,10 +212,7 @@ describe('Statement Expression Wrapping', () => {
             }
         });
 
-        return spec.rewriteRun({
-            ...typescript('lbl: Array(1, 2);', 'lbl: [1, 2];'),
-            afterRecipe: expectParserShaped
-        });
+        return spec.rewriteRun(typescript('lbl: Array(1, 2);', 'lbl: [1, 2];'));
     });
 
     it('should wrap an expression that replaces a statement of a case, but not its label', () => {
@@ -230,13 +226,12 @@ describe('Statement Expression Wrapping', () => {
             }
         });
 
-        return spec.rewriteRun({
-            ...typescript(
+        return spec.rewriteRun(
+            typescript(
                 'switch (x) {\n    case !!y:\n        !!z;\n}',
                 'switch (x) {\n    case y:\n        z;\n}'
-            ),
-            afterRecipe: expectParserShaped
-        });
+            )
+        );
     });
 
     it('should make a statement that replaces the expression of an expression statement the statement itself', () => {
@@ -257,10 +252,10 @@ describe('Statement Expression Wrapping', () => {
         });
 
         return spec.rewriteRun(
-            {...typescript('a || (a = b);', 'a ||= b;'), afterRecipe: expectParserShaped},
-            {...typescript(`foo['bar'];`, 'foo.bar;'), afterRecipe: expectParserShaped},
+            typescript('a || (a = b);', 'a ||= b;'),
+            typescript(`foo['bar'];`, 'foo.bar;'),
             // a `for` head holds every expression in an expression statement
-            {...typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}'), afterRecipe: expectParserShaped}
+            typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}')
         );
     });
 
@@ -291,9 +286,6 @@ describe('Statement Expression Wrapping', () => {
             }
         });
 
-        return spec.rewriteRun({
-            ...typescript('go()', 'if (ready) {\n    go()\n}'),
-            afterRecipe: expectParserShaped
-        });
+        return spec.rewriteRun(typescript('go()', 'if (ready) {\n    go()\n}'));
     });
 });
