@@ -1718,6 +1718,23 @@ class TestMinimalFormatting:
             "class B:\n  def f(self,x):\n    return x\n",
         ))
 
+    def test_formatting_the_class_with_its_body_set_aside_passes(self):
+        class RenameThenFormatWithoutTheBody(PythonVisitor[ExecutionContext]):
+            def visit_class_declaration(self, cd: ClassDeclaration, ctx: ExecutionContext) -> J:
+                if cd.name.simple_name != "A":
+                    return cd
+                renamed = cd.replace(name=cd.name.replace(simple_name="B"))
+                body = renamed.body
+                formatted = maybe_auto_format(cd, renamed.replace(body=body.replace(statements=[])), ctx,
+                                              cursor=self.cursor.parent_tree_cursor())
+                return formatted.replace(body=body)
+
+        spec = RecipeSpec(recipe=from_visitor(RenameThenFormatWithoutTheBody()), type_attribution=False)
+        spec.rewrite_run(python(
+            "class A:\n  def f(self,x):\n    return x\n",
+            "class B:\n  def f(self,x):\n    return x\n",
+        ))
+
     def test_formatting_that_changes_only_whitespace_passes(self):
         class FormatTheFile(PythonVisitor[ExecutionContext]):
             def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
