@@ -1,7 +1,8 @@
 from rewrite import Markers, random_id
 from rewrite.java import (Assert, Binary, Block, Expression, Identifier, P, J, JLeftPadded, MethodInvocation,
                           Return, Space, JRightPadded, Ternary, Unary)
-from rewrite.python import Binary as PyBinary, CompilationUnit, MinimumViableSpacingVisitor, PythonVisitor
+from rewrite.python import (Binary as PyBinary, CompilationUnit, IntelliJ, MinimumViableSpacingVisitor, PythonVisitor,
+                            TabsAndIndentsVisitor)
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
 
@@ -30,14 +31,14 @@ def test_statement_without_prefix():
             """
             def foo():
                 print('a')
-            print('a')
+                print('a')
             """
         ),
-        # The visitor leaves indentation to TabsAndIndentsVisitor, so the copy prints outside the body it is in.
-        spec=RecipeSpec(check_parser_shaped_trees=False)
+        spec=RecipeSpec()
         .with_recipes(
             from_visitor(DuplicateMethod()),
-            from_visitor(MinimumViableSpacingVisitor())
+            from_visitor(MinimumViableSpacingVisitor()),
+            from_visitor(TabsAndIndentsVisitor(IntelliJ.tabs_and_indents()))
         )
     )
 
@@ -46,13 +47,13 @@ def test_statement_without_prefix_in_a_crlf_file():
     rewrite_run(
         python(
             "def foo():\r\n    print('a')\r\n",
-            "def foo():\r\n    print('a')\r\nprint('a')\r\n",
+            "def foo():\r\n    print('a')\r\n    print('a')\r\n",
         ),
-        # The visitor leaves indentation to TabsAndIndentsVisitor, so the copy prints outside the body it is in.
-        spec=RecipeSpec(check_parser_shaped_trees=False)
+        spec=RecipeSpec()
         .with_recipes(
             from_visitor(DuplicateMethod()),
-            from_visitor(MinimumViableSpacingVisitor())
+            from_visitor(MinimumViableSpacingVisitor()),
+            from_visitor(TabsAndIndentsVisitor(IntelliJ.tabs_and_indents()))
         )
     )
 
