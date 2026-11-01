@@ -33,7 +33,7 @@ public class EmptySourcesTests : RewriteTest
     public void ARecipeThatThrowsOnAnEmptyFileFails()
     {
         var failure = Assert.Throws<XunitException>(() => RewriteRun(
-            spec => spec.SetRecipe(new RenameFirstClass(checksTheStructure: false)),
+            spec => spec.SetRecipe(new RenameFirstClass { ChecksTheStructure = false }),
             CSharp("class A { }", "class B { }")
         ));
 
@@ -57,7 +57,7 @@ public class EmptySourcesTests : RewriteTest
     public void ARecipeThatChecksTheStructurePasses()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new RenameFirstClass(checksTheStructure: true)),
+            spec => spec.SetRecipe(new RenameFirstClass { ChecksTheStructure = true }),
             CSharp("class A { }", "class B { }")
         );
     }
@@ -67,8 +67,59 @@ public class EmptySourcesTests : RewriteTest
     public void ARecipeThatChangesNothingIsNotProbed()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new RenameFirstClass(checksTheStructure: false)),
+            spec => spec.SetRecipe(new RenameFirstClass { ChecksTheStructure = false }),
             CSharp("class C { }")
+        );
+    }
+
+    /// <summary>A probe of a recipe with its options runs once in the process, whether it passes or fails.</summary>
+    [Fact]
+    public void AProbeRunsOncePerProcess()
+    {
+        Assert.Throws<XunitException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameFirstClass { NewName = "D" }),
+            CSharp("class A { }", "class D { }")
+        ));
+
+        // the same options aren't probed again, and other options are
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameFirstClass { NewName = "D" }),
+            CSharp("class A { }", "class D { }")
+        );
+        Assert.Throws<XunitException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameFirstClass { NewName = "E" }),
+            CSharp("class A { }", "class E { }")
+        ));
+    }
+
+    /// <summary>xUnit runs test classes in parallel, and a probe that several reach at once still runs once.</summary>
+    [Fact]
+    public void AProbeThatTestsReachAtOnceRunsOnce()
+    {
+        var recipe = new RenameFirstClass { NewName = "F" };
+        var runs = 0;
+        using var start = new Barrier(8);
+        var threads = Enumerable.Range(0, 8).Select(_ => new Thread(() =>
+        {
+            start.SignalAndWait();
+            Probes.Once(recipe, typeof(CompilationUnit), nameof(AProbeThatTestsReachAtOnceRunsOnce),
+                () => Interlocked.Increment(ref runs));
+        })).ToList();
+        threads.ForEach(thread => thread.Start());
+        threads.ForEach(thread => thread.Join());
+
+        Assert.Equal(1, runs);
+    }
+
+    [Fact]
+    public void ARecipeWhoseProbesTookTwentySecondsIsNotProbed()
+    {
+        var recipe = new OverBudget();
+        Probes.Charge(recipe, TimeSpan.FromSeconds(21));
+
+        RewriteRun(
+            spec => spec.SetRecipe(recipe),
+            CSharp("class A { }", "class B { }")
         );
     }
 
@@ -88,14 +139,20 @@ public class EmptySourcesTests : RewriteTest
         Assert.True(recipe.ReconcilerThrew);
     }
 
-    private class RenameFirstClass(bool checksTheStructure) : global::OpenRewrite.Core.Recipe
+    private class RenameFirstClass : global::OpenRewrite.Core.Recipe
     {
+        [Option(DisplayName = "Checks the structure", Description = "Whether a file without members is left alone.")]
+        public bool ChecksTheStructure { get; init; }
+
+        [Option(DisplayName = "New name", Description = "The name to give class A.")]
+        public string NewName { get; init; } = "B";
+
         public override string DisplayName => "Rename the first class";
-        public override string Description => "Renames the first class of a file from A to B.";
+        public override string Description => "Renames the first class of a file from A to the new name.";
 
-        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor(checksTheStructure);
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor(ChecksTheStructure, NewName);
 
-        private class Visitor(bool checksTheStructure) : CSharpVisitor<ExecutionContext>
+        private class Visitor(bool checksTheStructure, string newName) : CSharpVisitor<ExecutionContext>
         {
             public override J VisitCompilationUnit(CompilationUnit cu, ExecutionContext ctx)
             {
@@ -109,12 +166,15 @@ public class EmptySourcesTests : RewriteTest
                     return cu;
                 }
                 return cu.WithMembers([
-                    first.WithElement(classDecl.WithName(classDecl.Name.WithSimpleName("B"))),
+                    first.WithElement(classDecl.WithName(classDecl.Name.WithSimpleName(newName))),
                     .. cu.Members.Skip(1)
                 ]);
             }
         }
     }
+
+    /// <summary>A recipe that no other test runs, so that no other test's probes count toward its time.</summary>
+    private class OverBudget : RenameFirstClass;
 
     /// <summary>
     /// Renames class A to B, and fills an empty file with a class whose field type is an Identifier, where the parser
@@ -135,7 +195,7 @@ public class EmptySourcesTests : RewriteTest
             {
                 if (cu.Members.Count > 0)
                 {
-                    return new RenameFirstClass(checksTheStructure: true).GetVisitor().Visit(cu, ctx) as J ?? cu;
+                    return new RenameFirstClass { ChecksTheStructure = true }.GetVisitor().Visit(cu, ctx) as J ?? cu;
                 }
                 var filled = new CSharpParser().Parse("class C\n{\nstring x;\n}\n", sourcePath: cu.SourcePath);
                 var classDecl = (ClassDeclaration)filled.Members[0].Element;

@@ -96,6 +96,21 @@ public class UnparsedSourcesTests : RewriteTest
         );
     }
 
+    /// <summary>A probe of a recipe with its options runs once in the process, whether it passes or fails.</summary>
+    [Fact]
+    public void AProbeRunsOncePerProcess()
+    {
+        Assert.Throws<XunitException>(() => RewriteRun(
+            spec => spec.SetRecipe(new FindRootNamespacesOfOneTest()),
+            Project()
+        ));
+
+        RewriteRun(
+            spec => spec.SetRecipe(new FindRootNamespacesOfOneTest()),
+            Project()
+        );
+    }
+
     /// <summary>
     /// Marks the project file that declares a root namespace, and each class in its directory with that namespace,
     /// trusting its scanner to have found the project file unless it checks.
@@ -153,4 +168,7 @@ public class UnparsedSourcesTests : RewriteTest
             }
         }
     }
+
+    /// <summary>A recipe that no other test runs, so that its first probe is this test's.</summary>
+    private class FindRootNamespacesOfOneTest : FindRootNamespaces;
 }

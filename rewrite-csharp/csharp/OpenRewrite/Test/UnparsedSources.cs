@@ -37,11 +37,14 @@ internal static class UnparsedSources
             {
                 continue;
             }
-            var thrown = Probes.Run(recipe, sources.Where(s => !ReferenceEquals(s, missing)).ToList(), cycles);
-            if (thrown != null)
+            Probes.Once(recipe, missing.GetType(), nameof(UnparsedSources), () =>
             {
-                throw new XunitException(Message(recipe, missing, thrown), thrown);
-            }
+                var thrown = Probes.Run(recipe, sources.Where(s => !ReferenceEquals(s, missing)).ToList(), cycles);
+                if (thrown != null)
+                {
+                    throw new XunitException(Message(recipe, missing, thrown), thrown);
+                }
+            });
         }
     }
 

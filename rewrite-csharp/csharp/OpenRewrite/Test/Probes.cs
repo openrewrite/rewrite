@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Format;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -22,11 +24,102 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.Test;
 
 /// <summary>
-/// What the checks that run a recipe on sources the test doesn't give it share: how they run it and how they tell
-/// what it threw.
+/// What the checks that run a recipe on sources the test doesn't give it share: one run of each probe per process, a
+/// time budget per recipe, how they run the recipe and how they tell what it threw.
 /// </summary>
 internal static class Probes
 {
+    /// <summary>
+    /// Probes of recipes that resolve dependencies take seconds each, so a recipe stops being probed in this process
+    /// once its probes have taken this long.
+    /// </summary>
+    private static readonly TimeSpan TimeCap = TimeSpan.FromSeconds(20);
+
+    private static readonly ConcurrentDictionary<string, TimeSpan> ProbeTimes = new();
+
+    private static readonly ConcurrentDictionary<(string Recipe, Type Source, string Kind), bool> Probed = new();
+
+    /// <summary>
+    /// Runs a probe of the recipe on a type of source unless it already ran in this process for the recipe with the
+    /// same options, passing or failing, or the recipe's probes have taken <see cref="TimeCap"/>.
+    /// </summary>
+    public static void Once(Recipe recipe, Type sourceType, string kind, Action probe)
+    {
+        if (OverBudget(recipe) || !Probed.TryAdd((Key(recipe), sourceType, kind), true))
+        {
+            return;
+        }
+        var start = Stopwatch.GetTimestamp();
+        try
+        {
+            probe();
+        }
+        finally
+        {
+            Charge(recipe, Stopwatch.GetElapsedTime(start));
+        }
+    }
+
+    private static bool OverBudget(Recipe recipe) => ProbeTimes.GetValueOrDefault(TimeCapKey(recipe)) > TimeCap;
+
+    public static void Charge(Recipe recipe, TimeSpan elapsed) =>
+        ProbeTimes.AddOrUpdate(TimeCapKey(recipe), elapsed, (_, spent) => spent + elapsed);
+
+    /// <summary>
+    /// What a recipe's probes share a time cap by: its name, and for a recipe that runs others, theirs too, since one
+    /// composite class of a test project runs a different recipe list in each test.
+    /// </summary>
+    private static string TimeCapKey(Recipe recipe)
+    {
+        List<Recipe> children;
+        try
+        {
+            children = recipe.GetRecipeList();
+        }
+        catch (Exception)
+        {
+            return recipe.Name;
+        }
+        return children.Count == 0 ? recipe.Name : $"{recipe.Name}[{string.Join(",", children.Select(TimeCapKey))}]";
+    }
+
+    /// <summary>The recipe with the values of its options, and those of the recipes it runs.</summary>
+    private static string Key(Recipe recipe)
+    {
+        try
+        {
+            return Key(recipe.GetDescriptor());
+        }
+        catch (Exception)
+        {
+            return recipe.Name;
+        }
+    }
+
+    private static string Key(RecipeDescriptor descriptor)
+    {
+        var key = new StringBuilder(descriptor.Name).Append('(');
+        key.AppendJoin(",", descriptor.Options.Select(option => option.Name + "=" + ValueText(option.Value)));
+        key.Append(')');
+        if (descriptor.RecipeList.Count > 0)
+        {
+            key.Append('[').AppendJoin(",", descriptor.RecipeList.Select(Key)).Append(']');
+        }
+        return key.ToString();
+    }
+
+    private static string ValueText(object? value)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(value);
+        }
+        catch (Exception)
+        {
+            return value?.ToString() ?? "null";
+        }
+    }
+
     /// <summary>
     /// What the recipe throws when run on the sources for the test's cycles, with a fresh execution context, other
     /// than the formatter's failure to reconcile, which production skips.

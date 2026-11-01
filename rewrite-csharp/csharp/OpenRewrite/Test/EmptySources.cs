@@ -31,21 +31,24 @@ internal static class EmptySources
         {
             return;
         }
-        CompilationUnit empty;
-        try
+        Probes.Once(recipe, typeof(CompilationUnit), nameof(EmptySources), () =>
         {
-            empty = new CSharpParser().Parse("", sourcePath: changed.SourcePath);
-        }
-        catch (Exception)
-        {
-            return;
-        }
+            CompilationUnit empty;
+            try
+            {
+                empty = new CSharpParser().Parse("", sourcePath: changed.SourcePath);
+            }
+            catch (Exception)
+            {
+                return;
+            }
 
-        var thrown = Probes.Run(recipe, [empty], cycles);
-        if (thrown != null)
-        {
-            throw new XunitException(Message(recipe, empty, thrown), thrown);
-        }
+            var thrown = Probes.Run(recipe, [empty], cycles);
+            if (thrown != null)
+            {
+                throw new XunitException(Message(recipe, empty, thrown), thrown);
+            }
+        });
     }
 
     private static string Message(Recipe recipe, SourceFile empty, Exception thrown) =>
