@@ -10,6 +10,7 @@ import {
     ExecutionContext,
     InMemoryDataTableStore,
     noopVisitor,
+    Option,
     Recipe,
     ScanningRecipe,
     SourceFile,
@@ -660,6 +661,96 @@ describe("rewrite test", () => {
             sut.recipe = new Keep(() => [] as PlainText[], (acc, text) => acc.push(text));
             sut.checkLightweightAccumulators = false;
             return sut.rewriteRun(text("foo"));
+        });
+    });
+
+    describe("empty sources", () => {
+        class Capitalize extends Recipe {
+            name = "org.openrewrite.test.capitalize";
+            displayName = "Capitalize";
+            description = "Capitalizes the first letter of each text.";
+
+            @Option({displayName: "Checked", description: "Whether the recipe checks that the text has a first letter."})
+            checked!: boolean;
+
+            constructor(options: { checked: boolean }) {
+                super(options);
+            }
+
+            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                return capitalize(this.checked);
+            }
+        }
+
+        function capitalize(checked: boolean): TreeVisitor<any, ExecutionContext> {
+            return new class extends PlainTextVisitor<ExecutionContext> {
+                protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                    if (checked && text.text.length === 0) {
+                        return text;
+                    }
+                    const capitalized = text.text[0].toUpperCase() + text.text.substring(1);
+                    return capitalized === text.text ? text : {...text, text: capitalized};
+                }
+            };
+        }
+
+        const team = (sourceFile: PlainText) => withMarker(sourceFile, {kind: "my.Team", id: randomId()});
+
+        test("a recipe that throws on an empty file fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new Capitalize({checked: false});
+
+            // when
+            const run = sut.rewriteRun({...text("hello", "Hello"), path: "hello.txt", beforeRecipe: team});
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Check for the structure the recipe edits before using it, so that it handles an empty file or " +
+                "leaves it unchanged instead of throwing.\n" +
+                "org.openrewrite.test.capitalize threw when run on an empty PlainText at hello.txt with the markers " +
+                "of the test's source (Team):\n" +
+                "    TypeError: Cannot read properties of undefined (reading 'toUpperCase')\n" +
+                "        at PlainTextVisitor.visitText (test/test/rewrite-test.test.ts:");
+            await expect(run).rejects.toThrow(
+                "Then add a test with an empty source, such as typescript(\"\"), json(\"\") or yaml(\"\"), that " +
+                "states the intended result.");
+        });
+
+        test("a recipe that checks the structure passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Capitalize({checked: true});
+            return sut.rewriteRun(text("hello", "Hello"));
+        });
+
+        test("an ad hoc recipe is not probed", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(capitalize(false));
+            return sut.rewriteRun(text("hello", "Hello"));
+        });
+
+        test("the empty file has the markers the hooks gave the source", () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new class extends Recipe {
+                name = "org.openrewrite.test.requires-team";
+                displayName = "Requires team";
+                description = "Changes each text of a team, and throws on a text of none.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return new class extends PlainTextVisitor<ExecutionContext> {
+                        protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                            if (!findMarker(text, "my.Team")) {
+                                throw new Error("A text of no team");
+                            }
+                            return text.text === "changed" ? text : {...text, text: "changed"};
+                        }
+                    };
+                }
+            };
+
+            // when, then
+            return sut.rewriteRun({...text("original", "changed"), beforeRecipe: team});
         });
     });
 

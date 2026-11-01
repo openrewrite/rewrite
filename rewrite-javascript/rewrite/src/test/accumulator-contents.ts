@@ -22,6 +22,7 @@ import {TreeVisitor} from "../visitor";
 import {MarkersKind} from "../markers";
 import {Type} from "../java";
 import {NodeResolutionResultKind} from "../javascript/node-resolution-result";
+import {typeName} from "./probes";
 
 /** Beyond this many objects in one accumulator the walk stops descending. */
 const MAX_OBJECTS = 100_000;
@@ -203,7 +204,3 @@ function key(k: unknown): string {
     return shown.length > 60 ? `${shown.substring(0, 60)}...` : shown;
 }
 
-/** Reads as "PlainText" or "J.MethodInvocation". */
-function typeName(kind: string): string {
-    return kind.replace(/^.*\./, "").replace(/\$/g, ".");
-}

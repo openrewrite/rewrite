@@ -30,6 +30,9 @@ import {J, Type} from "../java";
 import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
 import * as path from "path";
 import {AccumulatorContents} from "./accumulator-contents";
+import {EmptySources} from "./empty-sources";
+import {RpcRecipe} from "../rpc/recipe";
+import {DelegatingRecipe} from "../rpc/java-recipe";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -264,6 +267,10 @@ export class RecipeSpec {
         cycles > expectedCycles && await this.expectStableOnFreshParse(flattenedSpecs, allParsed, changeset, runContext);
         contextWrites?.assertNone(this.recipe);
         await this.expectDataTables();
+        if (changeset.some(r => r.before && r.after !== r.before) && await isProbed(this.recipe)) {
+            await new EmptySources(this.recipe, changeset)
+                .assertNoneThrow(allParsed, this.executionContext, this.recipeExecutionContext, cycles);
+        }
     }
 
     private async expectDataTables() {
@@ -676,6 +683,23 @@ function callerFrame(): string | undefined {
         .map(line => line.trim().replace(/^at (async )?/, ""))
         .find(line => !/[\\/]test[\\/]rewrite-test\.[jt]s:|<anonymous>|^node:/.test(line));
     return frame?.split(process.cwd() + path.sep).join("");
+}
+
+/**
+ * Whether the recipe is run on sources the test doesn't give it, which a recipe isn't when it or one in its recipe list
+ * is the harness's stand-in for a visitor, or runs in Java, whose harness probes it.
+ */
+async function isProbed(recipe: Recipe): Promise<boolean> {
+    if (recipe instanceof NoopRecipe || recipe instanceof AdHocRecipe || recipe instanceof RpcRecipe ||
+        recipe instanceof DelegatingRecipe) {
+        return false;
+    }
+    for (const child of await recipe.recipeList()) {
+        if (!await isProbed(child)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /** Without the comments that search results and markup print as. */
