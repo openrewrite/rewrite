@@ -33,7 +33,8 @@ from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
 from rewrite.python.markers import PythonResolutionResult, Quoted
 from rewrite.python.visitor import PythonVisitor
-from rewrite.java.tree import Assignment, Identifier, Literal, MethodInvocation, Yield
+from rewrite.java.tree import Assignment, ClassDeclaration, Identifier, Literal, MethodInvocation, Yield
+from rewrite.python.format import AutoFormat, auto_format, maybe_auto_format
 from rewrite.python.tree import Await, CompilationUnit
 from rewrite.java import J, JavaType, Space
 from rewrite.utils import lst_dataclass
@@ -1598,3 +1599,70 @@ class TestParserShapedTrees:
         spec = RecipeSpec(recipe=from_visitor(_NoneAsName()), check_parser_shaped_trees=False,
                           type_attribution=False)
         spec.rewrite_run(python("x = 1\n", "x = None\n"))
+
+
+class _RenameThenFormatTheFile(_RenameA):
+    def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+        renamed = super().visit_compilation_unit(cu, ctx)
+        return cu if renamed is cu else auto_format(renamed, ctx)
+
+
+class TestMinimalFormatting:
+    """The harness rejects a recipe that auto-formats a whole file or class that existed before the run."""
+
+    def test_formatting_the_whole_file_after_a_one_line_edit_fails(self):
+        spec = RecipeSpec(recipe=from_visitor(_RenameThenFormatTheFile()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n", path=Path("a.py")))
+
+        message = str(failure.value)
+        assert message.startswith(
+            "Format only what the recipe changed, not the whole class or file around it.\n"
+            "org.openrewrite.adhoc auto-formatted a whole file or class that existed before the run, with no "
+            "stop_after:\n"
+            "  _RenameThenFormatTheFile.visit_compilation_unit (test_rewrite_test.py:"
+        )
+        assert ") called auto_format on\n    all of a.py\nThat rewrites the whitespace of code" in message
+        assert message.endswith("opts out with RecipeSpec(check_minimal_formatting=False).")
+
+    def test_formatting_the_whole_class_after_renaming_a_method_fails(self):
+        class RenameThenFormatTheClass(PythonVisitor[ExecutionContext]):
+            def visit_class_declaration(self, cd: ClassDeclaration, ctx: ExecutionContext) -> J:
+                renamed = _RenameA().visit(cd, ctx, self.cursor.parent_tree_cursor())
+                return cd if renamed is cd else auto_format(renamed, ctx, cursor=self.cursor.parent_tree_cursor())
+
+        spec = RecipeSpec(recipe=from_visitor(RenameThenFormatTheClass()), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"\) called auto_format on\n    class `A` of a.py\n"):
+            spec.rewrite_run(python(
+                "class A:\n    def a(self):\n        pass\n",
+                "class A:\n    def b(self):\n        pass\n",
+                path=Path("a.py"),
+            ))
+
+    def test_formatting_only_the_changed_element_passes(self):
+        class RenameThenFormatIt(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                if ident.simple_name != "a":
+                    return ident
+                return maybe_auto_format(ident, ident.replace(simple_name="b"), ctx,
+                                         cursor=self.cursor.parent_tree_cursor())
+
+        spec = RecipeSpec(recipe=from_visitor(RenameThenFormatIt()), type_attribution=False)
+        spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n"))
+
+    def test_formatting_that_changes_only_whitespace_passes(self):
+        class FormatTheFile(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                return auto_format(cu, ctx)
+
+        spec = RecipeSpec(recipe=from_visitor(FormatTheFile()), type_attribution=False)
+        spec.rewrite_run(python("x=1\n", "x = 1\n"))
+
+    def test_a_recipe_run_with_a_formatting_recipe_passes(self):
+        spec = RecipeSpec(type_attribution=False).with_recipes(from_visitor(_RenameThenFormatTheFile()), AutoFormat())
+        spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n"))
+
+    def test_check_turned_off_passes(self):
+        spec = RecipeSpec(recipe=from_visitor(_RenameThenFormatTheFile()), check_minimal_formatting=False,
+                          type_attribution=False)
+        spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n"))

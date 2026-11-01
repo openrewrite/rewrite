@@ -1,4 +1,6 @@
-from typing import Optional, cast
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Callable, Iterator, Optional, cast
 
 from .blank_lines import BlankLinesVisitor
 from .line_breaks import general_format_style
@@ -34,6 +36,23 @@ class AutoFormat(Recipe):
         return AutoFormatVisitor()
 
 
+FormattingListener = Callable[[Tree, Optional[Tree], Cursor], None]
+
+# Told of each request to auto-format a tree, with its stop_after and the cursor of its parent.
+_formatting_listener: ContextVar[Optional[FormattingListener]] = ContextVar("formatting_listener", default=None)
+
+
+@contextmanager
+def formatting_listener(listener: FormattingListener) -> Iterator[None]:
+    """Tells ``listener`` of each request to auto-format a tree in this context, so that a test harness can check
+    that a recipe formats only what it changed."""
+    token = _formatting_listener.set(listener)
+    try:
+        yield
+    finally:
+        _formatting_listener.reset(token)
+
+
 class AutoFormatVisitor(PythonVisitor[P]):
     def __init__(self, stop_after: Optional[Tree] = None):
         self._stop_after = stop_after
@@ -44,6 +63,9 @@ class AutoFormatVisitor(PythonVisitor[P]):
             return cast(T, tree)
         self._cursor = parent if parent is not None else Cursor(None, Cursor.ROOT_VALUE)
         cu = tree if isinstance(tree, JavaSourceFile) else self._cursor.first_enclosing_or_throw(JavaSourceFile)
+        listener = _formatting_listener.get()
+        if listener is not None and tree is not None:
+            listener(tree, self._stop_after, self._cursor)
 
         tree = NormalizeFormatVisitor(self._stop_after).visit(tree, p, self._cursor.fork())
 

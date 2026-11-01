@@ -42,6 +42,7 @@ from rewrite.markers import ParseExceptionResult
 
 from .accumulators import AccumulatorContents
 from .added_markers import assert_no_added_markers
+from .formatting_scope import FormattingScope
 from .probes import assert_none_throw_on_empty, assert_none_throw_on_unparsed
 from .spec import SourceSpec, AfterRecipeText, dedent
 from .tree_shapes import problems as shape_problems
@@ -187,6 +188,10 @@ class RecipeSpec:
     # text they print, such as an identifier where the parser builds a literal
     check_parser_shaped_trees: bool = True
 
+    # Whether to fail a recipe that auto-formats a whole source file or class that existed
+    # before the run, instead of only what it changed
+    check_minimal_formatting: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
@@ -246,13 +251,14 @@ class RecipeSpec:
         3. Validates parse/print idempotence if enabled
         4. Runs the recipe for ``expected_cycles_that_make_changes`` cycles, each on the
            output of the one before
-        5. Checks that the recipe left the execution context unchanged, kept no trees in its
-           accumulators and added no markers for its own use, if enabled
+        5. Checks that the recipe left the execution context unchanged, edited nothing while
+           scanning, kept no trees in its accumulators and added no markers for its own use, if enabled
         6. Compares results with expected "after" states
-        7. Checks that a fresh parse of the output builds the nodes the recipe built, if enabled
-        8. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
-        9. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
-           its parser failed on, where it has to raise nothing
+        7. Checks that the recipe auto-formatted only what it changed, if enabled
+        8. Checks that a fresh parse of the output builds the nodes the recipe built, if enabled
+        9. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
+        10. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
+            its parser failed on, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -300,7 +306,9 @@ class RecipeSpec:
         data_tables = InMemoryDataTableStore()
         self.execution_context.put_message(DATA_TABLE_STORE, data_tables)
         checks = _RunChecks()
-        results, unsettled = self._run_cycles(source_files, cycles, expected_cycles, checks)
+        formatting = FormattingScope(self.recipe, self.check_minimal_formatting)
+        with formatting.record():
+            results, unsettled = self._run_cycles(source_files, cycles, expected_cycles, checks)
         self._expect_execution_context_unchanged(checks)
         checks.accumulators.assert_none_found()
         if self.check_reporting_markers_only:
@@ -330,6 +338,7 @@ class RecipeSpec:
                 changes,
                 f"Expected recipe to complete in {_plural_cycles(expected_cycles)}, but cycle {cycle} changed",
             )
+        formatting.assert_formatted_only_what_changed(results)
         reparsed: Dict[int, Union[SourceFile, str]] = {}
         if self.check_parser_shaped_trees or cycles > expected_cycles:
             reparsed = self._reparse_output(specs, all_parsed, results)
@@ -347,6 +356,7 @@ class RecipeSpec:
         changed = {r._before.id for r in results if r._before is not None and r._before is not r._after}
         if not changed or _is_test_scaffolding(self.recipe):
             return
+
         def context() -> ExecutionContext:
             # A probe writes no rows to the test's data tables.
             return _LaterCycleContext(self.execution_context)
