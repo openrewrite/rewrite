@@ -22,7 +22,14 @@ import {emptyMarkers, findMarker, foundSearchResult, Marker, Markers, MarkersKin
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 import {J, Type} from "../../src/java";
-import {JavaScriptParser, JavaScriptVisitor, JS, NodeResolutionResultKind, typescript} from "../../src/javascript";
+import {
+    JavaScriptParser,
+    JavaScriptVisitor,
+    JS,
+    NodeResolutionResultKind,
+    PackageJsonParser,
+    typescript
+} from "../../src/javascript";
 import {autoFormat, AutoformatVisitor, maybeAutoFormat} from "../../src/javascript/format";
 
 function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
@@ -754,6 +761,35 @@ describe("rewrite test", () => {
 
             // when, then
             return sut.rewriteRun({...text("original", "changed"), beforeRecipe: team});
+        });
+
+        test("an empty package.json, which npm can't read, is not probed", async () => {
+            // given
+            const warn = vi.spyOn(console, "warn");
+            const sut = new RecipeSpec();
+            sut.recipe = new class BumpVersion extends Recipe {
+                name = "org.openrewrite.test.bump-version";
+                displayName = "Bump version";
+                description = "Changes the version 1.0.0 to 1.0.1.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return new class extends JsonVisitor<ExecutionContext> {
+                        protected override async visitLiteral(literal: Json.Literal, _p: ExecutionContext): Promise<Json | undefined> {
+                            return literal.value === "1.0.0" ? {...literal, source: '"1.0.1"', value: "1.0.1"} as Json.Literal : literal;
+                        }
+                    };
+                }
+            };
+
+            // when
+            await sut.rewriteRun({
+                ...json(`{"version": "1.0.0"}`, `{"version": "1.0.1"}`),
+                path: "package.json",
+                parser: () => new PackageJsonParser({skipDependencyResolution: true})
+            });
+
+            // then
+            expect(warn).not.toHaveBeenCalled();
         });
     });
 

@@ -72,11 +72,15 @@ export class EmptySources {
 }
 
 /**
- * An empty file at the source's path, with the markers that describe the source's project, or undefined if the
- * parser makes no empty source of the same kind from an empty file.
+ * An empty file at the source's path, with the markers that describe the source's project, or undefined for a kind of
+ * file that can't be empty.
  */
 async function parseEmpty(before: SourceFile, spec: SourceSpec<any>,
                           parseCtx: ExecutionContext): Promise<SourceFile | undefined> {
+    // a file its parser resolves a project from, such as a package.json, can't be empty
+    if (before.markers.markers.some(m => m.kind.endsWith("ResolutionResult"))) {
+        return undefined;
+    }
     let empty: SourceFile;
     try {
         const parsed: SourceFile[] = [];
@@ -92,7 +96,6 @@ async function parseEmpty(before: SourceFile, spec: SourceSpec<any>,
         return undefined;
     }
     const present = new Set(empty.markers.markers.map(m => m.kind));
-    // a resolution result describes what the file itself declares, which an empty file doesn't
-    const added = before.markers.markers.filter(m => !present.has(m.kind) && !m.kind.endsWith("ResolutionResult"));
+    const added = before.markers.markers.filter(m => !present.has(m.kind));
     return {...empty, markers: {...empty.markers, markers: [...empty.markers.markers, ...added]}};
 }
