@@ -235,6 +235,7 @@ public abstract class RewriteTest
                 {
                     ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, metadataReferences, checks);
                 }
+                EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
             }
             finally
             {
