@@ -154,15 +154,8 @@ public class RetainVersions {
             if (inherited == null || !Objects.equals(managed.getBomGav(), inherited.getBomGav())) {
                 continue;
             }
-            // A module importing its own BOM does not depend on the ancestor's import, even when
-            // both imports happen to resolve to the same version.
-            boolean localImport = pom.getRequested().getDependencyManagement().stream()
-                    .filter(it -> it instanceof ManagedDependency.Imported)
-                    .anyMatch(it -> Objects.equals(pom.getValue(it.getGroupId()), managed.getBomGav().getGroupId()) &&
-                                    Objects.equals(pom.getValue(it.getArtifactId()), managed.getBomGav().getArtifactId()));
-            if (localImport) {
-                continue;
-            }
+            // An equal BOM provenance may come from a local re-import. That import is also
+            // upgraded by the recipe and will no longer supply this dependency.
             for (Dependency dependency : pom.getRequested().getDependencies()) {
                 if (dependency.getVersion() == null &&
                     managed.matches(pom.getValue(dependency.getGroupId()), pom.getValue(dependency.getArtifactId()),

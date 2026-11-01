@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -73,6 +74,32 @@ class RetainVersionsModulesTest implements RewriteTest {
                     <version>%s</version>
                   </dependency>
                   <dependency>""".formatted(version).indent(6).stripTrailing());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void parentAndChildImportingSameBomRetainRemovedManagement(boolean childFirst) {
+        String childWithImport = CHILD.replace("  <dependencies>", """
+            <dependencyManagement>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-dependencies</artifactId>
+                  <version>4.1.0</version>
+                  <type>pom</type>
+                  <scope>import</scope>
+                </dependency>
+              </dependencies>
+            </dependencyManagement>
+            <dependencies>""");
+        SourceSpecs parent = pomXml(PARENT, upgradedParent("3.1.12"));
+        SourceSpecs child = mavenProject("child",
+          pomXml(childWithImport, childWithImport.replace("4.1.0", "4.2.0-RC1")));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies",
+            "4.2.0-RC1", null, true, singletonList("org.codehaus.janino:*"))),
+          childFirst ? new SourceSpecs[]{child, parent} : new SourceSpecs[]{parent, child}
+        );
     }
 
     @ParameterizedTest
