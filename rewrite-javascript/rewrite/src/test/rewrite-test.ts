@@ -669,13 +669,9 @@ class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
     }
 }
 
-/**
- * Whether the framework puts `key` on the execution context of a run itself, or Moderne's own code does, which Java's
- * harness allows too.
- */
+/** Whether the framework puts `key` on the execution context of a run itself. */
 function isFrameworkMessage(key: string | symbol): boolean {
-    return key === DATA_TABLE_STORE || key === ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT ||
-        typeof key === "string" && key.startsWith("io.moderne");
+    return key === DATA_TABLE_STORE || key === ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 }
 
 /** Records the messages that a recipe puts on the execution context of its run, with the code that put each. */

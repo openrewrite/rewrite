@@ -467,6 +467,18 @@ describe("rewrite test", () => {
                 "A recipe that must change the ExecutionContext opts out with spec.checkExecutionContextUnchanged = false.");
         });
 
+        test("a message under an io.moderne key fails like any other", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+                protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+                    ctx.messages["io.moderne.seen"] = true;
+                    return text;
+                }
+            });
+            await expect(sut.rewriteRun(text("hello")))
+                .rejects.toThrow('  "io.moderne.seen" at PlainTextVisitor.visitText (test/test/rewrite-test.test.ts:');
+        });
+
         test("a recipe that only reads the execution context passes", () => {
             // given
             const sut = new RecipeSpec();
