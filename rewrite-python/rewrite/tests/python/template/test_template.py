@@ -1085,3 +1085,6 @@ class TestTemplateApplySlotShape:
         self._run_recipe(_AwaitYieldFrom(),
                          "def f():\n    yield from step()\n",
                          "def f():\n    await step()\n")
+
+    def test_replaced_right_operand_of_the_same_operator_is_parenthesized(self):
+        self._run_recipe(_DeMorganRecipe(), "result = z and not (x or y)", "result = z and (not x and not y)")

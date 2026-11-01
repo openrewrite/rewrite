@@ -19,6 +19,8 @@ from rewrite.python.template import capture, pattern, template
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
+from .._parse_shape import parse_shape
+
 
 def _rule(before: str, after: str) -> Recipe:
     """A recipe rewriting `before` to `after`, so one test drives one slot from source to source."""
@@ -171,14 +173,21 @@ def test_a_comprehension_result_takes_an_expression():
     ))
 
 
-def test_an_associative_operator_lets_its_right_operand_regroup():
+def test_a_boolean_operator_keeps_its_right_operand_parenthesized():
     RecipeSpec(recipe=_rule("both({x})", "x and {x}")).rewrite_run(python(
         "a = both(not p and not q)\n",
-        "a = x and not p and not q\n",
+        "a = x and (not p and not q)\n",
+        after_recipe=parse_shape("a = x and (not p and not q)\n"),
     ))
     RecipeSpec(recipe=_rule("either({x})", "x or {x}")).rewrite_run(python(
         "a = either(p or q)\n",
-        "a = x or p or q\n",
+        "a = x or (p or q)\n",
+        after_recipe=parse_shape("a = x or (p or q)\n"),
+    ))
+    RecipeSpec(recipe=_rule("both({x})", "{x} and x")).rewrite_run(python(
+        "a = both(not p and not q)\n",
+        "a = not p and not q and x\n",
+        after_recipe=parse_shape("a = not p and not q and x\n"),
     ))
 
 
