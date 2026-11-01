@@ -249,6 +249,7 @@ public class TemplateApplyTests : RewriteTest
     [InlineData("-1")]
     [InlineData("null")]
     [InlineData("(1)")]
+    [InlineData("int.MaxValue")]
     [InlineData("Foo")]
     [InlineData("Foo.Bar")]
     public void CaptureAfterIsMatchesFreshParse(string captured)
