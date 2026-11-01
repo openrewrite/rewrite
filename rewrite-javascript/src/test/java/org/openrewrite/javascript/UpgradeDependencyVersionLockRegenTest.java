@@ -46,7 +46,7 @@ import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
  * Native lock regeneration for a version bump over a stubbed {@link HttpSender}, each lock byte-identical to the one
- * npm or pnpm wrote; a bump whose lock cannot be regenerated keeps the edit and warns.
+ * npm or pnpm wrote; a bump whose lock cannot be regenerated leaves the manifest untouched and warns.
  */
 class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
 
