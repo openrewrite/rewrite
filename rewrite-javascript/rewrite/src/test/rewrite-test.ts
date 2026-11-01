@@ -535,7 +535,7 @@ export class RecipeSpec {
 
     private async expectGeneratedFiles(specs: SourceSpec<any>[], changeset: Result[]) {
         for (const spec of specs) {
-            if (spec.before) {
+            if (spec.before !== null) {
                 continue;
             }
             if (!spec.after) {
@@ -547,7 +547,7 @@ export class RecipeSpec {
     }
 
     private expectNoUnexpectedGeneratedFiles(specs: SourceSpec<any>[], changeset: Result[]) {
-        const expectedPaths = new Set(specs.filter(spec => !spec.before).map(spec => spec.path));
+        const expectedPaths = new Set(specs.filter(spec => spec.before === null).map(spec => spec.path));
         const unexpected = changeset.filter(c => !c.before && c.after && !expectedPaths.has(c.after.sourcePath));
         if (unexpected.length > 0) {
             throw new Error([
@@ -588,7 +588,7 @@ export class RecipeSpec {
         let unnamed = 0;
         const before: [SourceSpec<any>, { text: string, sourcePath: string }][] = [];
         for (const spec of specs) {
-            if (spec.before) {
+            if (spec.before !== null) {
                 const sourcePath = spec.path || `source-${unnamed++}.${spec.ext}`;
                 before.push([spec, {text: dedent(spec.before), sourcePath: sourcePath}]);
             }

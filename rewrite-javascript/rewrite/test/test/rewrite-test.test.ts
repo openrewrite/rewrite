@@ -216,6 +216,16 @@ describe("rewrite test", () => {
                 .rejects.toThrow("The recipe generated source files the test did not expect:\n  generated.ts");
         });
 
+        test("an empty before is an empty file, not a generated one", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+                protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                    return text.text === "" ? {...text, text: "filled"} : text;
+                }
+            });
+            return sut.rewriteRun({...text("", "filled"), path: "empty.txt"});
+        });
+
         test("after: null expects the file to be deleted", () => {
             const sut = new RecipeSpec();
             sut.recipe = deleteText();
