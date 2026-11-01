@@ -470,13 +470,18 @@ class TemplateEngine:
         unformatted = _SubstitutedValues()
         unformatted.visit(result, None)
 
+        # A replacement keeps the indentation of the line the code it replaces starts, which may align
+        # to a bracket that formatting the result alone can't see.
+        keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
+
         # Auto-format the result
         try:
             from ..format import maybe_auto_format
             original = coordinates.tree
             result = maybe_auto_format(
                 original, result, None, None,
-                cursor.parent if cursor.parent is not None else None
+                cursor.parent if cursor.parent is not None else None,
+                keep_indent=keep_indent
             )
         except (ValueError, AttributeError):
             # No CompilationUnit in cursor ancestry — skip formatting
@@ -485,7 +490,8 @@ class TemplateEngine:
         if unformatted.values:
             result = _SubstitutedLayout(unformatted.values).visit(result, None)
             from ..format import minimally_format
-            result = minimally_format(result, None, cursor.parent if cursor is not None else None)
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None,
+                                      keep_indent=keep_indent)
         return result
 
     @classmethod
