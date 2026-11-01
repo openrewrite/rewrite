@@ -22,7 +22,7 @@ import {isParseError} from "../parse-error";
 import {MarkersKind} from "../markers";
 import {PlainText} from "../text";
 import {randomId} from "../uuid";
-import {describeThrown, passed, probedBefore, thrownBy, typeName, withMarkersOf} from "./probes";
+import {describeThrown, probeOnce, thrownBy, typeName, withMarkersOf} from "./probes";
 
 /**
  * Runs the recipe without a source it changed, as it meets a file its parser failed on, and with that source as plain
@@ -45,25 +45,21 @@ export class UnparsedSources {
                 continue;
             }
             probedKinds.add(before.kind);
-
-            const missing = `unparsed ${before.kind} missing`;
-            if (!await probedBefore(this.recipe, missing)) {
+            await probeOnce(this.recipe, `unparsed ${before.kind} missing`, async () => {
                 const thrown = await thrownBy(this.recipe, sources.filter(s => s !== before), recipeCtx, cycles);
                 if (thrown) {
                     throw new Error(this.missingMessage(before, thrown.error));
                 }
-                await passed(this.recipe, missing);
-            }
-
-            const plainText = `unparsed ${before.kind} ${PlainText.Kind.PlainText}`;
-            if (before.kind !== PlainText.Kind.PlainText && !await probedBefore(this.recipe, plainText)) {
-                const unparsed = await asPlainText(before);
-                const thrown = await thrownBy(this.recipe, sources.map(s => s === before ? unparsed : s), recipeCtx,
-                    cycles);
-                if (thrown) {
-                    throw new Error(this.plainTextMessage(unparsed, thrown.error));
-                }
-                await passed(this.recipe, plainText);
+            });
+            if (before.kind !== PlainText.Kind.PlainText) {
+                await probeOnce(this.recipe, `unparsed ${before.kind} ${PlainText.Kind.PlainText}`, async () => {
+                    const unparsed = await asPlainText(before);
+                    const thrown = await thrownBy(this.recipe, sources.map(s => s === before ? unparsed : s),
+                        recipeCtx, cycles);
+                    if (thrown) {
+                        throw new Error(this.plainTextMessage(unparsed, thrown.error));
+                    }
+                });
             }
         }
     }

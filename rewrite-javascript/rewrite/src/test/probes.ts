@@ -25,23 +25,65 @@ import {Marker} from "../markers";
 /** Messages that belong to the test's own run. */
 const NOT_COPIED = new Set<string | symbol>([DATA_TABLE_STORE, ACCUMULATOR_LISTENER]);
 
-/** What each recipe class passed a probe of, so that a recipe a suite tests many times is probed once. */
-const PASSED = new WeakMap<Function, Set<string>>();
+/**
+ * Probes of recipes that resolve dependencies take seconds each, so a recipe stops being probed in this process once
+ * its probes have taken this long.
+ */
+const TIME_CAP_MS = 20_000;
+
+/** How long each recipe's probes have taken in this process, by {@link timeCapKey}. */
+const PROBE_MS = new Map<string, number>();
+
+/** The probes each recipe class ran, which a process runs once whether they pass or fail. */
+const PROBED = new WeakMap<Function, Set<string>>();
 
 /**
- * Whether the recipe already passed `probe`, a key of what the probe runs it on. A probe that fails is never
- * remembered, so that every test of the recipe fails until it is fixed.
+ * Runs `run`, a probe of the recipe on what `probe` names, unless this process ran that probe before or the recipe's
+ * probes have taken the time cap, and charges the recipe the time it takes.
  */
-export async function probedBefore(recipe: Recipe, probe: string): Promise<boolean> {
-    return PASSED.get(recipe.constructor)?.has(await probeKey(recipe, probe)) ?? false;
+export async function probeOnce(recipe: Recipe, probe: string, run: () => Promise<void>): Promise<void> {
+    if ((PROBE_MS.get(await timeCapKey(recipe)) ?? 0) > TIME_CAP_MS) {
+        return;
+    }
+    let probed = PROBED.get(recipe.constructor);
+    if (!probed) {
+        PROBED.set(recipe.constructor, probed = new Set());
+    }
+    const key = await probeKey(recipe, probe);
+    if (probed.has(key)) {
+        return;
+    }
+    probed.add(key);
+    const start = performance.now();
+    try {
+        await run();
+    } finally {
+        await charge(recipe, performance.now() - start);
+    }
 }
 
-export async function passed(recipe: Recipe, probe: string): Promise<void> {
-    let passed = PASSED.get(recipe.constructor);
-    if (!passed) {
-        PASSED.set(recipe.constructor, passed = new Set());
+/** Adds `ms` to the time the recipe's probes have taken in this process. */
+export async function charge(recipe: Recipe, ms: number): Promise<void> {
+    const key = await timeCapKey(recipe);
+    PROBE_MS.set(key, (PROBE_MS.get(key) ?? 0) + ms);
+}
+
+/**
+ * What a recipe's probes share a time cap by: its name, and for a recipe with a recipe list its children's keys too,
+ * since a composite a test declares has one name whatever it runs.
+ */
+async function timeCapKey(recipe: Recipe): Promise<string> {
+    let children: Recipe[];
+    try {
+        children = await recipe.recipeList();
+    } catch {
+        return recipe.name;
     }
-    passed.add(await probeKey(recipe, probe));
+    const keys: string[] = [];
+    for (const child of children) {
+        keys.push(await timeCapKey(child));
+    }
+    return keys.length === 0 ? recipe.name : `${recipe.name}[${keys.join(",")}]`;
 }
 
 async function probeKey(recipe: Recipe, probe: string): Promise<string> {

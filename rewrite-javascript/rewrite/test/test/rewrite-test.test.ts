@@ -30,6 +30,7 @@ import {
     typescript
 } from "../../src/javascript";
 import {autoFormat, AutoformatVisitor, maybeAutoFormat} from "../../src/javascript/format";
+import {charge} from "../../src/test/probes";
 
 function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
     return {...t, markers: {...t.markers, markers: [...t.markers.markers, marker]}};
@@ -730,6 +731,57 @@ describe("rewrite test", () => {
             const sut = new RecipeSpec();
             sut.recipe = new Capitalize({checked: true});
             return sut.rewriteRun(text("hello", "Hello"));
+        });
+
+        test("a probe runs once in a process, whether it passes or fails", async () => {
+            // given
+            class CapitalizeTwice extends Capitalize {
+            }
+            const sut = new RecipeSpec();
+            sut.recipe = new CapitalizeTwice({checked: false});
+            await expect(sut.rewriteRun(text("hello", "Hello"))).rejects.toThrow("threw when run on an empty PlainText");
+
+            // when, then
+            return sut.rewriteRun(text("hello", "Hello"));
+        });
+
+        test("a recipe is probed no more once its probes have taken 20 seconds in the process", async () => {
+            // given
+            class CapitalizeSlowly extends Capitalize {
+                name = "org.openrewrite.test.capitalize-slowly";
+            }
+            await charge(new CapitalizeSlowly({checked: false}), 20_001);
+            const sut = new RecipeSpec();
+            sut.recipe = new CapitalizeSlowly({checked: false});
+
+            // when, then
+            return sut.rewriteRun(text("hello", "Hello"));
+        });
+
+        test("a composite shares its time cap only with composites of the same recipe list", async () => {
+            // given
+            class Each extends Recipe {
+                name = "org.openrewrite.test.each";
+                displayName = "Each";
+                description = "Runs each of its recipes.";
+
+                constructor(private readonly recipes: Recipe[]) {
+                    super();
+                }
+
+                async recipeList(): Promise<Recipe[]> {
+                    return this.recipes;
+                }
+            }
+            await charge(new Each([new Capitalize({checked: true})]), 20_001);
+            const sut = new RecipeSpec();
+
+            // when, then
+            sut.recipe = new Each([new Capitalize({checked: false})]);
+            await sut.rewriteRun(text("hello", "Hello"));
+            sut.recipe = new Each([new Capitalize({checked: false}), new Capitalize({checked: true})]);
+            await expect(sut.rewriteRun(text("hello", "Hello")))
+                .rejects.toThrow("org.openrewrite.test.each threw when run on an empty PlainText");
         });
 
         test("an ad hoc recipe is not probed", () => {

@@ -19,7 +19,7 @@ import {ExecutionContext} from "../execution";
 import {SourceFile} from "../tree";
 import {Result} from "../run";
 import {TreePrinters} from "../print";
-import {describeThrown, passed, probedBefore, thrownBy, typeName, withMarkersOf} from "./probes";
+import {describeThrown, probeOnce, thrownBy, typeName, withMarkersOf} from "./probes";
 
 /** Runs the recipe on an empty file of each kind it changed, and fails the test if the recipe throws there. */
 export class EmptySources {
@@ -38,15 +38,13 @@ export class EmptySources {
                 continue;
             }
             kinds.add(probe);
-            if (await probedBefore(this.recipe, probe)) {
-                continue;
-            }
-            const empty = await parseEmpty(before, spec, parseCtx);
-            const thrown = empty ? await thrownBy(this.recipe, [empty], recipeCtx, cycles) : undefined;
-            if (empty && thrown) {
-                throw new Error(this.message(empty, thrown.error));
-            }
-            await passed(this.recipe, probe);
+            await probeOnce(this.recipe, probe, async () => {
+                const empty = await parseEmpty(before, spec, parseCtx);
+                const thrown = empty ? await thrownBy(this.recipe, [empty], recipeCtx, cycles) : undefined;
+                if (empty && thrown) {
+                    throw new Error(this.message(empty, thrown.error));
+                }
+            });
         }
     }
 
