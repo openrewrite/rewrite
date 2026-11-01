@@ -117,6 +117,52 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void rightOperandOfAnEquallyBindingOperator() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(int a, int b, int c, boolean x, boolean y, boolean z, String s) {
+                      int d = a + (b + c);
+                      int e = a * (b * c);
+                      int f = a & (b & c);
+                      int g = a | (b | c);
+                      int h = a ^ (b ^ c);
+                      int i = a << (b << c);
+                      boolean j = x && (y && z);
+                      boolean k = x || (y || z);
+                      boolean l = x == (y == z);
+                      String m = s + (a + b);
+                      String n = s + (s + a);
+                      int o = (a + b) + c;
+                      boolean p = (x || y) || z;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(int a, int b, int c, boolean x, boolean y, boolean z, String s) {
+                      int d = a + (b + c);
+                      int e = a * (b * c);
+                      int f = a & (b & c);
+                      int g = a | (b | c);
+                      int h = a ^ (b ^ c);
+                      int i = a << (b << c);
+                      boolean j = x && (y && z);
+                      boolean k = x || (y || z);
+                      boolean l = x == (y == z);
+                      String m = s + (a + b);
+                      String n = s + (s + a);
+                      int o = a + b + c;
+                      boolean p = x || y || z;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void unaryOperatorsWithBinaries() {
         rewriteRun(
           java(
@@ -272,7 +318,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       // String concatenation with mixed types
                       String a = "Calculation: " + 1.5 * 2;
                       String b = "Item " + 1 + ": detail";
-                      String c = "Item " + 1 + ": detail";
+                      String c = "Item " + (1 + ": detail");
 
                       // String concatenation in conditions
                       boolean test1 = ("a" + "b").equals("ab");
@@ -546,6 +592,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();
+
+                      // Associative operations, which the parser still groups to the left
+                      int result8 = a + (b + c);
+                      boolean result9 = a > b || (b > c || c > a);
                   }
               }
               """,
@@ -577,6 +627,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
 
                       // Switch expression
                       int result7 = (switch(a) { default -> "one";}).length();
+
+                      // Associative operations, which the parser still groups to the left
+                      int result8 = a + (b + c);
+                      boolean result9 = a > b || (b > c || c > a);
                   }
               }
               """

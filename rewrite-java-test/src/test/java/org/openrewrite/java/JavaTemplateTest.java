@@ -162,6 +162,82 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizeParameterOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"shift".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(int)} << #{any(int)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0), method.getArguments().get(1));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int a = shift(1, 2 << 3);
+
+                  static int shift(int value, int distance) {
+                      return value << distance;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int a = 1 << (2 << 3);
+
+                  static int shift(int value, int distance) {
+                      return value << distance;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizeReplacementOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"either".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(boolean)} || #{any(boolean)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0), method.getArguments().get(1));
+                }
+            })),
+          java(
+            """
+              class A {
+                  boolean test(boolean x, boolean y, boolean z) {
+                      return x || either(y, z);
+                  }
+
+                  static boolean either(boolean a, boolean b) {
+                      return a || b;
+                  }
+              }
+              """,
+            """
+              class A {
+                  boolean test(boolean x, boolean y, boolean z) {
+                      return x || (y || z);
+                  }
+
+                  static boolean either(boolean a, boolean b) {
+                      return a || b;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {

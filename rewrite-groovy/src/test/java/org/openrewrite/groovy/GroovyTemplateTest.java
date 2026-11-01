@@ -543,6 +543,26 @@ class GroovyTemplateTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizeReplacementOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(replacePlaceholderWithArguments("#{any()} == #{any()}")),
+          groovy(
+            """
+              def flag = true
+              def a = 1
+              def b = 1
+              def same = flag == placeholder(a, b)
+              """,
+            """
+              def flag = true
+              def a = 1
+              def b = 1
+              def same = flag == (a == b)
+              """
+          ));
+    }
+
+    @Test
     void replaceArgumentsOfExplicitConstructorInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
