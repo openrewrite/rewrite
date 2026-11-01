@@ -135,7 +135,13 @@ export async function* scheduleRunStreaming(
             // of the recipe list, leaving nested scanners unrun.
             await recurseRecipeList(recipe, b, recipeLists, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
-                    await (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor);
+                    const scanned = await (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor);
+                    if (scanned !== b2 && ctx.getBoolean(ExecutionContext.SCANNING_MUTATION_VALIDATION, false)) {
+                        throw new Error("Record what the scanner finds in the accumulator, and make the edits in " +
+                            `editorWithData(acc). ${recipe.name}'s scanner ${scanned ? "changed" : "deleted"} ` +
+                            `${b2.sourcePath}, and the scanning phase discards edits. A scanner that reuses an ` +
+                            "editing visitor opts out with spec.checkNoEditsInScanningPhase = false.");
+                    }
                 }
                 return b2;
             });

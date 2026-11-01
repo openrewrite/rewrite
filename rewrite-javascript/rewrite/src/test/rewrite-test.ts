@@ -47,6 +47,7 @@ interface RecipeSpecConfiguration {
     allowEmptyDiff: boolean;
     checkReportingMarkersOnly: boolean;
     checkExecutionContextUnchanged: boolean;
+    checkNoEditsInScanningPhase: boolean;
     cycles?: number;
     expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
@@ -69,6 +70,9 @@ export class RecipeSpec {
      * shares.
      */
     checkExecutionContextUnchanged: boolean = true
+
+    /** Fails a run whose ScanningRecipe's scanner edits a tree, which the scanning phase discards. */
+    checkNoEditsInScanningPhase: boolean = true
 
     /**
      * The cycles to run, by default one more than {@link expectedCyclesThatMakeChanges} and at least two. The
@@ -123,6 +127,7 @@ export class RecipeSpec {
             allowEmptyDiff: this.allowEmptyDiff,
             checkReportingMarkersOnly: this.checkReportingMarkersOnly,
             checkExecutionContextUnchanged: this.checkExecutionContextUnchanged,
+            checkNoEditsInScanningPhase: this.checkNoEditsInScanningPhase,
             cycles: this.cycles,
             expectedCyclesThatMakeChanges: this.expectedCyclesThatMakeChanges,
             recipe: this.recipe,
@@ -226,6 +231,8 @@ export class RecipeSpec {
         }
 
         this.recipeExecutionContext.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
+        this.recipeExecutionContext.messages[ExecutionContext.SCANNING_MUTATION_VALIDATION] =
+            this.checkNoEditsInScanningPhase;
         const contextWrites = this.checkExecutionContextUnchanged ? new ExecutionContextWrites() : undefined;
         const runContext = (ctx: ExecutionContext) => contextWrites?.watch(ctx) ?? ctx;
         const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;

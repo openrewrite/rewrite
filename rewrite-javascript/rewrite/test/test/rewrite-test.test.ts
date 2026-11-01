@@ -3,6 +3,7 @@ import {text} from "../../src/text";
 import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
 import {ReplacedText} from "../../fixtures/replaced-text";
+import {ScanningEditor} from "../../fixtures/scanning-editor";
 import {DATA_TABLE_STORE, ExecutionContext, InMemoryDataTableStore, Recipe, ScanningRecipe, SourceFile, TreeVisitor} from "../../src";
 import {emptyMarkers, findMarker, foundSearchResult, Marker, Markers, MarkersKind} from "../../src/markers";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
@@ -460,6 +461,63 @@ describe("rewrite test", () => {
         });
     });
 
+    describe("no edits in the scanning phase", () => {
+        // Counts the texts it scans and upper-cases each, an edit the scanning phase throws away
+        class ShoutWhileScanning extends ScanningRecipe<{ count: number }> {
+            name = "org.openrewrite.test.shout-while-scanning";
+            displayName = "Shout while scanning";
+            description = "Counts texts while upper-casing them in its scanner.";
+
+            initialValue(_ctx: ExecutionContext): { count: number } {
+                return {count: 0};
+            }
+
+            async scanner(acc: { count: number }): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                        acc.count++;
+                        return {...text, text: text.text.toUpperCase()};
+                    }
+                };
+            }
+        }
+
+        test("a scanner that edits a tree fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new ShoutWhileScanning();
+
+            // when
+            const run = sut.rewriteRun({...text("hello"), path: "hello.txt"});
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Record what the scanner finds in the accumulator, and make the edits in editorWithData(acc). " +
+                "org.openrewrite.test.shout-while-scanning's scanner changed hello.txt, and the scanning phase " +
+                "discards edits. A scanner that reuses an editing visitor opts out with " +
+                "spec.checkNoEditsInScanningPhase = false.");
+        });
+
+        test("a scanner that only records what it finds passes", () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new ScanningEditor();
+
+            // when, then
+            return sut.rewriteRun(text("hello", "hello (count: 1)"));
+        });
+
+        test("checkNoEditsInScanningPhase turns the check off", () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new ShoutWhileScanning();
+            sut.checkNoEditsInScanningPhase = false;
+
+            // when, then
+            return sut.rewriteRun(text("hello"));
+        });
+    });
+
     test("a spec returns to its suite configuration between tests", () => {
         // Independent of whether the harness already switched tracking on
         RecipeSpec.trackSuiteConfiguration();
@@ -474,6 +532,7 @@ describe("rewrite test", () => {
         sut.checkParsePrintIdempotence = false;
         sut.checkReportingMarkersOnly = false;
         sut.checkExecutionContextUnchanged = false;
+        sut.checkNoEditsInScanningPhase = false;
         sut.cycles = 1;
         sut.expectedCyclesThatMakeChanges = 3;
         RecipeSpec.restoreSuiteConfiguration();
@@ -483,6 +542,7 @@ describe("rewrite test", () => {
         expect(sut.checkParsePrintIdempotence).toBe(true);
         expect(sut.checkReportingMarkersOnly).toBe(true);
         expect(sut.checkExecutionContextUnchanged).toBe(true);
+        expect(sut.checkNoEditsInScanningPhase).toBe(true);
         expect(sut.cycles).toBeUndefined();
         expect(sut.expectedCyclesThatMakeChanges).toBeUndefined();
     });
