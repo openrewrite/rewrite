@@ -15,6 +15,7 @@
 """Tests for the Python test harness."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Set
 from uuid import UUID, uuid4
 
@@ -1650,6 +1651,16 @@ class TestUnparsedSources:
         spec = RecipeSpec(recipe=_RenameToSettingsName(), type_attribution=False)
         with pytest.raises(AssertionError, match="RenameToSettingsName threw when settings.py was missing"):
             spec.rewrite_run(*_settings_and_app())
+
+    def test_each_probe_counts_its_time_toward_the_cap(self, monkeypatch):
+        # The clock advances a second each time it is read, so each probe takes a second.
+        clock = iter(range(100))
+        monkeypatch.setattr(probes, "time", SimpleNamespace(perf_counter=lambda: float(next(clock))))
+        recipe = _RenameToSettingsName(checked=True)
+        monkeypatch.setitem(probes._PROBE_SECONDS, probes._time_cap_key(recipe), 0.0)
+        RecipeSpec(recipe=recipe, type_attribution=False).rewrite_run(*_settings_and_app())
+
+        assert probes._PROBE_SECONDS[probes._time_cap_key(recipe)] == 2.0
 
     def test_a_recipe_probed_for_20_seconds_is_probed_no_more(self, monkeypatch):
         recipe = _RenameToSettingsName()
