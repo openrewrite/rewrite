@@ -10,7 +10,6 @@ import {
     DATA_TABLE_STORE,
     ExecutionContext,
     InMemoryDataTableStore,
-    isParseError,
     noopVisitor,
     Option,
     Recipe,
@@ -836,7 +835,7 @@ describe("rewrite test", () => {
             beforeRecipe: (document: Json.Document) => withMarker(document, {kind: "my.Team", id: randomId()})
         });
 
-        test("a recipe that casts a file it can't edit fails", async () => {
+        test("a recipe that casts a file read as plain text fails", async () => {
             // given
             const sut = new RecipeSpec();
             sut.recipe = new ChangeApplicationJson({checked: false});
@@ -848,46 +847,90 @@ describe("rewrite test", () => {
             await expect(run).rejects.toThrow(
                 "Check the kind of source file before casting it, so that the recipe leaves a file it can't edit " +
                 "unchanged instead of throwing.\n" +
-                "org.openrewrite.test.change-application-json threw when application.json was a ParseError (a file " +
-                "its parser failed on) with the markers of the test's source (Team):\n" +
+                "org.openrewrite.test.change-application-json threw when application.json was a PlainText (a file " +
+                "read as plain text) with the markers of the test's source (Team):\n" +
                 "    TypeError: Cannot read properties of undefined (reading 'kind')\n" +
                 "        at TreeVisitor.preVisit (test/test/rewrite-test.test.ts:");
             await expect(run).rejects.toThrow("  - don't catch the exception to make this pass");
-        });
-
-        test("a recipe that casts a file read as plain text fails", async () => {
-            // given
-            class SkipParseErrors extends Recipe {
-                name = "org.openrewrite.test.skip-parse-errors";
-                displayName = "Skip parse errors";
-                description = "Changes the values of `application.json` unless it failed to parse.";
-
-                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                    const change = changeApplicationJson(false);
-                    return new class extends TreeVisitor<any, ExecutionContext> {
-                        protected override async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                            this.stopAfterPreVisit();
-                            return isParseError(tree) ? tree : change.visit(tree, ctx);
-                        }
-                    };
-                }
-            }
-            const sut = new RecipeSpec();
-            sut.recipe = new SkipParseErrors();
-
-            // when
-            const run = sut.rewriteRun(applicationJson());
-
-            // then
-            await expect(run).rejects.toThrow(
-                "org.openrewrite.test.skip-parse-errors threw when application.json was a PlainText (a file read " +
-                "as plain text) with the markers of the test's source (Team):\n");
         });
 
         test("a recipe that checks the kind of source file passes", () => {
             const sut = new RecipeSpec();
             sut.recipe = new ChangeApplicationJson({checked: true});
             return sut.rewriteRun(applicationJson());
+        });
+
+        // Sets each text to the released version of version.txt, which its scanner records, reading that record
+        // before checking that the scanner made it unless `checked`
+        class Release extends ScanningRecipe<Map<string, string>> {
+            name = "org.openrewrite.test.release";
+            displayName = "Release";
+            description = "Sets each text to the released version of `version.txt`.";
+
+            @Option({displayName: "Checked", description: "Whether the recipe checks that its scanner found `version.txt`."})
+            checked!: boolean;
+
+            constructor(options: { checked: boolean }) {
+                super(options);
+            }
+
+            initialValue(_ctx: ExecutionContext): Map<string, string> {
+                return new Map();
+            }
+
+            async scanner(acc: Map<string, string>): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                        acc.set(text.sourcePath, text.text);
+                        return text;
+                    }
+                };
+            }
+
+            async editorWithData(acc: Map<string, string>): Promise<TreeVisitor<any, ExecutionContext>> {
+                const checked = this.checked;
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                        if (checked && !acc.has("version.txt")) {
+                            return text;
+                        }
+                        const released = acc.get("version.txt")!.replace(/-SNAPSHOT$/, "");
+                        return released === text.text ? text : {...text, text: released};
+                    }
+                };
+            }
+        }
+
+        const versions = () => [
+            {...text("1.0.0-SNAPSHOT", "1.0.0"), path: "version.txt"},
+            {...text("0.9.0", "1.0.0"), path: "lock.txt"}
+        ];
+
+        test("a ScanningRecipe that reads an accumulator entry its scanner never recorded fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = new Release({checked: false});
+
+            // when
+            const run = sut.rewriteRun(...versions());
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Check that the scanner found the files the recipe needs before using what it keeps of them, so " +
+                "that the recipe changes nothing instead of throwing when one is missing.\n" +
+                "org.openrewrite.test.release threw when version.txt was missing, which is how a JavaScript recipe " +
+                "sees a file its parser failed on or left unparsed:\n" +
+                "    TypeError: Cannot read properties of undefined (reading 'replace')\n" +
+                "        at PlainTextVisitor.visitText (test/test/rewrite-test.test.ts:");
+            await expect(run).rejects.toThrow(
+                "The host sends a JavaScript recipe only the JS/TS, JSON, YAML and plain-text files it parsed, so " +
+                "such a file is simply not there for the recipe.\n");
+        });
+
+        test("a ScanningRecipe that checks what its scanner recorded passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Release({checked: true});
+            return sut.rewriteRun(...versions());
         });
 
         test("a recipe a test declares inline is not probed", () => {

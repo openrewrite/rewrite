@@ -18,21 +18,15 @@ import {ExecutionContext} from "../execution";
 import {SourceFile} from "../tree";
 import {Result} from "../run";
 import {TreePrinters} from "../print";
-import {isParseError, ParseError, ParseErrorKind} from "../parse-error";
-import {Markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {isParseError} from "../parse-error";
+import {MarkersKind} from "../markers";
 import {PlainText} from "../text";
 import {randomId} from "../uuid";
 import {describeThrown, passed, probedBefore, thrownBy, typeName, withMarkersOf} from "./probes";
 
-/** The kinds of source a repository holds at a path its parser didn't make a tree of, as JavaScript reads them. */
-const unparsedKinds = [
-    {kind: ParseErrorKind, description: "a file its parser failed on"},
-    {kind: PlainText.Kind.PlainText, description: "a file read as plain text"}
-];
-
 /**
- * Runs the recipe with a source it changed in place of the file as a parse error and as plain text, and fails the test
- * if the recipe throws there.
+ * Runs the recipe without a source it changed, as it meets a file its parser failed on, and with that source as plain
+ * text, and fails the test if the recipe throws there.
  */
 export class UnparsedSources {
     private readonly changed: Set<SourceFile>;
@@ -51,72 +45,84 @@ export class UnparsedSources {
                 continue;
             }
             probedKinds.add(before.kind);
-            for (const {kind, description} of unparsedKinds) {
-                const probe = `unparsed ${before.kind} ${kind}`;
-                if (before.kind === kind || await probedBefore(this.recipe, probe)) {
-                    continue;
+
+            const missing = `unparsed ${before.kind} missing`;
+            if (!await probedBefore(this.recipe, missing)) {
+                const thrown = await thrownBy(this.recipe, sources.filter(s => s !== before), recipeCtx, cycles);
+                if (thrown) {
+                    throw new Error(this.missingMessage(before, thrown.error));
                 }
-                const unparsed = await asUnparsed(before, kind);
+                await passed(this.recipe, missing);
+            }
+
+            const plainText = `unparsed ${before.kind} ${PlainText.Kind.PlainText}`;
+            if (before.kind !== PlainText.Kind.PlainText && !await probedBefore(this.recipe, plainText)) {
+                const unparsed = await asPlainText(before);
                 const thrown = await thrownBy(this.recipe, sources.map(s => s === before ? unparsed : s), recipeCtx,
                     cycles);
                 if (thrown) {
-                    throw new Error(this.message(unparsed, description, thrown.error));
+                    throw new Error(this.plainTextMessage(unparsed, thrown.error));
                 }
-                await passed(this.recipe, probe);
+                await passed(this.recipe, plainText);
             }
         }
     }
 
-    private message(unparsed: SourceFile, description: string, thrown: unknown): string {
-        const markers = unparsed.markers.markers.filter(m => m.kind !== MarkersKind.ParseExceptionResult);
+    private missingMessage(missing: SourceFile, thrown: unknown): string {
+        return [
+            "Check that the scanner found the files the recipe needs before using what it keeps of them, so that " +
+            "the recipe changes nothing instead of throwing when one is missing.",
+            `${this.recipe.name} threw when ${missing.sourcePath} was missing, which is how a JavaScript recipe sees ` +
+            "a file its parser failed on or left unparsed:",
+            describeThrown(thrown, "    "),
+            "Besides the files the test gives it, a repository holds files their parser failed on or left " +
+            "unparsed. The host sends a JavaScript recipe only the JS/TS, JSON, YAML and plain-text files it " +
+            "parsed, so such a file is simply not there for the recipe.",
+            "  - when the scanner found no file of the kind the recipe needs, generate and change nothing, instead " +
+            "of reading an empty accumulator",
+            "  - check for undefined before using what the scanner keeps of a file it may not find " +
+            "(`acc.get(\"package.json\")?.version`)",
+            "  - don't catch the exception to make this pass"
+        ].join("\n");
+    }
+
+    private plainTextMessage(unparsed: SourceFile, thrown: unknown): string {
         return [
             "Check the kind of source file before casting it, so that the recipe leaves a file it can't edit " +
             "unchanged instead of throwing.",
-            `${this.recipe.name} threw when ${unparsed.sourcePath} was a ${typeName(unparsed.kind)} (${description})` +
-            `${withMarkersOf(markers)}:`,
+            `${this.recipe.name} threw when ${unparsed.sourcePath} was a ${typeName(unparsed.kind)} (a file read ` +
+            `as plain text)${withMarkersOf(unparsed.markers.markers)}:`,
             describeThrown(thrown, "    "),
-            "Besides the files the test gives it, a repository holds files their parser failed on and files read as " +
-            "plain text, at the same paths and with the same markers as files the recipe edits.",
+            "Besides the files the test gives it, a repository holds files read as plain text, at the same paths " +
+            "and with the same markers as files the recipe edits.",
             "  - visit with the visitor of the language the recipe edits, such as JavaScriptVisitor, JsonVisitor or " +
             "YamlVisitor, whose isAcceptable skips other kinds of source file",
             "  - in a TreeVisitor<any, ExecutionContext>, check the kind before a cast " +
             "(`tree.kind === JS.Kind.CompilationUnit`), not the file's path or markers",
-            "  - when the scanner found no file of the kind the recipe edits, generate and change nothing, instead " +
-            "of reading an empty accumulator",
             "  - don't catch the exception to make this pass"
         ].join("\n");
     }
 }
 
-/**
- * The file `before` was parsed from, as the kind of source a repository holds when its parser fails on the file or
- * reads it as plain text.
- */
-async function asUnparsed(before: SourceFile, kind: string): Promise<SourceFile> {
-    // these come from parsing the file itself
-    const kept = before.markers.markers.filter(m => m.kind !== MarkersKind.ParseExceptionResult &&
-        !m.kind.endsWith("ResolutionResult"));
-    const markers: Markers = {...before.markers, markers: kept};
-    const file = {
+/** The file `before` was parsed from, as the plain text a repository holds when no parser claims the file. */
+async function asPlainText(before: SourceFile): Promise<PlainText> {
+    return {
+        kind: PlainText.Kind.PlainText,
         id: randomId(),
+        // these come from parsing the file itself
+        markers: {
+            ...before.markers,
+            markers: before.markers.markers.filter(m => m.kind !== MarkersKind.ParseExceptionResult &&
+                !m.kind.endsWith("ResolutionResult"))
+        },
         sourcePath: before.sourcePath,
         charsetName: before.charsetName,
         charsetBomMarked: before.charsetBomMarked,
         checksum: before.checksum,
         fileAttributes: before.fileAttributes,
-        text: await TreePrinters.print(before)
+        text: await TreePrinters.print(before),
+        snippets: []
     };
-    if (kind === ParseErrorKind) {
-        const exception: ParseExceptionResult = {
-            kind: MarkersKind.ParseExceptionResult,
-            id: randomId(),
-            parserType: "Parser",
-            exceptionType: "Error",
-            message: "The file could not be parsed"
-        };
-        return {...file, kind: ParseErrorKind, markers: {...markers, markers: [...kept, exception]}} as ParseError;
-    }
-    return {...file, kind: PlainText.Kind.PlainText, markers, snippets: []} as PlainText;
 }
 
 /**
