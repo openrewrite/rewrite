@@ -300,9 +300,9 @@ func (v *MinimumViableSpacingVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	out := v.GoVisitor.VisitIf(ifStmt, p).(*java.If)
 	copied := *out
 	if !v.followsAnInit() {
-		condition := out.Condition
+		condition := *out.Condition
 		condition.Tree.Element = separateFrom("if", condition.Tree.Element, condition.Prefix)
-		copied.Condition = condition
+		copied.Condition = &condition
 	}
 	if out.ElsePart != nil && out.ElsePart.Body.Element != nil {
 		elsePart := *out.ElsePart
