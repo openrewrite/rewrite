@@ -657,6 +657,43 @@ public class TemplateApplyTests : RewriteTest
         Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
     }
 
+    /// <summary>
+    /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
+    /// </summary>
+    [Theory]
+    [InlineData("-", "-b", "-(-b)")]
+    [InlineData("-", "--b", "-(--b)")]
+    [InlineData("-", "-1", "-(-1)")]
+    [InlineData("+", "+b", "+(+b)")]
+    [InlineData("+", "++b", "+(++b)")]
+    [InlineData("-", "+b", "-+b")]
+    [InlineData("-", "b--", "-b--")]
+    [InlineData("- ", "-b", "- -b")]
+    [InlineData("x-", "-b", "x-(-b)")]
+    [InlineData("x-", "-b * c", "x-(-b * c)")]
+    [InlineData("x+", "++b", "x+(++b)")]
+    [InlineData("x - ", "-b", "x - -b")]
+    public void CaptureAfterSignMatchesFreshParse(string before, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}"), captured, expected);
+    }
+
+    [Fact]
+    public void ReplacementAfterSignKeepsItsSign()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"Negate({a})"),
+                CSharpTemplate.Expression($"-{a}")))),
+            CSharp(
+                "class C { int Negate(int i) => -i; int M(int b) { return -Negate(b); } }",
+                "class C { int Negate(int i) => -i; int M(int b) { return -(-b); } }"
+            )
+        );
+    }
+
     [Fact]
     public void NoCaptureParenthesizationWhenUnnecessary()
     {
@@ -718,6 +755,21 @@ public class TemplateApplyTests : RewriteTest
 
     private static Expression ParseExpression(string code) =>
         FindFirst<NamedVariable>(Parse($"class C {{ object v = {code}; }}"))!.Initializer!.Element;
+
+    /// <summary>
+    /// Applies <paramref name="tmpl"/> with its capture <c>a</c> bound to <paramref name="captured"/>, and checks
+    /// that the result prints <paramref name="expected"/> and is the tree the parser builds for that text.
+    /// </summary>
+    private static void AssertAppliesAsParsed(CSharpTemplate tmpl, string captured, string expected)
+    {
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression(captured) }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal(expected, printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
 
     private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));

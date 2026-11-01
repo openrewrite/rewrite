@@ -188,9 +188,11 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
+        if (WouldFuseSigns(parent, expr))
+            return CSharpPrecedences.Parenthesize(expr);
+
         // All prefix unary operators are at the same precedence level (13),
-        // so a unary inside another unary is always unambiguous — no parens needed.
-        // This covers !!x, -(-x), -(~x), ~(!x), etc.
+        // so a unary inside another unary is unambiguous once its sign can't fuse: !!x, -~x, ~!x, etc.
         if (parent is Unary or CsUnary)
             return expr;
 
@@ -232,7 +234,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        if (parent is Unary or CsUnary)
+        if (parent is Unary or CsUnary || WouldFuseSigns(parent, expr))
             return true;
 
         if (parent is Binary parentBinary)
@@ -266,4 +268,62 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
         return false;
     }
+
+    /// <summary>
+    /// Whether <paramref name="expr"/> starts with the sign <paramref name="parent"/> prints right before it,
+    /// so that the two would lex as <c>--</c> or <c>++</c>: <c>-(-x)</c> printed bare is <c>--x</c>.
+    /// </summary>
+    private static bool WouldFuseSigns(object? parent, Expression expr)
+    {
+        var preceding = parent switch
+        {
+            Unary { Operator.Element: Unary.OperatorType.Negative } => '-',
+            Unary { Operator.Element: Unary.OperatorType.Positive } => '+',
+            Binary { Operator.Element: Binary.OperatorType.Subtraction } b when b.Right.Id == expr.Id => '-',
+            Binary { Operator.Element: Binary.OperatorType.Addition } b when b.Right.Id == expr.Id => '+',
+            _ => (char?)null
+        };
+        return preceding != null && preceding == LeadingSign(expr);
+    }
+
+    /// <summary>
+    /// The sign <paramref name="expr"/> prints first, found down its left operands, unless whitespace or a comment
+    /// comes before it.
+    /// </summary>
+    private static char? LeadingSign(Expression expr)
+    {
+        for (Expression? e = expr; e != null; e = LeftOperand(e))
+        {
+            if (!e.Prefix.IsEmpty)
+                return null;
+            if (e is Unary u)
+            {
+                switch (u.Operator.Element)
+                {
+                    case Unary.OperatorType.Negative or Unary.OperatorType.PreDecrement:
+                        return '-';
+                    case Unary.OperatorType.Positive or Unary.OperatorType.PreIncrement:
+                        return '+';
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Expression? LeftOperand(Expression expr) => expr switch
+    {
+        Binary b => b.Left,
+        CsBinary b => b.Left,
+        Ternary t => t.Condition,
+        Assignment a => a.Variable,
+        AssignmentOperation a => a.Variable,
+        InstanceOf i => i.Expression.Element,
+        IsPattern ip => ip.Expression,
+        FieldAccess fa => fa.Target,
+        MethodInvocation mi => mi.Select?.Element,
+        ArrayAccess aa => aa.Indexed,
+        Unary { Operator.Element: Unary.OperatorType.PostIncrement or Unary.OperatorType.PostDecrement } u =>
+            u.Expression,
+        _ => null
+    };
 }
