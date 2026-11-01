@@ -1,0 +1,1 @@
+{"name": "root", "private": true, "workspaces": ["packages/*"], "dependencies": {"@probe/owner": "1.0.0"}}

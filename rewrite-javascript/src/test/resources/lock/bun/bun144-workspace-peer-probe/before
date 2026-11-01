@@ -1,0 +1,16 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "root",
+    },
+    "packages/host": {
+      "name": "@probe/host",
+      "version": "1.0.0",
+    },
+  },
+  "packages": {
+    "@probe/host": ["@probe/host@workspace:packages/host"],
+  }
+}

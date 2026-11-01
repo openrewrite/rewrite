@@ -374,10 +374,11 @@ final class Tree {
         }
 
         private boolean satisfies(Lockfile lockfile, int id, DependencyVersion version) {
-            Package pkg = lockfile.packages.get(id);
-            SemverVersion resolved = pkg.resolution.tag == Resolution.Tag.NPM ? pkg.resolution.version :
-                    pkg.resolution.tag == Resolution.Tag.WORKSPACE ? lockfile.workspaceVersions.get(pkg.nameHash) : null;
-            return resolved != null && version.npm().version.satisfies(resolved);
+            // resolution.rs satisfies_dependency_version: a workspace never satisfies an npm peer here.
+            // begin() only probes npm peers, so the other supported pairings (git and github) cannot occur.
+            Resolution resolved = lockfile.packages.get(id).resolution;
+            return resolved.tag == Resolution.Tag.NPM && version.tag == DependencyVersion.Tag.NPM &&
+                    version.npm().version.satisfies(resolved.version);
         }
 
         boolean hiddenBy(Builder builder, int treeId) {

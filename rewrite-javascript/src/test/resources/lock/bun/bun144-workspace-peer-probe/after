@@ -1,0 +1,25 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "root",
+      "dependencies": {
+        "@probe/owner": "1.0.0",
+      },
+    },
+    "packages/host": {
+      "name": "@probe/host",
+      "version": "1.0.0",
+    },
+  },
+  "packages": {
+    "@probe/host": ["@probe/host@workspace:packages/host"],
+
+    "@probe/owner": ["@probe/owner@1.0.0", "http://127.0.0.1:48731/@probe/owner/-/owner-1.0.0.tgz", { "dependencies": { "@probe/host": "1.1.0", "@probe/plugin": "1.0.0" } }, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+
+    "@probe/owner/@probe/host": ["@probe/host@1.1.0", "http://127.0.0.1:48731/@probe/host/-/host-1.1.0.tgz", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+
+    "@probe/owner/@probe/plugin": ["@probe/plugin@1.0.0", "http://127.0.0.1:48731/@probe/plugin/-/plugin-1.0.0.tgz", { "peerDependencies": { "@probe/host": "^1" } }, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+  }
+}

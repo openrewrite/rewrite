@@ -1,0 +1,1 @@
+{"name": "@probe/plugin", "dist-tags": {"latest": "1.0.0"}, "versions": {"1.0.0": {"name": "@probe/plugin", "version": "1.0.0", "peerDependencies": {"@probe/host": "^1"}, "dist": {"tarball": "https://registry.npmjs.org/@probe/plugin/-/plugin-1.0.0.tgz", "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="}}}}
