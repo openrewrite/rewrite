@@ -18,6 +18,7 @@ import {
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
+    param,
     pattern,
     Template,
     template,
@@ -142,6 +143,33 @@ describe('object literals in templates and patterns', () => {
             typescript('new E({b() {}});', 'new E({\n    a: 1,\n    b() {},\n});'),
             typescript('new E({...b});', 'new E({\n    a: 1,\n    ...b,\n});')
         ].map(source => ({...source, afterRecipe: expectParserShaped})));
+    });
+
+    describe('one member is a member of the object literal', () => {
+        const [m, options] = [capture('m'), capture<J.NewClass>('options')];
+        const templates: Record<string, (options: J.NewClass) => Template> = {
+            padded: options => Template.builder().code('new E({a: 1, ').param(options.body!.statements[0]).code('})').build(),
+            capture: () => template`new E({a: 1, ${m}})`,
+            parameter: () => template`new E({a: 1, ${param('m')}})`,
+            property: () => template`new E({a: 1, ${options.body!.statements[0].element}})`
+        };
+
+        test.for(Object.keys(templates))('passed %s', how => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                    if (method.name.simpleName !== how) {
+                        return super.visitMethodInvocation(method, p);
+                    }
+                    const bound = method.arguments.elements[0].element as J.NewClass;
+                    return templates[how](bound).apply(method, this.cursor, {
+                        values: new Map<string, J>([['options', bound], ['m', bound.body!.statements[0].element]])
+                    });
+                }
+            });
+            // rewriteRun compares the trees with a fresh parse of the text they print
+            return spec.rewriteRun(typescript(`${how}({b: 2});`, 'new E({a: 1, b: 2});'));
+        });
     });
 
     test('a variadic capture in an object literal pattern matches its properties', async () => {
