@@ -700,7 +700,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
-            source = textwrap.indent(str(literal.value_source), shift * " ")[shift:]
+            source = _shifted(str(literal.value_source), shift)
             return stm.replace(expression=literal.replace(value_source=source,
                                                           value=_string_value(source, literal.value)))
 
@@ -849,6 +849,14 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             if c in ('\n', '\r'):
                 length = 0
         return length
+
+
+def _shifted(source: str, shift: int) -> str:
+    """``source`` with each line after the first moved ``shift`` columns, to the left when ``shift`` is negative."""
+    if shift >= 0:
+        return textwrap.indent(source, shift * " ")[shift:]
+    first, *rest = source.split("\n")
+    return "\n".join([first, *(line[min(-shift, len(line) - len(line.lstrip(" "))):] for line in rest)])
 
 
 def _string_value(source: str, value: object) -> object:

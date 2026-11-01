@@ -997,6 +997,30 @@ def test_a_realigned_docstring_holds_the_string_its_text_spells():
     assert values == ["\n    Aligned with the body.\n    "]
 
 
+def test_an_over_indented_docstring_moves_left():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+    rewrite_run(
+        # language=python
+        python(
+            '''
+            def my_function():
+                    """
+                    Over-indented.
+                    """
+                    return None
+            ''',
+            '''
+            def my_function():
+                """
+                Over-indented.
+                """
+                return None
+            '''
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
 def test_method_select_suffix_already_correct():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
     rewrite_run(
