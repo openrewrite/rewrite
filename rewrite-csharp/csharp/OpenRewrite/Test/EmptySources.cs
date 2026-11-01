@@ -53,15 +53,13 @@ internal static class EmptySources
     }
 
     /// <summary>
-    /// What the recipe throws when run on the empty file alone, with a fresh execution context and the formatter
-    /// skipping what it can't reconcile, as in production.
+    /// What the recipe throws when run on the empty file alone, with a fresh execution context, other than the
+    /// formatter's failure to reconcile, which production skips.
     /// </summary>
     private static Exception? Run(Recipe recipe, SourceFile empty, int cycles)
     {
         var ctx = new ExecutionContext();
         var sources = new List<SourceFile> { empty };
-        var reconcilerThrows = WhitespaceReconciler.ThrowOnMismatchDefault;
-        WhitespaceReconciler.ThrowOnMismatchDefault = false;
         try
         {
             for (var cycle = 1; cycle <= cycles; cycle++)
@@ -79,11 +77,15 @@ internal static class EmptySources
         }
         catch (Exception e)
         {
+            // the switch that would skip it is process-wide, and tests running alongside need it on
+            for (var cause = e; cause != null; cause = cause.InnerException)
+            {
+                if (cause is WhitespaceReconciler.WhitespaceReconcileMismatchException)
+                {
+                    return null;
+                }
+            }
             return e;
-        }
-        finally
-        {
-            WhitespaceReconciler.ThrowOnMismatchDefault = reconcilerThrows;
         }
     }
 
