@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -168,6 +169,21 @@ func TestValuesAndSmallMarkersKeptInAnAccumulatorPass(t *testing.T) {
 		RewriteRun(t, GoProject("app", Golang(`
 			package main
 		`)))
+}
+
+func TestPatternKeptInAnAccumulatorPasses(t *testing.T) {
+	NewRecipeSpec().
+		WithRecipe(&keepWhatItSees{keep: func(acc *seen, v *seeingVisitor, sf java.Tree) {
+			if cu, ok := sf.(*golang.CompilationUnit); ok {
+				// matching parses the pattern, which then keeps the tree of its own code
+				pattern := template.Expression("a()").Build()
+				pattern.Match(cu, v.Cursor())
+				acc.all = append(acc.all, pattern)
+			}
+		}}).
+		RewriteRun(t, Golang(`
+			package main
+		`))
 }
 
 func TestAccumulatorCheckCanBeTurnedOff(t *testing.T) {

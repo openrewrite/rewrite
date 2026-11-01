@@ -45,6 +45,9 @@ var (
 	contextType     = reflect.TypeOf((*recipe.ExecutionContext)(nil)).Elem()
 	resolutionType  = reflect.TypeOf(golang.GoResolutionResult{})
 	keyOrIndex      = regexp.MustCompile(`\[[^\]]*]`)
+	// templatePackage holds GoPattern and GoTemplate, which the harness cannot
+	// import, as the tests of that package use the harness.
+	templatePackage = strings.TrimSuffix(cursorType.PkgPath(), "/visitor") + "/template"
 )
 
 // accumulatorContents finds the heavyweight objects, such as trees, that the
@@ -217,8 +220,9 @@ func heavyweight(t reflect.Type) bool {
 }
 
 // accumulatorLeaf reports whether the walk leaves a value of type t alone: one
-// that holds no references, type attribution, which refers to no tree, or a
-// recipe, which lives for the whole run anyway.
+// that holds no references, type attribution, which refers to no tree, a recipe,
+// which lives for the whole run anyway, or a pattern or template, which keeps
+// the tree of its own code only.
 func accumulatorLeaf(t reflect.Type) bool {
 	switch t.Kind() {
 	case reflect.Slice, reflect.Array:
@@ -232,7 +236,8 @@ func accumulatorLeaf(t reflect.Type) bool {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	return implementedBy(t, javaTypeIface) || implementedBy(t, recipeType)
+	return implementedBy(t, javaTypeIface) || implementedBy(t, recipeType) ||
+		t.PkgPath() == templatePackage && (t.Name() == "GoPattern" || t.Name() == "GoTemplate")
 }
 
 func holdsNoReference(t reflect.Type) bool {
