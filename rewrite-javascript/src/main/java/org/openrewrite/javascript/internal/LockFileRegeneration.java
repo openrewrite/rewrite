@@ -31,12 +31,12 @@ import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.function.Function;
 
 import static java.util.Arrays.asList;
@@ -340,10 +340,6 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * @param ctx supplies the {@code HttpSender} and host-configured registries/credentials
-     * @return the new lock content, or a structured failure
-     */
-    /**
      * Regenerate a lock for a recipe, including npm's normalization on subsequent installs. Each candidate must
      * still pass the port's unchanged-install check. Rejections, missing inputs, cycles and a bounded failure to
      * converge retain their original diagnostics.
@@ -374,6 +370,10 @@ public final class LockFileRegeneration {
         return result;
     }
 
+    /**
+     * @param ctx supplies the {@code HttpSender} and host-configured registries/credentials
+     * @return the new lock content, or a structured failure
+     */
     public Result regenerate(Request request, ExecutionContext ctx) {
         return NativeLockEngine.regenerate(port, request, ctx);
     }
