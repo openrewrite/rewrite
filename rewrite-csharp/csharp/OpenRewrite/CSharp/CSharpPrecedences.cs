@@ -67,7 +67,8 @@ internal static class CSharpPrecedences
         int parentPrec = GetPrecedence(parent);
         if (childPrec > parentPrec) return false;
         if (childPrec < parentPrec) return true;
-        if (isRightOperand && IsRightAssociative(child) && IsRightAssociative(parent)) return false;
+        // Right-associative: the left operand of an equally binding operator needs parentheses
+        if (IsRightAssociative(child) && IsRightAssociative(parent)) return !isRightOperand;
         // Left-associative: the right operand of an equally binding operator needs parentheses
         if (isRightOperand) return true;
         if (IsInSameMathGroup(child, parent)) return false;

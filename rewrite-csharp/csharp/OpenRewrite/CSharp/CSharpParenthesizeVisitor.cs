@@ -247,6 +247,13 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             return CSharpPrecedences.NeedsParentheses(expr, parentCsBinary, isRight);
         }
 
+        // The parser models a ?? b as a Ternary
+        if (parent is Ternary parentTernary && parentTernary.Markers.FindFirst<NullCoalescing>() != null)
+        {
+            bool isRight = parentTernary.FalsePart.Element.Id == expr.Id;
+            return CSharpPrecedences.NeedsParentheses(expr, parentTernary, isRight);
+        }
+
         if (parent is IsPattern)
         {
             // CsBinary with Or/And inside IsPattern is a pattern combinator, not a

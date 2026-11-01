@@ -222,6 +222,25 @@ public class CSharpPrecedencesTests
     }
 
     [Fact]
+    public void NeedsParentheses_NullCoalescingOnLeft_NeedsParens()
+    {
+        // a ?? b on the left of ??  =>  needs parens (a ?? b ?? c parses as a ?? (b ?? c))
+        var child = MakeNullCoalescing(MakeId("a"), MakeId("b"));
+        var parent = MakeNullCoalescing(child, MakeId("c"));
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: false));
+    }
+
+    [Fact]
+    public void NeedsParentheses_CsBinaryNullCoalescingOnLeft_NeedsParens()
+    {
+        var child = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("a"), MakeId("b"));
+        var parent = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, child, MakeId("c"));
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: false));
+        Assert.False(CSharpPrecedences.NeedsParentheses(child,
+            MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("x"), child), isRightOperand: true));
+    }
+
+    [Fact]
     public void NeedsParentheses_DifferentOpsAtSameLevel_NeedsParens()
     {
         // == inside !=  =>  needs parens (same precedence, different op)
