@@ -16,6 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
+import {expectParserShaped} from "../../test-util";
 
 describe('unnamed capture', () => {
     const spec = new RecipeSpec();
@@ -37,14 +38,15 @@ describe('unnamed capture', () => {
         });
         spec.cycles = 1;
 
-        return spec.rewriteRun(
+        return spec.rewriteRun({
             //language=typescript
-            typescript(`
+            ...typescript(`
                 const a = 2 * 2 + 3;
             `, `
-                const a = 3 + 2 + 2;
+                const a = 3 + (2 + 2);
             `),
-        );
+            afterRecipe: expectParserShaped
+        });
     });
 
     test('more complex example using replace', () => {

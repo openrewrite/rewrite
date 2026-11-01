@@ -221,6 +221,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (!expression?.kind || expression.kind !== J.Kind.Binary) {
             return expression;
         }
+        if (expression !== binary && this.cursor.value === binary) {
+            // the operands are visited under the binary that holds them, where a template reads their slots
+            const cursor = new Cursor(expression, this.cursor.parent);
+            this.cursor.messages.forEach((value, key) => cursor.messages.set(key, value));
+            this.cursor = cursor;
+        }
         binary = expression as J.Binary;
 
         const updates = {
