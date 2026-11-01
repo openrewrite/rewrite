@@ -62,8 +62,10 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
         {
             return;
         }
+        // CSharpVisitor.AutoFormat formats a subtree after the visit, as the visit leaves it
+        var deferred = tree is not SourceFile && frames.Take(i).Any(IsCSharpVisitorAutoFormat);
         _requests.Add(new Request(tree, sourceFile.Id,
-            CallSite(frames[i], caller, frames[Math.Max(i - 1, 0)], afterVisit), Describe(tree)));
+            CallSite(frames[i], caller, frames[Math.Max(i - 1, 0)], afterVisit), Describe(tree), deferred));
     }
 
     public void AssertFormattedOnlyWhatChanged(IEnumerable<Result> results)
@@ -80,7 +82,7 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
                 resultsByBefore.TryAdd(before.Id, result);
             }
         }
-        var treesByFile = new Dictionary<Guid, Dictionary<Guid, J>>();
+        var treesByFile = new Dictionary<SourceFile, Dictionary<Guid, J>>(ReferenceEqualityComparer.Instance);
         var found = new Dictionary<string, List<string>>();
         foreach (var request in _requests)
         {
@@ -89,12 +91,16 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
                 continue;
             }
             var before = result.Before!;
-            if (!treesByFile.TryGetValue(before.Id, out var trees))
+            if (!TreesById(before, treesByFile).TryGetValue(request.Tree.Id, out var original) ||
+                request.Tree is not J formatted)
             {
-                treesByFile[before.Id] = trees = TreesById(before);
+                continue;
             }
-            if (trees.TryGetValue(request.Tree.Id, out var original) && request.Tree is J formatted &&
-                !HoldsNoneOfItsChildren(original, formatted))
+            if (request.Deferred)
+            {
+                formatted = TreesById(result.After!, treesByFile).GetValueOrDefault(formatted.Id, formatted);
+            }
+            if (!HoldsNoneOfItsChildren(original, formatted))
             {
                 if (!found.TryGetValue(request.CallSite, out var targets))
                 {
@@ -136,13 +142,17 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
                type.FullName?.StartsWith("OpenRewrite.Core.TreeVisitorExtensions", StringComparison.Ordinal) == true;
     }
 
-    /// <summary>A visitor's <c>Visit(tree, p)</c>, which runs its after-visitors once it has visited the tree.</summary>
+    /// <summary>A visitor's <c>Visit(tree, p)</c>, which runs its after-visitors once it visited the tree.</summary>
     private static bool IsVisit(StackFrame frame) =>
         frame.GetMethod() is { Name: "Visit", DeclaringType: { IsGenericType: true } type } method &&
         type.GetGenericTypeDefinition() == typeof(TreeVisitor<,>) && method.GetParameters().Length == 2;
 
     private static bool IsScheduler(Type type) =>
         type.FullName?.StartsWith(typeof(RecipeScheduler).FullName!, StringComparison.Ordinal) == true;
+
+    private static bool IsCSharpVisitorAutoFormat(StackFrame frame) =>
+        frame.GetMethod() is { Name: "AutoFormat", DeclaringType: { IsGenericType: true } type } &&
+        type.GetGenericTypeDefinition() == typeof(CSharpVisitor<>);
 
     private static string CallSite(StackFrame frame, Type caller, StackFrame entry, bool afterVisit)
     {
@@ -196,10 +206,14 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
     private static bool OnlyWhitespaceChanged(Result result) =>
         Whitespace.Replace(Print(result.Before!), "") == Whitespace.Replace(Print(result.After!), "");
 
-    private static Dictionary<Guid, J> TreesById(Tree tree)
+    private static Dictionary<Guid, J> TreesById(SourceFile sourceFile,
+        Dictionary<SourceFile, Dictionary<Guid, J>> treesByFile)
     {
-        var trees = new Dictionary<Guid, J>();
-        new TreeCollector(trees).Visit(tree, 0);
+        if (!treesByFile.TryGetValue(sourceFile, out var trees))
+        {
+            treesByFile[sourceFile] = trees = new Dictionary<Guid, J>();
+            new TreeCollector(trees).Visit(sourceFile, 0);
+        }
         return trees;
     }
 
@@ -320,5 +334,6 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
             .ToString();
     }
 
-    private sealed record Request(Tree Tree, Guid SourceFileId, string CallSite, string Target);
+    /// <param name="Deferred">Whether the tree is formatted once the visit is done, as the visit leaves it.</param>
+    private sealed record Request(Tree Tree, Guid SourceFileId, string CallSite, string Target, bool Deferred);
 }

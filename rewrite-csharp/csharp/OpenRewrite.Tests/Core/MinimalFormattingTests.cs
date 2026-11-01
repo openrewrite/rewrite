@@ -139,6 +139,27 @@ public class MinimalFormattingTests : RewriteTest
         );
     }
 
+    /// <summary>MaybeAutoFormat formats the class once the visit is done, with the body put back.</summary>
+    [Fact]
+    public void FormattingTheClassWithItsBodySetAsideLaterFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameFooThenFormat(Format.ClassWithBodySetAsideLater)),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        ));
+
+        Assert.Contains(") called MaybeAutoFormat on\n    class `C` of source.cs\n", failure.Message);
+    }
+
+    [Fact]
+    public void FormattingTheClassWithItsBodySetAsidePasses()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameFooThenFormat(Format.ClassWithBodySetAside)),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+    }
+
     [Fact]
     public void AFormattingRecipePasses()
     {
@@ -188,6 +209,12 @@ public class MinimalFormattingTests : RewriteTest
         /// <summary>The class up to its name, once a call in it was renamed.</summary>
         ClassHeader,
 
+        /// <summary>The class with its body set aside, formatted at once, once a call in it was renamed.</summary>
+        ClassWithBodySetAside,
+
+        /// <summary>The class with its body set aside, formatted after the visit, once a call was renamed.</summary>
+        ClassWithBodySetAsideLater,
+
         /// <summary>The renamed call.</summary>
         Call,
 
@@ -221,8 +248,22 @@ public class MinimalFormattingTests : RewriteTest
                     Format.Class => MaybeAutoFormat(classDecl, visited, ctx, Cursor),
                     Format.ClassHeader when visited is ClassDeclaration renamed =>
                         MaybeAutoFormat(classDecl, renamed, renamed.Name, ctx, Cursor.ParentTree),
+                    Format.ClassWithBodySetAside or Format.ClassWithBodySetAsideLater
+                        when visited is ClassDeclaration renamed && !ReferenceEquals(renamed, classDecl) =>
+                        FormatWithBodySetAside(classDecl, renamed, ctx),
                     _ => visited
                 };
+            }
+
+            /// <summary>Formats the class with an empty body, and then puts its body back.</summary>
+            private ClassDeclaration FormatWithBodySetAside(ClassDeclaration classDecl, ClassDeclaration renamed,
+                ExecutionContext ctx)
+            {
+                var aside = renamed.WithBody(renamed.Body.WithStatements([]));
+                var formatted = format == Format.ClassWithBodySetAside
+                    ? MaybeAutoFormat(classDecl, aside, null, ctx, Cursor.ParentTree)
+                    : MaybeAutoFormat(classDecl, aside, ctx, Cursor);
+                return formatted.WithBody(renamed.Body);
             }
 
             public override J VisitMethodInvocation(MethodInvocation method, ExecutionContext ctx)
