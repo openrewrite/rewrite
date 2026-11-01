@@ -240,6 +240,37 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// The parser reads <c>x is Foo</c> as a type test and <c>x is "abc"</c> as a constant pattern,
+    /// so a capture after <c>is</c> builds whichever the printed text parses to.
+    /// </summary>
+    [Theory]
+    [InlineData("\"abc\"")]
+    [InlineData("-1")]
+    [InlineData("null")]
+    [InlineData("(1)")]
+    [InlineData("int.MaxValue")]
+    [InlineData("Foo")]
+    [InlineData("Foo.Bar")]
+    public void CaptureAfterIsMatchesFreshParse(string captured)
+    {
+        var expr = Capture.Expression("expr");
+        var value = Capture.Expression("value");
+        var tmpl = CSharpTemplate.Expression($"{expr} is {value}");
+        var values = new MatchResult(
+            new Dictionary<string, object>
+            {
+                ["expr"] = ParseExpression("x"),
+                ["value"] = ParseExpression(captured),
+            }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal($"x is {captured}", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {
@@ -594,6 +625,39 @@ public class TemplateApplyTests : RewriteTest
     }
 
     [Fact]
+    public void AutoParenthesizesCaptureOnRightOfSameOperator()
+    {
+        // f || g || h would parse as (f || g) || h
+        var cond = Capture.Expression("cond");
+        var other = Capture.Expression("other");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"{cond} ? true : {other}"),
+                CSharpTemplate.Expression($"{cond} || {other}")))),
+            CSharp(
+                "class C { bool M(bool f, bool g, bool h) { return f ? true : g || h; } }",
+                "class C { bool M(bool f, bool g, bool h) { return f || (g || h); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CaptureOnRightOfSameOperatorMatchesFreshParse()
+    {
+        // "x" + 1 + 2 is "x12", where "x" + (1 + 2) is "x3"
+        var right = Capture.Expression("right");
+        var tmpl = CSharpTemplate.Expression($"\"x\" + {right}");
+        var values = new MatchResult(
+            new Dictionary<string, object> { ["right"] = ParseExpression("1 + 2") }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal("\"x\" + (1 + 2)", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
+    [Fact]
     public void NoCaptureParenthesizationWhenUnnecessary()
     {
         // Pattern: {left} - {right} captures left = 2 * 3 (higher prec than -)
@@ -651,6 +715,9 @@ public class TemplateApplyTests : RewriteTest
     // ===============================================================
     // Recipe factories
     // ===============================================================
+
+    private static Expression ParseExpression(string code) =>
+        FindFirst<NamedVariable>(Parse($"class C {{ object v = {code}; }}"))!.Initializer!.Element;
 
     private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));

@@ -400,11 +400,18 @@ public static class RoslynFormatter
         private readonly HashSet<Guid> _nodeIds = [];
         private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
-        public void Add(J node)
+        /// <summary>
+        /// Registers <paramref name="node"/>. Roslyn formats its prefix as well, unless the node took over the prefix
+        /// of the node at <paramref name="cursor"/>, as a template replacement does, and that prefix doesn't end in a
+        /// line break.
+        /// </summary>
+        public void Add(J node, Cursor? cursor = null)
         {
             var (id, prefix) = PrintableIdAndPrefix(node);
             _nodeIds.Add(id);
-            _preservedPrefixes[id] = prefix;
+            if (cursor?.Value is J replaced && ReferenceEquals(PrintableIdAndPrefix(replaced).prefix, prefix) &&
+                !(prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace).EndsWith('\n'))
+                _preservedPrefixes[id] = prefix;
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
