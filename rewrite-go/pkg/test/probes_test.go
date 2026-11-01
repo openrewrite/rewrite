@@ -115,6 +115,22 @@ func TestRecipeWithOtherOptionsIsProbedAgain(t *testing.T) {
 		"golang.CompilationUnit at test.go holding only `package main`")
 }
 
+func TestRecipeListOfOtherRecipesIsProbedAgain(t *testing.T) {
+	forgetProbes(t)
+	// given a recipe list that passed its probe of an empty file in an earlier test
+	NewRecipeSpec().WithRecipe(&recipeList{recipes: []recipe.Recipe{&renameFirstFunction{checked: true}}}).
+		RewriteRun(t, firstFunctionA())
+
+	// when another test runs a list of the same name, of the recipe with another option value
+	got := failures(t, NewRecipeSpec().WithRecipe(&recipeList{recipes: []recipe.Recipe{&renameFirstFunction{}}}),
+		firstFunctionA())
+
+	// then that test probes it, as another recipe
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "org.openrewrite.golang.test.RecipeList panicked when run on a "+
+		"golang.CompilationUnit at test.go holding only `package main`")
+}
+
 func TestRecipeIsProbedAgainOnAnotherKindOfSource(t *testing.T) {
 	forgetProbes(t)
 	// given a recipe that passed its probe of an empty go.mod in an earlier test
