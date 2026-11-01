@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 
 from .blank_lines import BlankLinesVisitor
 from .line_breaks import general_format_style
@@ -12,7 +12,7 @@ from .tabs_and_indents_visitor import TabsAndIndentsVisitor
 from .. import TabsAndIndentsStyle, SpacesStyle, OtherStyle
 from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
-from ... import Recipe, Tree, Cursor
+from ... import Recipe, SourceFile, Tree, Cursor
 from ...java import JavaSourceFile
 from ...visitor import P, T
 
@@ -39,6 +39,9 @@ class AutoFormatVisitor(PythonVisitor[P]):
         self._stop_after = stop_after
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
+        if isinstance(tree, SourceFile) and not self.is_acceptable(tree, p):
+            # Such as a file the parser failed on, which has no Python to format.
+            return cast(T, tree)
         self._cursor = parent if parent is not None else Cursor(None, Cursor.ROOT_VALUE)
         cu = tree if isinstance(tree, JavaSourceFile) else self._cursor.first_enclosing_or_throw(JavaSourceFile)
 
