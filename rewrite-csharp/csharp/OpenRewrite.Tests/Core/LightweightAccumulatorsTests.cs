@@ -79,6 +79,23 @@ public class LightweightAccumulatorsTests : RewriteTest
         Assert.Contains("    StrongBox.Value -> MSBuildProject, after scanning\n", failure.Message);
     }
 
+    /// <summary>A target framework of an MSBuildProject marker and the packages it resolves are heavyweight too.</summary>
+    [Fact]
+    public void WhatAProjectResolvesKeptInTheAccumulatorFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new KeepsWhatTheProjectResolves()),
+            CSharp(Class)
+        ));
+
+        Assert.Contains(
+            "    LightweightAccumulatorsTests.KeepsWhatTheProjectResolves.Resolved.Framework -> TargetFramework, " +
+            "after scanning\n", failure.Message);
+        Assert.Contains(
+            "    LightweightAccumulatorsTests.KeepsWhatTheProjectResolves.Resolved.Packages[0] -> ResolvedPackage, " +
+            "after scanning\n", failure.Message);
+    }
+
     /// <summary>A recipe library tags a type of its own that is too large to keep, and the check finds it too.</summary>
     [Fact]
     public void ALibrarysOwnHeavyweightTypeKeptInTheAccumulatorFails()
@@ -207,6 +224,25 @@ public class LightweightAccumulatorsTests : RewriteTest
 
         protected override void Scan(StrongBox<MSBuildProject?> acc, global::OpenRewrite.Core.Tree tree) =>
             acc.Value ??= tree.Markers.FindFirst<MSBuildProject>();
+    }
+
+    private class KeepsWhatTheProjectResolves : ScansOnly<KeepsWhatTheProjectResolves.Resolved>
+    {
+        public override Resolved GetInitialValue(ExecutionContext ctx)
+        {
+            var package = new ResolvedPackage("Newtonsoft.Json", "13.0.3");
+            return new Resolved
+            {
+                Framework = new TargetFramework("net10.0", resolvedPackages: [package]),
+                Packages = [package]
+            };
+        }
+
+        public class Resolved
+        {
+            public TargetFramework? Framework { get; init; }
+            public List<ResolvedPackage> Packages { get; init; } = [];
+        }
     }
 
     /// <summary>A recipe library's index of every call in a repository, which it tags as too large to keep.</summary>
