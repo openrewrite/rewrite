@@ -287,6 +287,56 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void selectsTargetsAndQualifiers() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.IntSupplier;
+
+              class Test {
+                  int f;
+                  void run() {}
+
+                  void method(Object o, String s, String t, int[] arr, int[] other, boolean x) {
+                      int a = ((Test) o).f;
+                      int b = ((int[]) o)[0];
+                      Runnable c = ((Test) o)::run;
+                      int d = (x ? arr : other)[0];
+                      int e = (x ? arr : other).length;
+                      int g = (arr = other).length;
+                      int h = (s = t).length();
+                      int i = (s += t).length();
+                      IntSupplier j = (s + t)::length;
+                      int k = (s).length();
+                  }
+              }
+              """,
+            """
+              import java.util.function.IntSupplier;
+
+              class Test {
+                  int f;
+                  void run() {}
+
+                  void method(Object o, String s, String t, int[] arr, int[] other, boolean x) {
+                      int a = ((Test) o).f;
+                      int b = ((int[]) o)[0];
+                      Runnable c = ((Test) o)::run;
+                      int d = (x ? arr : other)[0];
+                      int e = (x ? arr : other).length;
+                      int g = (arr = other).length;
+                      int h = (s = t).length();
+                      int i = (s += t).length();
+                      IntSupplier j = (s + t)::length;
+                      int k = s.length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void instanceofExpressions() {
         rewriteRun(
           java(

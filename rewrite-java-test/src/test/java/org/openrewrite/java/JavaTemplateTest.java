@@ -278,6 +278,46 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizeParameterThatIsAFieldAccessTarget() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"length".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("#{any(int[])}.length", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int test(boolean x, int[] a, int[] b) {
+                      return length(x ? a : b);
+                  }
+
+                  static int length(int[] array) {
+                      return array.length;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int test(boolean x, int[] a, int[] b) {
+                      return (x ? a : b).length;
+                  }
+
+                  static int length(int[] array) {
+                      return array.length;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {

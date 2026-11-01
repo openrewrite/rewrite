@@ -95,8 +95,16 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
     private boolean needsParentheses(Expression expr, Object parent) {
         return parent instanceof J.Unary ||
-               (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+               isSelectOrTarget(expr, parent) ||
                 (expr instanceof J.SwitchExpression);
+    }
+
+    // a method select, field access target, indexed array or method reference qualifier binds tighter than operators
+    private boolean isSelectOrTarget(Expression expr, Object parent) {
+        return (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+               (parent instanceof J.FieldAccess && expr.isScope(((J.FieldAccess) parent).getTarget())) ||
+               (parent instanceof J.ArrayAccess && expr.isScope(((J.ArrayAccess) parent).getIndexed())) ||
+               (parent instanceof J.MemberReference && expr.isScope(((J.MemberReference) parent).getContaining()));
     }
 
     private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
@@ -215,7 +223,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.InstanceOf i = (J.InstanceOf) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Unary ||
+        if (needsParentheses(i, parent.getValue()) ||
             parent.getValue() instanceof J.MethodInvocation ||
             parent.getValue() instanceof J.NewClass ||
             parent.getValue() instanceof J.TypeCast) {
@@ -248,8 +256,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Assignment a = (J.Assignment) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.Unary ||
+        if (needsParentheses(a, parent.getValue()) ||
+            parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Ternary ||
             parent.getValue() instanceof J.TypeCast ||
             parent.getValue() instanceof J.InstanceOf) {
@@ -270,8 +278,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         // a compound assignment binds as loosely as an assignment does
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.Unary ||
+        if (needsParentheses(a, parent.getValue()) ||
+            parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Ternary ||
             parent.getValue() instanceof J.TypeCast ||
             parent.getValue() instanceof J.InstanceOf) {
