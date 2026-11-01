@@ -42,6 +42,7 @@ from rewrite.markers import ParseExceptionResult
 
 from .accumulators import AccumulatorContents
 from .added_markers import assert_no_added_markers
+from .probes import assert_none_throw_on_empty
 from .spec import SourceSpec, AfterRecipeText, dedent
 from .well_formed import assert_well_formed
 
@@ -244,6 +245,7 @@ class RecipeSpec:
            accumulators and added no markers for its own use, if enabled
         6. Compares results with expected "after" states
         7. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
+        8. Runs a recipe that changed a source on an empty file of its kind, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -326,6 +328,27 @@ class RecipeSpec:
             self._expect_execution_context_unchanged(checks)
             checks.accumulators.assert_none_found()
         self._expect_data_tables(data_tables)
+        self._expect_no_throw_on_other_sources(source_files, results, cycles)
+
+    def _expect_no_throw_on_other_sources(self, sources: List[SourceFile], results: List[Result], cycles: int) -> None:
+        """Run the recipe on the kinds of source a repository holds besides those the test gives it."""
+        changed = {r._before.id for r in results if r._before is not None and r._before is not r._after}
+        if not changed or _is_test_scaffolding(self.recipe):
+            return
+        def context() -> ExecutionContext:
+            # A probe writes no rows to the test's data tables.
+            return _LaterCycleContext(self.execution_context)
+
+        assert_none_throw_on_empty(self.recipe, sources, changed, self._parse_empty, context, cycles)
+
+    def _parse_empty(self, before: SourceFile) -> Optional[SourceFile]:
+        from rewrite.python.tree import CompilationUnit
+        if not isinstance(before, CompilationUnit):
+            return None
+        try:
+            return self._parse_python("", Path(str(before.source_path)), None, None)
+        except Exception:
+            return None
 
     def _expect_data_tables(self, store: InMemoryDataTableStore) -> None:
         written = store.get_data_tables()
@@ -855,6 +878,17 @@ def _print(source_file: SourceFile, sanitized: bool = False) -> str:
 def _in_workspace(path: Any) -> bool:
     path = Path(str(path))
     return not path.is_absolute() and ".." not in path.parts
+
+
+def _is_test_scaffolding(recipe: Recipe) -> bool:
+    """Whether a test made the recipe up to exercise something else: an ad-hoc recipe, one whose class is defined in
+    a function, or one with such a step."""
+    if isinstance(recipe, (NoopRecipe, AdHocRecipe)) or "<locals>" in type(recipe).__qualname__:
+        return True
+    try:
+        return any(_is_test_scaffolding(child) for child in recipe.recipe_list())
+    except Exception:
+        return True
 
 
 def _plural_cycles(n: int) -> str:

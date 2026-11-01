@@ -22,17 +22,18 @@ import pytest
 
 from dataclasses import dataclass, field
 
-from rewrite import (Cursor, ExecutionContext, InMemoryExecutionContext, Recipe, ScanningRecipe, SourceFile,
-                     TreeVisitor, random_id)
+from rewrite import (Cursor, ExecutionContext, InMemoryExecutionContext, Recipe, RecipeRunException, ScanningRecipe,
+                     SourceFile, TreeVisitor, option, random_id)
 from rewrite.data_table import DATA_TABLE_STORE, DataTable, column
 from rewrite.execution import Result
 from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
+from rewrite.test import probes
 from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
 from rewrite.python.markers import PythonResolutionResult, Quoted
 from rewrite.python.visitor import PythonVisitor
-from rewrite.java.tree import Identifier, MethodInvocation, Yield
+from rewrite.java.tree import Assignment, Identifier, MethodInvocation, Yield
 from rewrite.python.tree import Await, CompilationUnit
 from rewrite.java import J, JavaType, Space
 from rewrite.utils import lst_dataclass
@@ -1277,3 +1278,125 @@ class TestLightweightAccumulators:
         spec = RecipeSpec(recipe=_keeping(list, lambda acc, cu, cursor: acc.append(cu)),
                           check_lightweight_accumulators=False, type_attribution=False)
         spec.rewrite_run(python("a = 1\n"))
+
+
+# The recipes the harness probes are declared at module level, since it doesn't probe one defined in a function.
+@dataclass
+class _RenameFirstAssignment(Recipe):
+    """Renames the variable the first statement of a file assigns, checking that it is an assignment when ``checked``."""
+
+    checked: bool = field(default=False, metadata=option("Checked", "Check that the statement is an assignment."))
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.test.RenameFirstAssignment"
+
+    @property
+    def display_name(self) -> str:
+        return "Rename the first assignment"
+
+    @property
+    def description(self) -> str:
+        return "Rename the variable the first statement assigns."
+
+    def editor(self) -> TreeVisitor:
+        checked = self.checked
+
+        class Rename(PythonVisitor[ExecutionContext]):
+            target: Optional[UUID] = None
+
+            def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                first = cu.statements[0]
+                if checked and not isinstance(first, Assignment):
+                    return cu
+                self.target = first.variable.id
+                return super().visit_compilation_unit(cu, ctx)
+
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                if ident.id == self.target and ident.simple_name != "renamed":
+                    return ident.replace(simple_name="renamed")
+                return ident
+
+        return Rename()
+
+
+class _RequiresMarker(Recipe):
+    """Renames ``a`` to ``b`` in a file that carries a marker of ``marker_type``, and raises in one that doesn't."""
+
+    def __init__(self, marker_type: type):
+        self._marker_type = marker_type
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.test.RequiresMarker"
+
+    @property
+    def display_name(self) -> str:
+        return "Require a marker"
+
+    @property
+    def description(self) -> str:
+        return "Rename `a` in a file that carries the marker."
+
+    def editor(self) -> TreeVisitor:
+        marker_type = self._marker_type
+
+        class Rename(_RenameA):
+            def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                if cu.markers.find_first(marker_type) is None:
+                    raise ValueError(f"{cu.source_path} has no {marker_type.__name__}")
+                return super().visit_compilation_unit(cu, ctx)
+
+        return Rename()
+
+
+class TestEmptySources:
+    """The harness runs a recipe that changed a source on an empty file of its kind, where it has to raise nothing."""
+
+    @pytest.fixture(autouse=True)
+    def _probe_again(self):
+        # A probe runs once in a process, and each of these tests needs its own.
+        probes._PROBED.clear()
+
+    def test_a_recipe_that_throws_on_an_empty_file_fails(self):
+        @lst_dataclass
+        class BuildMetadata(Marker):
+            _id: int | UUID
+
+        def with_metadata(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(BuildMetadata(random_id())))
+
+        spec = RecipeSpec(recipe=_RenameFirstAssignment(), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\n", "renamed = 1\n", path=Path("a.py"), before_recipe=with_metadata))
+
+        message = str(failure.value)
+        assert message.startswith(
+            "Check for the structure the recipe edits before using it, so that it handles an empty file or leaves it "
+            "unchanged instead of throwing.\n"
+            "org.openrewrite.test.RenameFirstAssignment threw when run on an empty CompilationUnit at a.py with the "
+            "markers of the test's source (BuildMetadata):\n"
+            "    AttributeError: 'Empty' object has no attribute 'variable'\n"
+            "        at Rename.visit_compilation_unit (test_rewrite_test.py:"
+        )
+        assert message.endswith('Then add a test with an empty source, python(""), that states the intended result.')
+        assert isinstance(failure.value.__cause__, RecipeRunException)
+
+    def test_a_recipe_that_checks_the_structure_passes(self):
+        spec = RecipeSpec(recipe=_RenameFirstAssignment(checked=True), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "renamed = 1\n"))
+
+    def test_an_ad_hoc_recipe_is_not_probed(self):
+        spec = RecipeSpec(recipe=from_visitor(_RenameFirstAssignment().editor()), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "renamed = 1\n"))
+
+    def test_the_empty_file_has_the_markers_hooks_gave_the_source(self):
+        @lst_dataclass
+        class BuildMetadata(Marker):
+            _id: int | UUID
+
+        def with_metadata(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(BuildMetadata(random_id())))
+
+        spec = RecipeSpec(recipe=_RequiresMarker(BuildMetadata), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "b = 1\n", before_recipe=with_metadata))
