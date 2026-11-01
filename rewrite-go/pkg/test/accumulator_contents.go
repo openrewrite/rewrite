@@ -25,9 +25,6 @@ import (
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 const (
@@ -38,21 +35,17 @@ const (
 )
 
 var (
-	treeType        = reflect.TypeOf((*java.Tree)(nil)).Elem()
-	treeVisitorType = reflect.TypeOf((*recipe.TreeVisitor)(nil)).Elem()
+	heavyweightType = reflect.TypeOf((*recipe.Heavyweight)(nil)).Elem()
 	recipeType      = reflect.TypeOf((*recipe.Recipe)(nil)).Elem()
-	cursorType      = reflect.TypeOf((*visitor.Cursor)(nil)).Elem()
-	contextType     = reflect.TypeOf((*recipe.ExecutionContext)(nil)).Elem()
-	resolutionType  = reflect.TypeOf(golang.GoResolutionResult{})
 	keyOrIndex      = regexp.MustCompile(`\[[^\]]*]`)
 	// templatePackage holds GoPattern and GoTemplate, which the harness cannot
 	// import, as the tests of that package use the harness.
-	templatePackage = strings.TrimSuffix(cursorType.PkgPath(), "/visitor") + "/template"
+	templatePackage = strings.TrimSuffix(visitorPackage, "/visitor") + "/template"
 )
 
-// accumulatorContents finds the heavyweight objects, such as trees, that the
-// accumulators of scanning recipes keep. The walk reads fields, slices, arrays
-// and maps by reflection, and calls no method of the recipe's own.
+// accumulatorContents finds the recipe.Heavyweight objects, such as trees, that
+// the accumulators of scanning recipes keep. The walk reads fields, slices,
+// arrays and maps by reflection, and calls no method of the recipe's own.
 type accumulatorContents struct {
 	recipes  []string
 	findings map[string][]accumulatorFinding
@@ -207,16 +200,9 @@ func (w *accumulatorWalk) found(n *accumulatorNode) {
 }
 
 // heavyweight reports whether a value of type t is too costly to keep for a
-// whole cycle: a tree, cursor, visitor, execution context or module graph.
+// whole cycle, as a recipe.Heavyweight is.
 func heavyweight(t reflect.Type) bool {
-	if t.Kind() == reflect.Interface {
-		return t.Implements(treeType) || t.Implements(treeVisitorType)
-	}
-	if t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	return t == cursorType || t == contextType || t == resolutionType ||
-		implementedBy(t, treeType) || implementedBy(t, treeVisitorType)
+	return implementedBy(t, heavyweightType)
 }
 
 // accumulatorLeaf reports whether the walk leaves a value of type t alone: one
@@ -333,7 +319,8 @@ func (a *accumulatorContents) failure() string {
 	}
 	var b strings.Builder
 	b.WriteString("A ScanningRecipe's accumulator should keep the values the recipe needs, such as names, paths, " +
-		"positions and ids, and no trees, cursors, visitors, execution contexts or module graphs:\n")
+		"positions and ids, and no recipe.Heavyweight objects, such as trees, cursors, visitors, execution contexts " +
+		"and module graphs:\n")
 	for _, r := range a.recipes {
 		fmt.Fprintf(&b, "  %s keeps\n", r)
 		for i, f := range a.findings[r] {
@@ -347,6 +334,6 @@ func (a *accumulatorContents) failure() string {
 	b.WriteString("An accumulator stays in memory from the first source file scanned until the cycle ends, so " +
 		"what it keeps for each source file adds up over a large repository. A GoResolutionResult can hold the " +
 		"module graph of a whole build, while small markers such as GoProject are fine to keep. A recipe that " +
-		"must keep such an object opts out with spec.CheckLightweightAccumulators = false.")
+		"must keep a Heavyweight object opts out with spec.CheckLightweightAccumulators = false.")
 	return b.String()
 }

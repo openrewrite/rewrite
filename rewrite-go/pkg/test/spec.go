@@ -494,8 +494,8 @@ type RecipeSpec struct {
 	// returns each tree it visits unchanged, as the scanning phase discards edits.
 	CheckNoEditsInScanningPhase bool
 	// CheckLightweightAccumulators asserts that the accumulator of a ScanningRecipe
-	// keeps no trees, cursors, visitors, execution contexts or module graphs, which
-	// would stay in memory all cycle.
+	// keeps no recipe.Heavyweight objects, such as trees, cursors, visitors,
+	// execution contexts and module graphs, which would stay in memory all cycle.
 	CheckLightweightAccumulators bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
 	// report, such as search results and markup: a marker type turning up where

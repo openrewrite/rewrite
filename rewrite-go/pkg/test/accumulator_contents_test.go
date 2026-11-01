@@ -17,11 +17,14 @@
 package test
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/template"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -96,13 +99,14 @@ func TestSourceFileKeptInAnAccumulatorFails(t *testing.T) {
 	// then the run fails, naming the path to the source file
 	assert.Equal(t, []string{
 		"A ScanningRecipe's accumulator should keep the values the recipe needs, such as names, paths, " +
-			"positions and ids, and no trees, cursors, visitors, execution contexts or module graphs:\n" +
+			"positions and ids, and no recipe.Heavyweight objects, such as trees, cursors, visitors, execution " +
+			"contexts and module graphs:\n" +
 			"  org.openrewrite.golang.test.KeepWhatItSees keeps\n" +
 			"    test.seen.byPath[a.go] -> golang.CompilationUnit a.go, after scanning\n" +
 			"An accumulator stays in memory from the first source file scanned until the cycle ends, so " +
 			"what it keeps for each source file adds up over a large repository. A GoResolutionResult can hold the " +
 			"module graph of a whole build, while small markers such as GoProject are fine to keep. A recipe that " +
-			"must keep such an object opts out with spec.CheckLightweightAccumulators = false.",
+			"must keep a Heavyweight object opts out with spec.CheckLightweightAccumulators = false.",
 	}, got)
 }
 
@@ -140,6 +144,46 @@ func TestCursorKeptInAnAccumulatorFails(t *testing.T) {
 	// then the cursor is reported
 	require.Len(t, got, 1)
 	assert.Contains(t, got[0], "    test.seen.all[0] -> visitor.Cursor, after scanning\n")
+}
+
+// moduleIndex is a recipe library's own type, which it tags as too costly to keep.
+type moduleIndex struct {
+	modules map[string][]string
+}
+
+func (*moduleIndex) IsHeavyweight() {}
+
+func TestLibraryTypeTaggedHeavyweightKeptInAnAccumulatorFails(t *testing.T) {
+	// given a scanning recipe that keeps a type its library tags as Heavyweight
+	spec := NewRecipeSpec().WithRecipe(&keepWhatItSees{keep: func(acc *seen, _ *seeingVisitor, sf java.Tree) {
+		acc.byPath[sourcePathOf(sf)] = &moduleIndex{modules: map[string][]string{}}
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+	`).WithPath("a.go"))
+
+	// then the run fails, naming the path to it
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    test.seen.byPath[a.go] -> test.moduleIndex, after scanning\n")
+}
+
+func TestVisitorAndExecutionContextKeptInAnAccumulatorFail(t *testing.T) {
+	// given a scanning recipe that keeps its scanner and an execution context
+	spec := NewRecipeSpec().WithRecipe(&keepWhatItSees{keep: func(acc *seen, v *seeingVisitor, _ java.Tree) {
+		acc.all = append(acc.all, v, recipe.NewExecutionContext())
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+	`))
+
+	// then both are reported
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    test.seen.all[0] -> test.seeingVisitor, after scanning\n"+
+		"    test.seen.all[1] -> recipe.ExecutionContext, after scanning\n")
 }
 
 func TestSourceFileKeptWhileEditingFails(t *testing.T) {
@@ -195,3 +239,127 @@ func TestAccumulatorCheckCanBeTurnedOff(t *testing.T) {
 		package main
 	`))
 }
+
+func TestEveryTreeIsHeavyweight(t *testing.T) {
+	// given trees of each kind the parser builds
+	trees := []java.Tree{java.NewParseError("broken.go", "package", errors.New("expected 'IDENT'"))}
+	for sourcePath, source := range map[string]string{
+		"main.go": everyKindOfTree,
+		"go.mod":  "module example.com/app\n\ngo 1.22\n\nrequire (\n\texample.com/lib v1.0.0\n)\n",
+		"go.sum":  "example.com/lib v1.0.0 h1:abc=\n",
+	} {
+		sf, err := parseSource(parser.NewGoParser(), sourcePath, source)
+		require.NoError(t, err)
+		trees = append(trees, sf)
+	}
+
+	// when they are walked
+	untagged := map[string]bool{}
+	for _, tr := range trees {
+		visitor.Walk(tr, func(node java.Tree) bool {
+			if _, ok := node.(recipe.Heavyweight); !ok {
+				untagged[reflect.TypeOf(node).String()] = true
+			}
+			return true
+		})
+	}
+
+	// then each of them carries the tag
+	assert.Empty(t, untagged)
+}
+
+const everyKindOfTree = `package main
+
+import (
+	"fmt"
+	str "strings"
+)
+
+type (
+	Number interface{ ~int | ~float64 }
+	Pair[K comparable, V any] struct {
+		Key   K
+		Value V
+	}
+	Celsius float64
+)
+
+const limit, other = 10, 20
+
+var (
+	table    = map[string][]int{"a": {1, 2}}
+	callback func(int) error
+)
+
+func Sum[T Number](values ...T) (total T) {
+	for _, v := range values {
+		total += v
+	}
+	return
+}
+
+func Swap[A, B any](a A, b B) (B, A) { return b, a }
+
+func (p *Pair[K, V]) String() string { return fmt.Sprint(p.Key, p.Value) }
+
+//go:noinline
+func main() {
+	ch := make(chan int, 1)
+	done := make(<-chan struct{})
+	var arr [2]int
+	x, y := 1, 2
+	x, y = y, x
+	ptr := &arr
+	f := func() {}
+	go f()
+	defer f()
+	ch <- x
+	select {
+	case v := <-ch:
+		_ = v
+	case <-done:
+	default:
+	}
+	switch v := any(x).(type) {
+	case int:
+		_ = v
+		fallthrough
+	default:
+	}
+	if n := len(arr); n > 0 && !false {
+		x++
+	} else {
+		x--
+	}
+loop:
+	for i := 0; i < limit; i++ {
+		if i == 1 {
+			continue loop
+		}
+		break loop
+	}
+	switch {
+	case x > y:
+		goto end
+	}
+end:
+	_ = Celsius(1.5)
+	_ = Pair[string, int]{Key: "a", Value: (1 + 2) * -3}
+	_ = ptr[0]
+	_ = arr[:1]
+	_ = Sum[int](1, 2)
+	_ = Sum(arr[:]...)
+	swap := Swap[int, string]
+	_, _ = swap(1, "a")
+	x &^= y
+	_ = x &^ y
+	<-ch
+	(f())
+	_ = str.ToUpper("a")
+	_ = (*int)(nil)
+	_ = struct{ A int }{A: 1}
+	_ = table
+	_ = other
+	_ = callback
+}
+`
