@@ -1054,6 +1054,55 @@ public class AutoFormatTests : RewriteTest
     }
 
     /// <summary>
+    /// Without a style, the synthesized member is indented as the file already is, with tabs or two spaces.
+    /// </summary>
+    [Theory]
+    [InlineData("\t")]
+    [InlineData("  ")]
+    public void AutoFormatIndentsSynthesizedMemberAsTheFileDoes(string indent)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            CSharp(
+                $"class Foo : Exception\n{{\n{indent}public Foo(string m) : base(m) {{ }}\n}}\n",
+                $"class Foo : Exception\n{{\n{indent}public Foo(string m) : base(m) {{ }}\n\n" +
+                $"{indent}public Foo() : base()\n{indent}{{\n{indent}}}\n}}\n"
+            )
+        );
+    }
+
+    /// <summary>
+    /// The statements being reindented don't count toward the indentation of the file, which they don't have yet.
+    /// </summary>
+    [Fact]
+    public void AutoFormatReindentsMovedStatementsAsTheFileIndents()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new InlineNestedBlockRecipe()),
+            CSharp(
+                "class C\n{\n\tvoid M()\n\t{\n\t\t{\n\t\t\tFoo();\n\t\t\tBar();\n\t\t}\n\t}\n}\n",
+                "class C\n{\n\tvoid M()\n\t{\n\t\tFoo();\n\t\tBar();\n\t}\n}\n"
+            )
+        );
+    }
+
+    /// <summary>
+    /// The indentation an .editorconfig among the sources leaves unset is the file's own.
+    /// </summary>
+    [Fact]
+    public void AutoFormatIndentsSynthesizedMemberAsTheFileDoesWhereEditorConfigDoesNotSay()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            EditorConfig("root = true\n\n[*.cs]\ncsharp_new_line_before_open_brace = all\n"),
+            CSharp(
+                "class Foo : Exception\n{\n\tpublic Foo(string m) : base(m) { }\n}\n",
+                "class Foo : Exception\n{\n\tpublic Foo(string m) : base(m) { }\n\n\tpublic Foo() : base()\n\t{\n\t}\n}\n"
+            )
+        );
+    }
+
+    /// <summary>
     /// An .editorconfig among the sources styles them as it styles those of a repository, here indenting with a tab.
     /// </summary>
     [Fact]

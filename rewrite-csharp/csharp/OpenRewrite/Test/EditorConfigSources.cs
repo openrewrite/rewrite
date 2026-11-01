@@ -46,7 +46,7 @@ internal sealed class EditorConfigSources : IDisposable
 
     /// <summary><paramref name="cu"/> with the style the .editorconfig files give <paramref name="sourcePath"/>.</summary>
     public CompilationUnit Style(CompilationUnit cu, string sourcePath) =>
-        cu.WithMarkers(cu.Markers.Add(_resolver.Resolve(Path.Combine(_root, sourcePath))));
+        cu.WithMarkers(cu.Markers.Add(_resolver.Resolve(Path.Combine(_root, sourcePath), cu)));
 
     public void Dispose()
     {
