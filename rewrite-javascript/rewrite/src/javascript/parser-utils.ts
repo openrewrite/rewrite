@@ -17,7 +17,7 @@ import * as ts from "typescript";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 
-const is_statements: string[] = [
+const is_statements = new Set<string>([
     J.Kind.Assert,
     J.Kind.Assignment,
     J.Kind.AssignmentOperation,
@@ -55,7 +55,6 @@ const is_statements: string[] = [
     JS.Kind.ArrowFunction,
     JS.Kind.BindingElement,
     JS.Kind.Delete,
-    JS.Kind.Export,
     JS.Kind.ExportAssignment,
     JS.Kind.ExportDeclaration,
     JS.Kind.ForInLoop,
@@ -70,6 +69,8 @@ const is_statements: string[] = [
     JS.Kind.NamespaceDeclaration,
     JS.Kind.PropertyAssignment,
     JS.Kind.ScopedVariableDeclarations,
+    JS.Kind.Shebang,
+    JS.Kind.Spread,
     JS.Kind.TaggedTemplateExpression,
     JS.Kind.TemplateExpression,
     JS.Kind.TypeDeclaration,
@@ -77,9 +78,9 @@ const is_statements: string[] = [
     JS.Kind.WithStatement,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+])
 
-const is_expressions: string[] = [
+const is_expressions = new Set<string>([
     J.Kind.AnnotatedType,
     J.Kind.Annotation,
     J.Kind.ArrayAccess,
@@ -88,6 +89,7 @@ const is_expressions: string[] = [
     J.Kind.AssignmentOperation,
     J.Kind.Binary,
     J.Kind.ControlParentheses,
+    J.Kind.DeconstructionPattern,
     J.Kind.Empty,
     J.Kind.Erroneous,
     J.Kind.FieldAccess,
@@ -114,18 +116,23 @@ const is_expressions: string[] = [
     JS.Kind.Alias,
     JS.Kind.ArrayBindingPattern,
     JS.Kind.ArrowFunction,
+    JS.Kind.As,
     JS.Kind.Await,
     JS.Kind.BindingElement,
+    JS.Kind.ComputedPropertyName,
     JS.Kind.ConditionalType,
     JS.Kind.Delete,
     JS.Kind.ExportSpecifier,
     JS.Kind.ExpressionWithTypeArguments,
+    JS.Kind.FunctionCall,
     JS.Kind.FunctionType,
     JS.Kind.ImportType,
     JS.Kind.IndexedAccessType,
     JS.Kind.IndexedAccessTypeIndexType,
     JS.Kind.InferType,
     JS.Kind.Intersection,
+    JS.Kind.JsxEmbeddedExpression,
+    JS.Kind.JsxTag,
     JS.Kind.AssignmentOperation,
     JS.Kind.Binary,
     JS.Kind.ImportSpecifier,
@@ -135,6 +142,7 @@ const is_expressions: string[] = [
     JS.Kind.NamedImports,
     JS.Kind.ObjectBindingPattern,
     JS.Kind.SatisfiesExpression,
+    JS.Kind.Spread,
     JS.Kind.TaggedTemplateExpression,
     JS.Kind.TemplateExpression,
     JS.Kind.Tuple,
@@ -149,14 +157,14 @@ const is_expressions: string[] = [
     JS.Kind.Void,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-]
+])
 
 export function isStatement(statement: J):  statement is Statement {
-    return is_statements.includes(statement.kind);
+    return is_statements.has(statement.kind);
 }
 
 export function isExpression(expression: J):  expression is Expression {
-    return is_expressions.includes(expression.kind);
+    return is_expressions.has(expression.kind);
 }
 
 export function getNextSibling(node: ts.Node): ts.Node | undefined {

@@ -1121,7 +1121,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case && this.isInsideCaseStatements(parent as J.Case, draft))) {
-                if (draft.kind != J.Kind.Case) {
+                if (draft.kind != J.Kind.Case && !this.opensCaseBody(parent, draft)) {
                     this.ensurePrefixHasNewLine(draft);
                 }
             }
@@ -1151,6 +1151,12 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
      * Check if a statement is inside a Case's statements container or body,
      * not inside the caseLabels container.
      */
+    /** A block that opens a case's statements stays on the line of its label, as in `case X: {`. */
+    private opensCaseBody(parent: J | undefined, statement: J): boolean {
+        return parent?.kind === J.Kind.Case && statement.kind === J.Kind.Block &&
+            (parent as J.Case).statements.elements[0]?.element.id === statement.id;
+    }
+
     private isInsideCaseStatements(caseNode: J.Case, statement: J): boolean {
         // Check if statement is in the statements container
         if (caseNode.statements.elements.some(s => s.element.id === statement.id)) {

@@ -199,6 +199,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         assignOp = expression as J.AssignmentOperation;
 
+        const statement = await this.visitStatement(assignOp, p);
+        if (!statement?.kind || statement.kind !== J.Kind.AssignmentOperation) {
+            return statement;
+        }
+        assignOp = statement as J.AssignmentOperation;
+
         const updates = {
             prefix: await this.visitSpace(assignOp.prefix, p),
             markers: await this.visitMarkers(assignOp.markers, p),
@@ -229,6 +235,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitBlock(block: J.Block, p: P): Promise<J | undefined> {
+        const statement = await this.visitStatement(block, p);
+        if (!statement?.kind || statement.kind !== J.Kind.Block) {
+            return statement;
+        }
+        block = statement as J.Block;
+
         const updates = {
             prefix: await this.visitSpace(block.prefix, p),
             markers: await this.visitMarkers(block.markers, p),
@@ -340,6 +352,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(controlParens, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ControlParentheses) {
+            return expression;
+        }
+        controlParens = expression as J.ControlParentheses<T>;
+
         const updates: any = {
             prefix: await this.visitSpace(controlParens.prefix, p),
             markers: await this.visitMarkers(controlParens.markers, p),
@@ -797,6 +815,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         newClass = expression as J.NewClass;
 
+        const statement = await this.visitStatement(newClass, p);
+        if (!statement?.kind || statement.kind !== J.Kind.NewClass) {
+            return statement;
+        }
+        newClass = statement as J.NewClass;
+
         const updates: any = {
             prefix: await this.visitSpace(newClass.prefix, p),
             markers: await this.visitMarkers(newClass.markers, p),
@@ -845,6 +869,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitParameterizedType(parameterizedType: J.ParameterizedType, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(parameterizedType, p);
+        if (!expression?.kind || expression.kind !== J.Kind.ParameterizedType) {
+            return expression;
+        }
+        parameterizedType = expression as J.ParameterizedType;
+
         const updates: any = {
             prefix: await this.visitSpace(parameterizedType.prefix, p),
             markers: await this.visitMarkers(parameterizedType.markers, p),
@@ -856,6 +886,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     protected async visitParentheses<T extends J>(parentheses: J.Parentheses<T>, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(parentheses, p);
+        if (!expression?.kind || expression.kind !== J.Kind.Parentheses) {
+            return expression;
+        }
+        parentheses = expression as J.Parentheses<T>;
+
         const updates: any = {
             prefix: await this.visitSpace(parentheses.prefix, p),
             markers: await this.visitMarkers(parentheses.markers, p),

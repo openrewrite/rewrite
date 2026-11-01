@@ -15,8 +15,8 @@
  */
 
 import {Cursor, ExecutionContext, foundSearchResult, produceAsync} from "../../src";
-import {emptySpace, Expression, J, rightPadded, TextComment} from "../../src/java";
-import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
+import {emptySpace, Expression, J, rightPadded, Statement, TextComment} from "../../src/java";
+import {JavaScriptParser, JavaScriptVisitor, JS, sourceFileCache, template, typescript} from "../../src/javascript";
 import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
@@ -162,5 +162,34 @@ describe('JavaScript visitor formatting', () => {
                 'type C = /*~~>*/abstract new () => object;'
             )
         );
+    });
+});
+
+describe('JavaScript visitor dispatch', () => {
+    test('visitExpression and visitStatement see what the Java visitor shows them', async () => {
+        // given
+        const cu = await new JavaScriptParser({sourceFileCache}).parseOne({
+            text: 'for (const x of xs) { const y = <div>{x as T}</div>; }',
+            sourcePath: 'dispatch.tsx'
+        });
+        const expressions: string[] = [];
+        const statements: string[] = [];
+
+        // when
+        await new class extends JavaScriptVisitor<undefined> {
+            protected override async visitExpression(expression: Expression, p: undefined): Promise<J | undefined> {
+                expressions.push(expression.kind);
+                return expression;
+            }
+
+            protected override async visitStatement(statement: Statement, p: undefined): Promise<J | undefined> {
+                statements.push(statement.kind);
+                return statement;
+            }
+        }().visit(cu, undefined);
+
+        // then
+        expect(expressions).toEqual(expect.arrayContaining([JS.Kind.As, JS.Kind.JsxTag, JS.Kind.JsxEmbeddedExpression]));
+        expect(statements).toEqual(expect.arrayContaining([JS.Kind.ForOfLoop, J.Kind.Block]));
     });
 });
