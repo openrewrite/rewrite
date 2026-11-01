@@ -1368,6 +1368,34 @@ class _RequiresMarker(Recipe):
         return Rename()
 
 
+class _NoteVisitedTexts(Recipe):
+    """Renames ``a`` to ``b`` and notes the text of each file it visits on the execution context."""
+
+    key = "org.openrewrite.test.visitedTexts"
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.test.NoteVisitedTexts"
+
+    @property
+    def display_name(self) -> str:
+        return "Note visited texts"
+
+    @property
+    def description(self) -> str:
+        return "Rename `a` and note the text of each file visited."
+
+    def editor(self) -> TreeVisitor:
+        key = self.key
+
+        class Note(_RenameA):
+            def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                ctx.put_message(key, [*ctx.get_message(key, []), cu.print_all()])
+                return super().visit_compilation_unit(cu, ctx)
+
+        return Note()
+
+
 class TestEmptySources:
     """The harness runs a recipe that changed a source on an empty file of its kind, where it has to raise nothing."""
 
@@ -1418,6 +1446,14 @@ class TestEmptySources:
 
         spec = RecipeSpec(recipe=_RequiresMarker(BuildMetadata), type_attribution=False)
         spec.rewrite_run(python("a = 1\n", "b = 1\n", before_recipe=with_metadata))
+
+    def test_the_probe_leaves_the_tests_execution_context_as_it_was(self):
+        ctx = InMemoryExecutionContext()
+        spec = RecipeSpec(recipe=_NoteVisitedTexts(), execution_context=ctx,
+                          check_execution_context_unchanged=False, type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+
+        assert "" not in ctx.get_message(_NoteVisitedTexts.key)
 
 
 @dataclass

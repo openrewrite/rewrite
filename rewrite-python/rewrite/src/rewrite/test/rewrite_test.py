@@ -358,8 +358,7 @@ class RecipeSpec:
             return
 
         def context() -> ExecutionContext:
-            # A probe writes no rows to the test's data tables.
-            return _LaterCycleContext(self.execution_context)
+            return _ProbeContext(self.execution_context)
 
         assert_none_throw_on_empty(self.recipe, sources, changed, self._parse_empty, context, cycles)
         assert_none_throw_on_unparsed(self.recipe, sources, changed, context, cycles)
@@ -885,6 +884,22 @@ class _LaterCycleContext(DelegatingExecutionContext):
             self._data_tables = value
         else:
             super().put_message(key, value)
+
+
+class _ProbeContext(DelegatingExecutionContext):
+    """The context of a probe, which reads the test's messages but keeps its own, and its data tables, to itself."""
+
+    def __init__(self, delegate: ExecutionContext):
+        super().__init__(delegate)
+        self._messages: Dict[str, Any] = {}
+
+    def get_message(self, key, default_value=None):
+        if key in self._messages:
+            return self._messages[key]
+        return default_value if key == DATA_TABLE_STORE else super().get_message(key, default_value)
+
+    def put_message(self, key, value):
+        self._messages[key] = value
 
 
 # The messages the framework itself puts on the execution context while a recipe runs.
