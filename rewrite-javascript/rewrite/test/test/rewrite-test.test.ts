@@ -403,6 +403,63 @@ describe("rewrite test", () => {
         });
     });
 
+    describe("unchanged execution context", () => {
+        // Keeps what it has seen on the execution context, where an accumulator or cursor message belongs
+        const rememberInContext = () => fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+            protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+                ctx.messages["my.seen"] = [...(ctx.messages["my.seen"] ?? []), text.sourcePath];
+                return text;
+            }
+        });
+
+        test("a recipe that puts a message on the execution context fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = rememberInContext();
+
+            // when
+            const run = sut.rewriteRun(text("hello"));
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source " +
+                "file in cursor messages, with this.cursor.messages.set(key, value). org.openrewrite.adhoc put " +
+                "messages on the ExecutionContext, which every recipe and source file in a run shares, so what it " +
+                "keeps there leaks into the others:\n" +
+                '  "my.seen" at PlainTextVisitor.visitText (test/test/rewrite-test.test.ts:');
+            await expect(run).rejects.toThrow(
+                "A recipe that must change the ExecutionContext opts out with spec.checkExecutionContextUnchanged = false.");
+        });
+
+        test("a recipe that only reads the execution context passes", () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipeExecutionContext = new ExecutionContext({"my.greeting": "hello"});
+            sut.recipe = fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+                protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+                    const greeting = ctx.messages["my.greeting"];
+                    return text.text === greeting ? text : {...text, text: greeting};
+                }
+            });
+
+            // when, then
+            return sut.rewriteRun(text("hi", "hello"));
+        });
+
+        test("checkExecutionContextUnchanged turns the check off", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = rememberInContext();
+            sut.checkExecutionContextUnchanged = false;
+
+            // when
+            await sut.rewriteRun({...text("hello"), path: "hello.txt"});
+
+            // then
+            expect(sut.recipeExecutionContext.messages["my.seen"]).toContain("hello.txt");
+        });
+    });
+
     test("a spec returns to its suite configuration between tests", () => {
         // Independent of whether the harness already switched tracking on
         RecipeSpec.trackSuiteConfiguration();
@@ -416,6 +473,7 @@ describe("rewrite test", () => {
         sut.allowEmptyDiff = false;
         sut.checkParsePrintIdempotence = false;
         sut.checkReportingMarkersOnly = false;
+        sut.checkExecutionContextUnchanged = false;
         sut.cycles = 1;
         sut.expectedCyclesThatMakeChanges = 3;
         RecipeSpec.restoreSuiteConfiguration();
@@ -424,6 +482,7 @@ describe("rewrite test", () => {
         expect(sut.allowEmptyDiff).toBe(true);
         expect(sut.checkParsePrintIdempotence).toBe(true);
         expect(sut.checkReportingMarkersOnly).toBe(true);
+        expect(sut.checkExecutionContextUnchanged).toBe(true);
         expect(sut.cycles).toBeUndefined();
         expect(sut.expectedCyclesThatMakeChanges).toBeUndefined();
     });

@@ -28,6 +28,7 @@ import {JavaScriptVisitor} from "../javascript";
 import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J, Type} from "../java";
 import {DATA_TABLE_STORE, InMemoryDataTableStore} from "../data-table";
+import * as path from "path";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -45,6 +46,7 @@ interface RecipeSpecConfiguration {
     checkParsePrintIdempotence: boolean;
     allowEmptyDiff: boolean;
     checkReportingMarkersOnly: boolean;
+    checkExecutionContextUnchanged: boolean;
     cycles?: number;
     expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
@@ -61,6 +63,12 @@ export class RecipeSpec {
      * its output carry.
      */
     checkReportingMarkersOnly: boolean = true
+
+    /**
+     * Fails a run whose recipe puts a message on the execution context, which every recipe and source file in a run
+     * shares.
+     */
+    checkExecutionContextUnchanged: boolean = true
 
     /**
      * The cycles to run, by default one more than {@link expectedCyclesThatMakeChanges} and at least two. The
@@ -114,6 +122,7 @@ export class RecipeSpec {
             checkParsePrintIdempotence: this.checkParsePrintIdempotence,
             allowEmptyDiff: this.allowEmptyDiff,
             checkReportingMarkersOnly: this.checkReportingMarkersOnly,
+            checkExecutionContextUnchanged: this.checkExecutionContextUnchanged,
             cycles: this.cycles,
             expectedCyclesThatMakeChanges: this.expectedCyclesThatMakeChanges,
             recipe: this.recipe,
@@ -217,10 +226,13 @@ export class RecipeSpec {
         }
 
         this.recipeExecutionContext.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
+        const contextWrites = this.checkExecutionContextUnchanged ? new ExecutionContextWrites() : undefined;
+        const runContext = (ctx: ExecutionContext) => contextWrites?.watch(ctx) ?? ctx;
         const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;
         const cycles = this.cycles ?? Math.max(2, expectedCycles + 1);
         const {changeset, unsettled} = await this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile),
-            cycles, expectedCycles);
+            cycles, expectedCycles, runContext);
+        contextWrites?.assertNone(this.recipe);
 
         this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);
         this.checkReportingMarkersOnly && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
@@ -230,7 +242,8 @@ export class RecipeSpec {
             await this.expectNoFurtherChanges(unsettled.changes,
                 `Expected recipe to complete in ${pluralCycles(expectedCycles)}, but cycle ${unsettled.cycle} changed`);
         }
-        cycles > expectedCycles && await this.expectStableOnFreshParse(flattenedSpecs, allParsed, changeset);
+        cycles > expectedCycles && await this.expectStableOnFreshParse(flattenedSpecs, allParsed, changeset, runContext);
+        contextWrites?.assertNone(this.recipe);
         await this.expectDataTables();
     }
 
@@ -247,7 +260,8 @@ export class RecipeSpec {
         }
     }
 
-    private async runCycles(sources: SourceFile[], cycles: number, expectedCycles: number):
+    private async runCycles(sources: SourceFile[], cycles: number, expectedCycles: number,
+                            runContext: (ctx: ExecutionContext) => ExecutionContext):
         Promise<{ changeset: Result[], unsettled?: { cycle: number, changes: Result[] } }> {
         const lineages: { origin?: SourceFile, latest?: SourceFile }[] = sources.map(s => ({origin: s, latest: s}));
         const changesetOf = () => lineages.map(({origin, latest}) => new Result(origin, latest));
@@ -255,7 +269,7 @@ export class RecipeSpec {
         let cyclesThatMadeChanges = 0;
         for (let cycle = 1; cycle <= cycles; cycle++) {
             const live = lineages.filter(l => l.latest).map(l => l.latest!);
-            const ctx = cycle === 1 ? this.recipeExecutionContext : this.laterRunContext();
+            const ctx = runContext(cycle === 1 ? this.recipeExecutionContext : this.laterRunContext());
             const changes = (await scheduleRun(this.recipe, live, ctx)).changeset.filter(r => r.before !== r.after);
             if (changes.length === 0) {
                 break;
@@ -323,7 +337,8 @@ export class RecipeSpec {
      * recipe that recognizes its own output only by the shape of that LST changes it again.
      */
     private async expectStableOnFreshParse(specs: SourceSpec<any>[], parsed: [SourceSpec<any>, SourceFile][],
-                                           changeset: Result[]) {
+                                           changeset: Result[],
+                                           runContext: (ctx: ExecutionContext) => ExecutionContext) {
         if (!changeset.some(r => r.before !== r.after)) {
             return;
         }
@@ -359,7 +374,7 @@ export class RecipeSpec {
         }
 
         const sources = finals.map(([_, sourceFile]) => reparsedByFinal.get(sourceFile) ?? sourceFile);
-        const changes = (await scheduleRun(this.recipe, sources, this.laterRunContext())).changeset
+        const changes = (await scheduleRun(this.recipe, sources, runContext(this.laterRunContext()))).changeset
             .filter(r => r.before !== r.after);
         await this.expectNoFurtherChanges(changes, "Running the recipe on a fresh parse of its output changed", true);
     }
@@ -585,6 +600,63 @@ class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
         return ret;
     }
+}
+
+/**
+ * Whether the framework puts `key` on the execution context of a run itself, or Moderne's own code does, which Java's
+ * harness allows too.
+ */
+function isFrameworkMessage(key: string | symbol): boolean {
+    return key === DATA_TABLE_STORE || key === ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT ||
+        typeof key === "string" && key.startsWith("io.moderne");
+}
+
+/** Records the messages that a recipe puts on the execution context of its run, with the code that put each. */
+class ExecutionContextWrites {
+    private readonly writes = new Map<string | symbol, string | undefined>();
+
+    /** A view of `ctx` whose messages record what is put on them, and that otherwise acts as `ctx`. */
+    watch(ctx: ExecutionContext): ExecutionContext {
+        const record = (key: string | symbol) => {
+            if (!isFrameworkMessage(key) && !this.writes.has(key)) {
+                this.writes.set(key, callerFrame());
+            }
+        };
+        const messages = new Proxy(ctx.messages, {
+            set(target, key, value) {
+                record(key);
+                return Reflect.set(target, key, value);
+            },
+            defineProperty(target, key, attributes) {
+                record(key);
+                return Reflect.defineProperty(target, key, attributes);
+            }
+        });
+        return Object.create(ctx, {messages: {value: messages, enumerable: true, writable: true}});
+    }
+
+    assertNone(recipe: Recipe): void {
+        if (this.writes.size === 0) {
+            return;
+        }
+        throw new Error([
+            "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source file " +
+            "in cursor messages, with this.cursor.messages.set(key, value). " +
+            `${recipe.name} put messages on the ExecutionContext, which every recipe and source file in a run ` +
+            "shares, so what it keeps there leaks into the others:",
+            ...[...this.writes].map(([key, frame]) =>
+                `  ${typeof key === "symbol" ? key.toString() : JSON.stringify(key)}${frame ? ` at ${frame}` : ""}`),
+            "A recipe that must change the ExecutionContext opts out with spec.checkExecutionContextUnchanged = false."
+        ].join("\n"));
+    }
+}
+
+/** The first frame of the stack outside the harness and the runtime, relative to the working directory. */
+function callerFrame(): string | undefined {
+    const frame = (new Error().stack ?? "").split("\n").slice(1)
+        .map(line => line.trim().replace(/^at (async )?/, ""))
+        .find(line => !/[\\/]test[\\/]rewrite-test\.[jt]s:|<anonymous>|^node:/.test(line));
+    return frame?.split(process.cwd() + path.sep).join("");
 }
 
 /** Without the comments that search results and markup print as. */
