@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 import textwrap
 from enum import Enum, auto
@@ -699,8 +700,9 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             stm = cast(ExpressionStatement, super().visit_expression_statement(expr_stmt, p))
             literal = cast(Literal, stm.expression)
             shift = len(stm.prefix.last_whitespace.split("\n")[-1]) - prefix_before
-            return stm.replace(expression=
-                literal.replace(value_source=textwrap.indent(str(literal.value_source), shift * " ")[shift:]))
+            source = textwrap.indent(str(literal.value_source), shift * " ")[shift:]
+            return stm.replace(expression=literal.replace(value_source=source,
+                                                          value=_string_value(source, literal.value)))
 
         return super().visit_expression_statement(expr_stmt, p)
 
@@ -847,3 +849,12 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             if c in ('\n', '\r'):
                 length = 0
         return length
+
+
+def _string_value(source: str, value: object) -> object:
+    """The string a re-indented docstring's ``source`` now spells, which the parser would read, or ``value``."""
+    try:
+        spelled = ast.literal_eval(source)
+    except (SyntaxError, ValueError):
+        return value
+    return spelled if isinstance(spelled, str) else value

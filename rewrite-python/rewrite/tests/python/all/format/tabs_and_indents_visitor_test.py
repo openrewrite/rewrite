@@ -970,6 +970,33 @@ def test_docstring_alignment():
     )
 
 
+def test_a_realigned_docstring_holds_the_string_its_text_spells():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+    values = []
+    rewrite_run(
+        # language=python
+        python(
+            '''
+            def my_function():
+              """
+              Aligned with the body.
+              """
+              return None
+            ''',
+            '''
+            def my_function():
+                """
+                Aligned with the body.
+                """
+                return None
+            ''',
+            after_recipe=lambda cu: values.append(cu.statements[0].body.statements[0].expression.value)
+        ),
+        spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+    assert values == ["\n    Aligned with the body.\n    "]
+
+
 def test_method_select_suffix_already_correct():
     style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
     rewrite_run(
