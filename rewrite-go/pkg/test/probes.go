@@ -23,10 +23,93 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
+
+// probeTimeCap is how long a recipe's probes may take in the process before it
+// stops being probed.
+const probeTimeCap = 20 * time.Second
+
+// probes is what the process has probed and how long each recipe's probes took.
+var probes = newProbeLog()
+
+type probeLog struct {
+	mu    sync.Mutex
+	ran   map[probeKey]bool
+	spent map[string]time.Duration
+}
+
+type probeKey struct {
+	recipe string
+	source reflect.Type
+	kind   string
+}
+
+func newProbeLog() *probeLog {
+	return &probeLog{ran: map[probeKey]bool{}, spent: map[string]time.Duration{}}
+}
+
+// once returns the failure of try, which probes r on a source of type source in
+// the way kind names, unless the process has run that probe before, whether it
+// passed or failed, or r's probes have taken probeTimeCap.
+func (l *probeLog) once(r recipe.Recipe, source reflect.Type, kind string, try func() string) string {
+	key := probeKey{recipe: recipeWithOptions(r), source: source, kind: kind}
+	l.mu.Lock()
+	if l.ran[key] || l.spent[probeBudget(r)] > probeTimeCap {
+		l.mu.Unlock()
+		return ""
+	}
+	l.ran[key] = true
+	l.mu.Unlock()
+	start := time.Now()
+	defer func() { l.charge(r, time.Since(start)) }()
+	return try()
+}
+
+func (l *probeLog) charge(r recipe.Recipe, d time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.spent[probeBudget(r)] += d
+}
+
+// recipeWithOptions names r by its type, name and option values, and those of
+// the recipes it runs.
+func recipeWithOptions(r recipe.Recipe) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%T %s", r, r.Name())
+	for _, o := range r.Options() {
+		fmt.Fprintf(&b, " %s=%#v", o.Name, o.Value)
+	}
+	if list := r.RecipeList(); len(list) > 0 {
+		b.WriteString(" [")
+		for i, sub := range list {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(recipeWithOptions(sub))
+		}
+		b.WriteString("]")
+	}
+	return b.String()
+}
+
+// probeBudget names what r's probes share a time cap by: its name, or for a
+// recipe that runs others, theirs.
+func probeBudget(r recipe.Recipe) string {
+	list := r.RecipeList()
+	if len(list) == 0 {
+		return r.Name()
+	}
+	names := make([]string, len(list))
+	for i, sub := range list {
+		names[i] = probeBudget(sub)
+	}
+	return "[" + strings.Join(names, ",") + "]"
+}
 
 // probePanic is what a recipe panicked with when the harness ran it on sources
 // the test did not give it.

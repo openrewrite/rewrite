@@ -24,27 +24,31 @@ import (
 )
 
 // expectUnparsedSourcesHandled runs the recipe without a source of each kind it
-// changed, as a Go recipe meets a file the parser failed on, left unparsed or
-// read as plain text, failing t if the recipe panics there.
+// changed, once per process, as a Go recipe meets a file the parser failed on,
+// left unparsed or read as plain text, failing t if the recipe panics there.
 func (spec *RecipeSpec) expectUnparsedSourcesHandled(t testing.TB, run *recipeRun) {
 	t.Helper()
 	if spec.Recipe == nil {
 		return
 	}
-	kinds := map[reflect.Type]bool{}
 	for i, ps := range run.parsed {
-		if ps.tree == nil || ps.result == ps.tree || kinds[reflect.TypeOf(ps.tree)] {
+		if ps.tree == nil || ps.result == ps.tree {
 			continue
 		}
-		kinds[reflect.TypeOf(ps.tree)] = true
-		var others []java.Tree
-		for j, other := range run.parsed {
-			if j != i && other.tree != nil {
-				others = append(others, other.tree)
+		failure := probes.once(spec.Recipe, reflect.TypeOf(ps.tree), "missing", func() string {
+			var others []java.Tree
+			for j, other := range run.parsed {
+				if j != i && other.tree != nil {
+					others = append(others, other.tree)
+				}
 			}
-		}
-		if p := probe(spec.Recipe, others, run.freshParseContext, spec.cycles()); p != nil {
-			t.Error(unparsedSourceFailure(spec, sourcePathOf(ps.tree), p))
+			if p := probe(spec.Recipe, others, run.freshParseContext, spec.cycles()); p != nil {
+				return unparsedSourceFailure(spec, sourcePathOf(ps.tree), p)
+			}
+			return ""
+		})
+		if failure != "" {
+			t.Error(failure)
 		}
 	}
 }

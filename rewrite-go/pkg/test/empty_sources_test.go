@@ -30,10 +30,12 @@ import (
 )
 
 // renameFirstFunction renames the function a file declares first to first,
-// trusting that there is one unless checked.
+// trusting that there is one unless checked, and counts in declaringNone the
+// files it meets that declare none.
 type renameFirstFunction struct {
 	recipe.Base
-	checked bool
+	checked       bool
+	declaringNone *int
 }
 
 func (r *renameFirstFunction) Name() string {
@@ -44,17 +46,26 @@ func (r *renameFirstFunction) Description() string {
 	return "Renames the function a file declares first to `first`."
 }
 
+func (r *renameFirstFunction) Options() []recipe.OptionDescriptor {
+	return []recipe.OptionDescriptor{
+		recipe.Option("checked", "Checked", "Check that the file declares a function.").WithValue(r.checked),
+	}
+}
+
 func (r *renameFirstFunction) Editor() recipe.TreeVisitor {
-	return visitor.Init(&firstFunctionRenamer{checked: r.checked})
+	return visitor.Init(&firstFunctionRenamer{recipe: r})
 }
 
 type firstFunctionRenamer struct {
 	visitor.GoVisitor
-	checked bool
+	recipe *renameFirstFunction
 }
 
 func (v *firstFunctionRenamer) VisitCompilationUnit(cu *golang.CompilationUnit, _ any) java.J {
-	if v.checked && len(cu.Statements) == 0 {
+	if len(cu.Statements) == 0 && v.recipe.declaringNone != nil {
+		*v.recipe.declaringNone++
+	}
+	if v.recipe.checked && len(cu.Statements) == 0 {
 		return cu
 	}
 	fn := cu.Statements[0].Element.(*java.MethodDeclaration)
@@ -97,6 +108,7 @@ func (v *firstDirectiveReporter) VisitGoMod(gm *golang.GoMod, _ any) java.Tree {
 }
 
 func TestRecipeThatPanicsOnAFileWithOnlyAPackageClauseFails(t *testing.T) {
+	forgetProbes(t)
 	// given a recipe that trusts a file to declare a function
 	spec := NewRecipeSpec().WithRecipe(&renameFirstFunction{})
 
@@ -125,6 +137,7 @@ func TestRecipeThatPanicsOnAFileWithOnlyAPackageClauseFails(t *testing.T) {
 }
 
 func TestRecipeThatChecksTheStructurePasses(t *testing.T) {
+	forgetProbes(t)
 	NewRecipeSpec().
 		WithRecipe(&renameFirstFunction{checked: true}).
 		RewriteRun(t, Golang(`
@@ -139,6 +152,7 @@ func TestRecipeThatChecksTheStructurePasses(t *testing.T) {
 }
 
 func TestRecipeThatPanicsOnAnEmptyGoModFails(t *testing.T) {
+	forgetProbes(t)
 	// given a recipe that trusts a go.mod to hold a directive
 	spec := NewRecipeSpec().WithRecipe(&reportFirstDirective{})
 
@@ -162,6 +176,7 @@ func TestRecipeThatPanicsOnAnEmptyGoModFails(t *testing.T) {
 }
 
 func TestRecipeThatChangesNothingIsNotRunOnEmptySources(t *testing.T) {
+	forgetProbes(t)
 	NewRecipeSpec().
 		WithRecipe(&renameFirstFunction{}).
 		RewriteRun(t, Golang(`

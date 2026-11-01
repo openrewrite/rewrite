@@ -27,24 +27,28 @@ import (
 )
 
 // expectEmptySourcesHandled runs the recipe on an empty source of each kind it
-// changed, failing t if the recipe panics there.
+// changed, once per process, failing t if the recipe panics there.
 func (spec *RecipeSpec) expectEmptySourcesHandled(t testing.TB, run *recipeRun) {
 	t.Helper()
 	if spec.Recipe == nil {
 		return
 	}
-	kinds := map[reflect.Type]bool{}
 	for _, ps := range run.parsed {
-		if ps.tree == nil || ps.result == ps.tree || kinds[reflect.TypeOf(ps.tree)] {
+		if ps.tree == nil || ps.result == ps.tree {
 			continue
 		}
-		kinds[reflect.TypeOf(ps.tree)] = true
-		empty, what, carried := emptySource(ps.tree)
-		if empty == nil {
-			continue
-		}
-		if p := probe(spec.Recipe, []java.Tree{empty}, run.freshParseContext, spec.cycles()); p != nil {
-			t.Error(emptySourceFailure(spec, what, carried, p))
+		failure := probes.once(spec.Recipe, reflect.TypeOf(ps.tree), "empty", func() string {
+			empty, what, carried := emptySource(ps.tree)
+			if empty == nil {
+				return ""
+			}
+			if p := probe(spec.Recipe, []java.Tree{empty}, run.freshParseContext, spec.cycles()); p != nil {
+				return emptySourceFailure(spec, what, carried, p)
+			}
+			return ""
+		})
+		if failure != "" {
+			t.Error(failure)
 		}
 	}
 }

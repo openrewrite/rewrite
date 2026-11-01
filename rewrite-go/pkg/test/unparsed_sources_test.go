@@ -132,6 +132,7 @@ func internalImportsProject() Sources {
 }
 
 func TestRecipeThatPanicsWhenAFileItChangedIsMissingFails(t *testing.T) {
+	forgetProbes(t)
 	// given a scanning recipe that trusts its scanner to find go.mod
 	spec := NewRecipeSpec().WithRecipe(&reportInternalImports{})
 
@@ -150,6 +151,7 @@ func TestRecipeThatPanicsWhenAFileItChangedIsMissingFails(t *testing.T) {
 }
 
 func TestRecipeThatChecksWhatItsScannerFoundPasses(t *testing.T) {
+	forgetProbes(t)
 	NewRecipeSpec().
 		WithRecipe(&reportInternalImports{checked: true}).
 		RewriteRun(t, internalImportsProject())
