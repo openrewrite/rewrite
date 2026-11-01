@@ -20,6 +20,7 @@ using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
+using OpenRewrite.Xml;
 using Xunit.Sdk;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -162,6 +163,28 @@ public class LightweightAccumulatorsTests : RewriteTest
         RewriteRun(
             spec => spec.SetRecipe(new KeepsItsTemplate()),
             CSharp(Class, Class.Replace("Foo", "Bar"))
+        );
+    }
+
+    /// <summary>
+    /// The execution context keeps the SDK's build context for the whole run, so an accumulator that refers to it
+    /// keeps nothing more.
+    /// </summary>
+    [Fact]
+    public void TheBuildContextKeptInTheAccumulatorPasses()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new KeepsTheBuildContext()),
+            CsProj(
+                """
+                <Project>
+                </Project>
+                """,
+                """
+                <!--~~>--><Project>
+                </Project>
+                """,
+                sourcePath: "Directory.Build.props")
         );
     }
 
@@ -335,6 +358,27 @@ public class LightweightAccumulatorsTests : RewriteTest
         {
             public override J VisitMethodInvocation(MethodInvocation method, ExecutionContext ctx) =>
                 method.Name.SimpleName == "Foo" ? template.Apply(Cursor)! : base.VisitMethodInvocation(method, ctx);
+        }
+    }
+
+    /// <summary>Marks each build file it captured, keeping the build context as the SDK's csproj recipes do.</summary>
+    private class KeepsTheBuildContext : ScanningRecipe<DotNetBuildContext>
+    {
+        public override string DisplayName => "Find build files";
+        public override string Description => "Marks each build file that the build context captured.";
+
+        public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
+
+        public override ITreeVisitor<ExecutionContext> GetScanner(DotNetBuildContext buildContext) =>
+            new BuildContextScanner();
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor(DotNetBuildContext buildContext) =>
+            new Marker(buildContext);
+
+        private class Marker(DotNetBuildContext buildContext) : XmlVisitor<ExecutionContext>
+        {
+            public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx) =>
+                buildContext.Documents.ContainsKey(document.SourcePath) ? SearchResult.Found(document) : document;
         }
     }
 

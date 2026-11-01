@@ -20,6 +20,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using OpenRewrite.Core;
+using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -167,10 +168,10 @@ internal sealed class AccumulatorContents
             return Kind.Retained;
         }
         if (t.IsPrimitive || t.IsEnum || t.IsPointer || t == typeof(string) ||
-            // a recipe lives for the whole run anyway, type attribution refers to no tree, and a template or pattern
-            // keeps only the tree of its own code
-            typeof(Recipe).IsAssignableFrom(t) || typeof(JavaType).IsAssignableFrom(t) ||
-            t == typeof(CSharpTemplate) || t == typeof(CSharpPattern))
+            // a recipe and the execution context's build context live for the whole run anyway, type attribution
+            // refers to no tree, and a template or pattern keeps only the tree of its own code
+            typeof(Recipe).IsAssignableFrom(t) || t == typeof(DotNetBuildContext) ||
+            typeof(JavaType).IsAssignableFrom(t) || t == typeof(CSharpTemplate) || t == typeof(CSharpPattern))
         {
             return Kind.Leaf;
         }
