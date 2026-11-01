@@ -26,10 +26,10 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -103,25 +103,29 @@ public class ChangePlugin extends Recipe {
         MethodMatcher applyMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
-                new GroovyIsoVisitor<ExecutionContext>() {
+                new JavaIsoVisitor<ExecutionContext>() {
                     @Nullable
                     GradleProject gradleProject;
                     @Nullable
                     GradleSettings gradleSettings;
 
                     @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (!(tree instanceof SourceFile)) {
+                            return super.visit(tree, ctx);
+                        }
+                        SourceFile cu = (SourceFile) tree;
                         Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
                         Optional<GradleSettings> maybeGs = cu.getMarkers().findFirst(GradleSettings.class);
                         if (!maybeGp.isPresent() && !maybeGs.isPresent()) {
-                            return cu;
+                            return (J) cu;
                         }
 
                         gradleProject = maybeGp.orElse(null);
                         gradleSettings = maybeGs.orElse(null);
 
-                        G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                        if (g != cu) {
+                        J g = super.visit(tree, ctx);
+                        if (g != null && g != cu) {
                             if (gradleProject != null) {
                                 GradleProject updatedGp = gradleProject.withPlugins(ListUtils.map(gradleProject.getPlugins(), plugin -> {
                                     if (pluginId.equals(plugin.getId())) {
