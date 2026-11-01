@@ -853,7 +853,7 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 		return
 	}
 	if spec.Recipe != nil && spec.CheckParserShapedTrees {
-		if failure := treeShapesFailure(run.parseOutput()); failure != "" {
+		if failure := treeShapesFailure(run.parseOutput(), run.checks); failure != "" {
 			t.Error(failure)
 			return
 		}

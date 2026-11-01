@@ -38,7 +38,7 @@ var whitespaceRun = regexp.MustCompile(`\s+`)
 // makes differently of the text they print, or "" when there are none. When
 // some of the output does not parse, it reports only that, since the fresh
 // parse of the others may then lack the types it otherwise sees.
-func treeShapesFailure(output *outputParse) string {
+func treeShapesFailure(output *outputParse, checks *runChecks) string {
 	var changed []int
 	unparsed := false
 	for k := range output.finals {
@@ -61,7 +61,7 @@ func treeShapesFailure(output *outputParse) string {
 		if len(problems) == 0 {
 			continue
 		}
-		fmt.Fprintf(&found, "  %s:\n", sourcePathOf(output.finals[k]))
+		fmt.Fprintf(&found, "  %s%s:\n", sourcePathOf(output.finals[k]), checks.changedByOf(output.finals[k]))
 		for _, p := range problems {
 			fmt.Fprintf(&found, "    %s\n", p)
 		}

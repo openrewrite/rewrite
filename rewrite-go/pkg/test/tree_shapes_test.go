@@ -81,12 +81,12 @@ func TestNodeTheParserBuildsDifferentlyFails(t *testing.T) {
 	// when it runs
 	got := failures(t, spec, Golang(assignsOne, assignsTwo))
 
-	// then the run fails, naming the node and what the parser makes of its text
+	// then the run fails, naming the recipe, the node and what the parser makes of its text
 	assert.Equal(t, []string{
 		"Write code with a template from pkg/template or with the parser, or build the nodes the way the parser " +
 			"builds the text they print. The recipe's output holds nodes that the parser makes differently of " +
 			"the same text:\n" +
-			"  test.go:\n" +
+			"  test.go (changed by org.openrewrite.golang.test.ReplaceOne):\n" +
 			"    `2` is a java.Identifier where the parser makes a java.Literal\n" +
 			"A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
 			"parsed code never holds. If the output is meant to differ from parsed code, set " +
@@ -128,7 +128,40 @@ func TestOutputThatDoesNotParseFails(t *testing.T) {
 
 	// then the parse error is reported
 	require.Len(t, got, 1)
-	assert.Contains(t, got[0], "  test.go:\n    the text it prints doesn't parse: ")
+	assert.Contains(t, got[0], "  test.go (changed by org.openrewrite.golang.test.ReplaceOne):\n"+
+		"    the text it prints doesn't parse: ")
+}
+
+func TestNodeTheParserBuildsDifferentlyNamesTheRecipesOfACompositeThatChangedTheFile(t *testing.T) {
+	// given a composite whose second recipe writes a number as an identifier
+	spec := NewRecipeSpec().WithRecipe(&recipeList{recipes: []recipe.Recipe{
+		&renameIdentifiers{rename: renameAToB},
+		&replaceOne{replace: func(lit *java.Literal) java.J {
+			return &java.Identifier{ID: uuid.New(), Prefix: lit.Prefix, Markers: lit.Markers, Name: "2"}
+		}},
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+
+		func a() {
+			x := 1
+			_ = x
+		}
+	`, `
+		package main
+
+		func b() {
+			x := 2
+			_ = x
+		}
+	`))
+
+	// then the file names the recipes that changed it, not the composite
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "  test.go (changed by org.openrewrite.golang.test.RenameIdentifiers, "+
+		"org.openrewrite.golang.test.ReplaceOne):\n")
 }
 
 func TestNodeTheParserBuildsTheSamePasses(t *testing.T) {

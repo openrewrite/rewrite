@@ -17,7 +17,12 @@
 package test
 
 import (
+	"strings"
+
+	"github.com/google/uuid"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -63,6 +68,7 @@ func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext, 
 		for _, g := range gen {
 			if g != nil {
 				generated = append(generated, g)
+				checks.changed(rc, nil, g)
 			}
 		}
 	}
@@ -126,8 +132,10 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 			done(where)
 			return nil
 		}
+		before := tr
 		tr = visitor.DrainAfterVisits(editor, after, ctx)
 		done(where)
+		checks.changed(rc, before, tr)
 	}
 	return tr
 }
@@ -141,6 +149,58 @@ type runChecks struct {
 	contextChanges            []contextChange
 	scannerEdits              []scannerEdit
 	accumulators              accumulatorContents
+	// changedBy names, by source file id, the recipes that changed or generated
+	// each source.
+	changedBy map[uuid.UUID][]string
+}
+
+// changed notes that rc changed before into after, or generated after when
+// before is nil.
+func (c *runChecks) changed(rc recipe.Recipe, before, after java.Tree) {
+	if c == nil || after == before {
+		return
+	}
+	id, ok := sourceFileID(after)
+	if !ok {
+		return
+	}
+	if c.changedBy == nil {
+		c.changedBy = map[uuid.UUID][]string{}
+	}
+	if !containsString(c.changedBy[id], rc.Name()) {
+		c.changedBy[id] = append(c.changedBy[id], rc.Name())
+	}
+}
+
+// changedByOf names the recipes that changed or generated sf, or is "" when
+// none is known.
+func (c *runChecks) changedByOf(sf java.Tree) string {
+	if c == nil {
+		return ""
+	}
+	id, ok := sourceFileID(sf)
+	if !ok || len(c.changedBy[id]) == 0 {
+		return ""
+	}
+	return " (changed by " + strings.Join(c.changedBy[id], ", ") + ")"
+}
+
+func sourceFileID(t java.Tree) (uuid.UUID, bool) {
+	switch sf := t.(type) {
+	case *golang.CompilationUnit:
+		if sf != nil {
+			return sf.ID, true
+		}
+	case *golang.GoMod:
+		if sf != nil {
+			return sf.Ident, true
+		}
+	case *golang.GoSum:
+		if sf != nil {
+			return sf.Ident, true
+		}
+	}
+	return uuid.UUID{}, false
 }
 
 // scan runs the scanner of sr on tr as the checks watch it.
