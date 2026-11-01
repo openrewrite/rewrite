@@ -167,6 +167,50 @@ func TestRecipeInAFormatPackagePasses(t *testing.T) {
 		RewriteRun(t, Golang(declaresA, declaresB))
 }
 
+// bumpGoAndFormat raises the go directive of a go.mod to 1.23, and formats the file.
+type bumpGoAndFormat struct {
+	recipe.Base
+}
+
+func (r *bumpGoAndFormat) Name() string        { return "org.openrewrite.golang.test.BumpGoAndFormat" }
+func (r *bumpGoAndFormat) DisplayName() string { return "Bump go and format" }
+func (r *bumpGoAndFormat) Description() string { return "Raises go to 1.23, and formats." }
+
+func (r *bumpGoAndFormat) Editor() recipe.TreeVisitor {
+	return visitor.Init(&goDirectiveBumper{})
+}
+
+type goDirectiveBumper struct {
+	visitor.GoVisitor
+}
+
+func (v *goDirectiveBumper) VisitGoModDirective(d *golang.GoModDirective, _ any) java.Tree {
+	if d.Keyword != "go" || len(d.Values) != 1 || d.Values[0].Text != "1.22" {
+		return d
+	}
+	bumped := *d.Values[0]
+	bumped.Text = "1.23"
+	c := *d
+	c.Values = []*golang.GoModValue{&bumped}
+	v.DoAfterVisit(format.NewAutoFormatVisitor(nil))
+	return &c
+}
+
+func TestFormattingAWholeGoModPasses(t *testing.T) {
+	// the formatter lays out Go source files only
+	NewRecipeSpec().
+		WithRecipe(&bumpGoAndFormat{}).
+		RewriteRun(t, GoMod(`
+			module example.com/app
+
+			go 1.22
+		`, `
+			module example.com/app
+
+			go 1.23
+		`))
+}
+
 func TestMinimalFormattingCheckCanBeTurnedOff(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&renameAndFormat{how: "after visit"})
 	spec.CheckMinimalFormatting = false

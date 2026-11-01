@@ -46,47 +46,47 @@ var (
 	}
 )
 
-// formattingScope finds the requests a recipe makes to auto-format a whole
+// formattingScope finds the requests a recipe makes to auto-format a whole Go
 // source file that existed before the run. Test inputs are usually formatted
 // already, so the reformatting this causes on real code rarely shows in an
 // expected output.
 type formattingScope struct {
 	sources  map[uuid.UUID]bool
 	mu       sync.Mutex
-	asked    map[java.Tree]bool
+	asked    map[*golang.CompilationUnit]bool
 	requests []formatRequest
 }
 
 type formatRequest struct {
-	tree     java.Tree
+	cu       *golang.CompilationUnit
 	callSite string
 }
 
+// newFormattingScope watches the Go source files of parsed, leaving out go.mod
+// and go.sum, which the formatter does not lay out.
 func newFormattingScope(parsed []parsedSource) *formattingScope {
-	s := &formattingScope{sources: map[uuid.UUID]bool{}, asked: map[java.Tree]bool{}}
+	s := &formattingScope{sources: map[uuid.UUID]bool{}, asked: map[*golang.CompilationUnit]bool{}}
 	for _, ps := range parsed {
-		if id, ok := sourceFileID(ps.tree); ok {
-			s.sources[id] = true
+		if cu, ok := ps.tree.(*golang.CompilationUnit); ok {
+			s.sources[cu.ID] = true
 		}
 	}
 	return s
 }
 
 func (s *formattingScope) onFormat(t, stopAfter java.Tree, _ *visitor.Cursor) {
-	if stopAfter != nil {
-		return
-	}
-	if id, ok := sourceFileID(t); !ok || !s.sources[id] {
+	cu, ok := t.(*golang.CompilationUnit)
+	if stopAfter != nil || !ok || cu == nil || !s.sources[cu.ID] {
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.asked[t] {
+	if s.asked[cu] {
 		return
 	}
-	s.asked[t] = true
+	s.asked[cu] = true
 	if callSite, formatter := formatCallSite(); !formatter {
-		s.requests = append(s.requests, formatRequest{tree: t, callSite: callSite})
+		s.requests = append(s.requests, formatRequest{cu: cu, callSite: callSite})
 	}
 }
 
@@ -156,17 +156,16 @@ func (s *formattingScope) failure(r recipe.Recipe, parsed []parsedSource) string
 	}
 	bySource := map[uuid.UUID]parsedSource{}
 	for _, ps := range parsed {
-		if id, ok := sourceFileID(ps.tree); ok {
-			bySource[id] = ps
+		if cu, ok := ps.tree.(*golang.CompilationUnit); ok {
+			bySource[cu.ID] = ps
 		}
 	}
 	var callSites []string
 	targets := map[string][]string{}
 	for _, req := range s.requests {
-		id, _ := sourceFileID(req.tree)
-		ps := bySource[id]
+		ps := bySource[req.cu.ID]
 		if ps.result == nil || ps.result == ps.tree || onlyWhitespaceChanged(ps.tree, ps.result) ||
-			holdsNoneOfItsChildren(ps.tree, req.tree) {
+			holdsNoneOfItsChildren(ps.tree.(*golang.CompilationUnit), req.cu) {
 			continue
 		}
 		target := "all of " + sourcePathOf(ps.tree)
@@ -212,18 +211,6 @@ func containsString(list []string, s string) bool {
 	return false
 }
 
-func sourceFileID(t java.Tree) (uuid.UUID, bool) {
-	switch sf := t.(type) {
-	case *golang.CompilationUnit:
-		return sf.ID, sf != nil
-	case *golang.GoMod:
-		return sf.Ident, sf != nil
-	case *golang.GoSum:
-		return sf.Ident, sf != nil
-	}
-	return uuid.UUID{}, false
-}
-
 func onlyWhitespaceChanged(before, after java.Tree) bool {
 	return strings.Join(strings.Fields(printTree(before, printer.DefaultMarkerPrinter)), "") ==
 		strings.Join(strings.Fields(printTree(after, printer.DefaultMarkerPrinter)), "")
@@ -233,7 +220,7 @@ func onlyWhitespaceChanged(before, after java.Tree) bool {
 // the source file original held, as a copy of a file holding only new code to
 // be put back afterwards does. A file that had none would format them on real
 // code.
-func holdsNoneOfItsChildren(original, formatted java.Tree) bool {
+func holdsNoneOfItsChildren(original, formatted *golang.CompilationUnit) bool {
 	children := sourceChildren(original)
 	if len(children) == 0 {
 		return false
@@ -246,34 +233,18 @@ func holdsNoneOfItsChildren(original, formatted java.Tree) bool {
 	return true
 }
 
-func sourceChildren(t java.Tree) map[uuid.UUID]bool {
+func sourceChildren(cu *golang.CompilationUnit) map[uuid.UUID]bool {
 	ids := map[uuid.UUID]bool{}
-	switch sf := t.(type) {
-	case *golang.CompilationUnit:
-		if sf.PackageDecl != nil && sf.PackageDecl.Element != nil {
-			ids[sf.PackageDecl.Element.ID] = true
+	if cu.PackageDecl != nil && cu.PackageDecl.Element != nil {
+		ids[cu.PackageDecl.Element.ID] = true
+	}
+	if cu.Imports != nil {
+		for _, rp := range cu.Imports.Elements {
+			ids[rp.Element.ID] = true
 		}
-		if sf.Imports != nil {
-			for _, rp := range sf.Imports.Elements {
-				ids[rp.Element.ID] = true
-			}
-		}
-		for _, rp := range sf.Statements {
-			ids[rp.Element.GetID()] = true
-		}
-	case *golang.GoMod:
-		for _, rp := range sf.Statements {
-			switch s := rp.Element.(type) {
-			case *golang.GoModDirective:
-				ids[s.Ident] = true
-			case *golang.GoModBlock:
-				ids[s.Ident] = true
-			}
-		}
-	case *golang.GoSum:
-		for _, rp := range sf.Lines {
-			ids[rp.Element.Ident] = true
-		}
+	}
+	for _, rp := range cu.Statements {
+		ids[rp.Element.GetID()] = true
 	}
 	return ids
 }
