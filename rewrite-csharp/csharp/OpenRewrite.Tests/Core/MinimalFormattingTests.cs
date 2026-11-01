@@ -88,6 +88,39 @@ public class MinimalFormattingTests : RewriteTest
             failure.Message);
     }
 
+    /// <summary>The failure names the after-visit, not the precondition that ran the visitor.</summary>
+    [Fact]
+    public void AnAutoFormatVisitorRunAfterAVisitBehindAPreconditionFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new BehindAPrecondition(new RenameFooThenFormat(Format.AfterVisit))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        ));
+
+        Assert.Contains("\n  A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on\n    all of source.cs\n",
+            failure.Message);
+    }
+
+    /// <summary>A recipe whose own visitor is a formatter may format whole files, behind a precondition too.</summary>
+    [Fact]
+    public void AFormatterBehindAPreconditionPassesAlongsideAnEdit()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new Composite(new RenameFooThenFormat(Format.Call),
+                new BehindAPrecondition(new FormatEverything()))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+    }
+
+    [Fact]
+    public void AScanningRecipeWhoseVisitorIsAFormatterPassesAlongsideAnEdit()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new Composite(new RenameFooThenFormat(Format.Call), new FormatScanned())),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+    }
+
     [Fact]
     public void FormattingOnlyTheChangedElementPasses()
     {
@@ -216,5 +249,44 @@ public class MinimalFormattingTests : RewriteTest
         public override string Description => "Formats every source file.";
 
         public override ITreeVisitor<ExecutionContext> GetVisitor() => new AutoFormatVisitor<ExecutionContext>();
+    }
+
+    /// <summary>A scanning recipe whose visitor is a formatter.</summary>
+    private class FormatScanned : ScanningRecipe<HashSet<string>>
+    {
+        public override string DisplayName => "Format scanned files";
+        public override string Description => "Formats every source file it scanned.";
+
+        public override HashSet<string> GetInitialValue(ExecutionContext ctx) => [];
+
+        public override ITreeVisitor<ExecutionContext> GetScanner(HashSet<string> scanned) =>
+            ITreeVisitor<ExecutionContext>.Noop();
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor(HashSet<string> scanned) =>
+            new AutoFormatVisitor<ExecutionContext>();
+    }
+
+    /// <summary>Runs another recipe's visitor behind a precondition that every source file meets.</summary>
+    private class BehindAPrecondition(global::OpenRewrite.Core.Recipe recipe) : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => recipe.DisplayName;
+        public override string Description => recipe.Description;
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() =>
+            Preconditions.Check(new FindSourceFiles(), recipe.GetVisitor());
+
+        private class FindSourceFiles : TreeVisitor<global::OpenRewrite.Core.Tree, ExecutionContext>
+        {
+            public override global::OpenRewrite.Core.Tree? Visit(global::OpenRewrite.Core.Tree? tree,
+                ExecutionContext ctx) => tree is SourceFile ? SearchResult.Found(tree) : tree;
+        }
+    }
+
+    private class Composite(params global::OpenRewrite.Core.Recipe[] recipes) : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Composite";
+        public override string Description => "Runs its recipe list.";
+
+        public override List<global::OpenRewrite.Core.Recipe> GetRecipeList() => [.. recipes];
     }
 }

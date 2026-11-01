@@ -49,17 +49,21 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
         }
         var frames = new StackTrace(1, true).GetFrames();
         var i = 0;
+        var afterVisit = false;
         while (i < frames.Length - 1 && IsPlumbing(frames[i]))
         {
+            // a visitor's Visit that calls another visitor's Visit is running its after-visitors
+            afterVisit |= IsVisit(frames[i]) && IsVisit(frames[i + 1]);
             i++;
         }
-        // Formatters format whole files
-        if (frames[i].GetMethod()?.DeclaringType is not { } caller || InFormatNamespace(caller))
+        // Formatters format whole files, and so does a recipe whose own visitor is a formatter
+        if (frames[i].GetMethod()?.DeclaringType is not { } caller || InFormatNamespace(caller) ||
+            !afterVisit && IsScheduler(caller))
         {
             return;
         }
-        _requests.Add(new Request(tree, sourceFile.Id, CallSite(frames[i], caller, frames[Math.Max(i - 1, 0)]),
-            Describe(tree)));
+        _requests.Add(new Request(tree, sourceFile.Id,
+            CallSite(frames[i], caller, frames[Math.Max(i - 1, 0)], afterVisit), Describe(tree)));
     }
 
     public void AssertFormattedOnlyWhatChanged(IEnumerable<Result> results)
@@ -127,14 +131,22 @@ internal sealed class FormattingScope(Recipe recipe) : FormattingListener
                definition == typeof(JavaVisitor<>) || definition == typeof(CSharpVisitor<>) ||
                definition.Name.StartsWith("TreeVisitorAs", StringComparison.Ordinal) ||
                type.Namespace == typeof(AutoFormatVisitor<>).Namespace ||
-               type.FullName?.StartsWith("OpenRewrite.Core.Preconditions", StringComparison.Ordinal) == true ||
+               typeof(Check).IsAssignableFrom(type) || typeof(IComposite).IsAssignableFrom(type) ||
                type.FullName?.StartsWith("OpenRewrite.Core.ScanningRecipe", StringComparison.Ordinal) == true ||
                type.FullName?.StartsWith("OpenRewrite.Core.TreeVisitorExtensions", StringComparison.Ordinal) == true;
     }
 
-    private static string CallSite(StackFrame frame, Type caller, StackFrame entry)
+    /// <summary>A visitor's <c>Visit(tree, p)</c>, which runs its after-visitors once it has visited the tree.</summary>
+    private static bool IsVisit(StackFrame frame) =>
+        frame.GetMethod() is { Name: "Visit", DeclaringType: { IsGenericType: true } type } method &&
+        type.GetGenericTypeDefinition() == typeof(TreeVisitor<,>) && method.GetParameters().Length == 2;
+
+    private static bool IsScheduler(Type type) =>
+        type.FullName?.StartsWith(typeof(RecipeScheduler).FullName!, StringComparison.Ordinal) == true;
+
+    private static string CallSite(StackFrame frame, Type caller, StackFrame entry, bool afterVisit)
     {
-        if (caller.FullName?.StartsWith(typeof(RecipeScheduler).FullName!, StringComparison.Ordinal) == true)
+        if (afterVisit)
         {
             // the visitor that asked is gone from the stack by the time its after-visitors run
             return "A visitor's DoAfterVisit(new AutoFormatVisitor<P>()) ran on";
