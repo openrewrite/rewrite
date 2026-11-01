@@ -212,6 +212,8 @@ public sealed class CSharpTemplate
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
         }
 
+        tree = TemplateEngine.RetainIds(tree, cursorJ);
+
         // Phase 2: coordinate application (prefix preservation)
         if (coordinates != null)
         {

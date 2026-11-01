@@ -700,6 +700,36 @@ internal static class TemplateEngine
     }
 
     /// <summary>
+    /// Copy of <paramref name="tree"/> in which an id survives only at the first node carrying it, and only if it
+    /// names a node of <paramref name="replaced"/>, the subtree the result takes the place of. The parsed template
+    /// is shared by every application, and a capture spliced into two slots would put one id in two places.
+    /// </summary>
+    internal static J RetainIds(J tree, J? replaced)
+    {
+        var retainable = new HashSet<Guid>();
+        if (replaced != null)
+            new IdCollector(retainable).Visit(replaced, 0);
+        return new IdRetainer(retainable).VisitNonNull(tree, 0);
+    }
+
+    private sealed class IdCollector(HashSet<Guid> ids) : CSharpVisitor<int>
+    {
+        public override J? PostVisit(J tree, int p)
+        {
+            ids.Add(tree.Id);
+            return tree;
+        }
+    }
+
+    private sealed class IdRetainer(HashSet<Guid> retainable) : CSharpVisitor<int>
+    {
+        private readonly HashSet<Guid> _seen = [];
+
+        public override J? PostVisit(J tree, int p) =>
+            retainable.Contains(tree.Id) && _seen.Add(tree.Id) ? tree : J.SetId(tree, Tree.RandomId());
+    }
+
+    /// <summary>
     /// Apply coordinate-based insertion, preserving the original node's prefix.
     /// </summary>
     internal static J ApplyCoordinates(J tree, Cursor cursor, CSharpCoordinates coords)

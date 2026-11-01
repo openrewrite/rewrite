@@ -299,6 +299,60 @@ public class TemplateApplyTests : RewriteTest
         AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
     }
 
+    /// <summary>
+    /// Each application builds nodes of its own, as Java's templates do, so two replacements share no id.
+    /// </summary>
+    [Fact]
+    public void EachApplicationHasItsOwnIds()
+    {
+        var a = Capture.Expression("a");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({a})");
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression("1") }, null);
+
+        var first = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+        var second = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        Assert.Empty(IdsOf(first).Intersect(IdsOf(second)));
+    }
+
+    /// <summary>
+    /// A capture keeps its id where it moves from the replaced code, and only once.
+    /// </summary>
+    [Fact]
+    public void CaptureKeepsItsIdOnceWhenItComesFromTheReplacedCode()
+    {
+        var a = Capture.Expression("a");
+        var cu = Parse("class C { void M(int x) { Console.Write(x); } }");
+        var write = FindFirst<MethodInvocation>(cu)!;
+        var x = write.Arguments.Elements[0].Element;
+        var match = CSharpPattern.Expression($"Console.Write({a})")
+            .Match(write, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu))!;
+
+        var result = CSharpTemplate.Expression($"Math.Max({a}, {a})")
+            .Apply(new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu), write), values: match)!;
+
+        var arguments = ((MethodInvocation)result).Arguments.Elements;
+        Assert.Equal(x.Id, arguments[0].Element.Id);
+        Assert.NotEqual(x.Id, arguments[1].Element.Id);
+        Assert.Equal(IdsOf(result).Count, IdsOf(result).Distinct().Count());
+    }
+
+    private static List<Guid> IdsOf(J tree)
+    {
+        var ids = new List<Guid>();
+        new IdCollector(ids).Visit(tree, 0);
+        return ids;
+    }
+
+    private class IdCollector(List<Guid> ids) : CSharpVisitor<int>
+    {
+        public override J? PostVisit(J tree, int p)
+        {
+            ids.Add(tree.Id);
+            return tree;
+        }
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {
