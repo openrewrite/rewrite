@@ -492,6 +492,10 @@ type RecipeSpec struct {
 	// CheckNoEditsInScanningPhase asserts that the scanner of a ScanningRecipe
 	// returns each tree it visits unchanged, as the scanning phase discards edits.
 	CheckNoEditsInScanningPhase bool
+	// CheckLightweightAccumulators asserts that the accumulator of a ScanningRecipe
+	// keeps no trees, cursors, visitors, execution contexts or module graphs, which
+	// would stay in memory all cycle.
+	CheckLightweightAccumulators bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
 	// report, such as search results and markup: a marker type turning up where
 	// neither the sources it was given nor a fresh parse of its output have one
@@ -525,6 +529,7 @@ func NewRecipeSpec() *RecipeSpec {
 		CheckParsePrintIdempotence:     true,
 		CheckExecutionContextUnchanged: true,
 		CheckNoEditsInScanningPhase:    true,
+		CheckLightweightAccumulators:   true,
 		CheckReportingMarkersOnly:      true,
 		CheckUnchangedTreeIdentity:     true,
 	}
@@ -721,6 +726,7 @@ func (spec *RecipeSpec) runCycles(run *recipeRun) {
 	run.checks = &runChecks{
 		executionContextUnchanged: spec.CheckExecutionContextUnchanged,
 		noEditsInScanningPhase:    spec.CheckNoEditsInScanningPhase,
+		lightweightAccumulators:   spec.CheckLightweightAccumulators,
 	}
 	for cycle := 1; cycle <= spec.cycles(); cycle++ {
 		if cycle == 2 {

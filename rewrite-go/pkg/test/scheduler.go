@@ -46,6 +46,7 @@ func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext, 
 			}
 		}
 	}
+	checks.checkAccumulators(recipes, accs, "after scanning")
 
 	var generated []java.Tree
 	for i, rc := range recipes {
@@ -76,6 +77,7 @@ func runCycle(r recipe.Recipe, trees []java.Tree, ctx *recipe.ExecutionContext, 
 			kept = append(kept, g)
 		}
 	}
+	checks.checkAccumulators(recipes, accs, "after editing")
 	return results, kept
 }
 
@@ -135,8 +137,10 @@ func edit(recipes []recipe.Recipe, accs []any, tr java.Tree, ctx *recipe.Executi
 type runChecks struct {
 	executionContextUnchanged bool
 	noEditsInScanningPhase    bool
+	lightweightAccumulators   bool
 	contextChanges            []contextChange
 	scannerEdits              []scannerEdit
+	accumulators              accumulatorContents
 }
 
 // scan runs the scanner of sr on tr as the checks watch it.
@@ -160,6 +164,9 @@ func (c *runChecks) failures() []string {
 	}
 	if len(c.scannerEdits) > 0 {
 		failures = append(failures, scannerEditsFailure(c.scannerEdits))
+	}
+	if failure := c.accumulators.failure(); failure != "" {
+		failures = append(failures, failure)
 	}
 	return failures
 }
