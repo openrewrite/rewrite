@@ -62,6 +62,15 @@ public abstract class RewriteTest
         var recipeSpec = new RecipeSpec();
         configure(recipeSpec);
 
+        // An .editorconfig styles the C# sources, as SolutionParser has it do, and is not a source itself
+        var editorConfigSpecs = specs.Where(EditorConfigSources.Is).ToList();
+        if (editorConfigSpecs.Any(s => s.After != null))
+        {
+            throw new ArgumentException("An .editorconfig styles the sources of a test, and no recipe changes it.");
+        }
+        specs = specs.Where(s => !EditorConfigSources.Is(s)).ToArray();
+        using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
+
         var parser = new CSharpParser();
         var printer = new CSharpPrinter<object>();
 
@@ -136,7 +145,8 @@ public abstract class RewriteTest
                     semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
                 }
 
-                source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
+                source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
 
                 // Verify no non-whitespace content leaked into Space fields
                 if (validations.WhitespaceInSpaces)
@@ -463,6 +473,15 @@ public abstract class RewriteTest
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    /// <summary>
+    /// An .editorconfig of the project the test's sources belong to. The C# sources take the style it sets for their
+    /// paths, as <see cref="SolutionParser"/> gives them, and no recipe runs on it.
+    /// </summary>
+    protected static SourceSpec EditorConfig(string content, string sourcePath = ".editorconfig")
+    {
+        return new SourceSpec(content, null, sourcePath);
     }
 
     protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")

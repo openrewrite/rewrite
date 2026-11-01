@@ -1008,6 +1008,22 @@ public class AutoFormatTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// An .editorconfig among the sources styles them as it styles those of a repository, here indenting with a tab.
+    /// </summary>
+    [Fact]
+    public void AutoFormatIndentsSynthesizedMemberAsEditorConfigSays()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            EditorConfig("root = true\n\n[*.cs]\nindent_style = tab\n"),
+            CSharp(
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n\tpublic Foo() : base()\n\t{\n\t}\n}\n"
+            )
+        );
+    }
+
 }
 
 /// <summary>
