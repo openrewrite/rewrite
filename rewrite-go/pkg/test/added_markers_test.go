@@ -112,7 +112,11 @@ func (r *recorder) Failed() bool { return len(r.failures) > 0 || r.TB.Failed() }
 func failures(t *testing.T, spec *RecipeSpec, sources ...Sources) []string {
 	t.Helper()
 	r := &recorder{TB: t}
-	spec.verify(r, spec.parseAndApply(t, sources))
+	run := spec.parseAndApply(t, sources)
+	spec.verify(r, run)
+	if !r.Failed() {
+		spec.expectOtherSourcesHandled(r, run)
+	}
 	return r.failures
 }
 
