@@ -170,6 +170,21 @@ describe('object literals in templates and patterns', () => {
             // rewriteRun compares the trees with a fresh parse of the text they print
             return spec.rewriteRun(typescript(`${how}({b: 2});`, 'new E({a: 1, b: 2});'));
         });
+
+        test('a padded member put ahead of another leaves its trailing comma behind', () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                    const members = (method.arguments.elements[0].element as J.NewClass).body!.statements;
+                    const given = method.name.simpleName === 'one' ? members[0] : members;
+                    return Template.builder().code('new E({').param(given).code(', a: 1})').build().apply(method, this.cursor);
+                }
+            });
+            return spec.rewriteRun(
+                typescript('one({b: 2,});', 'new E({b: 2, a: 1});'),
+                typescript('all({b: 2, c: 3,});', 'new E({b: 2, c: 3, a: 1});')
+            );
+        });
     });
 
     test('a variadic capture in an object literal pattern matches its properties', async () => {

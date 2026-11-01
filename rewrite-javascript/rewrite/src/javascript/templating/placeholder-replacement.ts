@@ -53,6 +53,13 @@ function isObjectMember(value: unknown): value is J {
     return false;
 }
 
+/** `padded` less the trailing comma it brought from the end of the list it was taken from. */
+function withoutTrailingComma(padded: J.RightPadded<J>): J.RightPadded<J> {
+    const markers = padded.markers?.markers;
+    return markers?.some(m => m.kind === J.Markers.TrailingComma) ?
+        {...padded, markers: {...padded.markers, markers: markers.filter(m => m.kind !== J.Markers.TrailingComma)}} : padded;
+}
+
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
  */
@@ -452,7 +459,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
         }
 
-        return newElements;
+        // Only the last element prints the trailing comma that a given or captured padding brings along
+        return newElements.map((padded, i) => i === newElements.length - 1 ? padded : withoutTrailingComma(padded));
     }
 
     /** The member of an object literal, padded or not, that a parameter is or is bound to, if it is one. */
