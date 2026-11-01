@@ -45,26 +45,35 @@ interface Language {
     invalid(tree: Tree): string[]
 }
 
-const languages: { [kind: string]: Language } = {
-    [JS.Kind.CompilationUnit]: {
-        visitor: JavaScriptVisitor,
-        value: javaScriptValue,
-        skip: tree => tree.kind === J.Kind.Empty,
-        invalid: () => []
-    },
-    [Json.Kind.Document]: {
-        visitor: JsonVisitor,
-        value: jsonValue,
-        skip: tree => tree.kind === Json.Kind.Empty,
-        invalid: jsonInvalid
-    },
-    [Yaml.Kind.Documents]: {
-        visitor: YamlVisitor,
-        value: yamlValue,
-        skip: () => false,
-        invalid: yamlInvalid
-    }
-};
+let languages: { [kind: string]: Language } | undefined;
+
+/**
+ * The language of a source file of `kind`, from a table built on first use, since the modules of the languages import
+ * the harness and may still be loading when it loads.
+ */
+function languageOf(kind: string): Language | undefined {
+    languages ??= {
+        [JS.Kind.CompilationUnit]: {
+            visitor: JavaScriptVisitor,
+            value: javaScriptValue,
+            skip: tree => tree.kind === J.Kind.Empty,
+            invalid: () => []
+        },
+        [Json.Kind.Document]: {
+            visitor: JsonVisitor,
+            value: jsonValue,
+            skip: tree => tree.kind === Json.Kind.Empty,
+            invalid: jsonInvalid
+        },
+        [Yaml.Kind.Documents]: {
+            visitor: YamlVisitor,
+            value: yamlValue,
+            skip: () => false,
+            invalid: yamlInvalid
+        }
+    };
+    return languages[kind];
+}
 
 interface Node {
     readonly tree: Tree
@@ -84,7 +93,7 @@ export class TreeShapes {
     async assertParserShaped(results: Result[], freshParse: Map<SourceFile, SourceFile>): Promise<void> {
         const found: string[] = [];
         for (const {before, after} of results) {
-            const language = after && languages[after.kind];
+            const language = after && languageOf(after.kind);
             if (!after || after === before || !language) {
                 continue;
             }

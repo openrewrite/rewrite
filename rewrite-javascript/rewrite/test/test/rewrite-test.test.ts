@@ -32,6 +32,9 @@ import {
 } from "../../src/javascript";
 import {autoFormat, AutoformatVisitor, maybeAutoFormat} from "../../src/javascript/format";
 import {charge} from "../../src/test/probes";
+import {execFileSync} from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 
 function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
     return {...t, markers: {...t.markers, markers: [...t.markers.markers, marker]}};
@@ -1520,6 +1523,15 @@ describe("rewrite test", () => {
 
             // then
             expect(received).toEqual([new ReplacedText("second.txt", "second")]);
+        });
+    });
+
+    // The modules of the languages import the harness, so a test that imports one first loads the harness mid-way
+    describe.skipIf(!fs.existsSync(path.resolve(__dirname, "../../dist/index.js")))("load order", () => {
+        test.each(["index.js", "java/index.js", "javascript/index.js", "json/index.js", "rpc/index.js",
+            "test/index.js", "text/index.js", "yaml/index.js"])("the package loads with %s first", first => {
+            const module = path.resolve(__dirname, "../../dist", first);
+            execFileSync(process.execPath, ["-e", `require(${JSON.stringify(module)})`], {stdio: "pipe"});
         });
     });
 });
