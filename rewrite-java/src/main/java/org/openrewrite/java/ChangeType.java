@@ -308,8 +308,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
                         if (hasNoConflictingName(sf)) {
-                            if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                addImport(owningClass);
+                            for (JavaType.FullyQualified owner = owningClass; owner != null; owner = owner.getOwningClass()) {
+                                if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                                    addImport(owner);
+                                }
                             }
                             if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                                 addImport(fullyQualifiedTarget);
@@ -347,7 +349,19 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    Expression qualified = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    JavaType.FullyQualified fqTarget = (JavaType.FullyQualified) targetType;
+                    if (hasParameterizedTarget(fieldAccess)) {
+                        if (fqTarget.getOwningClass() != null) {
+                            J.FieldAccess fa = updateParameterizedFieldAccess(fieldAccess, originalType, fqTarget, ctx);
+                            if (getCursor().firstEnclosing(J.Import.class) == null &&
+                                    getCursor().firstEnclosing(Javadoc.class) == null) {
+                                doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                            }
+                            return fa;
+                        }
+                        maybeRemoveImport(originalType.getOwningClass());
+                    }
+                    Expression qualified = updateOuterClassTypes(TypeTree.build(fqTarget.getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
                     if (!(qualified instanceof J.FieldAccess)) {
                         // a type in the default package has no qualifier to shorten, and no import can name it
@@ -499,13 +513,100 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return super.visitMethodInvocation(method, ctx);
         }
 
-        private Expression updateOuterClassTypes(Expression typeTree) {
-            if (typeTree instanceof J.FieldAccess) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) targetType;
+        private static boolean hasParameterizedTarget(J.FieldAccess fieldAccess) {
+            Expression target = fieldAccess.getTarget();
+            while (target instanceof J.FieldAccess) {
+                target = ((J.FieldAccess) target).getTarget();
+            }
+            return target instanceof J.ParameterizedType;
+        }
 
+        private J.FieldAccess updateParameterizedFieldAccess(
+                J.FieldAccess fieldAccess,
+                JavaType.FullyQualified origType,
+                JavaType.FullyQualified targetFq,
+                ExecutionContext ctx
+        ) {
+            JavaType.FullyQualified origOwner = origType.getOwningClass() != null ? origType.getOwningClass() : origType;
+            JavaType.FullyQualified targetOwner = targetFq.getOwningClass();
+            assert targetOwner != null;
+
+            if (!TypeUtils.fullyQualifiedNamesAreEqual(origOwner.getFullyQualifiedName(), targetOwner.getFullyQualifiedName())) {
+                maybeRemoveImport(origOwner);
+            }
+
+            Expression target = fieldAccess.getTarget();
+            if (target instanceof J.ParameterizedType) {
+                J.ParameterizedType pt = (J.ParameterizedType) visitAndCast((J.ParameterizedType) target, ctx, super::visitParameterizedType);
+                NameTree clazz = pt.getClazz();
+                if (clazz instanceof J.FieldAccess && hasParameterizedTarget((J.FieldAccess) clazz) &&
+                        targetOwner.getOwningClass() != null) {
+                    clazz = updateParameterizedFieldAccess((J.FieldAccess) clazz, origOwner, targetOwner, ctx);
+                } else {
+                    Expression built = updateOuterClassTypes(
+                            TypeTree.build(targetOwner.getFullyQualifiedName()).withPrefix(clazz.getPrefix()),
+                            targetOwner
+                    );
+                    built = attributeTopLevelClassName(built, getTopLevelClassName(targetOwner));
+                    clazz = (NameTree) built;
+                }
+                JavaType ptType = updateType(pt.getType());
+                if (ptType instanceof JavaType.Parameterized) {
+                    ptType = ((JavaType.Parameterized) ptType).withType(targetOwner);
+                    if (pt.getType() != null) {
+                        oldNameToChangedType.put(pt.getType(), ptType);
+                    }
+                    oldNameToChangedType.put(ptType, ptType);
+                }
+                target = pt.withClazz(clazz).withType(ptType);
+            } else if (target instanceof J.FieldAccess && hasParameterizedTarget((J.FieldAccess) target) &&
+                    targetOwner.getOwningClass() != null) {
+                target = updateParameterizedFieldAccess((J.FieldAccess) target, origOwner, targetOwner, ctx);
+            }
+
+            JavaType updatedFieldAccessType = updateType(fieldAccess.getType());
+            if (updatedFieldAccessType instanceof JavaType.Parameterized) {
+                updatedFieldAccessType = ((JavaType.Parameterized) updatedFieldAccessType).withType(targetFq);
+            } else if (TypeUtils.isOfClassType(fieldAccess.getType(), origType.getFullyQualifiedName())) {
+                updatedFieldAccessType = targetFq;
+            }
+            if (fieldAccess.getType() != null && updatedFieldAccessType != null) {
+                oldNameToChangedType.put(fieldAccess.getType(), updatedFieldAccessType);
+                oldNameToChangedType.put(updatedFieldAccessType, updatedFieldAccessType);
+            }
+
+            // Clear the inner identifier's type (matching updateOuterClassTypes) so AddImport does not
+            // import the inner class directly and strip the parameterized outer class (see #9291)
+            String newSimpleName = targetFq.getFullyQualifiedName().substring(targetOwner.getFullyQualifiedName().length() + 1);
+            return fieldAccess
+                    .withTarget(target)
+                    .withName(fieldAccess.getName().withSimpleName(newSimpleName).withType(null))
+                    .withType(updatedFieldAccessType);
+        }
+
+        private static Expression attributeTopLevelClassName(Expression expr, JavaType.FullyQualified topLevelType) {
+            if (expr instanceof J.Identifier) {
+                return ((J.Identifier) expr).withType(topLevelType);
+            } else if (expr instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) expr;
+                if (fa.getType() instanceof JavaType.FullyQualified &&
+                        TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) fa.getType()).getFullyQualifiedName(), topLevelType.getFullyQualifiedName())) {
+                    return fa.withName(fa.getName().withType(topLevelType)).withType(topLevelType);
+                }
+                return fa.withTarget(attributeTopLevelClassName(fa.getTarget(), topLevelType));
+            }
+            return expr;
+        }
+
+        private Expression updateOuterClassTypes(Expression typeTree) {
+            return updateOuterClassTypes(typeTree, (JavaType.FullyQualified) targetType);
+        }
+
+        private Expression updateOuterClassTypes(Expression typeTree, JavaType.FullyQualified type) {
+            if (typeTree instanceof J.FieldAccess) {
                 if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
-                    return typeTree.withType(updateType(targetType));
+                    return typeTree.withType(updateType(type));
                 }
 
                 Stack<Expression> typeStack = new Stack<>();
