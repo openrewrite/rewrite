@@ -176,8 +176,7 @@ describe('Statement Expression Wrapping', () => {
 
                 // Verify body (statement context) - should be plain MethodInvocation, not wrapped
                 const body = ifStmt.thenPart.element;
-                expect(body.kind).toBe(JS.Kind.ExpressionStatement);
-                expect((body as JS.ExpressionStatement).expression.kind).toBe(J.Kind.MethodInvocation);
+                expect(body.kind).toBe(J.Kind.MethodInvocation);
             }
         });
     });
@@ -235,6 +234,46 @@ describe('Statement Expression Wrapping', () => {
                 'switch (x) {\n    case !!y:\n        !!z;\n}',
                 'switch (x) {\n    case y:\n        z;\n}'
             ),
+            afterRecipe: expectParserShaped
+        });
+    });
+
+    it('should make a statement that replaces the expression of an expression statement the statement itself', () => {
+        const spec = new RecipeSpec();
+        const [a, b, object] = [capture('a'), capture('b'), capture('object')];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const match = await pattern`${a} || (${a} = ${b})`.match(binary, this.cursor);
+                return match ? template`${a} ||= ${b}`.apply(binary, this.cursor, {values: match}) :
+                    super.visitBinary(binary, p);
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+                const match = await pattern`${object}['bar']`.match(arrayAccess, this.cursor);
+                return match ? template`${object}.bar`.apply(arrayAccess, this.cursor, {values: match}) :
+                    super.visitArrayAccess(arrayAccess, p);
+            }
+        });
+
+        return spec.rewriteRun(
+            {...typescript('a || (a = b);', 'a ||= b;'), afterRecipe: expectParserShaped},
+            {...typescript(`foo['bar'];`, 'foo.bar;'), afterRecipe: expectParserShaped},
+            // a `for` head holds every expression in an expression statement
+            {...typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}'), afterRecipe: expectParserShaped}
+        );
+    });
+
+    it('should make a statement substituted where a template writes a statement the statement itself', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return this.cursor.parentTree()?.value.kind !== JS.Kind.CompilationUnit ? method :
+                    template`if (ready) {\n${method}\n}`.apply(method, this.cursor);
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript('go()', 'if (ready) {\n    go()\n}'),
             afterRecipe: expectParserShaped
         });
     });

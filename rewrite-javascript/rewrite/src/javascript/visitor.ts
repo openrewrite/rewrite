@@ -21,6 +21,7 @@ import {ValidRecipeReturnType} from "../visitor";
 import {Expression, J, JavaVisitor, NameTree, Statement, Type, TypedTree} from "../java";
 import {create, Draft} from "mutative";
 import {isJavaScript, JS, JSX} from "./tree";
+import {isStatement} from "./parser-utils";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -276,6 +277,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             markers: await this.visitMarkers(expressionStatement.markers, p),
             expression: await this.visitDefined<Expression>(expressionStatement.expression, p)
         };
+        // Outside a `for` head the parser makes a statement the statement itself, so a visit that makes one does too
+        const visited: J | undefined = updates.expression;
+        if (visited && visited !== expressionStatement.expression && isStatement(visited) &&
+            this.cursor.parentTree()?.value.kind !== J.Kind.ForLoopControl) {
+            return {...visited, prefix: concatenated(updates.prefix, visited.prefix)};
+        }
         return updateIfChanged(expressionStatement, updates);
     }
 
@@ -1292,4 +1299,16 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         return super.accept(j, p);
     }
+}
+
+/** The prefix that prints as `outer` and then `inner`. */
+function concatenated(outer: J.Space, inner: J.Space): J.Space {
+    if (outer.comments.length === 0) {
+        return {...inner, whitespace: outer.whitespace + inner.whitespace};
+    }
+    const last = outer.comments[outer.comments.length - 1];
+    return {
+        ...outer,
+        comments: [...outer.comments.slice(0, -1), {...last, suffix: last.suffix + inner.whitespace}, ...inner.comments]
+    };
 }
