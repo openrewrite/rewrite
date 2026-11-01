@@ -977,6 +977,54 @@ public class AutoFormatTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// A template replacement keeps the prefix of the code it replaces, where Roslyn's default style would reindent it.
+    /// </summary>
+    [Theory]
+    [InlineData("class C\n{\n\tvoid M()\n\t{\n\t\tConsole.Write(1);\n\t}\n}\n")]
+    [InlineData("class C\n{\n  void M()\n  {\n    Console.Write(1);\n  }\n}\n")]
+    [InlineData("class C\n{\n    void M() { Console.Write(1); }\n}\n")]
+    [InlineData("class C\n{\n    void M()\n    {\n        Foo(); Console.Write(1);\n    }\n}\n")]
+    public void TemplateReplacementKeepsItsPrefix(string before)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new WriteToWriteLineRecipe()),
+            CSharp(before, before.Replace("Console.Write(", "Console.WriteLine("))
+        );
+    }
+
+    /// <summary>
+    /// A synthesized member is indented even when its prefix is also the class's, since that prefix ends a line.
+    /// </summary>
+    [Fact]
+    public void AutoFormatIndentsSynthesizedMemberOfClassAfterBlankLine()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            CSharp(
+                "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+}
+
+/// <summary>
+/// Replaces <c>Console.Write(x)</c> with <c>Console.WriteLine(x)</c> through a template.
+/// </summary>
+file class WriteToWriteLineRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Write to WriteLine";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor()
+    {
+        var x = Capture.Expression("x");
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Expression($"Console.Write({x})"),
+            CSharpTemplate.Expression($"Console.WriteLine({x})"));
+    }
 }
 
 /// <summary>

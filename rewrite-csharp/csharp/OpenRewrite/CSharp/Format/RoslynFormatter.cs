@@ -398,10 +398,20 @@ public static class RoslynFormatter
         IEquatable<DeferredFormatVisitor<P>>
     {
         private readonly HashSet<Guid> _nodeIds = [];
+        private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
-        public void Add(J node)
+        /// <summary>
+        /// Registers <paramref name="node"/>. Roslyn formats its prefix as well, unless the node took over the prefix
+        /// of the node at <paramref name="cursor"/>, as a template replacement does, and that prefix doesn't end in a
+        /// line break.
+        /// </summary>
+        public void Add(J node, Cursor? cursor = null)
         {
-            _nodeIds.Add(PrintableIdAndPrefix(node).id);
+            var (id, prefix) = PrintableIdAndPrefix(node);
+            _nodeIds.Add(id);
+            if (cursor?.Value is J replaced && ReferenceEquals(PrintableIdAndPrefix(replaced).prefix, prefix) &&
+                !(prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace).EndsWith('\n'))
+                _preservedPrefixes[id] = prefix;
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
@@ -413,8 +423,7 @@ public static class RoslynFormatter
             // in a single pass — ensures IDs match the actual tree
             cu = (CompilationUnit)FlattenAndRegister(cu);
 
-            // A node's own prefix is formatted too, as Java's autoFormat does
-            return FormatSpans(cu, _nodeIds, []);
+            return FormatSpans(cu, _nodeIds, _preservedPrefixes);
         }
 
         /// <summary>
@@ -424,7 +433,7 @@ public static class RoslynFormatter
         /// </summary>
         private J FlattenAndRegister(J tree)
         {
-            var flattener = new SyntheticBlockFlattener(_nodeIds);
+            var flattener = new SyntheticBlockFlattener(_nodeIds, _preservedPrefixes);
             flattener.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
             return flattener.VisitNonNull(tree, 0);
         }
@@ -439,7 +448,8 @@ public static class RoslynFormatter
     /// When a synthetic block's ID is in the registered set, replaces it with
     /// the individual statement IDs so formatting targets the actual nodes.
     /// </summary>
-    private class SyntheticBlockFlattener(HashSet<Guid> nodeIds) : CSharpVisitor<int>
+    private class SyntheticBlockFlattener(
+        HashSet<Guid> nodeIds, Dictionary<Guid, Space> preservedPrefixes) : CSharpVisitor<int>
     {
         public override J VisitBlock(Block block, int ctx)
         {
@@ -463,6 +473,8 @@ public static class RoslynFormatter
                     // If this synthetic block was registered for formatting,
                     // register its individual statements instead
                     var registered = nodeIds.Remove(inner.Id);
+                    if (registered)
+                        preservedPrefixes.Remove(inner.Id);
 
                     var innerStmts = inner.Statements;
                     for (var k = 0; k < innerStmts.Count; k++)

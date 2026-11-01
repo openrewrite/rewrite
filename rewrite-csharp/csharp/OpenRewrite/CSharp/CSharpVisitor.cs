@@ -1578,7 +1578,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             return (T)(J)RoslynFormatter.Format(cu);
 
         _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
-        _deferredFormat.Add(tree);
+        _deferredFormat.Add(tree, cursor);
         MaybeDoAfterVisit(_deferredFormat);
         return tree;
     }
