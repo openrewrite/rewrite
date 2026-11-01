@@ -1573,6 +1573,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
+        FormattingListener.BeforeFormat(tree, null, cursor);
+
         // Full CU formatting — do it immediately, no benefit to deferring
         if (tree is CompilationUnit cu)
             return (T)(J)RoslynFormatter.Format(cu);
