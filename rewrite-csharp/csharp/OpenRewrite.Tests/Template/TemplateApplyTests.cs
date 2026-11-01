@@ -271,6 +271,34 @@ public class TemplateApplyTests : RewriteTest
         Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
     }
 
+    /// <summary>
+    /// A type test binds as a relational operator, and a pattern takes a shift expression.
+    /// </summary>
+    [Theory]
+    [InlineData("", " is Foo", "a == b", "(a == b) is Foo")]
+    [InlineData("", " is Foo", "a ?? b", "(a ?? b) is Foo")]
+    [InlineData("", " is Foo", "c ? a : b", "(c ? a : b) is Foo")]
+    [InlineData("", " is Foo", "c = a", "(c = a) is Foo")]
+    [InlineData("", " is Foo", "a + b", "a + b is Foo")]
+    [InlineData("", " is Foo", "a < b", "a < b is Foo")]
+    [InlineData("", " is Foo", "a as string", "a as string is Foo")]
+    [InlineData("", " is Foo", "x is Bar", "x is Bar is Foo")]
+    [InlineData("x is ", "", "a == b", "x is (a == b)")]
+    [InlineData("x is ", "", "a & b", "x is (a & b)")]
+    [InlineData("x is ", "", "c ? a : b", "x is (c ? a : b)")]
+    [InlineData("x is ", "", "a << b", "x is a << b")]
+    [InlineData("x is ", "", "a + b", "x is a + b")]
+    [InlineData("x is < ", "", "a == b", "x is < (a == b)")]
+    [InlineData("x is < ", "", "a + b", "x is < a + b")]
+    [InlineData("!", "", "x is Foo", "!(x is Foo)")]
+    [InlineData("", " == y", "x is Foo", "x is Foo == y")]
+    [InlineData("", ".ToString()", "x is Foo", "(x is Foo).ToString()")]
+    public void CaptureInTypeTestMatchesFreshParse(string before, string after, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {

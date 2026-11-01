@@ -35,7 +35,7 @@ public static class CSharpParenthesizeVisitor
         // Fast exit: simple expression types never need parenthesization
         if (newTree is not (Binary or Unary or Ternary or Assignment or AssignmentOperation
             or TypeCast or CsBinary or CsUnary or IsPattern or RangeExpression
-            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression))
+            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf))
             return newTree;
 
         var originalTree = cursor.Value;
@@ -114,6 +114,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return MaybeWrapBinaryLike(c);
     }
 
+    public override J VisitInstanceOf(InstanceOf instanceOf, P p)
+    {
+        var i = _recursive ? (InstanceOf)base.VisitInstanceOf(instanceOf, p) : instanceOf;
+        return MaybeWrapBinaryLike(i);
+    }
+
     public override J VisitAssignment(Assignment assignment, P p)
     {
         var a = _recursive ? (Assignment)base.VisitAssignment(assignment, p) : assignment;
@@ -189,6 +195,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     // Helpers
     // -----------------------------------------------------------------------
 
+    private const int ShiftPrecedence = 8;
     private const int UnaryPrecedence = 13;
     private const int PrimaryPrecedence = 14;
 
@@ -227,7 +234,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         // Ternary (prec -1) needs parens inside most expression contexts.
         // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
         // so a ternary used as the condition of another ternary needs parens.
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary || NeedsParenthesesInSlot(expr))
+        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary or InstanceOf or ConstantPattern
+            or RelationalPattern || NeedsParenthesesInSlot(expr))
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
@@ -239,7 +247,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parent = parentCursor.Value;
 
         // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
-        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern || NeedsParenthesesInSlot(expr))
+        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern or InstanceOf or ConstantPattern
+            or RelationalPattern || NeedsParenthesesInSlot(expr))
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
@@ -333,6 +342,14 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
             return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation or Lambda;
         }
+
+        // A type test is a left-associative relational operator: a == b is Foo parses as a == (b is Foo)
+        if (parent is InstanceOf instanceOf && instanceOf.Expression.Element.Id == expr.Id)
+            return CSharpPrecedences.GetPrecedence(expr) < CSharpPrecedences.GetPrecedence(instanceOf);
+
+        // A pattern takes a shift expression: x is a == b parses as (x is a) == b
+        if (parent is ConstantPattern or RelationalPattern)
+            return CSharpPrecedences.GetPrecedence(expr) < ShiftPrecedence;
 
         return false;
     }
