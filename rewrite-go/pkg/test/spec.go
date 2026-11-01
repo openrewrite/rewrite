@@ -832,6 +832,10 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 
 	// Pass 5: the recipe copes with sources the test does not give it.
 	spec.expectEmptySourcesHandled(t, run)
+	if t.Failed() {
+		return
+	}
+	spec.expectUnparsedSourcesHandled(t, run)
 }
 
 // expectNoFurtherChanges reports whether it found changes to fail t with.
