@@ -154,11 +154,9 @@ func (r *autoFormat) Description() string        { return "Formats every source 
 func (r *autoFormat) Editor() recipe.TreeVisitor { return format.NewAutoFormatVisitor(nil) }
 
 func TestRecipeWhoseVisitorIsAFormatterPasses(t *testing.T) {
-	spec := NewRecipeSpec().
-		WithRecipe(&recipeList{recipes: []recipe.Recipe{&renameIdentifiers{rename: renameAToB}, &autoFormat{}}})
-	// AutoFormatVisitor copies nodes it leaves unchanged, so a file it formats again comes back as a new tree.
-	spec.CheckUnchangedTreeIdentity = false
-	spec.RewriteRun(t, Golang(declaresA, declaresB))
+	NewRecipeSpec().
+		WithRecipe(&recipeList{recipes: []recipe.Recipe{&renameIdentifiers{rename: renameAToB}, &autoFormat{}}}).
+		RewriteRun(t, Golang(declaresA, declaresB))
 }
 
 func TestRecipeInAFormatPackagePasses(t *testing.T) {
