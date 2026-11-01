@@ -2085,73 +2085,79 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void deriveFromNexus() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
-            .executionContext(centralWithDirectoryListings())
-            .recipeExecutionContext(centralWithDirectoryListings()),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.saxon</groupId>
-                              <artifactId>saxon</artifactId>
-                              <version>9.1.0.8</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void deriveFromNexus() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.saxon</groupId>
+                                  <artifactId>saxon</artifactId>
+                                  <version>9.1.0.8</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
     }
 
     @Test
-    void deriveFromNexusUpgrade() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
-            .executionContext(centralWithDirectoryListings())
-            .recipeExecutionContext(centralWithDirectoryListings()),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>2.0.3</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>2.0.4</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void deriveFromNexusUpgrade() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>2.0.3</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>2.0.4</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
     }
 
     @Test
@@ -2179,44 +2185,76 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void badManagedVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
-            .executionContext(centralWithDirectoryListings())
-            .recipeExecutionContext(centralWithDirectoryListings()),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>net.sourceforge.orbroker</groupId>
-                              <artifactId>orbroker</artifactId>
-                              <version>blah</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
+    void badManagedVersion() throws IOException {
+        try (MockWebServer repository = directoryListingRepository()) {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                .executionContext(directoryListingContext(repository))
+                .recipeExecutionContext(directoryListingContext(repository)),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>net.sourceforge.orbroker</groupId>
+                                  <artifactId>orbroker</artifactId>
+                                  <version>blah</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+                  """
+              )
+            );
+            assertThat(repository.getRequestCount()).isGreaterThanOrEqualTo(2);
+        }
     }
 
-    /**
-     * Some old artifacts have no maven-metadata.xml on Maven Central, only its HTML directory listing.
-     * Pinning Central keeps a ~/.m2/settings.xml mirror, which may serve no listings, out of resolution.
-     * The MAVEN_CENTRAL_MIRROR_* mirror still stands in for Central when it is set.
-     */
-    private static MavenExecutionContextView centralWithDirectoryListings() {
-        return MavenSettingsAutoLoadingExtension.withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+    // Deliberately omit maven-metadata.xml so these tests exercise the HTTP directory-listing fallback.
+    // Artifact mirrors need not serve Central's HTML listings, so serve the historical fixtures locally.
+    private static MockWebServer directoryListingRepository() throws IOException {
+        MockWebServer repository = new MockWebServer();
+        repository.setDispatcher(new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                if ("/net/sourceforge/orbroker/orbroker/".equals(request.getPath())) {
+                    return new MockResponse().setBody("""
+                      <html><body>
+                      <a href="../">../</a>
+                      <a href="2.0.3/">2.0.3/</a>
+                      <a href="2.0.4/">2.0.4/</a>
+                      </body></html>
+                      """);
+                }
+                if ("/net/sourceforge/saxon/saxon/".equals(request.getPath())) {
+                    return new MockResponse().setBody("""
+                      <html><body>
+                      <a href="../">../</a>
+                      <a href="9.1.0.8/">9.1.0.8/</a>
+                      <a href="9.2.0.0/">9.2.0.0/</a>
+                      </body></html>
+                      """);
+                }
+                return new MockResponse().setResponseCode(404);
+            }
+        });
+        repository.start();
+        return repository;
+    }
+
+    private static MavenExecutionContextView directoryListingContext(MockWebServer repository) {
+        String uri = repository.url("/").toString();
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setAddCentralRepository(false)
           .setRepositories(singletonList(MavenRepository.builder()
-            .id("central")
-            .uri("https://repo.maven.apache.org/maven2")
+            .id("directory-listing-fixture")
+            .uri(uri)
             .knownToExist(true)
-            .build())));
+            .build()));
     }
 
     @Test
