@@ -251,6 +251,42 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void castAndInstanceofOperands() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method(long x, long y, int i, Object o, Object p) {
+                      int a = (int) (x + y);
+                      Object b = (Object) (o = p);
+                      long c = (long) (i += 1);
+                      Object d = (Object) (o instanceof String);
+                      Integer e = (Integer) (-i);
+                      Integer f = (Integer) (++i);
+                      int g = (int) (-i);
+                      boolean h = (o = p) instanceof String;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method(long x, long y, int i, Object o, Object p) {
+                      int a = (int) (x + y);
+                      Object b = (Object) (o = p);
+                      long c = (long) (i += 1);
+                      Object d = (Object) (o instanceof String);
+                      Integer e = (Integer) (-i);
+                      Integer f = (Integer) (++i);
+                      int g = (int) -i;
+                      boolean h = (o = p) instanceof String;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void instanceofExpressions() {
         rewriteRun(
           java(
@@ -627,6 +663,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       // Associative operations, which the parser still groups to the left
                       int result8 = a + (b + c);
                       boolean result9 = a > b || (b > c || c > a);
+
+                      // Cast operand
+                      long result11 = (long) (a + b);
                   }
               }
               """,
@@ -663,6 +702,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       // Associative operations, which the parser still groups to the left
                       int result8 = a + (b + c);
                       boolean result9 = a > b || (b > c || c > a);
+
+                      // Cast operand
+                      long result11 = (long) (a + b);
                   }
               }
               """

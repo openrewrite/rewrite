@@ -84,7 +84,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         if (needsParentheses(b, parent.getValue())) {
             return parenthesize(b);
-        } else if (parent.getValue() instanceof J.InstanceOf) {
+        } else if (parent.getValue() instanceof J.InstanceOf || parent.getValue() instanceof J.TypeCast) {
             return parenthesize(b);
         } else if (parent.getValue() instanceof J.Binary && needsParenthesesForPrecedence(b, parent.getValue())) {
             return parenthesize(b);
@@ -165,6 +165,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             return u;
         } else if (needsParentheses(u, parent.getValue())) {
             return parenthesize(u);
+        } else if (parent.getValue() instanceof J.TypeCast && isPrefixPlusOrMinus(u.getOperator()) &&
+                   !(((J.TypeCast) parent.getValue()).getClazz().getTree() instanceof J.Primitive)) {
+            // `(Integer) -i` reads as `Integer - i`, since only a primitive cast may precede `+`, `-`, `++` or `--`
+            return parenthesize(u);
         } else if (parent.getValue() instanceof J.Unary) {
             J.Unary parentUnary = parent.getValue();
             // Ensure proper precedence for nested unary operations
@@ -213,7 +217,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Unary ||
             parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass) {
+            parent.getValue() instanceof J.NewClass ||
+            parent.getValue() instanceof J.TypeCast) {
             return parenthesize(i);
         }
 
@@ -245,7 +250,9 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.Ternary) {
+            parent.getValue() instanceof J.Ternary ||
+            parent.getValue() instanceof J.TypeCast ||
+            parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(a);
         }
 
@@ -265,7 +272,9 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.Ternary) {
+            parent.getValue() instanceof J.Ternary ||
+            parent.getValue() instanceof J.TypeCast ||
+            parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(a);
         }
 
@@ -275,6 +284,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
         return parenthesize((Expression) super.visitSwitchExpression(switch_, p));
+    }
+
+    private boolean isPrefixPlusOrMinus(J.Unary.Type operator) {
+        return operator == J.Unary.Type.Positive || operator == J.Unary.Type.Negative ||
+               operator == J.Unary.Type.PreIncrement || operator == J.Unary.Type.PreDecrement;
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {

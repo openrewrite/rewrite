@@ -238,6 +238,46 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizeParameterThatIsCast() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!"toInt".equals(method.getSimpleName())) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    return JavaTemplate.apply("(int) #{any(long)}", getCursor(),
+                      method.getCoordinates().replace(), method.getArguments().get(0));
+                }
+            })),
+          java(
+            """
+              class A {
+                  int test(long x, long y) {
+                      return toInt(x + y);
+                  }
+
+                  static int toInt(long value) {
+                      return (int) value;
+                  }
+              }
+              """,
+            """
+              class A {
+                  int test(long x, long y) {
+                      return (int) (x + y);
+                  }
+
+                  static int toInt(long value) {
+                      return (int) value;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {
