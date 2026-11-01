@@ -22,6 +22,7 @@ import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 import {J, Type} from "../../src/java";
 import {JavaScriptParser, JavaScriptVisitor, JS, NodeResolutionResultKind, typescript} from "../../src/javascript";
+import {autoFormat, AutoformatVisitor, maybeAutoFormat} from "../../src/javascript/format";
 
 function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
     return {...t, markers: {...t.markers, markers: [...t.markers.markers, marker]}};
@@ -953,6 +954,128 @@ describe("rewrite test", () => {
         });
     });
 
+    describe("minimal formatting", () => {
+        const before = `
+            class A {
+                m() {
+                    foo();
+                }
+
+                n() {
+                    other();
+                }
+            }
+        `;
+        const after = `
+            class A {
+                m() {
+                    bar();
+                }
+
+                n() {
+                    other();
+                }
+            }
+        `;
+
+        // Renames foo() to bar(), then formats what `format` picks
+        class RenameAndFormat extends JavaScriptVisitor<ExecutionContext> {
+            constructor(private readonly format: "call" | "class" | "file" | "after visit") {
+                super();
+            }
+
+            protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
+                const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+                return this.format === "file" && visited !== cu ? autoFormat(visited, p) : visited;
+            }
+
+            protected override async visitClassDeclaration(c: J.ClassDeclaration, p: ExecutionContext): Promise<J | undefined> {
+                const visited = await super.visitClassDeclaration(c, p) as J.ClassDeclaration;
+                return this.format === "class" && visited !== c ? autoFormat(visited, p, undefined, this.cursor.parent) : visited;
+            }
+
+            protected override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                if (method.name.simpleName !== "foo") {
+                    return method;
+                }
+                const renamed = {...method, name: {...method.name, simpleName: "bar"}};
+                if (this.format === "after visit") {
+                    this.afterVisit.push(new AutoformatVisitor());
+                }
+                return this.format === "call" ? maybeAutoFormat(method, renamed, p, undefined, this.cursor.parent) : renamed;
+            }
+        }
+
+        test("a recipe that formats the whole file after a one-line edit fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new RenameAndFormat("file"));
+
+            // when
+            const run = sut.rewriteRun({...typescript(before, after), path: "src/a.ts"});
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Format only what the recipe changed, not the whole class or file around it. These calls of " +
+                "org.openrewrite.adhoc auto-formatted a whole file or class that existed before the run, with no " +
+                "stopAfter:\n" +
+                "  RenameAndFormat.visitJsCompilationUnit (test/test/rewrite-test.test.ts:");
+            await expect(run).rejects.toThrow(") called autoFormat on\n    all of src/a.ts\n");
+            await expect(run).rejects.toThrow("spec.checkMinimalFormatting = false.");
+        });
+
+        test("a recipe that formats the whole class it changed fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new RenameAndFormat("class"));
+            await expect(sut.rewriteRun({...typescript(before, after), path: "src/a.ts"}))
+                .rejects.toThrow(") called autoFormat on\n    class `A` of src/a.ts\n");
+        });
+
+        test("an AutoformatVisitor run after the visit fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new RenameAndFormat("after visit"));
+            await expect(sut.rewriteRun({...typescript(before, after), path: "src/a.ts"}))
+                .rejects.toThrow("  A visitor's afterVisit.push(new AutoformatVisitor()) ran on\n    all of src/a.ts\n");
+        });
+
+        test("a recipe that formats only the element it changed passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new RenameAndFormat("call"));
+            return sut.rewriteRun(typescript(before, after));
+        });
+
+        test("a formatting recipe may format whole files", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new class extends Recipe {
+                name = "org.openrewrite.test.format.rename-and-format";
+                displayName = "Rename and format";
+                description = "Renames `foo()` to `bar()` and formats the file.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return new RenameAndFormat("file");
+                }
+            };
+            return sut.rewriteRun(typescript(before, after));
+        });
+
+        test("formatting that only changes whitespace passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: ExecutionContext): Promise<J | undefined> {
+                    return autoFormat(cu, p);
+                }
+            });
+            return sut.rewriteRun(typescript(`class A {\n  m() {\n  }\n}`, `class A {\n    m() {\n    }\n}`));
+        });
+
+        test("checkMinimalFormatting turns the check off", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new RenameAndFormat("file"));
+            sut.checkMinimalFormatting = false;
+            return sut.rewriteRun(typescript(before, after));
+        });
+    });
+
     test("a spec returns to its suite configuration between tests", () => {
         // Independent of whether the harness already switched tracking on
         RecipeSpec.trackSuiteConfiguration();
@@ -970,6 +1093,7 @@ describe("rewrite test", () => {
         sut.checkNoEditsInScanningPhase = false;
         sut.checkLightweightAccumulators = false;
         sut.checkParserShapedTrees = false;
+        sut.checkMinimalFormatting = false;
         sut.cycles = 1;
         sut.expectedCyclesThatMakeChanges = 3;
         RecipeSpec.restoreSuiteConfiguration();
@@ -982,6 +1106,7 @@ describe("rewrite test", () => {
         expect(sut.checkNoEditsInScanningPhase).toBe(true);
         expect(sut.checkLightweightAccumulators).toBe(true);
         expect(sut.checkParserShapedTrees).toBe(true);
+        expect(sut.checkMinimalFormatting).toBe(true);
         expect(sut.cycles).toBeUndefined();
         expect(sut.expectedCyclesThatMakeChanges).toBeUndefined();
     });

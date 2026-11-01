@@ -26,6 +26,7 @@ import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
 import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
+import {AsyncLocalStorage} from "node:async_hooks";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
@@ -57,6 +58,26 @@ export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor):
 }
 
 /**
+ * Hears about each request to auto-format a tree made while it listens, so that a test harness can check that a
+ * recipe formats only what it changed.
+ */
+export abstract class FormattingListener {
+    private static readonly current = new AsyncLocalStorage<FormattingListener>();
+
+    /** AutoformatVisitor calls this before it formats `tree`, stopping after `stopAfter` when it is given. */
+    static beforeFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void {
+        FormattingListener.current.getStore()?.onFormat(tree, stopAfter, cursor);
+    }
+
+    protected abstract onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+
+    /** Runs `run`, hearing about the formatting it requests. */
+    listen<T>(run: () => Promise<T>): Promise<T> {
+        return FormattingListener.current.run(this, run);
+    }
+}
+
+/**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *
  * Style resolution order (first match wins):
@@ -77,6 +98,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        FormattingListener.beforeFormat(tree, this.stopAfter, cursor);
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
             const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);

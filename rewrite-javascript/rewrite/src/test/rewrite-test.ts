@@ -33,6 +33,7 @@ import {AccumulatorContents} from "./accumulator-contents";
 import {EmptySources} from "./empty-sources";
 import {UnparsedSources} from "./unparsed-sources";
 import {TreeShapes} from "./tree-shapes";
+import {FormattingScope} from "./formatting-scope";
 import {RpcRecipe} from "../rpc/recipe";
 import {DelegatingRecipe} from "../rpc/java-recipe";
 
@@ -56,6 +57,7 @@ interface RecipeSpecConfiguration {
     checkNoEditsInScanningPhase: boolean;
     checkLightweightAccumulators: boolean;
     checkParserShapedTrees: boolean;
+    checkMinimalFormatting: boolean;
     cycles?: number;
     expectedCyclesThatMakeChanges?: number;
     recipe: Recipe;
@@ -93,6 +95,12 @@ export class RecipeSpec {
      * as a J.Identifier where the parser makes a J.Literal of `null`.
      */
     checkParserShapedTrees: boolean = true
+
+    /**
+     * Fails a run whose recipe auto-formats a whole source file or class that existed before the run, instead of only
+     * what it changed.
+     */
+    checkMinimalFormatting: boolean = true
 
     /**
      * The cycles to run, by default one more than {@link expectedCyclesThatMakeChanges} and at least two. The
@@ -150,6 +158,7 @@ export class RecipeSpec {
             checkNoEditsInScanningPhase: this.checkNoEditsInScanningPhase,
             checkLightweightAccumulators: this.checkLightweightAccumulators,
             checkParserShapedTrees: this.checkParserShapedTrees,
+            checkMinimalFormatting: this.checkMinimalFormatting,
             cycles: this.cycles,
             expectedCyclesThatMakeChanges: this.expectedCyclesThatMakeChanges,
             recipe: this.recipe,
@@ -261,8 +270,10 @@ export class RecipeSpec {
         const runContext = (ctx: ExecutionContext) => contextWrites?.watch(ctx) ?? ctx;
         const expectedCycles = this.expectedCyclesThatMakeChanges ?? 1;
         const cycles = this.cycles ?? Math.max(2, expectedCycles + 1);
-        const {changeset, unsettled} = await this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile),
-            cycles, expectedCycles, runContext);
+        const formattingScope = this.checkMinimalFormatting ? new FormattingScope(this.recipe) : undefined;
+        const run = () => this.runCycles(allParsed.map(([_, sourceFile]) => sourceFile), cycles, expectedCycles,
+            runContext);
+        const {changeset, unsettled} = formattingScope ? await formattingScope.listen(run) : await run();
         contextWrites?.assertNone(this.recipe);
 
         this.expectNoUnexpectedGeneratedFiles(flattenedSpecs, changeset);
@@ -274,6 +285,7 @@ export class RecipeSpec {
             await this.expectNoFurtherChanges(unsettled.changes,
                 `Expected recipe to complete in ${pluralCycles(expectedCycles)}, but cycle ${unsettled.cycle} changed`);
         }
+        await formattingScope?.assertFormattedOnlyWhatChanged(changeset);
         const changed = changeset.some(r => r.before !== r.after);
         const freshParse = changed && (cycles > expectedCycles || this.checkParserShapedTrees) ?
             await this.freshParse(flattenedSpecs, allParsed, changeset) : new Map<SourceFile, SourceFile>();
