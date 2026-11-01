@@ -16,21 +16,15 @@
 import {types} from "util";
 import {AccumulatorListener} from "../run";
 import {Recipe} from "../recipe";
-import {Cursor, isSourceFile, isTree} from "../tree";
-import {ExecutionContext} from "../execution";
-import {TreeVisitor} from "../visitor";
-import {MarkersKind} from "../markers";
+import {isSourceFile} from "../tree";
+import {heavyweightType} from "../heavyweight";
 import {Type} from "../java";
-import {NodeResolutionResultKind} from "../javascript/node-resolution-result";
 import {typeName} from "./probes";
 
 /** Beyond this many objects in one accumulator the walk stops descending. */
 const MAX_OBJECTS = 100_000;
 
 const MAX_PATHS = 5;
-
-/** Markers that reach far more than the file they are on, as Java's `Heavyweight` markers do. */
-const heavyweightMarkerKinds = new Set<string>([NodeResolutionResultKind]);
 
 interface Finding {
     readonly path: string
@@ -45,9 +39,9 @@ interface Node {
 }
 
 /**
- * Finds the trees, cursors, visitors, execution contexts and dependency models that ScanningRecipe accumulators keep.
- * An accumulator lives from the first source file scanned until the cycle ends. The walk reads data properties and
- * built-in collections, and runs no code of the recipe's own.
+ * Finds the heavyweight objects that ScanningRecipe accumulators keep, which are trees and the types
+ * registerHeavyweight registers. An accumulator lives from the first source file scanned until the cycle ends. The
+ * walk reads data properties and built-in collections, and runs no code of the recipe's own.
  */
 export class AccumulatorContents {
     /** What each recipe's accumulator keeps, by recipe name and then by the shape of the path to it. */
@@ -156,19 +150,13 @@ function walks(value: unknown): value is object {
 
 /** How to name what the accumulator keeps, when it is a heavyweight object. */
 function heavyweight(value: object): string | undefined {
-    if (isSourceFile(value)) {
-        return `${typeName(value.kind)} ${value.sourcePath}`;
-    } else if (isTree(value) && value.kind !== MarkersKind.Markers) {
-        return typeName(value.kind);
-    } else if (value instanceof Cursor) {
-        return "Cursor";
-    } else if (value instanceof ExecutionContext) {
-        return "ExecutionContext";
-    } else if (value instanceof TreeVisitor) {
-        return "TreeVisitor";
+    const type = heavyweightType(value);
+    if (type === undefined) {
+        return undefined;
+    } else if (typeof type === "function") {
+        return type.name || "an object of an anonymous class";
     }
-    const kind = (value as { kind?: unknown }).kind;
-    return typeof kind === "string" && heavyweightMarkerKinds.has(kind) ? typeName(kind) : undefined;
+    return isSourceFile(value) ? `${typeName(type)} ${value.sourcePath}` : typeName(type);
 }
 
 function pathOf(node: Node): string {

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {registerHeavyweight} from "./heavyweight";
 
 export class ExecutionContext {
     /** Mirrors `org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT`. */
@@ -47,6 +48,8 @@ export class ExecutionContext {
         }
     }
 }
+
+registerHeavyweight(ExecutionContext);
 
 const executionContextCodec: RpcCodec<ExecutionContext> = {
     rpcNew(): ExecutionContext {

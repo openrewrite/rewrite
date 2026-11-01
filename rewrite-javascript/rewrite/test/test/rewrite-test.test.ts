@@ -13,6 +13,7 @@ import {
     noopVisitor,
     Option,
     Recipe,
+    registerHeavyweight,
     ScanningRecipe,
     SourceFile,
     TreeVisitor
@@ -635,6 +636,45 @@ describe("rewrite test", () => {
                 ...text("foo"),
                 beforeRecipe: (sourceFile: PlainText) => withMarker(sourceFile, {kind: NodeResolutionResultKind, id: randomId()})
             })).rejects.toThrow("    acc.resolution -> NodeResolutionResult, after scanning\n");
+        });
+
+        test("an execution context and a visitor kept in the accumulator fail", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => [] as object[], acc => acc.push(new ExecutionContext(), noopVisitor()));
+            await expect(sut.rewriteRun(text("foo"))).rejects.toThrow(
+                "    acc[0] -> ExecutionContext, after scanning\n" +
+                "    acc[1] -> TreeVisitor, after scanning\n");
+        });
+
+        test("an object of a class a recipe library registered heavyweight fails", async () => {
+            // given
+            class DependencyGraph {
+                constructor(readonly paths: string[]) {
+                }
+            }
+            registerHeavyweight(DependencyGraph);
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({graph: undefined as DependencyGraph | undefined}),
+                (acc, text) => acc.graph = new DependencyGraph([text.sourcePath]));
+
+            // when, then
+            await expect(sut.rewriteRun(text("foo")))
+                .rejects.toThrow("    acc.graph -> DependencyGraph, after scanning\n");
+        });
+
+        test("a marker of a kind a recipe library registered heavyweight fails", async () => {
+            // given
+            registerHeavyweight("org.openrewrite.test.LockFile");
+            const sut = new RecipeSpec();
+            sut.recipe = new Keep(() => ({lockFile: undefined as Marker | undefined}),
+                (acc, text) => acc.lockFile = findMarker(text, "org.openrewrite.test.LockFile"));
+
+            // when, then
+            await expect(sut.rewriteRun({
+                ...text("foo"),
+                beforeRecipe: (sourceFile: PlainText) =>
+                    withMarker(sourceFile, {kind: "org.openrewrite.test.LockFile", id: randomId()})
+            })).rejects.toThrow("    acc.lockFile -> LockFile, after scanning\n");
         });
 
         test("a source file kept while editing fails", async () => {
