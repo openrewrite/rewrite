@@ -1200,14 +1200,14 @@ class TestLightweightAccumulators:
 
         assert str(failure.value) == (
             "A ScanningRecipe's accumulator should keep the values the recipe needs, such as source paths, names and "
-            "ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts or "
-            "PythonResolutionResult markers:\n"
+            "ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts, "
+            "PythonResolutionResult markers or their resolved dependencies:\n"
             "  org.openrewrite.test.Keeps keeps\n"
             "    Scanned.source_files['a.py'] -> CompilationUnit a.py, after scanning\n"
             "An accumulator stays in memory from the first source file scanned until the cycle ends, so what it keeps "
-            "for each source file adds up over a large repository, and a PythonResolutionResult reaches the resolved "
-            "dependencies of a whole project. A recipe that must keep such an object opts out with "
-            "RecipeSpec(check_lightweight_accumulators=False)."
+            "for each source file adds up over a large repository, and a PythonResolutionResult or a resolved "
+            "dependency reaches the dependencies of a whole project. A recipe that must keep such an object opts out "
+            "with RecipeSpec(check_lightweight_accumulators=False)."
         )
 
     def test_a_cursor_kept_fails(self):
@@ -1262,6 +1262,22 @@ class TestLightweightAccumulators:
         spec = RecipeSpec(recipe=_keeping(dict, keep), type_attribution=False)
         with pytest.raises(AssertionError, match=r"    dict\[a.py\] -> PythonResolutionResult, after scanning\n"):
             spec.rewrite_run(python("a = 1\n", path=Path("a.py"), before_recipe=with_resolution))
+
+    def test_a_resolved_dependency_kept_fails(self):
+        requests = PythonResolutionResult.ResolvedDependency("requests", "2.32.3", None, None)
+        resolution = PythonResolutionResult(random_id(), "demo", "1.0", None, None, "pyproject.toml", None, None,
+                                            [], [], {}, {}, [], [], [requests], None, None)
+
+        def with_resolution(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(resolution))
+
+        def keep(acc: Dict[Any, Any], cu: CompilationUnit, cursor: Cursor) -> None:
+            acc["resolved"] = cu.markers.find_first(PythonResolutionResult).resolved_dependencies
+
+        spec = RecipeSpec(recipe=_keeping(dict, keep), type_attribution=False)
+        with pytest.raises(AssertionError, match=r"    dict\['resolved'\]\[0\] -> "
+                                                 r"PythonResolutionResult.ResolvedDependency, after scanning\n"):
+            spec.rewrite_run(python("a = 1\n", before_recipe=with_resolution))
 
     def test_values_pass(self):
         def keep(acc: Dict[Any, Any], cu: CompilationUnit, cursor: Cursor) -> None:

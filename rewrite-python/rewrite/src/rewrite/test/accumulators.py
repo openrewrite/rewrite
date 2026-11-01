@@ -41,7 +41,8 @@ _MAX_PATHS = 5
 _KEY_OR_INDEX = re.compile(r"\[[^\]]*]")
 
 # Trees and what reaches them, and the resolved dependencies of a whole project.
-_HEAVYWEIGHT = (Tree, Cursor, TreeVisitor, ExecutionContext, PythonResolutionResult)
+_HEAVYWEIGHT = (Tree, Cursor, TreeVisitor, ExecutionContext, PythonResolutionResult,
+                PythonResolutionResult.ResolvedDependency)
 
 # A recipe lives for the whole run anyway, and type attribution refers to no tree.
 _LEAVES = (str, bytes, bytearray, int, float, complex, type, Enum, PurePath, UUID, Recipe, JavaType, types.ModuleType)
@@ -68,8 +69,8 @@ class AccumulatorContents:
         if not self._findings:
             return
         lines = ["A ScanningRecipe's accumulator should keep the values the recipe needs, such as source paths, names "
-                 "and ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts "
-                 "or PythonResolutionResult markers:"]
+                 "and ids, and no trees (a CompilationUnit or any node in it), cursors, visitors, execution contexts, "
+                 "PythonResolutionResult markers or their resolved dependencies:"]
         for recipe, findings in self._findings.items():
             lines.append(f"  {recipe} keeps")
             for shown, (path, what, when) in enumerate(findings.values()):
@@ -78,9 +79,9 @@ class AccumulatorContents:
                     break
                 lines.append(f"    {path} -> {what}, {when}")
         lines.append("An accumulator stays in memory from the first source file scanned until the cycle ends, so what "
-                     "it keeps for each source file adds up over a large repository, and a PythonResolutionResult "
-                     "reaches the resolved dependencies of a whole project. A recipe that must keep such an object "
-                     "opts out with RecipeSpec(check_lightweight_accumulators=False).")
+                     "it keeps for each source file adds up over a large repository, and a PythonResolutionResult or "
+                     "a resolved dependency reaches the dependencies of a whole project. A recipe that must keep such "
+                     "an object opts out with RecipeSpec(check_lightweight_accumulators=False).")
         raise AssertionError("\n".join(lines))
 
 
