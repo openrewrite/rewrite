@@ -764,6 +764,7 @@ function expectsStatement(parentTree: J): boolean {
         parentTree.kind === J.Kind.ForLoop ||
         parentTree.kind === J.Kind.If ||
         parentTree.kind === J.Kind.IfElse ||
+        parentTree.kind === J.Kind.Label ||
         parentTree.kind === J.Kind.WhileLoop ||
         parentTree.kind === JS.Kind.CompilationUnit ||
         parentTree.kind === JS.Kind.ForInLoop;

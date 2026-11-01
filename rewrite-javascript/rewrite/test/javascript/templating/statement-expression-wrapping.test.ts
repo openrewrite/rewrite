@@ -17,6 +17,7 @@ import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typ
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
+import {expectParserShaped} from '../../test-util';
 
 describe('Statement Expression Wrapping', () => {
     let parser: JavaScriptParser;
@@ -201,6 +202,20 @@ describe('Statement Expression Wrapping', () => {
                 expect(statement.kind).toBe(JS.Kind.ExpressionStatement);
                 expect((statement as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.As);
             }
+        });
+    });
+
+    it('should wrap an expression that replaces the statement of a label', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return template`[1, 2]`.apply(method, this.cursor);
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript('lbl: Array(1, 2);', 'lbl: [1, 2];'),
+            afterRecipe: expectParserShaped
         });
     });
 });
