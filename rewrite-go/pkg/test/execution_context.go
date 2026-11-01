@@ -18,6 +18,7 @@ package test
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -78,26 +79,44 @@ func changedMessages(before map[string]any, ctx *recipe.ExecutionContext) []stri
 	return changed
 }
 
-// sameMessage reports whether b is a: the same pointer, map, slice or func, or
-// an equal value.
+// sameMessage reports whether b is a, comparing pointers, maps, slices and funcs
+// by identity wherever they sit, and floats bit for bit so that NaN is itself.
 func sameMessage(a, b any) bool {
-	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
-	if !va.IsValid() || !vb.IsValid() {
-		return va.IsValid() == vb.IsValid()
+	return sameValue(reflect.ValueOf(a), reflect.ValueOf(b))
+}
+
+func sameValue(a, b reflect.Value) bool {
+	if !a.IsValid() || !b.IsValid() {
+		return a.IsValid() == b.IsValid()
 	}
-	if va.Type() != vb.Type() {
+	if a.Type() != b.Type() {
 		return false
 	}
-	switch va.Kind() {
+	switch a.Kind() {
 	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
-		return va.Pointer() == vb.Pointer()
+		return a.Pointer() == b.Pointer()
 	case reflect.Slice:
-		return va.Pointer() == vb.Pointer() && va.Len() == vb.Len()
+		return a.Pointer() == b.Pointer() && a.Len() == b.Len()
+	case reflect.Interface:
+		return sameValue(a.Elem(), b.Elem())
+	case reflect.Struct:
+		for i := 0; i < a.NumField(); i++ {
+			if !sameValue(a.Field(i), b.Field(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Array:
+		for i := 0; i < a.Len(); i++ {
+			if !sameValue(a.Index(i), b.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Float32, reflect.Float64:
+		return math.Float64bits(a.Float()) == math.Float64bits(b.Float())
 	}
-	if va.Comparable() {
-		return va.Equal(vb)
-	}
-	return reflect.DeepEqual(a, b)
+	return a.Equal(b)
 }
 
 func contextChangesFailure(changes []contextChange) string {

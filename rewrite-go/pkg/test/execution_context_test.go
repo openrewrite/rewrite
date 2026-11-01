@@ -17,6 +17,7 @@
 package test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -149,6 +150,29 @@ func TestRecipeReadingTheExecutionContextPasses(t *testing.T) {
 		WithRecipe(&renameBToCUnlessKept{}).
 		WithExecutionContext(ctx).
 		RewriteRun(t, Golang(`
+			package main
+
+			func b() {}
+		`))
+}
+
+// handlerOptions holds a func and a NaN, which reflect.DeepEqual finds unequal to themselves.
+type handlerOptions struct {
+	onError func(error)
+	ratio   float64
+}
+
+func TestRecipeLeavingAMessageThatHoldsAFuncAlonePasses(t *testing.T) {
+	ctx := recipe.NewExecutionContext()
+	ctx.PutMessage("org.openrewrite.golang.test.options", handlerOptions{onError: func(error) {}, ratio: math.NaN()})
+	NewRecipeSpec().
+		WithRecipe(&renameIdentifiers{rename: renameAToB}).
+		WithExecutionContext(ctx).
+		RewriteRun(t, Golang(`
+			package main
+
+			func a() {}
+		`, `
 			package main
 
 			func b() {}
