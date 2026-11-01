@@ -186,10 +186,11 @@ public abstract class RewriteTest
 
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
-            var runCtx = new ExecutionContext();
+            var checks = new RunChecks(validations);
+            var runCtx = checks.Ctx;
             try
             {
-                var run = RunCycles(recipeSpec.Recipe, sources, runCtx, cycles, expectedCycles);
+                var run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
                 var results = run.Changes;
 
                 if (inputMarkers != null)
@@ -231,7 +232,7 @@ public abstract class RewriteTest
                 }
                 if (cycles > expectedCycles && results.Count > 0)
                 {
-                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, metadataReferences, runCtx);
+                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, metadataReferences, checks);
                 }
             }
             finally
@@ -257,7 +258,7 @@ public abstract class RewriteTest
     }
 
     /// <summary>Runs the recipe cycle after cycle, each on what the cycle before produced.</summary>
-    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx,
+    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, RunChecks checks,
         int cycles, int expectedCycles)
     {
         var lineages = sources.Select(s => new Lineage(s, s)).ToList();
@@ -272,8 +273,8 @@ public abstract class RewriteTest
         {
             var live = lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList();
             var changes = cycle == 1
-                ? RecipeScheduler.Run(recipe, live, ctx)
-                : RunWithoutWritingDataTables(recipe, live, ctx);
+                ? checks.Run(recipe, live)
+                : RunWithoutWritingDataTables(recipe, live, checks);
             if (changes.Count == 0)
             {
                 break;
@@ -311,14 +312,15 @@ public abstract class RewriteTest
     }
 
     /// <summary>Data tables are written by the first cycle only, as in Java.</summary>
-    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
+    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, RunChecks checks)
     {
+        var ctx = checks.Ctx;
         var dataTables = ctx.ComputeMessageIfAbsent<IDataTableStore>(DataTable<object>.DataTableStoreKey,
             _ => new InMemoryDataTableStore());
         ctx.PutMessage(DataTable<object>.DataTableStoreKey, new InMemoryDataTableStore());
         try
         {
-            return RecipeScheduler.Run(recipe, sources, ctx);
+            return checks.Run(recipe, sources);
         }
         finally
         {
@@ -372,7 +374,7 @@ public abstract class RewriteTest
     /// recipe that recognizes its own output only by the shape of that LST changes it again.
     /// </summary>
     private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
-        ImmutableArray<MetadataReference>? metadataReferences, ExecutionContext ctx)
+        ImmutableArray<MetadataReference>? metadataReferences, RunChecks checks)
     {
         var units = finals.OfType<CompilationUnit>()
             .Select(unit =>
@@ -410,7 +412,7 @@ public abstract class RewriteTest
         }
 
         var sources = finals.Select(f => reparsedByFinal.GetValueOrDefault(f, f)).ToList();
-        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, ctx),
+        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
             "Running the recipe on a fresh parse of its output changed", sanitized: true);
     }
 

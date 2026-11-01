@@ -25,9 +25,13 @@ namespace OpenRewrite.Core;
 /// </summary>
 public static class RecipeScheduler
 {
-    public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
+    public static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx) =>
+        Run(recipe, sources, ctx, null);
+
+    internal static List<Result> Run(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx,
+        IRunObserver? observer)
     {
-        var state = new RunState(ctx);
+        var state = new RunState(ctx, observer);
         var results = new List<Result>();
 
         if (HasScanningRecipe(recipe, state))
@@ -117,6 +121,7 @@ public static class RecipeScheduler
     private static T? RecurseRecipeList<T>(Recipe recipe, T initial, RunState state, Func<Recipe, T, T?> fn)
         where T : class
     {
+        state.Observer?.Running(recipe);
         var t = fn(recipe, initial);
         foreach (var subRecipe in state.SubRecipes(recipe))
         {
@@ -152,9 +157,11 @@ public static class RecipeScheduler
     /// every phase. Resolving each recipe list once per run keeps sub-recipe identity — and
     /// therefore accumulator identity — stable.
     /// </summary>
-    private sealed class RunState(ExecutionContext ctx)
+    private sealed class RunState(ExecutionContext ctx, IRunObserver? observer)
     {
         public ExecutionContext Ctx { get; } = ctx;
+
+        public IRunObserver? Observer { get; } = observer;
 
         private readonly Dictionary<Recipe, List<Recipe>> _recipeLists = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<IScanningRecipe, object> _accumulators = new(ReferenceEqualityComparer.Instance);
@@ -179,4 +186,14 @@ public static class RecipeScheduler
             return acc;
         }
     }
+}
+
+/// <summary>
+/// Hears what a run does, so that the test harness can check the recipe while it runs. A run outside the harness has
+/// no observer.
+/// </summary>
+internal interface IRunObserver
+{
+    /// <summary>Called before the scheduler calls into <paramref name="recipe"/> for a source file or a phase.</summary>
+    void Running(Recipe recipe);
 }

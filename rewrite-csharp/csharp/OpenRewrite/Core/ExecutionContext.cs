@@ -25,7 +25,7 @@ public class ExecutionContext
     public T? GetMessage<T>(string key) where T : class
         => _messages.TryGetValue(key, out var val) ? val as T : null;
 
-    public void PutMessage(string key, object value)
+    public virtual void PutMessage(string key, object value)
         => _messages[key] = value;
 
     public T ComputeMessageIfAbsent<T>(string key, Func<string, T> fn) where T : notnull
@@ -33,7 +33,7 @@ public class ExecutionContext
         if (!_messages.TryGetValue(key, out var val))
         {
             val = fn(key);
-            _messages[key] = val;
+            PutMessage(key, val);
         }
 
         return (T)val;

@@ -59,10 +59,19 @@ public sealed class Validations
     /// </summary>
     public bool ReportingMarkersOnly { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to leave the execution context, which every recipe and source file in a run
+    /// shares, unchanged. Default: enabled.
+    /// </summary>
+    public bool ExecutionContextUnchanged { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
-    /// <summary>All validations disabled except <see cref="ReportingMarkersOnly"/>.</summary>
+    /// <summary>
+    /// The parse, print and formatting reconciliation checks disabled, and the checks of what the recipe does, such
+    /// as <see cref="ReportingMarkersOnly"/>, left on.
+    /// </summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,
