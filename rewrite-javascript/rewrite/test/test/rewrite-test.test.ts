@@ -20,7 +20,7 @@ import {
 import {emptyMarkers, findMarker, foundSearchResult, Marker, Markers, MarkersKind} from "../../src/markers";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
-import {J} from "../../src/java";
+import {J, Type} from "../../src/java";
 import {JavaScriptParser, JavaScriptVisitor, JS, NodeResolutionResultKind, typescript} from "../../src/javascript";
 
 function withMarker<T extends { markers: Markers }>(t: T, marker: Marker): T {
@@ -867,6 +867,92 @@ describe("rewrite test", () => {
         });
     });
 
+    describe("parser-shaped trees", () => {
+        // Writes `null` in place of `0`, as a string or as the parser's null
+        const nullByHand = (value: string | null) => fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            protected override async visitLiteral(literal: J.Literal, _p: ExecutionContext): Promise<J | undefined> {
+                return literal.valueSource !== "0" ? literal :
+                    {...literal, value, valueSource: "null", type: Type.Primitive.Null} as J.Literal;
+            }
+        });
+
+        test("a node the parser builds differently fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = nullByHand("null");
+
+            // when
+            const run = sut.rewriteRun({...typescript(`const a = 0;`, `const a = null;`), path: "src/a.ts"});
+
+            // then
+            await expect(run).rejects.toThrow(
+                "Write code with a template or the format's own parser, or build the nodes the way its parser " +
+                "builds the text they print. The output of org.openrewrite.adhoc holds nodes that its parser makes " +
+                "differently of the same text:\n" +
+                "  src/a.ts:\n" +
+                "    `null` has the string value \"null\" of type null where the parser makes the value null of type null\n" +
+                "A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
+                "parsed code never holds. If the output is meant to differ from parsed code, set " +
+                "spec.checkParserShapedTrees = false.");
+        });
+
+        test("a node the parser builds the same passes", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = nullByHand(null);
+            return sut.rewriteRun(typescript(`const a = 0;`, `const a = null;`));
+        });
+
+        test("text that doesn't parse fails", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                protected override async visitIdentifier(identifier: J.Identifier, _p: ExecutionContext): Promise<J | undefined> {
+                    return identifier.simpleName === "a" ? {...identifier, simpleName: "1a"} as J.Identifier : identifier;
+                }
+            });
+            await expect(sut.rewriteRun({...typescript(`const a = 0;`, `const 1a = 0;`), path: "src/a.ts"}))
+                .rejects.toThrow("  src/a.ts:\n    the text it prints doesn't parse: ");
+        });
+
+        test("a key that appears twice in a JSON object fails", async () => {
+            // given
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends JsonVisitor<ExecutionContext> {
+                protected override async visitObject(object: Json.Object, _p: ExecutionContext): Promise<Json | undefined> {
+                    if (object.members.length !== 1) {
+                        return object;
+                    }
+                    const [first] = object.members;
+                    const repeated = {...first, element: {...first.element, id: randomId(), prefix: {...first.element.prefix, whitespace: " "}}};
+                    return {...object, members: [first, repeated]} as Json.Object;
+                }
+            });
+
+            // when
+            const run = sut.rewriteRun({...json(`{"key": "value"}`, `{"key": "value", "key": "value"}`), path: "a.json"});
+
+            // then
+            await expect(run).rejects.toThrow("  a.json:\n    the key `key` appears twice in one object\n");
+        });
+
+        test("a literal with surrogate escapes may hold the value it spells", () => {
+            // the parser keeps the cleaned source of such a literal as its value
+            const sut = new RecipeSpec();
+            sut.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                protected override async visitLiteral(literal: J.Literal, _p: ExecutionContext): Promise<J | undefined> {
+                    return literal.valueSource !== "''" ? literal : {...literal, valueSource: '""', value: "\uD83D"} as J.Literal;
+                }
+            });
+            return sut.rewriteRun(typescript(`const a = '\\uD83D';`, `const a = "\\uD83D";`));
+        });
+
+        test("checkParserShapedTrees turns the check off", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = nullByHand("null");
+            sut.checkParserShapedTrees = false;
+            return sut.rewriteRun(typescript(`const a = 0;`, `const a = null;`));
+        });
+    });
+
     test("a spec returns to its suite configuration between tests", () => {
         // Independent of whether the harness already switched tracking on
         RecipeSpec.trackSuiteConfiguration();
@@ -883,6 +969,7 @@ describe("rewrite test", () => {
         sut.checkExecutionContextUnchanged = false;
         sut.checkNoEditsInScanningPhase = false;
         sut.checkLightweightAccumulators = false;
+        sut.checkParserShapedTrees = false;
         sut.cycles = 1;
         sut.expectedCyclesThatMakeChanges = 3;
         RecipeSpec.restoreSuiteConfiguration();
@@ -894,6 +981,7 @@ describe("rewrite test", () => {
         expect(sut.checkExecutionContextUnchanged).toBe(true);
         expect(sut.checkNoEditsInScanningPhase).toBe(true);
         expect(sut.checkLightweightAccumulators).toBe(true);
+        expect(sut.checkParserShapedTrees).toBe(true);
         expect(sut.cycles).toBeUndefined();
         expect(sut.expectedCyclesThatMakeChanges).toBeUndefined();
     });

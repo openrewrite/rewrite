@@ -32,8 +32,10 @@ describe('JavaScript visitor formatting', () => {
                 ctx: ExecutionContext
             ): Promise<J | undefined> {
                 const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+                // applied where an argument goes, so that the template makes an expression and not a statement
+                const argument = original.arguments.elements[0].element;
                 const altered = await produceAsync(original, async draft => {
-                    const newArg = await template`\`extra\``.apply(original, this.cursor) as Expression;
+                    const newArg = await template`\`extra\``.apply(argument, new Cursor(argument, this.cursor)) as Expression;
 
                     draft.arguments.elements = [
                         ...draft.arguments.elements,
