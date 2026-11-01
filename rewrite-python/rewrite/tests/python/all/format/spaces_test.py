@@ -1,4 +1,6 @@
-from rewrite.python import SpacesVisitor
+from rewrite import ExecutionContext
+from rewrite.java import J
+from rewrite.python import CompilationUnit, PythonVisitor, SpacesVisitor
 from rewrite.python.style import IntelliJ
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
@@ -54,4 +56,16 @@ def test_trailing_comma_takes_the_space_inside_its_brackets():
         python("d = [0,]", "d = [ 0, ]"),
         spec=RecipeSpec().with_recipe(from_visitor(SpacesVisitor(
             spaces.with_within(spaces.within.with_brackets(True)))))
+    )
+
+
+def test_formatting_stops_after_the_given_tree():
+    class SpaceTheFirstStatement(PythonVisitor[ExecutionContext]):
+        def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+            return SpacesVisitor(IntelliJ.spaces(), cu.statements[0]).visit(cu, ctx)
+
+    rewrite_run(
+        # language=python
+        python("a=1\nb=2\n", "a = 1\nb=2\n"),
+        spec=RecipeSpec().with_recipe(from_visitor(SpaceTheFirstStatement()))
     )

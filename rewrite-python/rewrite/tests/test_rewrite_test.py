@@ -1702,6 +1702,22 @@ class TestMinimalFormatting:
         spec = RecipeSpec(recipe=from_visitor(RenameThenFormatIt()), type_attribution=False)
         spec.rewrite_run(python("a = 1\nprint(a)\n", "b = 1\nprint(b)\n"))
 
+    def test_formatting_only_the_class_header_passes(self):
+        class RenameThenFormatTheHeader(PythonVisitor[ExecutionContext]):
+            def visit_class_declaration(self, cd: ClassDeclaration, ctx: ExecutionContext) -> J:
+                if cd.name.simple_name != "A":
+                    return cd
+                renamed = cd.replace(name=cd.name.replace(simple_name="B"))
+                return maybe_auto_format(cd, renamed, ctx, stop_after=renamed.name,
+                                         cursor=self.cursor.parent_tree_cursor())
+
+        spec = RecipeSpec(recipe=from_visitor(RenameThenFormatTheHeader()), type_attribution=False)
+        # The body keeps the spacing and indentation that formatting it would change.
+        spec.rewrite_run(python(
+            "class A:\n  def f(self,x):\n    return x\n",
+            "class B:\n  def f(self,x):\n    return x\n",
+        ))
+
     def test_formatting_that_changes_only_whitespace_passes(self):
         class FormatTheFile(PythonVisitor[ExecutionContext]):
             def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:

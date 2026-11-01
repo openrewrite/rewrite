@@ -42,6 +42,8 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         self._stop = False
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[J]:
+        if self._stop:
+            return cast(Optional[J], tree)
         if parent is not None:
             self._cursor = parent
             if tree is None:

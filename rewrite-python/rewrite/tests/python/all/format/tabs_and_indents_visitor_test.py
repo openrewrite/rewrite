@@ -1,6 +1,8 @@
 import pytest
 
-from rewrite.python import IntelliJ
+from rewrite import ExecutionContext
+from rewrite.java import J
+from rewrite.python import CompilationUnit, IntelliJ, PythonVisitor
 from rewrite.python.format import TabsAndIndentsVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
@@ -1018,6 +1020,23 @@ def test_an_over_indented_docstring_moves_left():
             '''
         ),
         spec=RecipeSpec().with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
+
+
+def test_indentation_stops_after_the_given_tree():
+    style = IntelliJ.tabs_and_indents().with_use_tab_character(False).with_tab_size(4)
+
+    class IndentTheFirstFunction(PythonVisitor[ExecutionContext]):
+        def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+            return TabsAndIndentsVisitor(style, stop_after=cu.statements[0]).visit(cu, ctx)
+
+    rewrite_run(
+        # language=python
+        python(
+            "def f():\n  return 1\n\ndef g():\n  return 2\n",
+            "def f():\n    return 1\n\ndef g():\n  return 2\n",
+        ),
+        spec=RecipeSpec().with_recipe(from_visitor(IndentTheFirstFunction()))
     )
 
 
