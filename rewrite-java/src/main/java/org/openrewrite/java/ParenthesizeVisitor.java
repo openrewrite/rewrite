@@ -237,9 +237,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             int parentPrecedence = getPrecedence(parentBinary.getOperator());
 
             if (parentPrecedence > instanceOfPrecedence) {
-                if (parentBinary.getRight().isScope(i)) {
-                    return parenthesize(i);
-                }
+                return parenthesize(i);
             }
         }
 
