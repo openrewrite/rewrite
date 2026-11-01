@@ -264,6 +264,29 @@ describe('Statement Expression Wrapping', () => {
         );
     });
 
+    it('should make a statement that no expression holds, made of the expression of an expression statement, the statement itself', () => {
+        const spec = new RecipeSpec();
+        const [cond, call, value] = [capture('cond'), capture('call'), capture('value')];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const match = await pattern`${cond} && ${call}`.match(binary, this.cursor);
+                if (match) {
+                    return template`if (${cond}) ${call}`.apply(binary, this.cursor, {values: match});
+                }
+                const sum = await pattern`${value} + 1`.match(binary, this.cursor);
+                return sum ? template`yield ${value}`.apply(binary, this.cursor, {values: sum}) :
+                    super.visitBinary(binary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            typescript('cond && doIt();', 'if (cond) doIt();'),
+            // the parser holds a `yield` in a JS.StatementExpression wherever it stands
+            typescript('function* g() {\n    x + 1;\n}', 'function* g() {\n    yield x;\n}')
+        );
+    });
+
     it('should keep the markers of the expression statement a statement takes the place of', () => {
         const spec = new RecipeSpec();
         const object = capture('object');

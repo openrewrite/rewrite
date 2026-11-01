@@ -279,9 +279,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             expression: await this.visitDefined<Expression>(expressionStatement.expression, p)
         }));
         // Outside a `for` head the parser makes a statement the statement itself, so a visit that makes one does too
-        const visited: J | undefined = updates.expression;
+        let visited: J | undefined = updates.expression;
         if (visited && visited !== expressionStatement.expression && isStatement(visited) &&
             this.cursor.parentTree()?.value.kind !== J.Kind.ForLoopControl) {
+            // and it holds a statement that is no expression in a JS.StatementExpression only when it is a `yield`
+            const held = visited.kind === JS.Kind.StatementExpression ? (visited as JS.StatementExpression).statement : undefined;
+            if (held && held.kind !== J.Kind.Yield) {
+                visited = {...held, prefix: concatenated(visited.prefix, held.prefix), markers: withOuterMarkers(visited.markers, held.markers)};
+            }
             return {
                 ...visited,
                 prefix: concatenated(updates.prefix, visited.prefix),
