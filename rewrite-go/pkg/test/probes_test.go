@@ -148,6 +148,18 @@ func TestRecipeIsNotProbedOnceItsProbesTookTwentySeconds(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+func TestProbesCountTowardTheTimeCap(t *testing.T) {
+	forgetProbes(t)
+	// given a recipe whose probes have taken exactly 20 seconds
+	probes.charge(&renameFirstFunction{checked: true}, probeTimeCap)
+
+	// when a test probes it once more
+	NewRecipeSpec().WithRecipe(&renameFirstFunction{checked: true}).RewriteRun(t, firstFunctionA())
+
+	// then a later test of it, on a file its probe of an empty file fails on, does not probe it
+	assert.Empty(t, failures(t, NewRecipeSpec().WithRecipe(&renameFirstFunction{}), firstFunctionA()))
+}
+
 func TestCompositeIsCappedByTheRecipesItRuns(t *testing.T) {
 	forgetProbes(t)
 	// given a recipe list of one recipe whose probes have taken more than 20 seconds
