@@ -173,6 +173,9 @@ class RecipeSpec:
     # recipe and source file in a run shares
     check_execution_context_unchanged: bool = True
 
+    # Whether to fail a ScanningRecipe whose scanner changes a tree, which the scanning phase discards
+    check_no_edits_in_scanning_phase: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
@@ -330,7 +333,8 @@ class RecipeSpec:
     def _recipe_context(self, later_cycle: bool, checks: _RunChecks) -> ExecutionContext:
         """The context of one run of the recipe, which the checks that watch the run look through."""
         ctx = _LaterCycleContext(self.execution_context) if later_cycle else self.execution_context
-        return _CheckedContext(ctx, checks.context_puts if self.check_execution_context_unchanged else None)
+        messages = {ExecutionContext.SCANNING_MUTATION_VALIDATION: self.check_no_edits_in_scanning_phase}
+        return _CheckedContext(ctx, messages, checks.context_puts if self.check_execution_context_unchanged else None)
 
     def _expect_execution_context_unchanged(self, checks: _RunChecks) -> None:
         if checks.context_puts:
@@ -799,11 +803,18 @@ class _RunChecks:
 
 
 class _CheckedContext(DelegatingExecutionContext):
-    """The context a recipe runs under, which records the messages the recipe puts on it."""
+    """The context a recipe runs under, which holds the messages that turn checks on and records those the
+    recipe puts on it."""
 
-    def __init__(self, delegate: ExecutionContext, puts: Optional[Dict[str, str]]):
+    def __init__(self, delegate: ExecutionContext, messages: Dict[str, Any], puts: Optional[Dict[str, str]]):
         super().__init__(delegate)
+        self._messages = messages
         self._puts = puts
+
+    def get_message(self, key, default_value=None):
+        if key in self._messages:
+            return self._messages[key]
+        return super().get_message(key, default_value)
 
     def put_message(self, key, value):
         if self._puts is not None and key not in _FRAMEWORK_MESSAGES and key not in self._puts:

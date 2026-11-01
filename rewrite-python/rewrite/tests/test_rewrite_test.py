@@ -1065,3 +1065,75 @@ class TestExecutionContextUnchanged:
         spec = RecipeSpec(recipe=_remembering_names(rename=True), check_execution_context_unchanged=False,
                           type_attribution=False)
         spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+
+
+class _RenameA(PythonVisitor[ExecutionContext]):
+    def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+        return ident.replace(simple_name="b") if ident.simple_name == "a" else ident
+
+
+def _renaming_scanned_files(scanner_edits: bool) -> Recipe:
+    """A recipe that renames ``a`` to ``b`` in the files its scanner found an ``a`` in, and whose scanner renames
+    it too when ``scanner_edits``."""
+
+    class RenameScanned(ScanningRecipe[Set[str]]):
+        @property
+        def name(self) -> str:
+            return "org.openrewrite.test.RenameScanned"
+
+        @property
+        def display_name(self) -> str:
+            return "Rename scanned files"
+
+        @property
+        def description(self) -> str:
+            return "Rename `a` in the files the scanner found it in."
+
+        def initial_value(self, ctx: ExecutionContext) -> Set[str]:
+            return set()
+
+        def scanner(self, acc: Set[str]) -> TreeVisitor:
+            if scanner_edits:
+                return _RenameA()
+
+            class Find(PythonVisitor[ExecutionContext]):
+                def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                    if ident.simple_name == "a":
+                        acc.add(str(self.cursor.first_enclosing_or_throw(CompilationUnit).source_path))
+                    return ident
+
+            return Find()
+
+        def editor_with_data(self, acc: Set[str]) -> TreeVisitor:
+            class Rename(_RenameA):
+                def visit_compilation_unit(self, cu: CompilationUnit, ctx: ExecutionContext) -> J:
+                    return super().visit_compilation_unit(cu, ctx) if str(cu.source_path) in acc else cu
+
+            return Rename()
+
+    return RenameScanned()
+
+
+class TestNoEditsInScanningPhase:
+    """The harness rejects a ScanningRecipe whose scanner edits what it scans."""
+
+    def test_a_scanner_that_edits_fails(self):
+        spec = RecipeSpec(recipe=_renaming_scanned_files(scanner_edits=True), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\n", "b = 1\n", path=Path("a.py")))
+
+        assert str(failure.value) == (
+            "Record what the scanner finds in the accumulator, and make the edits in editor_with_data(acc).\n"
+            "org.openrewrite.test.RenameScanned's scanner changed a.py, and the scanning phase discards edits. "
+            "A scanner that reuses an editing visitor opts out with "
+            "RecipeSpec(check_no_edits_in_scanning_phase=False)."
+        )
+
+    def test_a_scanner_that_records_what_it_finds_passes(self):
+        spec = RecipeSpec(recipe=_renaming_scanned_files(scanner_edits=False), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "b = 1\n"), python("c = 1\n"))
+
+    def test_check_turned_off_passes(self):
+        spec = RecipeSpec(recipe=_renaming_scanned_files(scanner_edits=True), check_no_edits_in_scanning_phase=False,
+                          type_attribution=False)
+        spec.rewrite_run(python("a = 1\n"))

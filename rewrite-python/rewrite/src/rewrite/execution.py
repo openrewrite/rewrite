@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 class ExecutionContext(ABC):
     REQUIRE_PRINT_EQUALS_INPUT: ClassVar[str] = "org.openrewrite.requirePrintEqualsInput"
     CHARSET: ClassVar[str] = "org.openrewrite.parser.charset"
+    # Set by a test harness to fail a ScanningRecipe whose scanner changes the tree it scans.
+    SCANNING_MUTATION_VALIDATION: ClassVar[str] = "org.openrewrite.test.scanningMutationValidation"
 
     @abstractmethod
     def get_message(self, key: str, default_value=None) -> Any:

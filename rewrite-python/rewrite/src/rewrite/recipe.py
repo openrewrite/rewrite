@@ -294,6 +294,7 @@ class Recipe(ABC):
         Returns:
             List of results showing before/after for each changed file
         """
+        from rewrite.execution import ExecutionContext
         from rewrite.visitor import Cursor
 
         cursor = Cursor(None, Cursor.ROOT_VALUE)
@@ -307,7 +308,14 @@ class Recipe(ABC):
             # of the remainder of the recipe list, leaving nested scanners unrun.
             def scan_one(recipe: Recipe, source: SourceFile) -> SourceFile:
                 if isinstance(recipe, ScanningRecipe):
-                    recipe.scanner(recipe.accumulator(cursor, ctx)).visit(source, ctx, cursor)
+                    scanned = recipe.scanner(recipe.accumulator(cursor, ctx)).visit(source, ctx, cursor)
+                    if scanned is not source and ctx.get_message(ExecutionContext.SCANNING_MUTATION_VALIDATION, False):
+                        raise AssertionError(
+                            "Record what the scanner finds in the accumulator, and make the edits in "
+                            f"editor_with_data(acc).\n{recipe.name}'s scanner changed {source.source_path}, and the "
+                            "scanning phase discards edits. A scanner that reuses an editing visitor opts out with "
+                            "RecipeSpec(check_no_edits_in_scanning_phase=False)."
+                        )
                 return source
 
             # edit() is used only to iterate the source files; scan_one returns
