@@ -16,6 +16,7 @@
 import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
+import {foundSearchResult} from '../../../src/markers';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
 import {expectParserShaped} from '../../test-util';
 
@@ -261,6 +262,24 @@ describe('Statement Expression Wrapping', () => {
             // a `for` head holds every expression in an expression statement
             {...typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}'), afterRecipe: expectParserShaped}
         );
+    });
+
+    it('should keep the markers of the expression statement a statement takes the place of', () => {
+        const spec = new RecipeSpec();
+        const object = capture('object');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitExpressionStatement(statement: JS.ExpressionStatement, p: any): Promise<J | undefined> {
+                return super.visitExpressionStatement(foundSearchResult(statement, 'found'), p);
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+                const match = await pattern`${object}['bar']`.match(arrayAccess, this.cursor);
+                return match ? template`${object}.bar`.apply(arrayAccess, this.cursor, {values: match}) :
+                    super.visitArrayAccess(arrayAccess, p);
+            }
+        });
+
+        return spec.rewriteRun(typescript(`foo['bar'];`, '/*~~(found)~~>*/foo.bar;'));
     });
 
     it('should make a statement substituted where a template writes a statement the statement itself', () => {
