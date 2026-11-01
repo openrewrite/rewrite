@@ -71,13 +71,13 @@ public class UnparsedSourcesTests : RewriteTest
         Assert.StartsWith(
             "Check that the scanner found the files the recipe needs before using what it keeps of them, so that it " +
             "changes nothing when one is missing.\n" +
-            "OpenRewrite.Tests.Core.UnparsedSourcesTests+FindRootNamespaces threw when Directory.Build.props was " +
-            "missing, which is how a C# recipe sees a file its parser failed on:\n" +
+            "OpenRewrite.Tests.Core.FindRootNamespaces threw when Directory.Build.props was missing, which is " +
+            "how a C# recipe sees a file its parser failed on:\n" +
             "    System.Collections.Generic.KeyNotFoundException: The given key '' was not present in the dictionary.",
             failure.Message);
         Assert.Contains(
-            "\n        at OpenRewrite.Tests.Core.UnparsedSourcesTests.FindRootNamespaces.ClassMarker." +
-            "VisitClassDeclaration(UnparsedSourcesTests.cs:",
+            "\n        at OpenRewrite.Tests.Core.FindRootNamespaces.ClassMarker.VisitClassDeclaration(" +
+            "UnparsedSourcesTests.cs:",
             failure.Message);
         Assert.Contains(
             "The host sends a C# recipe only the C# and XML files it parsed, so to the recipe such a file is simply " +
@@ -111,64 +111,97 @@ public class UnparsedSourcesTests : RewriteTest
         );
     }
 
-    /// <summary>
-    /// Marks the project file that declares a root namespace, and each class in its directory with that namespace,
-    /// trusting its scanner to have found the project file unless it checks.
-    /// </summary>
-    private class FindRootNamespaces : ScanningRecipe<Dictionary<string, string>>
+    /// <summary>A recipe declared inside a test class is scaffolding for the test, so it isn't probed.</summary>
+    [Fact]
+    public void AHelperRecipeOfATestClassIsNotProbed()
     {
-        [Option(DisplayName = "Checks what its scanner found",
-            Description = "Whether a class whose project file the scanner didn't find is left alone.")]
-        public bool ChecksWhatItsScannerFound { get; init; }
+        RewriteRun(
+            spec => spec.SetRecipe(new HelperFindRootNamespaces()),
+            Project()
+        );
+    }
 
-        public override string DisplayName => "Find root namespaces";
-        public override string Description => "Marks each class with the root namespace its project declares.";
+    /// <summary>A recipe that runs a helper recipe of a test class is scaffolding too.</summary>
+    [Fact]
+    public void ARecipeThatRunsAHelperRecipeOfATestClassIsNotProbed()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RunsAHelperRecipe()),
+            Project()
+        );
+    }
 
-        public override Dictionary<string, string> GetInitialValue(ExecutionContext ctx) => [];
+    /// <summary>A test's helper that reads what its scanner never recorded.</summary>
+    internal class HelperFindRootNamespaces : FindRootNamespaces;
+}
 
-        public override ITreeVisitor<ExecutionContext> GetScanner(Dictionary<string, string> rootNamespaces) =>
-            new ProjectScanner(rootNamespaces);
+/// <summary>
+/// Marks the project file that declares a root namespace, and each class in its directory with that namespace,
+/// trusting its scanner to have found the project file unless it checks.
+/// </summary>
+internal class FindRootNamespaces : ScanningRecipe<Dictionary<string, string>>
+{
+    [Option(DisplayName = "Checks what its scanner found",
+        Description = "Whether a class whose project file the scanner didn't find is left alone.")]
+    public bool ChecksWhatItsScannerFound { get; init; }
 
-        public override ITreeVisitor<ExecutionContext> GetVisitor(Dictionary<string, string> rootNamespaces) =>
-            new ProjectMarker(rootNamespaces).Combine(new ClassMarker(rootNamespaces, ChecksWhatItsScannerFound));
+    public override string DisplayName => "Find root namespaces";
+    public override string Description => "Marks each class with the root namespace its project declares.";
 
-        private static string DirectoryOf(SourceFile sourceFile) => Path.GetDirectoryName(sourceFile.SourcePath) ?? "";
+    public override Dictionary<string, string> GetInitialValue(ExecutionContext ctx) => [];
 
-        private class ProjectScanner(Dictionary<string, string> rootNamespaces) : XmlVisitor<ExecutionContext>
+    public override ITreeVisitor<ExecutionContext> GetScanner(Dictionary<string, string> rootNamespaces) =>
+        new ProjectScanner(rootNamespaces);
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor(Dictionary<string, string> rootNamespaces) =>
+        new ProjectMarker(rootNamespaces).Combine(new ClassMarker(rootNamespaces, ChecksWhatItsScannerFound));
+
+    private static string DirectoryOf(SourceFile sourceFile) => Path.GetDirectoryName(sourceFile.SourcePath) ?? "";
+
+    private class ProjectScanner(Dictionary<string, string> rootNamespaces) : XmlVisitor<ExecutionContext>
+    {
+        public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
         {
-            public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
+            if (document.Root.GetChild("PropertyGroup")?.GetChild("RootNamespace")?.GetValue() is { } rootNamespace)
             {
-                if (document.Root.GetChild("PropertyGroup")?.GetChild("RootNamespace")?.GetValue() is { } rootNamespace)
-                {
-                    rootNamespaces[DirectoryOf(document)] = rootNamespace;
-                }
-                return document;
+                rootNamespaces[DirectoryOf(document)] = rootNamespace;
             }
-        }
-
-        private class ProjectMarker(Dictionary<string, string> rootNamespaces) : XmlVisitor<ExecutionContext>
-        {
-            public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx) =>
-                rootNamespaces.TryGetValue(DirectoryOf(document), out var rootNamespace)
-                    ? SearchResult.Found(document, $"root namespace {rootNamespace}")
-                    : document;
-        }
-
-        private class ClassMarker(Dictionary<string, string> rootNamespaces, bool checks)
-            : CSharpVisitor<ExecutionContext>
-        {
-            public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
-            {
-                var directory = DirectoryOf(Cursor.FirstEnclosingOrThrow<CompilationUnit>());
-                if (checks && !rootNamespaces.ContainsKey(directory))
-                {
-                    return classDecl;
-                }
-                return SearchResult.Found(classDecl, $"in {rootNamespaces[directory]}");
-            }
+            return document;
         }
     }
 
-    /// <summary>A recipe that no other test runs, so that its first probe is this test's.</summary>
-    private class FindRootNamespacesOfOneTest : FindRootNamespaces;
+    private class ProjectMarker(Dictionary<string, string> rootNamespaces) : XmlVisitor<ExecutionContext>
+    {
+        public override global::OpenRewrite.Xml.Xml VisitDocument(Document document, ExecutionContext ctx) =>
+            rootNamespaces.TryGetValue(DirectoryOf(document), out var rootNamespace)
+                ? SearchResult.Found(document, $"root namespace {rootNamespace}")
+                : document;
+    }
+
+    private class ClassMarker(Dictionary<string, string> rootNamespaces, bool checks)
+        : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            var directory = DirectoryOf(Cursor.FirstEnclosingOrThrow<CompilationUnit>());
+            if (checks && !rootNamespaces.ContainsKey(directory))
+            {
+                return classDecl;
+            }
+            return SearchResult.Found(classDecl, $"in {rootNamespaces[directory]}");
+        }
+    }
+}
+
+/// <summary>A recipe that no other test runs, so that its first probe is this test's.</summary>
+internal class FindRootNamespacesOfOneTest : FindRootNamespaces;
+
+/// <summary>Runs the helper recipe that UnparsedSourcesTests declares.</summary>
+internal class RunsAHelperRecipe : global::OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Run a helper recipe";
+    public override string Description => "Runs the recipe a test class declares to find root namespaces.";
+
+    public override List<global::OpenRewrite.Core.Recipe> GetRecipeList() =>
+        [new UnparsedSourcesTests.HelperFindRootNamespaces()];
 }

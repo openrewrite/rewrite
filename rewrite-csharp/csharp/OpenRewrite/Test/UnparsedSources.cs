@@ -29,6 +29,10 @@ internal static class UnparsedSources
         int cycles)
     {
         var changed = results.Where(r => r.Before != null).Select(r => r.Before!.Id).ToHashSet();
+        if (changed.Count == 0 || IsTestScaffolding(recipe))
+        {
+            return;
+        }
         var probedKinds = new HashSet<Type>();
         foreach (var missing in sources)
         {
@@ -45,6 +49,29 @@ internal static class UnparsedSources
                     throw new XunitException(Message(recipe, missing, thrown), thrown);
                 }
             });
+        }
+    }
+
+    /// <summary>
+    /// Recipes declared inside a test class, and recipes that run one, are scaffolding for the test, not recipes under
+    /// test.
+    /// </summary>
+    private static bool IsTestScaffolding(Recipe recipe)
+    {
+        for (var type = recipe.GetType().DeclaringType; type != null; type = type.DeclaringType)
+        {
+            if (typeof(RewriteTest).IsAssignableFrom(type))
+            {
+                return true;
+            }
+        }
+        try
+        {
+            return recipe.GetRecipeList().Any(IsTestScaffolding);
+        }
+        catch (Exception)
+        {
+            return true;
         }
     }
 
