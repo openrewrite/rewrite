@@ -790,14 +790,32 @@ describe("rewrite test", () => {
 
         test("a probe runs once in a process, whether it passes or fails", async () => {
             // given
+            let emptyTexts = 0;
             class CapitalizeTwice extends Capitalize {
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    const capitalizeText = capitalize(this.checked);
+                    return new class extends PlainTextVisitor<ExecutionContext> {
+                        protected override async visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText | undefined> {
+                            emptyTexts += text.text.length === 0 ? 1 : 0;
+                            return capitalizeText.visit(text, ctx);
+                        }
+                    };
+                }
             }
             const sut = new RecipeSpec();
             sut.recipe = new CapitalizeTwice({checked: false});
             await expect(sut.rewriteRun(text("hello", "Hello"))).rejects.toThrow("threw when run on an empty PlainText");
+            sut.recipe = new CapitalizeTwice({checked: true});
+            await sut.rewriteRun(text("hello", "Hello"));
 
-            // when, then
-            return sut.rewriteRun(text("hello", "Hello"));
+            // when
+            sut.recipe = new CapitalizeTwice({checked: false});
+            await sut.rewriteRun(text("hello", "Hello"));
+            sut.recipe = new CapitalizeTwice({checked: true});
+            await sut.rewriteRun(text("hello", "Hello"));
+
+            // then
+            expect(emptyTexts).toBe(2);
         });
 
         test("a recipe is probed no more once its probes have taken 20 seconds in the process", async () => {
