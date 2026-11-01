@@ -22,8 +22,7 @@ namespace OpenRewrite.CSharp.Template;
 /// <summary>
 /// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
 /// produced by a multi-statement template, rather than a real block in the source code.
-/// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
-/// and by <see cref="RoslynFormatter.DeferredFormatVisitor{P}"/> to identify blocks to flatten.
+/// Used by <see cref="RoslynFormatter.DeferredFormatVisitor{P}"/> to identify blocks to flatten.
 /// </summary>
 public sealed class SyntheticBlockContainer : Marker
 {
@@ -618,24 +617,6 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Extract the J element from a JRightPadded or JLeftPadded wrapper via reflection.
-    /// Returns null if the value is not a padding wrapper or doesn't contain a J element.
-    /// </summary>
-    private static J? UnwrapPaddingElement(object? value)
-    {
-        var type = value?.GetType();
-        if (type is { IsGenericType: true })
-        {
-            var genericDef = type.GetGenericTypeDefinition();
-            if (genericDef == typeof(JRightPadded<>) || genericDef == typeof(JLeftPadded<>))
-            {
-                return type.GetProperty("Element")?.GetValue(value) as J;
-            }
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Check if a statement is a preamble field (typed capture declaration with placeholder name).
     /// </summary>
     private static bool IsPreambleField(Statement stmt)
@@ -749,69 +730,6 @@ internal static class TemplateEngine
     private static J PreservePrefix(J replacement, J original)
     {
         return J.SetPrefix(replacement, original.Prefix);
-    }
-
-    /// <summary>
-    /// Auto-format the template result within the enclosing compilation unit.
-    /// Delegates to <see cref="RoslynFormatter.FormatSubtree"/> for the splice→format→extract pipeline.
-    /// The prefix set in the coordinates phase is preserved — the formatter only affects
-    /// internal whitespace (argument spacing, etc.), matching the JS/TS approach.
-    /// </summary>
-    internal static J AutoFormat(J tree, Cursor cursor)
-    {
-        var cu = cursor.FirstEnclosing<CompilationUnit>();
-        if (cu == null)
-            return tree;
-
-        // The cursor's value is the original node being replaced.
-        // Unwrap JRightPadded/JLeftPadded if the cursor points to a padding wrapper.
-        var original = cursor.Value as J ?? UnwrapPaddingElement(cursor.Value);
-        if (original == null)
-            return tree;
-
-        // Synthetic block containers hold multiple statements that will be spliced
-        // into the parent block. Format each statement individually at the parent level
-        // so Roslyn sees them as direct siblings, not block-internal children.
-        if (tree is Block blk && blk.Markers.FindFirst<SyntheticBlockContainer>() != null)
-            return AutoFormatSyntheticBlock(blk, cu, original);
-
-        return AutoFormatSingle(tree, cu, original);
-    }
-
-    private static J AutoFormatSingle(J tree, CompilationUnit cu, J original)
-    {
-        // Save the prefix set by ApplyCoordinates — the formatter may override it
-        var preservedPrefix = tree.Prefix;
-
-        // Assign a fresh ID so FindById targets exactly this instance,
-        // not a stale node from a prior application of the same template
-        tree = J.SetId(tree, Tree.RandomId());
-
-        var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
-
-        // Restore the coordinate-set prefix. The formatter handles internal whitespace;
-        // the prefix (indentation/newlines before the node) comes from the original tree.
-        return J.SetPrefix(formatted, preservedPrefix);
-    }
-
-    /// <summary>
-    /// Format each statement in a synthetic block individually, splicing each one
-    /// into the original node's position so Roslyn formats it at the parent level.
-    /// </summary>
-    private static Block AutoFormatSyntheticBlock(Block blk, CompilationUnit cu, J original)
-    {
-        var preservedBlockPrefix = blk.Prefix;
-        var formattedStmts = new List<JRightPadded<Statement>>(blk.Statements.Count);
-
-        foreach (var s in blk.Statements)
-        {
-            var stmt = (J)s.Element;
-            stmt = J.SetId(stmt, Tree.RandomId());
-            var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, stmt, stopAfter: null);
-            formattedStmts.Add(s.WithElement((Statement)formatted));
-        }
-
-        return blk.WithStatements(formattedStmts).WithPrefix(preservedBlockPrefix);
     }
 
     private static string BuildCacheKey(string code, ScaffoldPreamble preamble,

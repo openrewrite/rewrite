@@ -189,7 +189,7 @@ public sealed class CSharpTemplate
     /// <returns>The generated AST node with substitutions and prefix applied, but not formatted.
     /// The caller is responsible for formatting, e.g. via
     /// <see cref="CSharpVisitor{P}.AutoFormat{T}"/> (deferred batch) or
-    /// <see cref="AutoFormatExtensions.AutoFormat{T}"/> (immediate).</returns>
+    /// <see cref="Format.AutoFormatVisitor{P}.Format"/> (immediate).</returns>
     public J? Apply(Cursor cursor, MatchResult? values = null,
         CSharpCoordinates? coordinates = null)
     {
