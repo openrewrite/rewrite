@@ -457,6 +457,8 @@ val generateTestClasspath = tasks.register("generateTestClasspath") {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
+    // Recorded package-manager inputs and outputs must remain byte-exact, including package.json files.
+    exclude("**/lock/bun/bun144-*/**")
     // Test fixtures without a file extension, which the check has no header style for
     excludes(listOf(
         "**/npm-arborist/*-cases", "**/npm-arborist/*-dumps", "**/npm-arborist/*-shapes", "**/npm-arborist/*-tables",
