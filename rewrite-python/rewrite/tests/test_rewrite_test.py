@@ -994,3 +994,74 @@ class TestExtraCycles:
         RecipeSpec(recipe=from_visitor(RenameToPrint())).rewrite_run(python("foo()\n", "print()\n"))
 
         assert typed == [False, True]
+
+
+def _remembering_names(rename: bool = False) -> Recipe:
+    """A recipe that keeps the last name it saw on the execution context, and renames ``a`` when ``rename``."""
+
+    class RememberNames(PythonVisitor[ExecutionContext]):
+        def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+            ctx.put_message("org.openrewrite.test.lastName", ident.simple_name)
+            return ident.replace(simple_name="b") if rename and ident.simple_name == "a" else ident
+
+    return from_visitor(RememberNames())
+
+
+class TestExecutionContextUnchanged:
+    """The harness rejects a recipe that keeps state on the execution context."""
+
+    def test_a_recipe_that_puts_a_message_fails(self):
+        spec = RecipeSpec(recipe=_remembering_names(rename=True), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("a = 1\n", "b = 1\n"))
+
+        message = str(failure.value)
+        assert message.startswith(
+            "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source file "
+            "in cursor messages, e.g. self.cursor.put_message(...) and self.cursor.get_nearest_message(...).\n"
+            "org.openrewrite.adhoc put messages on the execution context, which every recipe and source file in a run "
+            "shares, so what it keeps there leaks into the others:\n"
+            '  "org.openrewrite.test.lastName" at RememberNames.visit_identifier (test_rewrite_test.py:'
+        )
+        assert message.endswith(
+            "A recipe that must change the execution context opts out with "
+            "RecipeSpec(check_execution_context_unchanged=False)."
+        )
+
+    def test_a_put_made_while_scanning_fails(self):
+        class CountFiles(ScanningRecipe[List[str]]):
+            @property
+            def name(self) -> str:
+                return "org.openrewrite.test.CountFiles"
+
+            @property
+            def display_name(self) -> str:
+                return "Count files"
+
+            @property
+            def description(self) -> str:
+                return "Count files."
+
+            def initial_value(self, ctx: ExecutionContext) -> List[str]:
+                ctx.put_message("org.openrewrite.test.counted", True)
+                return []
+
+        spec = RecipeSpec(recipe=CountFiles(), type_attribution=False)
+        with pytest.raises(AssertionError,
+                           match='  "org.openrewrite.test.counted" at CountFiles.initial_value'):
+            spec.rewrite_run(python("a = 1\n"))
+
+    def test_data_tables_and_cursor_messages_pass(self):
+        class NoteNames(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                self.cursor.put_message("name", ident.simple_name)
+                _FOUND_NAMES.insert_row(ctx, _FoundName(ident.simple_name))
+                return ident.replace(markers=ident.markers.add(SearchResult(random_id(), None)))
+
+        spec = RecipeSpec(recipe=from_visitor(NoteNames()), type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "/*~~>*/a = 1\n"))
+
+    def test_check_turned_off_passes(self):
+        spec = RecipeSpec(recipe=_remembering_names(rename=True), check_execution_context_unchanged=False,
+                          type_attribution=False)
+        spec.rewrite_run(python("a = 1\n", "b = 1\n"))
