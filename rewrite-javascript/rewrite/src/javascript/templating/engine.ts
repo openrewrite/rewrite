@@ -939,8 +939,9 @@ export class TemplateApplier {
                         expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
-            } else if (!parentExpectsStatement) {
-                // Expression context: wrap in StatementExpression if result is statement-only
+            } else if (!parentExpectsStatement && isExpression(originalTree)) {
+                // Expression context: wrap in StatementExpression if result is statement-only. A slot that held
+                // a statement-only node, such as an arrow function's block body, takes one unwrapped.
                 if (resultIsStatement && !resultIsExpression) {
                     const stmt = resultToUse as Statement;
                     resultToUse = {
