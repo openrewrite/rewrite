@@ -114,14 +114,6 @@ _PY_BINARY_PRECEDENCE = {
     py.Binary.Type.StringConcatenation: Precedence.PRIMARY,
 }
 
-_ASSOCIATIVE = frozenset({j.Binary.Type.And, j.Binary.Type.Or})
-"""Operators whose right operand may stay unparenthesized at its own precedence.
-
-`and`/`or` are grammar, not the object protocol: both groupings call `__bool__`
-on the same operands in order and yield the same one. An overloadable operator
-is absent — `+` regroups differently on floats, `|`/`&`/`^` on `__ror__` dispatch.
-"""
-
 _UNARY_PRECEDENCE = {
     j.Unary.Type.Not: Precedence.NOT,
     j.Unary.Type.Negative: Precedence.UNARY,
@@ -311,14 +303,16 @@ def _binary_slot(parent, child_id: UUID) -> Optional[SlotConstraints]:
     if not is_left and _id_of(parent.right) != child_id:
         return None
 
+    if parent.operator == py.Binary.Type.StringConcatenation:
+        # Adjacent strings make one atom, and `'a' ('b')` is a call rather than `'a' 'b'`
+        return None
     if precedence == Precedence.COMPARISON:
         # Comparisons chain rather than associate, so `(a < b) < c` and `a < b < c` differ
         return SlotConstraints(precedence + 1)
     if precedence == Precedence.POWER:
         # `**` is right-associative, and `-a ** b` means `-(a ** b)`, so its left operand takes no unary
         return SlotConstraints(Precedence.AWAIT if is_left else Precedence.UNARY)
-    if parent.operator in _ASSOCIATIVE:
-        return SlotConstraints(precedence)
+    # Left-associative: the right operand of an equally binding operator needs parentheses
     return SlotConstraints(precedence if is_left else precedence + 1)
 
 
