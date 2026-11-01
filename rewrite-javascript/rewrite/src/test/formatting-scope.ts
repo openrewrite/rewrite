@@ -135,6 +135,10 @@ function callSite(stack: string): string | undefined {
     for (i++; i < frames.length && inFormat(frames[i]) && /^(maybeAutoFormat|autoFormat)$/.test(frames[i].fn); i++) {
         helper = frames[i].fn;
     }
+    // a precondition and a scanning recipe's editor hand the tree on to the visitor they wrap, after an await
+    while (i < frames.length && (isWrapper(frames[i]) || frames[i].location.startsWith("node:"))) {
+        i++;
+    }
     const caller = frames[i];
     if (!caller) {
         return undefined;
@@ -150,6 +154,11 @@ function callSite(stack: string): string | undefined {
 
 function inFormat(frame: Frame): boolean {
     return /[\\/]format[\\/]/.test(frame.location);
+}
+
+/** The visit of a precondition or of a scanning recipe's editor, which runs the visitor it wraps. */
+function isWrapper(frame: Frame): boolean {
+    return /\.visit$/.test(frame.fn) && /(^|[\\/])(src|dist)[\\/](preconditions|recipe)\.[jt]s:/.test(frame.location);
 }
 
 /** A formatting recipe may format whole files, and so may the recipes run alongside it. */

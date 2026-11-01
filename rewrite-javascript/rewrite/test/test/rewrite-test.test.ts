@@ -5,6 +5,7 @@ import {ChangeText} from "../../fixtures/change-text";
 import {ReplacedText} from "../../fixtures/replaced-text";
 import {ScanningEditor} from "../../fixtures/scanning-editor";
 import {
+    check,
     Cursor,
     DATA_TABLE_STORE,
     ExecutionContext,
@@ -1055,6 +1056,61 @@ describe("rewrite test", () => {
                     return new RenameAndFormat("file");
                 }
             };
+            return sut.rewriteRun(typescript(before, after));
+        });
+
+        // Renames foo() to bar(), then runs `tidy`, a recipe whose own visitor is a formatter
+        const renameThenTidy = (tidy: Recipe) => new class extends Recipe {
+            name = "org.openrewrite.test.rename-then-tidy";
+            displayName = "Rename then tidy";
+            description = "Renames `foo()` to `bar()`, then formats.";
+
+            async recipeList(): Promise<Recipe[]> {
+                return [fromVisitor(new RenameAndFormat("call")), tidy];
+            }
+        };
+
+        test("a recipe whose own visitor is a formatter may format whole files, behind a precondition too", () => {
+            // given
+            class TidyClasses extends Recipe {
+                name = "org.openrewrite.test.tidy-classes";
+                displayName = "Tidy classes";
+                description = "Formats the files that declare a class.";
+
+                async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return check(new class extends JavaScriptVisitor<ExecutionContext> {
+                        protected override async visitClassDeclaration(c: J.ClassDeclaration, _p: ExecutionContext): Promise<J | undefined> {
+                            return foundSearchResult(c);
+                        }
+                    }, new AutoformatVisitor());
+                }
+            }
+            const sut = new RecipeSpec();
+            sut.recipe = renameThenTidy(new TidyClasses());
+
+            // when, then
+            return sut.rewriteRun(typescript(before, after));
+        });
+
+        test("a scanning recipe whose own editor is a formatter may format whole files", () => {
+            // given
+            class TidyScanned extends ScanningRecipe<{}> {
+                name = "org.openrewrite.test.tidy-scanned";
+                displayName = "Tidy scanned";
+                description = "Formats every file it scanned.";
+
+                initialValue(_ctx: ExecutionContext): {} {
+                    return {};
+                }
+
+                async editorWithData(_acc: {}): Promise<TreeVisitor<any, ExecutionContext>> {
+                    return new AutoformatVisitor();
+                }
+            }
+            const sut = new RecipeSpec();
+            sut.recipe = renameThenTidy(new TidyScanned());
+
+            // when, then
             return sut.rewriteRun(typescript(before, after));
         });
 
