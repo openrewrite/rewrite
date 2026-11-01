@@ -1455,6 +1455,18 @@ class TestEmptySources:
 
         assert "" not in ctx.get_message(_NoteVisitedTexts.key)
 
+    def test_a_probe_that_failed_does_not_run_again(self):
+        spec = RecipeSpec(recipe=_RenameFirstAssignment(), type_attribution=False)
+        with pytest.raises(AssertionError, match="threw when run on an empty CompilationUnit"):
+            spec.rewrite_run(python("a = 1\n", "renamed = 1\n"))
+
+        spec.rewrite_run(python("a = 1\n", "renamed = 1\n"))
+
+    def test_a_recipe_probed_for_20_seconds_is_probed_no_more(self, monkeypatch):
+        recipe = _RenameFirstAssignment()
+        monkeypatch.setitem(probes._PROBE_SECONDS, probes._time_cap_key(recipe), 20.5)
+        RecipeSpec(recipe=recipe, type_attribution=False).rewrite_run(python("a = 1\n", "renamed = 1\n"))
+
 
 @dataclass
 class _RenameToSettingsName(ScanningRecipe[Dict[str, str]]):
@@ -1597,6 +1609,19 @@ class TestUnparsedSources:
 
         spec = RecipeSpec(recipe=RenameToSettingsName(), type_attribution=False)
         spec.rewrite_run(*_settings_and_app())
+
+    def test_a_probe_that_passed_does_not_run_again(self):
+        spec = RecipeSpec(recipe=_RenameToSettingsName(), type_attribution=False)
+        settings, app = _settings_and_app()
+        # The probe leaves out app.py, the first source the recipe changes, and the scanner still finds settings.py.
+        spec.rewrite_run(app, settings)
+
+        spec.rewrite_run(settings, app)
+
+    def test_a_recipe_probed_for_20_seconds_is_probed_no_more(self, monkeypatch):
+        recipe = _RenameToSettingsName()
+        monkeypatch.setitem(probes._PROBE_SECONDS, probes._time_cap_key(recipe), 20.5)
+        RecipeSpec(recipe=recipe, type_attribution=False).rewrite_run(*_settings_and_app())
 
 
 class _NoneAsName(PythonVisitor[ExecutionContext]):
