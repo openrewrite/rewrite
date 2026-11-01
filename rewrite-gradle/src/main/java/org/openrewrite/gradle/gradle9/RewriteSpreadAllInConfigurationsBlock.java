@@ -153,8 +153,8 @@ public class RewriteSpreadAllInConfigurationsBlock extends Recipe {
         if (statement instanceof J.Return) {
             J.Return ret = (J.Return) statement;
             // Moving an explicit return into a new closure changes which closure it exits.
-            if (ret.getMarkers().findFirst(ImplicitReturn.class).isEmpty() &&
-                ret.getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isEmpty()) {
+            if (!ret.getMarkers().findFirst(ImplicitReturn.class).isPresent() &&
+                !ret.getMarkers().findFirst(org.openrewrite.groovy.marker.ImplicitReturn.class).isPresent()) {
                 return null;
             }
             Expression expression = ret.getExpression();
