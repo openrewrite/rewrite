@@ -826,6 +826,12 @@ func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	}
 
 	spec.expectDataTablesWritten(t, run.dataTables)
+	if t.Failed() {
+		return
+	}
+
+	// Pass 5: the recipe copes with sources the test does not give it.
+	spec.expectEmptySourcesHandled(t, run)
 }
 
 // expectNoFurtherChanges reports whether it found changes to fail t with.
