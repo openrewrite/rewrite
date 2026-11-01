@@ -398,13 +398,10 @@ public static class RoslynFormatter
         IEquatable<DeferredFormatVisitor<P>>
     {
         private readonly HashSet<Guid> _nodeIds = [];
-        private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
         public void Add(J node)
         {
-            var (id, prefix) = PrintableIdAndPrefix(node);
-            _nodeIds.Add(id);
-            _preservedPrefixes[id] = prefix;
+            _nodeIds.Add(PrintableIdAndPrefix(node).id);
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
@@ -416,7 +413,8 @@ public static class RoslynFormatter
             // in a single pass — ensures IDs match the actual tree
             cu = (CompilationUnit)FlattenAndRegister(cu);
 
-            return FormatSpans(cu, _nodeIds, _preservedPrefixes);
+            // A node's own prefix is formatted too, as Java's autoFormat does
+            return FormatSpans(cu, _nodeIds, []);
         }
 
         /// <summary>
@@ -426,7 +424,7 @@ public static class RoslynFormatter
         /// </summary>
         private J FlattenAndRegister(J tree)
         {
-            var flattener = new SyntheticBlockFlattener(_nodeIds, _preservedPrefixes);
+            var flattener = new SyntheticBlockFlattener(_nodeIds);
             flattener.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
             return flattener.VisitNonNull(tree, 0);
         }
@@ -441,8 +439,7 @@ public static class RoslynFormatter
     /// When a synthetic block's ID is in the registered set, replaces it with
     /// the individual statement IDs so formatting targets the actual nodes.
     /// </summary>
-    private class SyntheticBlockFlattener(
-        HashSet<Guid> nodeIds, Dictionary<Guid, Space> preservedPrefixes) : CSharpVisitor<int>
+    private class SyntheticBlockFlattener(HashSet<Guid> nodeIds) : CSharpVisitor<int>
     {
         public override J VisitBlock(Block block, int ctx)
         {
@@ -466,8 +463,6 @@ public static class RoslynFormatter
                     // If this synthetic block was registered for formatting,
                     // register its individual statements instead
                     var registered = nodeIds.Remove(inner.Id);
-                    if (registered)
-                        preservedPrefixes.Remove(inner.Id);
 
                     var innerStmts = inner.Statements;
                     for (var k = 0; k < innerStmts.Count; k++)
