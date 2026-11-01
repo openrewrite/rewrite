@@ -83,13 +83,14 @@ func TestNodeTheParserBuildsDifferentlyFails(t *testing.T) {
 
 	// then the run fails, naming the recipe, the node and what the parser makes of its text
 	assert.Equal(t, []string{
-		"Write code with a template from pkg/template or with the parser, or build the nodes the way the parser " +
-			"builds the text they print. The recipe's output holds nodes that the parser makes differently of " +
-			"the same text:\n" +
+		"Write code with a template from pkg/template that names what its code uses through Imports, Context " +
+			"or ExportData, or with the parser, or build the nodes the way the parser builds the text they print. " +
+			"The recipe's output holds nodes that the parser makes differently of the same text:\n" +
 			"  test.go (changed by org.openrewrite.golang.test.ReplaceOne):\n" +
 			"    `2` is a java.Identifier where the parser makes a java.Literal\n" +
 			"A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
-			"parsed code never holds. If the output is meant to differ from parsed code, set " +
+			"parsed code never holds. The parser builds a call such as `time.Duration(x)` as a java.TypeCast " +
+			"only when it can resolve the name to a type. If the output is meant to differ from parsed code, set " +
 			"spec.CheckParserShapedTrees = false.",
 	}, got)
 }

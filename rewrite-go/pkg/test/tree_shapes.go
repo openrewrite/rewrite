@@ -69,11 +69,12 @@ func treeShapesFailure(output *outputParse, checks *runChecks) string {
 	if found.Len() == 0 {
 		return ""
 	}
-	return "Write code with a template from pkg/template or with the parser, or build the nodes the way the " +
-		"parser builds the text they print. The recipe's output holds nodes that the parser makes differently " +
-		"of the same text:\n" + found.String() +
+	return "Write code with a template from pkg/template that names what its code uses through Imports, Context " +
+		"or ExportData, or with the parser, or build the nodes the way the parser builds the text they print. " +
+		"The recipe's output holds nodes that the parser makes differently of the same text:\n" + found.String() +
 		"A recipe that runs after it matches the tree, not the text, so it misses or mistakes a node that " +
-		"parsed code never holds. If the output is meant to differ from parsed code, set " +
+		"parsed code never holds. The parser builds a call such as `time.Duration(x)` as a java.TypeCast only " +
+		"when it can resolve the name to a type. If the output is meant to differ from parsed code, set " +
 		"spec.CheckParserShapedTrees = false."
 }
 
