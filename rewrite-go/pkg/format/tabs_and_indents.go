@@ -322,6 +322,7 @@ func (v *TabsAndIndentsVisitor) VisitLabel(l *java.Label, p any) java.J {
 	if next, ok := v.Visit(statement, p).(java.Statement); ok {
 		statement = next
 	}
+	statement = unlessLabelUnchanged(l.Statement, statement)
 	if statement == out.Statement {
 		return out
 	}
@@ -508,7 +509,7 @@ func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement
 }
 
 // unlessLabelUnchanged returns original when it is a label whose lead-in,
-// indented with the body and then back out by VisitLabel, ends as it began.
+// indented as a statement and then back out by VisitLabel, ends as it began.
 func unlessLabelUnchanged(original, formatted java.Statement) java.Statement {
 	before, ok := original.(*java.Label)
 	if !ok {

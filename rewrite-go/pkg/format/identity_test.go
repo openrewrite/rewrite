@@ -129,11 +129,15 @@ func F(x int, ch chan int, s []int, m map[string]int) int {
 	case int:
 		_ = v
 	}
+retry:
 outer:
 	for j := 0; j < 3; j++ {
 		for {
 			continue outer
 		}
+	}
+	if total < 0 {
+		goto retry
 	}
 	return total
 }
