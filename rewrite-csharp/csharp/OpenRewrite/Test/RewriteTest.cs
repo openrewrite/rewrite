@@ -249,6 +249,7 @@ public abstract class RewriteTest
                     TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
                 }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
+                UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
             }
             finally
             {
