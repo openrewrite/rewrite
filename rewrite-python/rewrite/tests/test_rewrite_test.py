@@ -1643,6 +1643,14 @@ class TestUnparsedSources:
 
         spec.rewrite_run(settings, app)
 
+    def test_a_recipe_with_other_options_is_probed_again(self):
+        checked = RecipeSpec(recipe=_RenameToSettingsName(checked=True), type_attribution=False)
+        checked.rewrite_run(*_settings_and_app())
+
+        spec = RecipeSpec(recipe=_RenameToSettingsName(), type_attribution=False)
+        with pytest.raises(AssertionError, match="RenameToSettingsName threw when settings.py was missing"):
+            spec.rewrite_run(*_settings_and_app())
+
     def test_a_recipe_probed_for_20_seconds_is_probed_no_more(self, monkeypatch):
         recipe = _RenameToSettingsName()
         monkeypatch.setitem(probes._PROBE_SECONDS, probes._time_cap_key(recipe), 20.5)
