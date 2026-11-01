@@ -337,7 +337,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (isManagedDependencyImportTag(groupId, artifactId)) {
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
-                                retainVersions();
+                                retainVersions(tag, ctx);
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
@@ -350,9 +350,37 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return t;
                 }
 
-                private void retainVersions() {
-                    RetainVersions.plan(this, retainVersions == null ? emptyList() : retainVersions)
-                            .forEach(it -> doAfterVisit(it.getVisitor()));
+                private void retainVersions(Xml.Tag tag, ExecutionContext ctx) throws MavenDownloadingException {
+                    List<String> retained = retainVersions == null ? emptyList() : retainVersions;
+                    RetainVersions.plan(this, retained).forEach(it -> doAfterVisit(it.getVisitor()));
+                    MavenResolutionResult mrr = getResolutionResult();
+                    if (retained.isEmpty() || mrr.getModules().isEmpty()) {
+                        return;
+                    }
+                    ResolvedPom pom = mrr.getPom();
+                    String bomGroup = pom.getValue(tag.getChildValue("groupId").orElse(""));
+                    String bomArtifact = pom.getValue(tag.getChildValue("artifactId").orElse(""));
+                    for (ResolvedManagedDependency managed : pom.getDependencyManagement()) {
+                        ResolvedGroupArtifactVersion oldBom = managed.getBomGav();
+                        if (oldBom == null || !Objects.equals(bomGroup, oldBom.getGroupId()) ||
+                            !Objects.equals(bomArtifact, oldBom.getArtifactId())) {
+                            continue;
+                        }
+                        String newerVersion = findNewerVersion(oldBom.getGroupId(), oldBom.getArtifactId(), oldBom.getVersion(), ctx);
+                        if (newerVersion != null) {
+                            MavenPomDownloader downloader = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                                    MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
+                            ResolvedPom newBom = downloader.download(new GroupArtifactVersion(bomGroup, bomArtifact, newerVersion),
+                                            null, pom, pom.getRepositories())
+                                    .resolve(emptyList(), downloader, ctx);
+                            for (ResolvedManagedDependency dependency : RetainVersions.planForModules(mrr, oldBom, newBom, retained)) {
+                                doAfterVisit(new AddManagedDependencyVisitor(dependency.getGroupId(), dependency.getArtifactId(),
+                                        requireNonNull(dependency.getVersion()), dependency.getScope() == null ? null :
+                                        dependency.getScope().toString().toLowerCase(), dependency.getType(), dependency.getClassifier(), null));
+                            }
+                        }
+                        break;
+                    }
                 }
             }
 
