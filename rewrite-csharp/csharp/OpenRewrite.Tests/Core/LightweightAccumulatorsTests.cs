@@ -52,7 +52,8 @@ public class LightweightAccumulatorsTests : RewriteTest
 
         Assert.StartsWith(
             "Keep the values a recipe needs in its ScanningRecipe accumulator, such as source paths, names, ids and " +
-            "positions, and no trees, cursors, visitors, execution contexts or MSBuildProject markers:\n" +
+            "positions, and no IHeavyweight objects, such as trees, cursors, visitors, execution contexts and " +
+            "MSBuildProject markers:\n" +
             "  OpenRewrite.Tests.Core.LightweightAccumulatorsTests+KeepsWhatItScans keeps\n" +
             "    LightweightAccumulatorsTests.KeepsWhatItScans.Scanned.SourceFiles[source.cs] -> " +
             "CompilationUnit source.cs, after scanning\n" +
@@ -76,6 +77,19 @@ public class LightweightAccumulatorsTests : RewriteTest
         ));
 
         Assert.Contains("    StrongBox.Value -> MSBuildProject, after scanning\n", failure.Message);
+    }
+
+    /// <summary>A recipe library tags a type of its own that is too large to keep, and the check finds it too.</summary>
+    [Fact]
+    public void ALibrarysOwnHeavyweightTypeKeptInTheAccumulatorFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new KeepsItsCallGraph()),
+            CSharp(Class)
+        ));
+
+        Assert.Contains("    StrongBox.Value -> LightweightAccumulatorsTests.CallGraph, after scanning\n",
+            failure.Message);
     }
 
     [Fact]
@@ -193,6 +207,17 @@ public class LightweightAccumulatorsTests : RewriteTest
 
         protected override void Scan(StrongBox<MSBuildProject?> acc, global::OpenRewrite.Core.Tree tree) =>
             acc.Value ??= tree.Markers.FindFirst<MSBuildProject>();
+    }
+
+    /// <summary>A recipe library's index of every call in a repository, which it tags as too large to keep.</summary>
+    private sealed class CallGraph : IHeavyweight
+    {
+        public Dictionary<string, List<string>> CallersByMethod { get; } = new();
+    }
+
+    private class KeepsItsCallGraph : ScansOnly<StrongBox<CallGraph>>
+    {
+        public override StrongBox<CallGraph> GetInitialValue(ExecutionContext ctx) => new(new CallGraph());
     }
 
     private class KeepsCursors : ScanningRecipe<List<Cursor>>

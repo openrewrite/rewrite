@@ -18,7 +18,7 @@ namespace OpenRewrite.Core;
 /// <summary>
 /// Context for recipe execution, providing message passing between recipes and visitors.
 /// </summary>
-public class ExecutionContext
+public class ExecutionContext : IHeavyweight
 {
     private readonly Dictionary<string, object> _messages = new();
 

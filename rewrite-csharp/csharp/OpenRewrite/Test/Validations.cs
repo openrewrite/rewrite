@@ -72,8 +72,9 @@ public sealed class Validations
     public bool NoEditsInScanningPhase { get; init; } = true;
 
     /// <summary>
-    /// Whether a ScanningRecipe's accumulator is validated to keep values, such as paths, names and ids, and no trees,
-    /// cursors, visitors or other objects that would stay in memory all cycle. Default: enabled.
+    /// Whether a ScanningRecipe's accumulator is validated to keep values, such as paths, names and ids, and no
+    /// <see cref="OpenRewrite.Core.IHeavyweight"/> objects, such as trees, cursors and visitors, which would stay in
+    /// memory all cycle. Default: enabled.
     /// </summary>
     public bool LightweightAccumulators { get; init; } = true;
 

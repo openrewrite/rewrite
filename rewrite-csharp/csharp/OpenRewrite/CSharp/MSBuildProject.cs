@@ -22,7 +22,7 @@ namespace OpenRewrite.CSharp;
 /// Metadata about a .NET project (.csproj) extracted from MSBuild evaluation.
 /// Attached as a marker to the Xml.Document representing the .csproj file in the LST.
 /// </summary>
-public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatable<MSBuildProject>
+public sealed class MSBuildProject : Marker, IHeavyweight, IRpcCodec<MSBuildProject>, IEquatable<MSBuildProject>
 {
     public Guid Id { get; }
     public string? Sdk { get; }

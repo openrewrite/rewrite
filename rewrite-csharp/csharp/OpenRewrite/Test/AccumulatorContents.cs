@@ -20,7 +20,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using OpenRewrite.Core;
-using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -28,8 +27,8 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.Test;
 
 /// <summary>
-/// Finds the objects too large to keep for a whole cycle, such as trees, that ScanningRecipe accumulators keep. The
-/// walk reads fields and the collections of .NET itself, and runs no code of the recipe's own.
+/// Finds the <see cref="IHeavyweight"/> objects, such as trees, that ScanningRecipe accumulators keep. The walk reads
+/// fields and the collections of .NET itself, and runs no code of the recipe's own.
 /// </summary>
 internal sealed class AccumulatorContents
 {
@@ -163,7 +162,7 @@ internal sealed class AccumulatorContents
 
     private static Kind KindOf(Type type) => Kinds.GetOrAdd(type, t =>
     {
-        if (IsHeavyweight(t))
+        if (typeof(IHeavyweight).IsAssignableFrom(t))
         {
             return Kind.Retained;
         }
@@ -190,12 +189,6 @@ internal sealed class AccumulatorContents
         // read by its fields, since enumerating a collection class of the recipe's own runs its code
         return IsHolder(t) || IsBuiltOnTheSdk(t.Assembly) ? Kind.Object : Kind.Leaf;
     });
-
-    /// <summary>The kinds of object an accumulator should not keep for a whole cycle.</summary>
-    private static bool IsHeavyweight(Type type) =>
-        typeof(Tree).IsAssignableFrom(type) || typeof(Cursor).IsAssignableFrom(type) ||
-        typeof(ExecutionContext).IsAssignableFrom(type) || type == typeof(MSBuildProject) ||
-        type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ITreeVisitor<>));
 
     /// <summary>
     /// Whether a collection is one of .NET's own or extends one, so that its elements are read by enumerating it.
@@ -262,8 +255,9 @@ internal sealed class AccumulatorContents
         SourceFile sourceFile => $"{TypeName(value.GetType())} {sourceFile.SourcePath}",
         Cursor => "Cursor",
         ExecutionContext => "ExecutionContext",
-        Tree or Marker => TypeName(value.GetType()),
-        _ => "TreeVisitor"
+        _ when value.GetType().GetInterfaces().Any(i =>
+            i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ITreeVisitor<>)) => "TreeVisitor",
+        _ => TypeName(value.GetType())
     };
 
     private static string TypeName(Type type)
@@ -310,7 +304,8 @@ internal sealed class AccumulatorContents
     {
         var message = new StringBuilder(
             "Keep the values a recipe needs in its ScanningRecipe accumulator, such as source paths, names, ids and " +
-            "positions, and no trees, cursors, visitors, execution contexts or MSBuildProject markers:\n");
+            "positions, and no IHeavyweight objects, such as trees, cursors, visitors, execution contexts and " +
+            "MSBuildProject markers:\n");
         foreach (var (recipe, findings) in _findings)
         {
             message.Append("  ").Append(recipe).Append(" keeps\n");
