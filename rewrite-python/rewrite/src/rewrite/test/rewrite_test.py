@@ -42,7 +42,7 @@ from rewrite.markers import ParseExceptionResult
 
 from .accumulators import AccumulatorContents
 from .added_markers import assert_no_added_markers
-from .probes import assert_none_throw_on_empty
+from .probes import assert_none_throw_on_empty, assert_none_throw_on_unparsed
 from .spec import SourceSpec, AfterRecipeText, dedent
 from .well_formed import assert_well_formed
 
@@ -245,7 +245,8 @@ class RecipeSpec:
            accumulators and added no markers for its own use, if enabled
         6. Compares results with expected "after" states
         7. Checks that one more cycle, and a run on a fresh parse of the output, change nothing
-        8. Runs a recipe that changed a source on an empty file of its kind, where it has to raise nothing
+        8. Runs a recipe that changed a source on an empty file of its kind, and with the source as a file
+           its parser failed on, where it has to raise nothing
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -340,6 +341,7 @@ class RecipeSpec:
             return _LaterCycleContext(self.execution_context)
 
         assert_none_throw_on_empty(self.recipe, sources, changed, self._parse_empty, context, cycles)
+        assert_none_throw_on_unparsed(self.recipe, sources, changed, context, cycles)
 
     def _parse_empty(self, before: SourceFile) -> Optional[SourceFile]:
         from rewrite.python.tree import CompilationUnit
