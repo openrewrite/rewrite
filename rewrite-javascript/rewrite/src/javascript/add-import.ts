@@ -1583,7 +1583,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             value: this.module,
             valueSource,
             unicodeEscapes: this.moduleUnicodeEscapes,
-            type: undefined
+            type: Type.Primitive.String
         };
     }
 
