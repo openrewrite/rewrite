@@ -756,9 +756,12 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
 }
 
 // FIXME: This is a heuristic to determine if the parent expects a statement child
-function expectsStatement(parentTree: J): boolean {
+function expectsStatement(parentTree: J, childId: string): boolean {
+    if (parentTree.kind === J.Kind.Case) {
+        // the labels of a case are expressions
+        return !(parentTree as J.Case).caseLabels.elements.some(label => label.element.id === childId);
+    }
     return parentTree.kind === J.Kind.Block ||
-        parentTree.kind === J.Kind.Case ||
         parentTree.kind === J.Kind.DoWhileLoop ||
         parentTree.kind === J.Kind.ForEachLoop ||
         parentTree.kind === J.Kind.ForLoop ||
@@ -783,7 +786,7 @@ export function replacedByObjectLiteral(tree: J, cursor: Cursor): boolean {
         return true;
     }
     const parentTree = cursor.parentTree()?.value;
-    return parentTree !== undefined && !expectsStatement(parentTree);
+    return parentTree !== undefined && !expectsStatement(parentTree, tree.id);
 }
 
 /**
@@ -916,7 +919,7 @@ export class TemplateApplier {
 
         // Only apply wrapping logic if we have parent context
         if (parentTree) {
-            const parentExpectsStatement = expectsStatement(parentTree);
+            const parentExpectsStatement = expectsStatement(parentTree, originalTree.id);
             const originalIsStatement = isStatement(originalTree);
 
             const resultIsStatement = isStatement(resultToUse);

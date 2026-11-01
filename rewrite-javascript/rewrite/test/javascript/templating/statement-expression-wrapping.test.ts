@@ -218,4 +218,24 @@ describe('Statement Expression Wrapping', () => {
             afterRecipe: expectParserShaped
         });
     });
+
+    it('should wrap an expression that replaces a statement of a case, but not its label', () => {
+        const spec = new RecipeSpec();
+        const operand = capture('operand');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitUnary(unary: J.Unary, p: any): Promise<J | undefined> {
+                const match = await pattern`!!${operand}`.match(unary, this.cursor);
+                return match ? template`${operand}`.apply(unary, this.cursor, {values: match}) :
+                    super.visitUnary(unary, p);
+            }
+        });
+
+        return spec.rewriteRun({
+            ...typescript(
+                'switch (x) {\n    case !!y:\n        !!z;\n}',
+                'switch (x) {\n    case y:\n        z;\n}'
+            ),
+            afterRecipe: expectParserShaped
+        });
+    });
 });
