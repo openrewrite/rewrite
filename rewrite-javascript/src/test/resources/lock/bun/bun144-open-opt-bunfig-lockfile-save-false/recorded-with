@@ -1,0 +1,3 @@
+bun 1.4.4 (38afee6c8), frozen-registry release sweep, 2026-11-01
+platform os=linux cpu=x64 libc=glibc
+before exit=0, after exit=0, frozen-over-after exit=0, fresh exit=0

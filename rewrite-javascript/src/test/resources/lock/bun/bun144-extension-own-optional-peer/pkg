@@ -1,0 +1,1 @@
+{"name": "p", "dependencies": {"@ecies/ciphers": "0.2.5", "@noble/ciphers": "1.3.0"}, "packageExtensions": {"@ecies/ciphers": {"peerDependenciesMeta": {"@noble/ciphers": {"optional": true}}}}}

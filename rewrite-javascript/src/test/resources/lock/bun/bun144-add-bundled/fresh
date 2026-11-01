@@ -1,0 +1,26 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-bundledeps": "1.0.0",
+        "ms": "2.1.3",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-bundledeps": ["@isaacs/testing-bundledeps@1.0.0", "", { "dependencies": { "@isaacs/testing-bundledeps-a": "*", "@isaacs/testing-bundledeps-c": "*" } }, "sha512-P8AF2FoTfHOPGY6W53FHVg9mza6ipzkppAwnbnNNkPaLQIEFTpx3U95ir1AKqmub7nTi115Qi6zHiqJzGe5Cqg=="],
+
+    "@isaacs/testing-bundledeps-b": ["@isaacs/testing-bundledeps-b@1.0.0", "", {}, "sha512-UDbCq7GHRDb743m4VBpnsui6hNeB3o08qe/FRnX9JFo0VHnLoXkdtvm/WurwABLxL/xw5wP/tfN2jF90EjQehQ=="],
+
+    "@isaacs/testing-bundledeps-c": ["@isaacs/testing-bundledeps-c@2.0.0", "", { "dependencies": { "@isaacs/testing-bundledeps-b": "*" } }, "sha512-nwGzs5eUI+0/+CB2oF7ce3Xu070w38pB//NoV9I9RedeT/+Y4fiOcIbLXYzt/yVJkZEOmTYXa1lVsrTypPvtlA=="],
+
+    "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+
+    "@isaacs/testing-bundledeps/@isaacs/testing-bundledeps-a": ["@isaacs/testing-bundledeps-a@1.0.0", "", { "dependencies": { "@isaacs/testing-bundledeps-b": "*" }, "bundled": true }, "sha512-2b/w0tAsreSNReTbLmIf+1jtt8R0cvMgMCeLF4P2LAE6cmKw7aIjLPupeB+5R8dm1BoMUuZbzFCzw0P4vP6spw=="],
+
+    "@isaacs/testing-bundledeps/@isaacs/testing-bundledeps-b": ["@isaacs/testing-bundledeps-b@1.0.0", "", {}, "sha512-UDbCq7GHRDb743m4VBpnsui6hNeB3o08qe/FRnX9JFo0VHnLoXkdtvm/WurwABLxL/xw5wP/tfN2jF90EjQehQ=="],
+  }
+}

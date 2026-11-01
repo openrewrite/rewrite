@@ -1,0 +1,1 @@
+Bun 1.4.4 records an unresolved optional range even when another ms is installed.

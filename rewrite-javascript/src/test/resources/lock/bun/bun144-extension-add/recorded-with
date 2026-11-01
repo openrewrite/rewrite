@@ -1,0 +1,4 @@
+bun 1.4.4, node v24.22.2 (fetch only), 2026-11-01
+before exit=0, after exit=0, frozen-over-after exit=0, fresh exit=0, again exit=0, empty-cache rerun exit=0
+platform os=linux cpu=arm64 libc=
+edit started 2026-11-01T17:25:19Z

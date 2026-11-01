@@ -1,0 +1,1 @@
+{"name": "p", "dependencies": {"eciesjs": "0.4.18", "@noble/ciphers": "2.1.1"}}
