@@ -31,6 +31,7 @@ from rewrite.python.template.coordinates import PythonCoordinates
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
 from rewrite.python.template.replacement import SubstitutedValue
+from rewrite.python.tree import StatementExpression, YieldFrom
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 from rewrite.tree import Tree
@@ -1020,16 +1021,48 @@ class _ReplaceSize(Recipe):
         return Visitor()
 
 
+class _AwaitYieldFrom(Recipe):
+    @property
+    def name(self) -> str:
+        return "test.AwaitYieldFrom"
+
+    @property
+    def display_name(self) -> str:
+        return "Await instead of yield from"
+
+    @property
+    def description(self) -> str:
+        return "Replaces `yield from x` with `await x`."
+
+    def editor(self):
+        x = capture('x')
+        tmpl = template("await {x}", x=x)
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_statement_expression(self, statement_expression, p):
+                statement_expression = super().visit_statement_expression(statement_expression, p)
+                if not isinstance(statement_expression, StatementExpression):
+                    return statement_expression
+                yield_ = statement_expression.statement
+                if not isinstance(yield_, j.Yield) or not isinstance(yield_.value, YieldFrom):
+                    return statement_expression
+                return tmpl.apply(self.cursor, values={'x': yield_.value.expression})
+        return Visitor()
+
+
 class TestTemplateApplySlotShape:
     """The tree `apply` leaves behind has the node kinds a parse of the printed result has."""
 
     @staticmethod
     def _run(replacement: str, before: str, after: str, coordinates_on_a_copy: bool = False) -> None:
+        TestTemplateApplySlotShape._run_recipe(_ReplaceSize(replacement, coordinates_on_a_copy), before, after)
+
+    @staticmethod
+    def _run_recipe(recipe: Recipe, before: str, after: str) -> None:
         def same_kinds_as_parse(cu):
             assert _kinds(cu) == _kinds(_parse(after))
 
-        RecipeSpec(recipe=_ReplaceSize(replacement, coordinates_on_a_copy)).rewrite_run(
-            python(before, after, after_recipe=same_kinds_as_parse))
+        RecipeSpec(recipe=recipe).rewrite_run(python(before, after, after_recipe=same_kinds_as_parse))
 
     def test_replaced_call_in_an_expression_slot_stays_bare(self):
         self._run("len({x})", "b = a.size()", "b = len(a)")
@@ -1043,3 +1076,12 @@ class TestTemplateApplySlotShape:
 
     def test_coordinates_on_a_rebuilt_node_find_its_slot(self):
         self._run("{x} + 1", "f(a.size())", "f(a + 1)", coordinates_on_a_copy=True)
+
+    def test_replaced_yield_is_wrapped_only_at_statement_level(self):
+        self._run_recipe(_AwaitYieldFrom(),
+                         "def f():\n    result = yield from step()\n",
+                         "def f():\n    result = await step()\n")
+
+        self._run_recipe(_AwaitYieldFrom(),
+                         "def f():\n    yield from step()\n",
+                         "def f():\n    await step()\n")
