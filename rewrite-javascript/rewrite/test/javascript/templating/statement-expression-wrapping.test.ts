@@ -254,6 +254,27 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun(javascript('with (o) !x;', 'with (o) x;'));
     });
 
+    it('should wrap an expression that replaces a statement of a for head, but not its condition', () => {
+        const spec = new RecipeSpec();
+        const [name, bound] = [capture('name'), capture('bound')];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitVariableDeclarations(declarations: J.VariableDeclarations, p: any): Promise<J | undefined> {
+                const match = await pattern`let ${name} = 0`.match(declarations, this.cursor);
+                return match ? template`${name} = 0`.apply(declarations, this.cursor, {values: match}) :
+                    super.visitVariableDeclarations(declarations, p);
+            }
+
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const match = await pattern`i < ${bound}`.match(binary, this.cursor);
+                return match ? template`i <= ${bound}`.apply(binary, this.cursor, {values: match}) :
+                    super.visitBinary(binary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(typescript('for (let i = 0; i < n;) {\n}', 'for (i = 0; i <= n;) {\n}'));
+    });
+
     it('should make a statement that replaces the expression of an expression statement the statement itself', () => {
         const spec = new RecipeSpec();
         const [a, b, object] = [capture('a'), capture('b'), capture('object')];

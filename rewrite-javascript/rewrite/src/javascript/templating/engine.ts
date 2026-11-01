@@ -932,6 +932,18 @@ export class TemplateApplier {
     private wrapTree(originalTree: J, resultToUse: J) {
         const parentTree = this.cursor?.parentTree()?.value;
 
+        // A `for` head holds each expression of its init and update in an expression statement, as the parser does
+        if (parentTree?.kind === J.Kind.ForLoopControl &&
+            (parentTree as J.ForLoop.Control).condition?.element.id !== originalTree.id) {
+            return isExpression(resultToUse) && resultToUse.kind !== JS.Kind.ExpressionStatement ? {
+                kind: JS.Kind.ExpressionStatement,
+                id: randomId(),
+                prefix: resultToUse.prefix,
+                markers: wrapperMarkers(resultToUse),
+                expression: {...resultToUse, prefix: emptySpace}
+            } as JS.ExpressionStatement : resultToUse;
+        }
+
         // Only apply wrapping logic if we have parent context
         if (parentTree) {
             const parentExpectsStatement = expectsStatement(parentTree, originalTree.id);
