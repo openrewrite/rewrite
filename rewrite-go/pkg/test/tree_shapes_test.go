@@ -176,6 +176,134 @@ func TestNodeTheParserBuildsTheSamePasses(t *testing.T) {
 		RewriteRun(t, Golang(assignsOne, assignsTwo))
 }
 
+// conversion builds `qualifier.name(operand)` in the place of lit, as the parser
+// builds a conversion to a type it resolves.
+func conversion(lit *java.Literal, qualifier, name string, operand java.Expression) java.J {
+	return &java.TypeCast{
+		ID:     uuid.New(),
+		Prefix: lit.Prefix,
+		Clazz: &java.ControlParentheses{ID: uuid.New(), Tree: java.RightPadded[java.Expression]{
+			Element: &java.FieldAccess{
+				ID:     uuid.New(),
+				Target: &java.Identifier{ID: uuid.New(), Name: qualifier},
+				Name:   java.LeftPadded[*java.Identifier]{Element: &java.Identifier{ID: uuid.New(), Name: name}},
+			},
+		}},
+		Expr: operand,
+	}
+}
+
+// invocation builds `qualifier.name(argument)` in the place of lit as a call.
+func invocation(lit *java.Literal, qualifier, name string, argument java.Expression) java.J {
+	return &java.MethodInvocation{
+		ID:     uuid.New(),
+		Prefix: lit.Prefix,
+		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{ID: uuid.New(), Name: qualifier}},
+		Name:   &java.Identifier{ID: uuid.New(), Name: name},
+		Arguments: java.Container[java.Expression]{Elements: []java.RightPadded[java.Expression]{
+			{Element: argument},
+		}},
+	}
+}
+
+func two() *java.Literal {
+	return &java.Literal{ID: uuid.New(), Source: "2", Value: int64(2)}
+}
+
+const assignsOneToAKind = `
+	package main
+
+	import "example.com/types"
+
+	var kind types.Kind = 1
+`
+
+const assignsAKind = `
+	package main
+
+	import "example.com/types"
+
+	var kind types.Kind = types.Kind(2)
+`
+
+func TestConversionToATypeTheParserCannotResolvePasses(t *testing.T) {
+	// The harness's parser resolves no package outside the standard library and
+	// the test's sources, so it makes a call of `types.Kind(2)`.
+	NewRecipeSpec().
+		WithRecipe(&replaceOne{replace: func(lit *java.Literal) java.J {
+			return conversion(lit, "types", "Kind", two())
+		}}).
+		RewriteRun(t, Golang(assignsOneToAKind, assignsAKind))
+}
+
+func TestOperandOfAConversionToATypeTheParserCannotResolveIsCompared(t *testing.T) {
+	// given a recipe that converts a number it writes as an identifier
+	spec := NewRecipeSpec().WithRecipe(&replaceOne{replace: func(lit *java.Literal) java.J {
+		return conversion(lit, "types", "Kind", &java.Identifier{ID: uuid.New(), Name: "2"})
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(assignsOneToAKind, assignsAKind))
+
+	// then the operand is reported
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    `2` is a java.Identifier where the parser makes a java.Literal\n")
+}
+
+func TestConversionWhereTheParserResolvesAFunctionFails(t *testing.T) {
+	// given a recipe that writes a call to strconv.Itoa as a conversion
+	spec := NewRecipeSpec().WithRecipe(&replaceOne{replace: func(lit *java.Literal) java.J {
+		return conversion(lit, "strconv", "Itoa", two())
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+
+		import "strconv"
+
+		var s = 1
+		var _ = strconv.Itoa
+	`, `
+		package main
+
+		import "strconv"
+
+		var s = strconv.Itoa(2)
+		var _ = strconv.Itoa
+	`))
+
+	// then the conversion is reported
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    `strconv.Itoa(2)` is a java.TypeCast where the parser makes a java.MethodInvocation\n")
+}
+
+func TestCallWhereTheParserResolvesAConversionFails(t *testing.T) {
+	// given a recipe that writes a conversion to time.Duration as a call
+	spec := NewRecipeSpec().WithRecipe(&replaceOne{replace: func(lit *java.Literal) java.J {
+		return invocation(lit, "time", "Duration", two())
+	}})
+
+	// when it runs
+	got := failures(t, spec, Golang(`
+		package main
+
+		import "time"
+
+		var d time.Duration = 1
+	`, `
+		package main
+
+		import "time"
+
+		var d time.Duration = time.Duration(2)
+	`))
+
+	// then the call is reported
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "    `time.Duration(2)` is a java.MethodInvocation where the parser makes a java.TypeCast\n")
+}
+
 func TestTreeShapesCheckCanBeTurnedOff(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&replaceOne{replace: func(lit *java.Literal) java.J {
 		return &java.Identifier{ID: uuid.New(), Prefix: lit.Prefix, Markers: lit.Markers, Name: "2"}

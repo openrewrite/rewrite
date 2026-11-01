@@ -100,6 +100,11 @@ func compareShapes(node, parsed *shapeNode, problems *[]string) {
 		return
 	}
 	if reflect.TypeOf(node.tree) != reflect.TypeOf(parsed.tree) {
+		if unresolvedConversion(node, parsed) {
+			// The last children are the operand and the argument.
+			compareShapes(node.children[len(node.children)-1], parsed.children[len(parsed.children)-1], problems)
+			return
+		}
 		*problems = append(*problems, fmt.Sprintf("%s is a %s where the parser makes a %s",
 			node, typeName(reflect.TypeOf(node.tree)), typeName(reflect.TypeOf(parsed.tree))))
 		return
@@ -118,6 +123,21 @@ func compareShapes(node, parsed *shapeNode, problems *[]string) {
 	for i := range node.children {
 		compareShapes(node.children[i], parsed.children[i], problems)
 	}
+}
+
+// unresolvedConversion reports whether node is a conversion where parsed is a
+// call with one argument and no method type. The parser makes such a call of a
+// conversion to a type it cannot resolve, as of a package outside the standard
+// library and the test's sources.
+func unresolvedConversion(node, parsed *shapeNode) bool {
+	_, cast := node.tree.(*java.TypeCast)
+	call, ok := parsed.tree.(*java.MethodInvocation)
+	if !cast || !ok || call.MethodType != nil || len(call.Arguments.Elements) != 1 ||
+		len(node.children) == 0 || len(parsed.children) == 0 {
+		return false
+	}
+	_, empty := call.Arguments.Elements[0].Element.(*java.Empty)
+	return !empty
 }
 
 // shapeValue is what tells a node apart from another of its type with the same
