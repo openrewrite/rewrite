@@ -594,6 +594,39 @@ public class TemplateApplyTests : RewriteTest
     }
 
     [Fact]
+    public void AutoParenthesizesCaptureOnRightOfSameOperator()
+    {
+        // f || g || h would parse as (f || g) || h
+        var cond = Capture.Expression("cond");
+        var other = Capture.Expression("other");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"{cond} ? true : {other}"),
+                CSharpTemplate.Expression($"{cond} || {other}")))),
+            CSharp(
+                "class C { bool M(bool f, bool g, bool h) { return f ? true : g || h; } }",
+                "class C { bool M(bool f, bool g, bool h) { return f || (g || h); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CaptureOnRightOfSameOperatorMatchesFreshParse()
+    {
+        // "x" + 1 + 2 is "x12", where "x" + (1 + 2) is "x3"
+        var right = Capture.Expression("right");
+        var tmpl = CSharpTemplate.Expression($"\"x\" + {right}");
+        var values = new MatchResult(
+            new Dictionary<string, object> { ["right"] = ParseExpression("1 + 2") }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal("\"x\" + (1 + 2)", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
+    [Fact]
     public void NoCaptureParenthesizationWhenUnnecessary()
     {
         // Pattern: {left} - {right} captures left = 2 * 3 (higher prec than -)
@@ -651,6 +684,9 @@ public class TemplateApplyTests : RewriteTest
     // ===============================================================
     // Recipe factories
     // ===============================================================
+
+    private static Expression ParseExpression(string code) =>
+        FindFirst<NamedVariable>(Parse($"class C {{ object v = {code}; }}"))!.Initializer!.Element;
 
     private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));
