@@ -158,11 +158,11 @@ class CacheTest {
     @Test
     void reproducesYarn402MixedPrettierArchive() throws IOException {
         byte[] tgz;
-        try (InputStream in = CacheTest.class.getResourceAsStream("/yarn-berry/compression/prettier-3.9.10.tgz")) {
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/prettier-3.9.10.tgz")) {
             tgz = in.readAllBytes();
         }
         byte[] expected;
-        try (InputStream in = CacheTest.class.getResourceAsStream("/yarn-berry/compression/prettier-3.9.10-mixed.zip")) {
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/prettier-3.9.10-mixed.zip")) {
             expected = in.readAllBytes();
         }
         assertThat(TgzUtils.convertToZip(tgz, "node_modules/prettier", 1).toByteArray("mixed")).isEqualTo(expected);
@@ -178,7 +178,7 @@ class CacheTest {
             tgz = in.readAllBytes();
         }
         byte[] expected;
-        try (InputStream in = CacheTest.class.getResourceAsStream("/yarn-berry/compression/ms-2.1.3-" + level + ".zip")) {
+        try (InputStream in = CacheTest.class.getResourceAsStream("/lock/support/yarn-berry/compression/ms-2.1.3-" + level + ".zip")) {
             expected = in.readAllBytes();
         }
         Object compression = "mixed".equals(level) ? level : Integer.valueOf(level);

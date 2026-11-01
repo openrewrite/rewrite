@@ -10,7 +10,7 @@ The install delta includes the package-manager consolidation (#44968 / 9510e7415
 | Upstream source | Behavior ported and evidence |
 | --- | --- |
 | npm.rs | Range resolution avoids deprecated matches, retains explicit tags and exact pins, and recognizes exact versions only for a single comparator. |
-| SemverQuery.rs, SemverRange.rs, Version.rs | Intersections, wildcard comparator bounds, prerelease ceilings, unsigned overflow rejection, build-metadata hyphens. `semver.tsv` contains 285 answers from the actual executable. |
+| SemverQuery.rs, SemverRange.rs, Version.rs | Intersections, wildcard comparator bounds, prerelease ceilings, unsigned overflow rejection, build-metadata hyphens. `lock/support/bun/1.4.4/semver.tsv` in the fixture repository contains 285 answers from the actual executable. |
 | PackageManagerEnqueue.rs | Required peers must satisfy their ranges; new candidates replace incompatible stale peers. Existing three transitive-peer recordings now match 1.4.4. |
 | lockfile/Tree.rs | `PeerProbes` stops a dependency hoisting away from the peer its owner provides. The reduced `eciesjs` fixture comes from the catalyst failure; frozen installs alone missed this. `bun144-workspace-peer-probe` verifies that a workspace never satisfies an npm probe: the plugin stays beside its owner's registry provider even when the workspace version is in range. |
 | lockfile/bun.lock.rs | Preserve explicit empty trusted lists, use published registry package names for trust entries, read/write libc and install-script metadata, validate nonempty integrity fields at strict lock versions, and preserve unresolved optional edges when another package of that name exists. |
@@ -37,7 +37,7 @@ state are reproducible. The release gate names the install paths this engine can
 ## Recordings and reruns
 
 The external fixture checkout used by these tests is openrewrite/rewrite-javascript-lock-fixtures at
-`8533f9639291673cad34703ed76178eb46bc72cf`. The `lock/bun/bun144-*` resources contain actual Bun 1.4.4 output,
+`a2891e010709778a8406349cafe4e95d6f869648`. The `lock/bun/bun144-*` resources contain actual Bun 1.4.4 output,
 never hand-edited output locks. `pkg-before`, `pkg`, config and tree files are inputs. The existing fixture
 recorder can recreate a recording with Bun 1.4.4 on PATH:
 

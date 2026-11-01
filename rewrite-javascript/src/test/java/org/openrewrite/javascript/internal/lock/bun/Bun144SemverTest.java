@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class Bun144SemverTest {
     @ParameterizedTest
-    @CsvFileSource(resources = "1.4.4/semver.tsv", delimiter = '\t')
+    @CsvFileSource(resources = "/lock/support/bun/1.4.4/semver.tsv", delimiter = '\t')
     void matchesTheActualRuntime(String version, String range, boolean expected) {
         BunRelease release = BunRelease.of("1.4.4");
         assertThat(SemverQuery.parse(range, release).satisfies(SemverVersion.parse(version, release).version.min()))

@@ -457,8 +457,6 @@ val generateTestClasspath = tasks.register("generateTestClasspath") {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
-    // Recorded package-manager inputs and outputs must remain byte-exact, including package.json files.
-    exclude("**/lock/bun/bun144-*/**")
     // Test fixtures without a file extension, which the check has no header style for
     excludes(listOf(
         "**/npm-arborist/*-cases", "**/npm-arborist/*-dumps", "**/npm-arborist/*-shapes", "**/npm-arborist/*-tables",
@@ -473,7 +471,7 @@ extensions.configure<LicenseExtension> {
 // The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
 // live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
 // Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
-val lockFixturesCommit = "8533f9639291673cad34703ed76178eb46bc72cf"
+val lockFixturesCommit = "a2891e010709778a8406349cafe4e95d6f869648"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
     inputs.property("commit", lockFixturesCommit)
