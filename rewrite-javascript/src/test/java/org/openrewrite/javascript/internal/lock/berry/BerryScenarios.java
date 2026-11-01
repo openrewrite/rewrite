@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -530,6 +531,16 @@ final class BerryScenarios {
         public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
             String file = name + "-" + version + ".tgz";
             byte[] tgz = http(mirror(url, "npmjs", "yarnpkg"), file);
+            // The original corpus stopped before fetching a newly resolved builtin patch. Keep its exact
+            // registry tarball here while retaining every existing missing-route assertion for other scenarios.
+            if (tgz == null && ("compat-patch-typescript-bump".equals(scenario.getName()) && "typescript-5.6.3.tgz".equals(file) ||
+                 "small-compat-patch-carried".equals(scenario.getName()) && "resolve-1.22.8.tgz".equals(file))) {
+                try (InputStream in = BerryScenarios.class.getResourceAsStream("/yarn-berry/compat/" + file)) {
+                    if (in != null) tgz = in.readAllBytes();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
             if (tgz == null) {
                 notRecorded(file);
             }

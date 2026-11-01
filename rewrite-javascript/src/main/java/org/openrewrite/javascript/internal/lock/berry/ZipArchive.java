@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -93,6 +95,63 @@ final class ZipArchive {
             throw new AlreadyExists("symlink '" + target + "' -> '/" + path + "'");
         }
         entries.put(path, new Entry(S_IFLNK | 0777, target.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    ZipArchive stableCopy() {
+        ZipArchive copy = new ZipArchive();
+        List<String> paths = new ArrayList<>(entries.keySet());
+        paths.sort((a, b) -> {
+            String[] left = a.split("/");
+            String[] right = b.split("/");
+            for (int n = 0; n < Math.min(left.length, right.length); n++) {
+                int order = left[n].compareTo(right[n]);
+                if (order != 0) return order;
+            }
+            return Integer.compare(left.length, right.length);
+        });
+        for (String path : paths) {
+            Entry e = entries.get(path);
+            copy.entries.put(path, new Entry(e.mode, e.data.clone()));
+        }
+        return copy;
+    }
+
+    ZipArchive copy() {
+        ZipArchive copy = new ZipArchive();
+        for (Map.Entry<String, Entry> e : entries.entrySet()) {
+            copy.entries.put(e.getKey(), new Entry(e.getValue().mode, e.getValue().data.clone()));
+        }
+        return copy;
+    }
+
+    Entry entry(String path) {
+        Entry entry = entries.get(path);
+        if (entry == null) throw new ReportError(ReportError.EXCEPTION, "ENOENT: no such file, " + path);
+        return entry;
+    }
+
+    void requireNoSymlinkInPath(String path) {
+        StringBuilder current = new StringBuilder();
+        for (String part : path.split("/")) {
+            if (current.length() > 0) current.append('/');
+            current.append(part);
+            Entry entry = entries.get(current.toString());
+            if (entry != null && (entry.mode & 0170000) == S_IFLNK) {
+                throw new org.openrewrite.javascript.internal.lock.CannotKnow(
+                        "applying a patch through symbolic link " + current);
+            }
+        }
+    }
+
+    void remove(String path) {
+        entry(path);
+        entries.remove(path);
+    }
+
+    void rename(String from, String to) {
+        Entry value = entry(from);
+        entries.remove(from);
+        entries.put(to, value);
     }
 
     byte[] toByteArray(Object level) {
