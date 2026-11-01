@@ -75,6 +75,24 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
+    /**
+     * Visits the children of `tree` through `visit` under a cursor that holds it, where a visit made it of the tree
+     * on the cursor, and puts the given cursor back after with the messages they left.
+     */
+    protected visitChildrenOf<R>(tree: J, visit: () => Promise<R>): Promise<R> {
+        const given = this.cursor;
+        if (given.value === tree || given.value?.kind !== tree.kind) {
+            return visit();
+        }
+        this.cursor = new Cursor(tree, given.parent);
+        given.messages.forEach((value, key) => this.cursor.messages.set(key, value));
+        return visit().then(visited => {
+            this.cursor.messages.forEach((value, key) => given.messages.set(key, value));
+            this.cursor = given;
+            return visited;
+        });
+    }
+
     protected async visitAnnotatedType(annotatedType: J.AnnotatedType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(annotatedType, p);
         if (!expression?.kind || expression.kind !== J.Kind.AnnotatedType) {
@@ -82,12 +100,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         annotatedType = expression as J.AnnotatedType;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(annotatedType, async () => ({
             prefix: await this.visitSpace(annotatedType.prefix, p),
             markers: await this.visitMarkers(annotatedType.markers, p),
             annotations: await mapAsync(annotatedType.annotations, a => this.visitDefined<J.Annotation>(a, p)),
             typeExpression: await this.visitDefined(annotatedType.typeExpression, p) as TypedTree
-        };
+        }));
         return updateIfChanged(annotatedType, updates);
     }
 
@@ -98,12 +116,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         annotation = expression as J.Annotation;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(annotation, async () => ({
             prefix: await this.visitSpace(annotation.prefix, p),
             markers: await this.visitMarkers(annotation.markers, p),
             annotationType: await this.visitTypeName(annotation.annotationType, p),
             arguments: await this.visitOptionalContainer(annotation.arguments, p)
-        };
+        }));
         return updateIfChanged(annotation, updates);
     }
 
@@ -114,12 +132,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         arrayAccess = expression as J.ArrayAccess;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(arrayAccess, async () => ({
             prefix: await this.visitSpace(arrayAccess.prefix, p),
             markers: await this.visitMarkers(arrayAccess.markers, p),
             indexed: await this.visitDefined(arrayAccess.indexed, p) as Expression,
             dimension: await this.visitDefined(arrayAccess.dimension, p) as J.ArrayDimension
-        };
+        }));
         return updateIfChanged(arrayAccess, updates);
     }
 
@@ -140,17 +158,19 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         arrayType = expression as J.ArrayType;
 
-        const updates: any = {
-            prefix: await this.visitSpace(arrayType.prefix, p),
-            markers: await this.visitMarkers(arrayType.markers, p),
-            elementType: await this.visitDefined(arrayType.elementType, p) as TypedTree,
-            dimension: await this.visitLeftPadded(arrayType.dimension, p),
-            type: await this.visitType(arrayType.type, p)
-        };
-        if (arrayType.annotations) {
-            updates.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
-        }
-        return updateIfChanged(arrayType, updates);
+        return this.visitChildrenOf(arrayType, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(arrayType.prefix, p),
+                markers: await this.visitMarkers(arrayType.markers, p),
+                elementType: await this.visitDefined(arrayType.elementType, p) as TypedTree,
+                dimension: await this.visitLeftPadded(arrayType.dimension, p),
+                type: await this.visitType(arrayType.type, p)
+            };
+            if (arrayType.annotations) {
+                updates.annotations = await mapAsync(arrayType.annotations, a => this.visitDefined<J.Annotation>(a, p));
+            }
+            return updateIfChanged(arrayType, updates);
+        });
     }
 
     protected async visitAssert(anAssert: J.Assert, p: P): Promise<J | undefined> {
@@ -160,12 +180,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         anAssert = statement as J.Assert;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(anAssert, async () => ({
             prefix: await this.visitSpace(anAssert.prefix, p),
             markers: await this.visitMarkers(anAssert.markers, p),
             condition: await this.visitDefined(anAssert.condition, p) as Expression,
             detail: await this.visitOptionalLeftPadded(anAssert.detail, p)
-        };
+        }));
         return updateIfChanged(anAssert, updates);
     }
 
@@ -182,13 +202,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         assignment = statement as J.Assignment;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(assignment, async () => ({
             prefix: await this.visitSpace(assignment.prefix, p),
             markers: await this.visitMarkers(assignment.markers, p),
             variable: await this.visitDefined(assignment.variable, p) as Expression,
             assignment: await this.visitLeftPadded(assignment.assignment, p),
             type: await this.visitType(assignment.type, p)
-        };
+        }));
         return updateIfChanged(assignment, updates);
     }
 
@@ -205,14 +225,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         assignOp = statement as J.AssignmentOperation;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(assignOp, async () => ({
             prefix: await this.visitSpace(assignOp.prefix, p),
             markers: await this.visitMarkers(assignOp.markers, p),
             variable: await this.visitDefined(assignOp.variable, p) as Expression,
             operator: await this.visitLeftPadded(assignOp.operator, p),
             assignment: await this.visitDefined(assignOp.assignment, p) as Expression,
             type: await this.visitType(assignOp.type, p)
-        };
+        }));
         return updateIfChanged(assignOp, updates);
     }
 
@@ -221,27 +241,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (!expression?.kind || expression.kind !== J.Kind.Binary) {
             return expression;
         }
-        const given = this.cursor;
-        if (expression !== binary && given.value === binary) {
-            // the operands are visited under the binary that holds them, where a template reads their slots
-            this.cursor = new Cursor(expression, given.parent);
-            given.messages.forEach((value, key) => this.cursor.messages.set(key, value));
-        }
         binary = expression as J.Binary;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(binary, async () => ({
             prefix: await this.visitSpace(binary.prefix, p),
             markers: await this.visitMarkers(binary.markers, p),
             left: await this.visitDefined(binary.left, p) as Expression,
             operator: await this.visitLeftPadded(binary.operator, p),
             right: await this.visitDefined(binary.right, p) as Expression,
             type: await this.visitType(binary.type, p)
-        };
-        if (this.cursor !== given) {
-            // what follows reads the cursor of the binary it was given, as for every other tree
-            this.cursor.messages.forEach((value, key) => given.messages.set(key, value));
-            this.cursor = given;
-        }
+        }));
         return updateIfChanged(binary, updates);
     }
 
@@ -252,13 +261,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         block = statement as J.Block;
 
-        const updates = {
+        const updates = await this.visitChildrenOf(block, async () => ({
             prefix: await this.visitSpace(block.prefix, p),
             markers: await this.visitMarkers(block.markers, p),
             static: await this.visitRightPadded(block.static, p),
             statements: await mapAsync(block.statements, stmt => this.visitRightPadded(stmt, p)),
             end: await this.visitSpace(block.end, p)
-        };
+        }));
         return updateIfChanged(block, updates);
     }
 
@@ -269,14 +278,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         breakStatement = statement as J.Break;
 
-        const updates: any = {
-            prefix: await this.visitSpace(breakStatement.prefix, p),
-            markers: await this.visitMarkers(breakStatement.markers, p)
-        };
-        if (breakStatement.label) {
-            updates.label = await this.visitDefined(breakStatement.label, p) as J.Identifier;
-        }
-        return updateIfChanged(breakStatement, updates);
+        return this.visitChildrenOf(breakStatement, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(breakStatement.prefix, p),
+                markers: await this.visitMarkers(breakStatement.markers, p)
+            };
+            if (breakStatement.label) {
+                updates.label = await this.visitDefined(breakStatement.label, p) as J.Identifier;
+            }
+            return updateIfChanged(breakStatement, updates);
+        });
     }
 
     protected async visitCase(aCase: J.Case, p: P): Promise<J | undefined> {
@@ -286,17 +297,19 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         aCase = statement as J.Case;
 
-        const updates: any = {
-            prefix: await this.visitSpace(aCase.prefix, p),
-            markers: await this.visitMarkers(aCase.markers, p),
-            caseLabels: await this.visitContainer(aCase.caseLabels, p),
-            statements: await this.visitContainer(aCase.statements, p),
-            body: await this.visitOptionalRightPadded(aCase.body, p)
-        };
-        if (aCase.guard) {
-            updates.guard = await this.visitDefined(aCase.guard, p) as Expression;
-        }
-        return updateIfChanged(aCase, updates);
+        return this.visitChildrenOf(aCase, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(aCase.prefix, p),
+                markers: await this.visitMarkers(aCase.markers, p),
+                caseLabels: await this.visitContainer(aCase.caseLabels, p),
+                statements: await this.visitContainer(aCase.statements, p),
+                body: await this.visitOptionalRightPadded(aCase.body, p)
+            };
+            if (aCase.guard) {
+                updates.guard = await this.visitDefined(aCase.guard, p) as Expression;
+            }
+            return updateIfChanged(aCase, updates);
+        });
     }
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J | undefined> {
@@ -306,7 +319,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         classDecl = statement as J.ClassDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(classDecl, async () => ({
             prefix: await this.visitSpace(classDecl.prefix, p),
             markers: await this.visitMarkers(classDecl.markers, p),
             leadingAnnotations: await mapAsync(classDecl.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
@@ -320,7 +333,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             permitting: await this.visitOptionalContainer(classDecl.permitting, p),
             body: await this.visitDefined(classDecl.body, p) as J.Block,
             type: await this.visitType(classDecl.type, p) as Type.Class | undefined
-        };
+        }));
         return updateIfChanged(classDecl, updates);
     }
 
@@ -352,14 +365,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         continueStatement = statement as J.Continue;
 
-        const updates: any = {
-            prefix: await this.visitSpace(continueStatement.prefix, p),
-            markers: await this.visitMarkers(continueStatement.markers, p)
-        };
-        if (continueStatement.label) {
-            updates.label = await this.visitDefined(continueStatement.label, p) as J.Identifier;
-        }
-        return updateIfChanged(continueStatement, updates);
+        return this.visitChildrenOf(continueStatement, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(continueStatement.prefix, p),
+                markers: await this.visitMarkers(continueStatement.markers, p)
+            };
+            if (continueStatement.label) {
+                updates.label = await this.visitDefined(continueStatement.label, p) as J.Identifier;
+            }
+            return updateIfChanged(continueStatement, updates);
+        });
     }
 
     protected async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, p: P): Promise<J | undefined> {
@@ -369,11 +384,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         controlParens = expression as J.ControlParentheses<T>;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(controlParens, async () => ({
             prefix: await this.visitSpace(controlParens.prefix, p),
             markers: await this.visitMarkers(controlParens.markers, p),
             tree: await this.visitRightPadded(controlParens.tree, p)
-        };
+        }));
         return updateIfChanged(controlParens, updates);
     }
 
@@ -395,12 +410,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         doWhileLoop = statement as J.DoWhileLoop;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(doWhileLoop, async () => ({
             prefix: await this.visitSpace(doWhileLoop.prefix, p),
             markers: await this.visitMarkers(doWhileLoop.markers, p),
             body: await this.visitRightPadded(doWhileLoop.body, p),
             whileCondition: await this.visitLeftPadded(doWhileLoop.whileCondition, p)
-        };
+        }));
         return updateIfChanged(doWhileLoop, updates);
     }
 
@@ -444,11 +459,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         enumValueSet = statement as J.EnumValueSet;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(enumValueSet, async () => ({
             prefix: await this.visitSpace(enumValueSet.prefix, p),
             markers: await this.visitMarkers(enumValueSet.markers, p),
             enums: await mapAsync(enumValueSet.enums, e => this.visitRightPadded(e, p))
-        };
+        }));
         return updateIfChanged(enumValueSet, updates);
     }
 
@@ -485,13 +500,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         fieldAccess = statement as J.FieldAccess;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(fieldAccess, async () => ({
             prefix: await this.visitSpace(fieldAccess.prefix, p),
             markers: await this.visitMarkers(fieldAccess.markers, p),
             target: await this.visitDefined(fieldAccess.target, p) as Expression,
             name: await this.visitLeftPadded(fieldAccess.name, p),
             type: await this.visitType(fieldAccess.type, p)
-        };
+        }));
         return updateIfChanged(fieldAccess, updates);
     }
 
@@ -502,12 +517,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         forLoop = statement as J.ForEachLoop;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(forLoop, async () => ({
             prefix: await this.visitSpace(forLoop.prefix, p),
             markers: await this.visitMarkers(forLoop.markers, p),
             control: await this.visitDefined(forLoop.control, p) as J.ForEachLoop.Control,
             body: await this.visitRightPadded(forLoop.body, p)
-        };
+        }));
         return updateIfChanged(forLoop, updates);
     }
 
@@ -528,12 +543,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         forLoop = statement as J.ForLoop;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(forLoop, async () => ({
             prefix: await this.visitSpace(forLoop.prefix, p),
             markers: await this.visitMarkers(forLoop.markers, p),
             control: await this.visitDefined(forLoop.control, p) as J.ForLoop.Control,
             body: await this.visitRightPadded(forLoop.body, p)
-        };
+        }));
         return updateIfChanged(forLoop, updates);
     }
 
@@ -572,16 +587,18 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         iff = statement as J.If;
 
-        const updates: any = {
-            prefix: await this.visitSpace(iff.prefix, p),
-            markers: await this.visitMarkers(iff.markers, p),
-            ifCondition: await this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>,
-            thenPart: await this.visitRightPadded(iff.thenPart, p)
-        };
-        if (iff.elsePart) {
-            updates.elsePart = await this.visitDefined(iff.elsePart, p) as J.If.Else;
-        }
-        return updateIfChanged(iff, updates);
+        return this.visitChildrenOf(iff, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(iff.prefix, p),
+                markers: await this.visitMarkers(iff.markers, p),
+                ifCondition: await this.visitDefined(iff.ifCondition, p) as J.ControlParentheses<Expression>,
+                thenPart: await this.visitRightPadded(iff.thenPart, p)
+            };
+            if (iff.elsePart) {
+                updates.elsePart = await this.visitDefined(iff.elsePart, p) as J.If.Else;
+            }
+            return updateIfChanged(iff, updates);
+        });
     }
 
     protected async visitElse(anElse: J.If.Else, p: P): Promise<J | undefined> {
@@ -611,20 +628,22 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         instanceOf = expression as J.InstanceOf;
 
-        const updates: any = {
-            prefix: await this.visitSpace(instanceOf.prefix, p),
-            markers: await this.visitMarkers(instanceOf.markers, p),
-            expression: await this.visitRightPadded(instanceOf.expression, p),
-            class: await this.visitDefined(instanceOf.class, p) as J,
-            type: await this.visitType(instanceOf.type, p)
-        };
-        if (instanceOf.pattern) {
-            updates.pattern = await this.visitDefined(instanceOf.pattern, p) as J;
-        }
-        if (instanceOf.modifier) {
-            updates.modifier = await this.visitDefined(instanceOf.modifier, p) as J.Modifier;
-        }
-        return updateIfChanged(instanceOf, updates);
+        return this.visitChildrenOf(instanceOf, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(instanceOf.prefix, p),
+                markers: await this.visitMarkers(instanceOf.markers, p),
+                expression: await this.visitRightPadded(instanceOf.expression, p),
+                class: await this.visitDefined(instanceOf.class, p) as J,
+                type: await this.visitType(instanceOf.type, p)
+            };
+            if (instanceOf.pattern) {
+                updates.pattern = await this.visitDefined(instanceOf.pattern, p) as J;
+            }
+            if (instanceOf.modifier) {
+                updates.modifier = await this.visitDefined(instanceOf.modifier, p) as J.Modifier;
+            }
+            return updateIfChanged(instanceOf, updates);
+        });
     }
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, p: P): Promise<J | undefined> {
@@ -634,11 +653,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         intersectionType = expression as J.IntersectionType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(intersectionType, async () => ({
             prefix: await this.visitSpace(intersectionType.prefix, p),
             markers: await this.visitMarkers(intersectionType.markers, p),
             bounds: await this.visitContainer(intersectionType.bounds, p)
-        };
+        }));
         return updateIfChanged(intersectionType, updates);
     }
 
@@ -649,12 +668,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         label = statement as J.Label;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(label, async () => ({
             prefix: await this.visitSpace(label.prefix, p),
             markers: await this.visitMarkers(label.markers, p),
             label: await this.visitRightPadded(label.label, p),
             statement: await this.visitDefined(label.statement, p) as Statement
-        };
+        }));
         return updateIfChanged(label, updates);
     }
 
@@ -671,14 +690,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         lambda = statement as J.Lambda;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(lambda, async () => ({
             prefix: await this.visitSpace(lambda.prefix, p),
             markers: await this.visitMarkers(lambda.markers, p),
             parameters: await this.visitDefined(lambda.parameters, p) as J.Lambda.Parameters,
             arrow: await this.visitSpace(lambda.arrow, p),
             body: await this.visitDefined(lambda.body, p) as Statement | Expression,
             type: await this.visitType(lambda.type, p)
-        };
+        }));
         return updateIfChanged(lambda, updates);
     }
 
@@ -713,7 +732,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         memberRef = expression as J.MemberReference;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(memberRef, async () => ({
             prefix: await this.visitSpace(memberRef.prefix, p),
             markers: await this.visitMarkers(memberRef.markers, p),
             containing: await this.visitRightPadded(memberRef.containing, p),
@@ -722,7 +741,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             type: await this.visitType(memberRef.type, p),
             methodType: await this.visitType(memberRef.methodType, p) as Type.Method | undefined,
             variableType: await this.visitType(memberRef.variableType, p) as Type.Variable | undefined
-        };
+        }));
         return updateIfChanged(memberRef, updates);
     }
 
@@ -733,27 +752,29 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         method = statement as J.MethodDeclaration;
 
-        const updates: any = {
-            prefix: await this.visitSpace(method.prefix, p),
-            markers: await this.visitMarkers(method.markers, p),
-            leadingAnnotations: await mapAsync(method.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
-            modifiers: await mapAsync(method.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
-            nameAnnotations: await mapAsync(method.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
-            name: await this.visitDefined(method.name, p),
-            parameters: await this.visitContainer(method.parameters, p),
-            dimensionsAfterName: await mapAsync(method.dimensionsAfterName ?? [], dim => this.visitLeftPadded(dim, p)),
-            throws: method.throws && await this.visitContainer(method.throws, p),
-            body: method.body && await this.visitDefined(method.body, p) as J.Block,
-            defaultValue: await this.visitOptionalLeftPadded(method.defaultValue, p),
-            methodType: await this.visitType(method.methodType, p) as Type.Method | undefined
-        };
-        if (method.typeParameters) {
-            updates.typeParameters = await this.visitDefined(method.typeParameters, p) as J.TypeParameters;
-        }
-        if (method.returnTypeExpression) {
-            updates.returnTypeExpression = await this.visitDefined(method.returnTypeExpression, p) as TypedTree;
-        }
-        return updateIfChanged(method, updates);
+        return this.visitChildrenOf(method, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(method.prefix, p),
+                markers: await this.visitMarkers(method.markers, p),
+                leadingAnnotations: await mapAsync(method.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+                modifiers: await mapAsync(method.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+                nameAnnotations: await mapAsync(method.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+                name: await this.visitDefined(method.name, p),
+                parameters: await this.visitContainer(method.parameters, p),
+                dimensionsAfterName: await mapAsync(method.dimensionsAfterName ?? [], dim => this.visitLeftPadded(dim, p)),
+                throws: method.throws && await this.visitContainer(method.throws, p),
+                body: method.body && await this.visitDefined(method.body, p) as J.Block,
+                defaultValue: await this.visitOptionalLeftPadded(method.defaultValue, p),
+                methodType: await this.visitType(method.methodType, p) as Type.Method | undefined
+            };
+            if (method.typeParameters) {
+                updates.typeParameters = await this.visitDefined(method.typeParameters, p) as J.TypeParameters;
+            }
+            if (method.returnTypeExpression) {
+                updates.returnTypeExpression = await this.visitDefined(method.returnTypeExpression, p) as TypedTree;
+            }
+            return updateIfChanged(method, updates);
+        });
     }
 
     protected async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
@@ -769,7 +790,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         method = statement as J.MethodInvocation;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(method, async () => ({
             prefix: await this.visitSpace(method.prefix, p),
             markers: await this.visitMarkers(method.markers, p),
             select: await this.visitOptionalRightPadded(method.select, p),
@@ -777,7 +798,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             name: await this.visitDefined(method.name, p) as J.Identifier,
             arguments: await this.visitContainer(method.arguments, p),
             methodType: await this.visitType(method.methodType, p) as Type.Method | undefined
-        };
+        }));
         return updateIfChanged(method, updates);
     }
 
@@ -806,17 +827,19 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         newArray = expression as J.NewArray;
 
-        const updates: any = {
-            prefix: await this.visitSpace(newArray.prefix, p),
-            markers: await this.visitMarkers(newArray.markers, p),
-            dimensions: await mapAsync(newArray.dimensions, dim => this.visitDefined<J.ArrayDimension>(dim, p)),
-            initializer: await this.visitOptionalContainer(newArray.initializer, p),
-            type: await this.visitType(newArray.type, p)
-        };
-        if (newArray.typeExpression) {
-            updates.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypedTree;
-        }
-        return updateIfChanged(newArray, updates);
+        return this.visitChildrenOf(newArray, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(newArray.prefix, p),
+                markers: await this.visitMarkers(newArray.markers, p),
+                dimensions: await mapAsync(newArray.dimensions, dim => this.visitDefined<J.ArrayDimension>(dim, p)),
+                initializer: await this.visitOptionalContainer(newArray.initializer, p),
+                type: await this.visitType(newArray.type, p)
+            };
+            if (newArray.typeExpression) {
+                updates.typeExpression = await this.visitDefined(newArray.typeExpression, p) as TypedTree;
+            }
+            return updateIfChanged(newArray, updates);
+        });
     }
 
     protected async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
@@ -832,23 +855,25 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         newClass = statement as J.NewClass;
 
-        const updates: any = {
-            prefix: await this.visitSpace(newClass.prefix, p),
-            markers: await this.visitMarkers(newClass.markers, p),
-            new: await this.visitSpace(newClass.new, p),
-            arguments: await this.visitContainer(newClass.arguments, p),
-            constructorType: await this.visitType(newClass.constructorType, p) as Type.Method | undefined
-        };
-        if (newClass.enclosing) {
-            updates.enclosing = await this.visitRightPadded(newClass.enclosing, p);
-        }
-        if (newClass.class) {
-            updates.class = await this.visitDefined(newClass.class, p) as TypedTree;
-        }
-        if (newClass.body) {
-            updates.body = await this.visitDefined(newClass.body, p) as J.Block;
-        }
-        return updateIfChanged(newClass, updates);
+        return this.visitChildrenOf(newClass, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(newClass.prefix, p),
+                markers: await this.visitMarkers(newClass.markers, p),
+                new: await this.visitSpace(newClass.new, p),
+                arguments: await this.visitContainer(newClass.arguments, p),
+                constructorType: await this.visitType(newClass.constructorType, p) as Type.Method | undefined
+            };
+            if (newClass.enclosing) {
+                updates.enclosing = await this.visitRightPadded(newClass.enclosing, p);
+            }
+            if (newClass.class) {
+                updates.class = await this.visitDefined(newClass.class, p) as TypedTree;
+            }
+            if (newClass.body) {
+                updates.body = await this.visitDefined(newClass.body, p) as J.Block;
+            }
+            return updateIfChanged(newClass, updates);
+        });
     }
 
     protected async visitNullableType(nullableType: J.NullableType, p: P): Promise<J | undefined> {
@@ -858,12 +883,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         nullableType = expression as J.NullableType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(nullableType, async () => ({
             prefix: await this.visitSpace(nullableType.prefix, p),
             markers: await this.visitMarkers(nullableType.markers, p),
             annotations: await mapAsync(nullableType.annotations, a => this.visitDefined<J.Annotation>(a, p)),
             typeTree: await this.visitRightPadded(nullableType.typeTree, p)
-        };
+        }));
         return updateIfChanged(nullableType, updates);
     }
 
@@ -886,13 +911,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         parameterizedType = expression as J.ParameterizedType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(parameterizedType, async () => ({
             prefix: await this.visitSpace(parameterizedType.prefix, p),
             markers: await this.visitMarkers(parameterizedType.markers, p),
             class: await this.visitTypeName(parameterizedType.class, p),
             typeParameters: await this.visitOptionalContainer(parameterizedType.typeParameters, p),
             type: await this.visitType(parameterizedType.type, p)
-        };
+        }));
         return updateIfChanged(parameterizedType, updates);
     }
 
@@ -903,11 +928,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         parentheses = expression as J.Parentheses<T>;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(parentheses, async () => ({
             prefix: await this.visitSpace(parentheses.prefix, p),
             markers: await this.visitMarkers(parentheses.markers, p),
             tree: await this.visitRightPadded(parentheses.tree, p)
-        };
+        }));
         return updateIfChanged(parentheses, updates);
     }
 
@@ -918,12 +943,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         parTypeTree = expression as J.ParenthesizedTypeTree;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(parTypeTree, async () => ({
             prefix: await this.visitSpace(parTypeTree.prefix, p),
             markers: await this.visitMarkers(parTypeTree.markers, p),
             annotations: await mapAsync(parTypeTree.annotations, a => this.visitDefined<J.Annotation>(a, p)),
             parenthesizedType: await this.visitDefined(parTypeTree.parenthesizedType, p) as J.Parentheses<TypeTree>
-        };
+        }));
         return updateIfChanged(parTypeTree, updates);
     }
 
@@ -949,14 +974,16 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         ret = statement as J.Return;
 
-        const updates: any = {
-            prefix: await this.visitSpace(ret.prefix, p),
-            markers: await this.visitMarkers(ret.markers, p)
-        };
-        if (ret.expression) {
-            updates.expression = await this.visitDefined(ret.expression, p) as Expression;
-        }
-        return updateIfChanged(ret, updates);
+        return this.visitChildrenOf(ret, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(ret.prefix, p),
+                markers: await this.visitMarkers(ret.markers, p)
+            };
+            if (ret.expression) {
+                updates.expression = await this.visitDefined(ret.expression, p) as Expression;
+            }
+            return updateIfChanged(ret, updates);
+        });
     }
 
     protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
@@ -966,12 +993,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         aSwitch = statement as J.Switch;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(aSwitch, async () => ({
             prefix: await this.visitSpace(aSwitch.prefix, p),
             markers: await this.visitMarkers(aSwitch.markers, p),
             selector: await this.visitDefined(aSwitch.selector, p) as J.ControlParentheses<Expression>,
             cases: await this.visitDefined(aSwitch.cases, p) as J.Block
-        };
+        }));
         return updateIfChanged(aSwitch, updates);
     }
 
@@ -982,13 +1009,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         switchExpr = expression as J.SwitchExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(switchExpr, async () => ({
             prefix: await this.visitSpace(switchExpr.prefix, p),
             markers: await this.visitMarkers(switchExpr.markers, p),
             selector: await this.visitDefined(switchExpr.selector, p) as J.ControlParentheses<Expression>,
             cases: await this.visitDefined(switchExpr.cases, p) as J.Block,
             type: await this.visitType(switchExpr.type, p)
-        };
+        }));
         return updateIfChanged(switchExpr, updates);
     }
 
@@ -999,12 +1026,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         sync = statement as J.Synchronized;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(sync, async () => ({
             prefix: await this.visitSpace(sync.prefix, p),
             markers: await this.visitMarkers(sync.markers, p),
             lock: await this.visitDefined(sync.lock, p) as J.ControlParentheses<Expression>,
             body: await this.visitDefined(sync.body, p) as J.Block
-        };
+        }));
         return updateIfChanged(sync, updates);
     }
 
@@ -1021,14 +1048,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         ternary = statement as J.Ternary;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(ternary, async () => ({
             prefix: await this.visitSpace(ternary.prefix, p),
             markers: await this.visitMarkers(ternary.markers, p),
             condition: await this.visitDefined(ternary.condition, p) as Expression,
             truePart: await this.visitLeftPadded(ternary.truePart, p),
             falsePart: await this.visitLeftPadded(ternary.falsePart, p),
             type: await this.visitType(ternary.type, p)
-        };
+        }));
         return updateIfChanged(ternary, updates);
     }
 
@@ -1039,11 +1066,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         thrown = statement as J.Throw;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(thrown, async () => ({
             prefix: await this.visitSpace(thrown.prefix, p),
             markers: await this.visitMarkers(thrown.markers, p),
             exception: await this.visitDefined(thrown.exception, p) as Expression
-        };
+        }));
         return updateIfChanged(thrown, updates);
     }
 
@@ -1054,14 +1081,14 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         tryable = statement as J.Try;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(tryable, async () => ({
             prefix: await this.visitSpace(tryable.prefix, p),
             markers: await this.visitMarkers(tryable.markers, p),
             resources: await this.visitOptionalContainer(tryable.resources, p),
             body: await this.visitDefined(tryable.body, p) as J.Block,
             catches: await mapAsync(tryable.catches, c => this.visitDefined<J.Try.Catch>(c, p)),
             finally: await this.visitOptionalLeftPadded(tryable.finally, p)
-        };
+        }));
         return updateIfChanged(tryable, updates);
     }
 
@@ -1091,12 +1118,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         typeCast = expression as J.TypeCast;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeCast, async () => ({
             prefix: await this.visitSpace(typeCast.prefix, p),
             markers: await this.visitMarkers(typeCast.markers, p),
             class: await this.visitDefined(typeCast.class, p) as J.ControlParentheses<TypedTree>,
             expression: await this.visitDefined(typeCast.expression, p) as Expression
-        };
+        }));
         return updateIfChanged(typeCast, updates);
     }
 
@@ -1135,13 +1162,13 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         unary = statement as J.Unary;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(unary, async () => ({
             prefix: await this.visitSpace(unary.prefix, p),
             markers: await this.visitMarkers(unary.markers, p),
             operator: await this.visitLeftPadded(unary.operator, p),
             expression: await this.visitDefined(unary.expression, p) as Expression,
             type: await this.visitType(unary.type, p)
-        };
+        }));
         return updateIfChanged(unary, updates);
     }
 
@@ -1158,11 +1185,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         unknown = statement as J.Unknown;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(unknown, async () => ({
             prefix: await this.visitSpace(unknown.prefix, p),
             markers: await this.visitMarkers(unknown.markers, p),
             source: await this.visitDefined(unknown.source, p) as J.UnknownSource
-        };
+        }));
         return updateIfChanged(unknown, updates);
     }
 
@@ -1181,20 +1208,22 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         varDecls = statement as J.VariableDeclarations;
 
-        const updates: any = {
-            prefix: await this.visitSpace(varDecls.prefix, p),
-            markers: await this.visitMarkers(varDecls.markers, p),
-            leadingAnnotations: await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
-            modifiers: await mapAsync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
-            variables: await mapAsync(varDecls.variables, v => this.visitRightPadded(v, p))
-        };
-        if (varDecls.typeExpression) {
-            updates.typeExpression = await this.visitDefined(varDecls.typeExpression, p) as TypedTree;
-        }
-        if (varDecls.varargs) {
-            updates.varargs = await this.visitSpace(varDecls.varargs, p);
-        }
-        return updateIfChanged(varDecls, updates);
+        return this.visitChildrenOf(varDecls, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(varDecls.prefix, p),
+                markers: await this.visitMarkers(varDecls.markers, p),
+                leadingAnnotations: await mapAsync(varDecls.leadingAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
+                modifiers: await mapAsync(varDecls.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
+                variables: await mapAsync(varDecls.variables, v => this.visitRightPadded(v, p))
+            };
+            if (varDecls.typeExpression) {
+                updates.typeExpression = await this.visitDefined(varDecls.typeExpression, p) as TypedTree;
+            }
+            if (varDecls.varargs) {
+                updates.varargs = await this.visitSpace(varDecls.varargs, p);
+            }
+            return updateIfChanged(varDecls, updates);
+        });
     }
 
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
@@ -1216,12 +1245,12 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         whileLoop = statement as J.WhileLoop;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(whileLoop, async () => ({
             prefix: await this.visitSpace(whileLoop.prefix, p),
             markers: await this.visitMarkers(whileLoop.markers, p),
             condition: await this.visitDefined(whileLoop.condition, p) as J.ControlParentheses<Expression>,
             body: await this.visitRightPadded(whileLoop.body, p)
-        };
+        }));
         return updateIfChanged(whileLoop, updates);
     }
 
@@ -1232,15 +1261,17 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         wildcard = expression as J.Wildcard;
 
-        const updates: any = {
-            prefix: await this.visitSpace(wildcard.prefix, p),
-            markers: await this.visitMarkers(wildcard.markers, p),
-            bound: await this.visitOptionalLeftPadded(wildcard.bound, p)
-        };
-        if (wildcard.boundedType) {
-            updates.boundedType = await this.visitTypeName(wildcard.boundedType, p);
-        }
-        return updateIfChanged(wildcard, updates);
+        return this.visitChildrenOf(wildcard, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(wildcard.prefix, p),
+                markers: await this.visitMarkers(wildcard.markers, p),
+                bound: await this.visitOptionalLeftPadded(wildcard.bound, p)
+            };
+            if (wildcard.boundedType) {
+                updates.boundedType = await this.visitTypeName(wildcard.boundedType, p);
+            }
+            return updateIfChanged(wildcard, updates);
+        });
     }
 
     protected async visitYield(aYield: J.Yield, p: P): Promise<J | undefined> {
@@ -1250,15 +1281,17 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         aYield = statement as J.Yield;
 
-        const updates: any = {
-            prefix: await this.visitSpace(aYield.prefix, p),
-            markers: await this.visitMarkers(aYield.markers, p)
-        };
-        // a bare `yield` has no value
-        if (aYield.value) {
-            updates.value = await this.visitDefined(aYield.value, p) as Expression;
-        }
-        return updateIfChanged(aYield, updates);
+        return this.visitChildrenOf(aYield, async () => {
+            const updates: any = {
+                prefix: await this.visitSpace(aYield.prefix, p),
+                markers: await this.visitMarkers(aYield.markers, p)
+            };
+            // a bare `yield` has no value
+            if (aYield.value) {
+                updates.value = await this.visitDefined(aYield.value, p) as Expression;
+            }
+            return updateIfChanged(aYield, updates);
+        });
     }
 
     protected async visitOptionalRightPadded<T extends J | boolean>(right: J.RightPadded<T> | undefined, p: P): Promise<J.RightPadded<T> | undefined> {

@@ -94,6 +94,53 @@ describe('visitor', () => {
         expect(parents.map(parent => parent.id)).toEqual([replacement!.id, replacement!.id]);
     });
 
+    test('visit the children of any tree visitExpression or visitStatement returns under it', async () => {
+        // given
+        const cu = await new JavaScriptParser().parseOne({
+            text: 'const x = !a ? b === c : -d;\nif (y) {\n    z(1);\n} else {\n    w = await v;\n}',
+            sourcePath: 'children.ts'
+        });
+        const given = new Set<J>();
+        const returned = new Set<J>();
+        const misplaced: string[] = [];
+        const CustomVisitor = class extends JavaScriptVisitor<undefined> {
+            protected async visitExpression(expression: Expression): Promise<J | undefined> {
+                given.add(expression);
+                const copy = {...expression, id: randomId()};
+                returned.add(copy);
+                return copy;
+            }
+
+            protected async visitStatement(statement: Statement): Promise<J | undefined> {
+                given.add(statement);
+                const copy = {...statement, id: randomId()};
+                returned.add(copy);
+                return copy;
+            }
+
+            protected async preVisit(tree: J): Promise<J | undefined> {
+                const parent = this.cursor.parentTree()?.value;
+                if (given.has(parent)) {
+                    misplaced.push(`${tree.kind} visited under the ${parent.kind} given`);
+                }
+                return tree;
+            }
+
+            protected async postVisit(tree: J): Promise<J | undefined> {
+                if (returned.has(this.cursor.value)) {
+                    misplaced.push(`${tree.kind} left the cursor on the tree returned`);
+                }
+                return tree;
+            }
+        }
+
+        // when
+        await new CustomVisitor().visit(cu, undefined);
+
+        // test
+        expect(misplaced).toEqual([]);
+    });
+
     test('restore the cursor of the given binary once the operands are visited', async () => {
         // given
         const cu = await new JavaScriptParser().parseOne({text: 'const x = 3 + 4;', sourcePath: 'binary.ts'});

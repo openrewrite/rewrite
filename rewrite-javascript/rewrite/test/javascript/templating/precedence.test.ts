@@ -614,6 +614,37 @@ describe('template precedence', () => {
                 `const a = z - (y + x);`));
         });
 
+        test('when the result replaces an operand that visitExpression moved', () => {
+            const comparison = capture<J>({constraint: node => node.kind === J.Kind.Binary});
+            const l = capture(), r = capture();
+            const rule = rewrite(() => ({before: pattern`${comparison} === ${r}`, after: template`${r} === ${comparison}`}))
+                .orElse(rewrite(() => ({before: pattern`${l} < ${r}`, after: template`${l} === ${r}`})));
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, expression) || expression;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = p < q === s;`,
+                `const a = s === (p === q);`));
+        });
+
+        test('when the result replaces a part of a ternary that visitExpression moved', () => {
+            const c = capture(), t = capture(), f = capture();
+            const rule = rewrite(() => ({before: pattern`!${c} ? ${t} : ${f}`, after: template`${c} ? ${f} : ${t}`}))
+                .orElse(rewrite(() => ({before: pattern`b`, after: template`x ? y : z`})));
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, expression) || expression;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const v = !b ? a : c;`,
+                `const v = (x ? y : z) ? c : a;`));
+        });
+
         test('the parentheses the source already had are kept', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
