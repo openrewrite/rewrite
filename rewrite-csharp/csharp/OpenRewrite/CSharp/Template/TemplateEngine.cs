@@ -863,6 +863,23 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         return base.VisitIdentifier(identifier, p);
     }
 
+    public override J VisitInstanceOf(InstanceOf instanceOf, int p)
+    {
+        var clazzIsPlaceholder = instanceOf.Clazz is Identifier clazzId &&
+                                 Placeholder.FromPlaceholder(clazzId.SimpleName) != null;
+        var result = base.VisitInstanceOf(instanceOf, p);
+
+        // The parser reads `x is <name>` as a type test and `x is "abc"` as a constant pattern
+        if (clazzIsPlaceholder && result is InstanceOf { Pattern: null, Clazz: Expression value and not TypeTree } io)
+        {
+            return new IsPattern(io.Id, io.Prefix, io.Markers, io.Expression.Element,
+                new JLeftPadded<Expression>(io.Expression.After,
+                    new ConstantPattern(Tree.RandomId(), value.Prefix, Markers.Empty,
+                        J.SetPrefix(value, Space.Empty))));
+        }
+        return result;
+    }
+
     public override J VisitAnnotation(Annotation annotation, int p)
     {
         annotation = (Annotation)base.VisitAnnotation(annotation, p);

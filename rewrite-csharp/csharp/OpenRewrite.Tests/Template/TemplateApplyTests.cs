@@ -240,6 +240,36 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// The parser reads <c>x is Foo</c> as a type test and <c>x is "abc"</c> as a constant pattern,
+    /// so a capture after <c>is</c> builds whichever the printed text parses to.
+    /// </summary>
+    [Theory]
+    [InlineData("\"abc\"")]
+    [InlineData("-1")]
+    [InlineData("null")]
+    [InlineData("(1)")]
+    [InlineData("Foo")]
+    [InlineData("Foo.Bar")]
+    public void CaptureAfterIsMatchesFreshParse(string captured)
+    {
+        var expr = Capture.Expression("expr");
+        var value = Capture.Expression("value");
+        var tmpl = CSharpTemplate.Expression($"{expr} is {value}");
+        var values = new MatchResult(
+            new Dictionary<string, object>
+            {
+                ["expr"] = ParseExpression("x"),
+                ["value"] = ParseExpression(captured),
+            }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal($"x is {captured}", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {
