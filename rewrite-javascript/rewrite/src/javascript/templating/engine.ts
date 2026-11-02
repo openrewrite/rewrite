@@ -926,39 +926,25 @@ export class TemplateApplier {
         if (slotMarkers) {
             resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
         }
-        const slot = this.replacedSlot(originalTree);
+        const slot = this.replacedSlot(originalTree, parentTree);
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
             {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
         return this.format(resultToUse, originalTree);
     }
 
-    /** The node holding the tree being replaced and the id it holds it under, per the cursor. */
-    private replacedSlot(originalTree: J): [J, string] | undefined {
-        const frames: J[] = [];
-        for (let c: Cursor | undefined = this.cursor; c && frames.length < 2; c = c.parent) {
-            if (isTree(c.value)) {
-                frames.push(c.value as J);
-            }
-        }
-        if (frames.length === 0) {
+    /** The node holding the tree being replaced and the id it holds it under. */
+    private replacedSlot(originalTree: J, parentTree: J | undefined): [J, string] | undefined {
+        if (parentTree === undefined) {
             return undefined;
-        }
-
-        // The visitor may sit on the node holding what is being replaced rather than on it
-        if (requiredPrecedence(frames[0], originalTree.id) !== undefined) {
-            return [frames[0], originalTree.id];
-        }
-        if (frames.length < 2) {
-            return undefined;
-        }
-        if (requiredPrecedence(frames[1], originalTree.id) !== undefined) {
-            return [frames[1], originalTree.id];
+        } else if (requiredPrecedence(parentTree, originalTree.id) !== undefined) {
+            return [parentTree, originalTree.id];
         }
         // A chained rule rewrites the previous rule's detached result, leaving the cursor on the node
         // that result stands in for; a wrong guess here only ever adds parentheses, never drops them
-        return frames[0].id !== originalTree.id && requiredPrecedence(frames[1], frames[0].id) !== undefined ?
-            [frames[1], frames[0].id] : undefined;
+        const standIn = this.cursor?.value;
+        return isTree(standIn) && standIn.id !== originalTree.id &&
+            requiredPrecedence(parentTree, standIn.id) !== undefined ? [parentTree, standIn.id] : undefined;
     }
 
     private async format(resultToUse: J, originalTree: J) {
