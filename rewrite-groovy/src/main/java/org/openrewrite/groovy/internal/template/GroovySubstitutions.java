@@ -38,10 +38,12 @@ public class GroovySubstitutions extends Substitutions {
     public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
         Object parent = cursor.getParentTreeCursor().getValue();
         if (parent instanceof J.TypeCast) {
-            boolean asCast = ((J.TypeCast) parent).getMarkers().findFirst(AsStyleTypeCast.class).isPresent();
-            if (newTree instanceof J.Unary || asCast && bindsAsTightlyAsAs(newTree)) {
+            if (isAsCast((J.TypeCast) parent) ? bindsAsTightlyAsAs(newTree) :
+                    newTree instanceof J.Unary && !hasPowerOperand((J.Unary) newTree)) {
                 return newTree;
-            } else if (newTree instanceof G.Binary && ((G.Binary) newTree).getOperator() != G.Binary.Type.Access) {
+            } else if (newTree instanceof G.Binary && ((G.Binary) newTree).getOperator() != G.Binary.Type.Access ||
+                       newTree instanceof G.Range || newTree instanceof J.Unary ||
+                       newTree instanceof J.TypeCast && isAsCast((J.TypeCast) newTree)) {
                 return new J.Parentheses<>(randomId(), newTree.getPrefix(), Markers.EMPTY,
                         JRightPadded.build(newTree.withPrefix(Space.EMPTY)));
             }
@@ -49,8 +51,21 @@ public class GroovySubstitutions extends Substitutions {
         return super.maybeParenthesize(newTree, cursor);
     }
 
+    private static boolean isAsCast(J.TypeCast typeCast) {
+        return typeCast.getMarkers().findFirst(AsStyleTypeCast.class).isPresent();
+    }
+
+    // `-a ** b` is `-(a ** b)`, so `(T) -a ** b` would cast `-a` alone
+    private static boolean hasPowerOperand(J.Unary unary) {
+        Expression operand = unary.getExpression();
+        return operand instanceof J.Unary ? hasPowerOperand((J.Unary) operand) :
+                operand instanceof G.Binary && ((G.Binary) operand).getOperator() == G.Binary.Type.Power;
+    }
+
     private static boolean bindsAsTightlyAsAs(Expression e) {
-        if (e instanceof J.Binary) {
+        if (e instanceof J.Unary || e instanceof G.Range) {
+            return true;
+        } else if (e instanceof J.Binary) {
             switch (((J.Binary) e).getOperator()) {
                 case Multiplication:
                 case Division:

@@ -607,6 +607,45 @@ class GroovyTemplateTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizeOperandThatACastWouldCutShort() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "toInteger" -> "(Integer) #{any()}";
+                      case "toList" -> "(List) #{any()}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return GroovyTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+              }
+          })),
+          groovy(
+            """
+              def a = 1
+              def b = 2
+              def squared = toInteger(-a ** 2)
+              def coerced = toInteger(a as Integer)
+              def range = toList(a..b)
+              def negated = toInteger(-a)
+              """,
+            """
+              def a = 1
+              def b = 2
+              def squared = (Integer) (-a ** 2)
+              def coerced = (Integer) (a as Integer)
+              def range = (List) (a..b)
+              def negated = (Integer) -a
+              """
+          ));
+    }
+
+    @Test
     void replaceArgumentsOfExplicitConstructorInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
