@@ -58,12 +58,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -125,6 +125,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -163,6 +165,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -201,6 +205,8 @@ describe('RemoveImport visitor', () => {
                             //@formatter:off
                             `
                                 Array.isArray([]);
+
+                                export {};
                             `
                             //@formatter:on
                         ),
@@ -233,12 +239,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -274,12 +280,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -318,12 +324,12 @@ describe('RemoveImport visitor', () => {
                             `
                                 import React from 'react';
 
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `,
                             `
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `
@@ -433,10 +439,10 @@ describe('RemoveImport visitor', () => {
                     `
                         import React, {useState} from 'react';
 
-                        const x = 1;
+                        export const x = 1;
                     `,
                     `
-                        const x = 1;
+                        export const x = 1;
                     `
                 )
             );
@@ -475,12 +481,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import * as fs from 'fs';
 
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             console.log('test');
                         }
                     `
@@ -518,6 +524,41 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('should remove unused namespace import when removing a specific member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        export const x = 1;
+                    `,
+                    `
+                        export const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('should keep used namespace import when removing a specific member', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "SFC"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as React from 'react';
+
+                        const el: React.ReactNode = null;
+                    `
+                )
+            );
+        });
     });
 
     describe('type imports', () => {
@@ -531,12 +572,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import type {Stats} from 'fs';
 
-                        function example() {
+                        export function example() {
                             return null;
                         }
                     `,
                     `
-                        function example() {
+                        export function example() {
                             return null;
                         }
                     `
@@ -885,6 +926,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log("no util usage");
+
+                        export {};
                     `
                 )
             );
@@ -920,6 +963,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log("no util usage");
+
+                        export {};
                     `
                 )
             );
@@ -1127,7 +1172,7 @@ describe('RemoveImport visitor', () => {
                         import fs from 'fs';
 
                         // This comment belongs to the class below
-                        class MyClass {
+                        export class MyClass {
                             doSomething() {
                                 return 'test';
                             }
@@ -1135,7 +1180,7 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         // This comment belongs to the class below
-                        class MyClass {
+                        export class MyClass {
                             doSomething() {
                                 return 'test';
                             }
@@ -1159,7 +1204,7 @@ describe('RemoveImport visitor', () => {
                          * Documentation for the function
                          * @returns {string} A test value
                          */
-                        function example() {
+                        export function example() {
                             return 'test';
                         }
                     `,
@@ -1168,7 +1213,7 @@ describe('RemoveImport visitor', () => {
                          * Documentation for the function
                          * @returns {string} A test value
                          */
-                        function example() {
+                        export function example() {
                             return 'test';
                         }
                     `
@@ -1187,13 +1232,13 @@ describe('RemoveImport visitor', () => {
                         import fs from 'fs'; // This import is unused
 
                         // Main application code starts here
-                        function main() {
+                        export function main() {
                             console.log('application');
                         }
                     `,
                     `
                         // Main application code starts here
-                        function main() {
+                        export function main() {
                             console.log('application');
                         }
                     `
@@ -1249,6 +1294,8 @@ describe('RemoveImport visitor', () => {
                     `,
                     `
                         console.log('test');
+
+                        export {};
                     `
                 )
             );
@@ -1292,6 +1339,8 @@ describe('RemoveImport visitor', () => {
                     `
                         // File comment
                         console.log('test');
+
+                        export {};
                     `
                 )
             );
@@ -1307,11 +1356,11 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from "fs";
 
-                        const foo = 1;
+                        export const foo = 1;
                         console.log(foo);
                     `,
                     `
-                        const foo = 1;
+                        export const foo = 1;
                         console.log(foo);
                         `
                 )
@@ -1328,12 +1377,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from "fs";
 
-                        function foo() {
+                        export function foo() {
                             return 42;
                         }
                     `,
                     `
-                        function foo() {
+                        export function foo() {
                             return 42;
                         }
                     `
@@ -1399,7 +1448,7 @@ describe('RemoveImport visitor', () => {
                                     children: string;
                                 };
 
-                                function App({ children }: Props) {
+                                export function App({ children }: Props) {
                                     return <div>{children}</div>;
                                 }
                             `,
@@ -1408,7 +1457,7 @@ describe('RemoveImport visitor', () => {
                                     children: string;
                                 };
 
-                                function App({ children }: Props) {
+                                export function App({ children }: Props) {
                                     return <div>{children}</div>;
                                 }
                             `
@@ -1480,12 +1529,12 @@ describe('RemoveImport visitor', () => {
                             `
                                 import {vi} from 'vitest';
 
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `,
                             `
-                                function example() {
+                                export function example() {
                                     console.log('test');
                                 }
                             `
@@ -1776,13 +1825,13 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from 'fs';
 
-                        function f() {
+                        export function f() {
                             const readFile = 1;
                             return readFile;
                         }
                     `,
                     `
-                        function f() {
+                        export function f() {
                             const readFile = 1;
                             return readFile;
                         }
@@ -1796,12 +1845,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {readFile} from 'fs';
 
-                        function g(readFile: number) {
+                        export function g(readFile: number) {
                             return readFile;
                         }
                     `,
                     `
-                        function g(readFile: number) {
+                        export function g(readFile: number) {
                             return readFile;
                         }
                     `
@@ -1819,12 +1868,12 @@ describe('RemoveImport visitor', () => {
                     `
                         import {T} from 'm';
 
-                        function f<T>(x: T): T {
+                        export function f<T>(x: T): T {
                             return x;
                         }
                     `,
                     `
-                        function f<T>(x: T): T {
+                        export function f<T>(x: T): T {
                             return x;
                         }
                     `
@@ -1908,13 +1957,13 @@ describe('RemoveImport visitor', () => {
                     `
                         import {X} from 'm';
 
-                        namespace Outer {
+                        export namespace Outer {
                             namespace X { export const go = () => 1 }
                             X.go();
                         }
                     `,
                     `
-                        namespace Outer {
+                        export namespace Outer {
                             namespace X { export const go = () => 1 }
                             X.go();
                         }
@@ -1923,4 +1972,67 @@ describe('RemoveImport visitor', () => {
             );
         });
     });
+
+    describe('multiline import layout', () => {
+        test('should preserve trailing comma when removing the last specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "C"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {
+                            A,
+                            B,
+                            C,
+                        } from 'm';
+
+                        A();
+                        B();
+                    `,
+                    `
+                        import {
+                            A,
+                            B,
+                        } from 'm';
+
+                        A();
+                        B();
+                    `
+                )
+            );
+        });
+
+        test('should preserve layout when removing a middle specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "B"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {
+                            A,
+                            B,
+                            C,
+                        } from 'm';
+
+                        A();
+                        C();
+                    `,
+                    `
+                        import {
+                            A,
+                            C,
+                        } from 'm';
+
+                        A();
+                        C();
+                    `
+                )
+            );
+        });
+    });
+
 });

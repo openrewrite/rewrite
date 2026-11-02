@@ -5,6 +5,8 @@ import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
+import {randomId} from "../uuid";
+import {JavaScriptParser} from "./parser";
 
 // Type alias for RightPadded elements to simplify type signatures
 type RightPaddedElement<T extends J> = {
@@ -71,10 +73,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         // If the original last element was removed and we have remaining elements,
-        // transfer its trailing space to the new last element
+        // transfer its trailing layout (space and markers, which carry TrailingComma)
+        // to the new last element, so the closing brace keeps its position.
         if (filtered.length > 0 && originalLastElement?.element && !shouldKeep(originalLastElement.element)) {
             const lastIdx = filtered.length - 1;
-            filtered[lastIdx] = {...filtered[lastIdx], after: originalTrailingSpace};
+            filtered[lastIdx] = {...filtered[lastIdx], after: originalTrailingSpace, markers: originalLastElement.markers};
         }
 
         return {
@@ -182,9 +185,21 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 return stmt;
             });
 
-            draft.statements = newStatements.some(s => s === undefined)
+            const filtered = newStatements.some(s => s === undefined)
                 ? newStatements.filter(s => s !== undefined)
                 : newStatements;
+
+            if (isTypeScriptSource(compilationUnit.sourcePath) &&
+                hasModuleSyntax(compilationUnit.statements) && !hasModuleSyntax(filtered)) {
+                const marker = await parseModuleMarker();
+                draft.statements = [...filtered, {
+                    ...marker,
+                    element: {...marker.element, id: randomId(),
+                        prefix: {...marker.element.prefix, whitespace: filtered.length ? '\n\n' : ''}}
+                }];
+            } else {
+                draft.statements = filtered;
+            }
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
     }
@@ -266,13 +281,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = namedBindings as J.Identifier;
                 const name = identifier.simpleName;
 
-                // When removing a specific member from a namespace import,
-                // we can only remove the entire namespace if it's not used
+                // A member-scoped removal removes the whole namespace when it's unused
                 if (this.member !== undefined) {
-                    // We're trying to remove a specific member from this namespace
-                    // Check if the namespace itself is used
                     if (!usedNames.has(name)) {
-                        // Namespace is not used, remove the entire import
                         if (!importClause.name) {
                             return undefined;
                         }
@@ -280,7 +291,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                             draft.namedBindings = undefined;
                         }, p);
                     }
-                    // Namespace is used, we can't remove individual members from it
                 } else if (this.shouldRemoveImport(name, usedNames, name)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
@@ -296,13 +306,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const alias = namedBindings as JS.Alias;
                 const aliasName = (alias.alias as J.Identifier).simpleName;
 
-                // When removing a specific member from a namespace import,
-                // we can only remove the entire namespace if it's not used
+                // Same as above: member-scoped removal removes unused namespace
                 if (this.member !== undefined) {
-                    // We're trying to remove a specific member from this namespace
-                    // Check if the namespace itself is used
                     if (!usedNames.has(aliasName)) {
-                        // Namespace is not used, remove the entire import
                         if (!importClause.name) {
                             return undefined;
                         }
@@ -310,7 +316,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                             draft.namedBindings = undefined;
                         }, p);
                     }
-                    // Namespace is used, we can't remove individual members from it
                 } else if (this.shouldRemoveImport(aliasName, usedNames, aliasName)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
@@ -683,3 +688,25 @@ function isRequireCall(node: J): boolean {
     const name = (node as J.MethodInvocation).name;
     return name?.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === 'require';
 }
+
+function hasModuleSyntax(statements: J.RightPadded<J>[]): boolean {
+    return statements.some(({element: s}) =>
+        s.kind === JS.Kind.Import || s.kind === JS.Kind.ExportDeclaration || s.kind === JS.Kind.ExportAssignment ||
+        ((s as {modifiers?: J.Modifier[]}).modifiers ?? []).some(m => m.keyword === 'export'));
+}
+
+const TS_EXT = /\.(?:[cm]?ts|tsx)$/;
+function isTypeScriptSource(sourcePath: string): boolean {
+    return TS_EXT.test(sourcePath);
+}
+
+let moduleMarkerCache: J.RightPadded<J> | undefined;
+async function parseModuleMarker(): Promise<J.RightPadded<J>> {
+    if (moduleMarkerCache) return moduleMarkerCache;
+    const parser = new JavaScriptParser();
+    for await (const sf of parser.parse({text: 'export {};', sourcePath: 'module-marker.ts'})) {
+        moduleMarkerCache = (sf as JS.CompilationUnit).statements[0];
+    }
+    return moduleMarkerCache!;
+}
+
