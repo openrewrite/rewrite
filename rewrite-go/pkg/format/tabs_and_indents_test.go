@@ -24,6 +24,8 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func TestTabsAndIndentsVisitorSetsTheFilesDeclarationsAtTheMargin(t *testing.T) {
@@ -37,6 +39,28 @@ func TestTabsAndIndentsVisitorSetsTheFilesDeclarationsAtTheMargin(t *testing.T) 
 
 	// then
 	assert.Equal(t, "// Package p is a package.\npackage p\n\nimport \"fmt\"\n\nvar V = fmt.Sprint()\n\n// F does nothing.\nfunc F() {\n}\n\n//go:noinline\nfunc G() {}\n\n//go:generate stringer -type K\ntype K int\n", printer.Print(out))
+}
+
+func TestTabsAndIndentsVisitorStopsAfterASelectClausesCommunication(t *testing.T) {
+	// given a select clause whose body, written after its communication, holds
+	// a statement indented too deep
+	src := "package p\n\nfunc f(c chan int) {\n\tselect {\n\tcase v := <-c:\n\t\tif v > 0 {\n\t\t\t\t\tv++\n\t\t}\n\t}\n}\n"
+	cu, err := parser.NewGoParser().Parse("t.go", src)
+	require.NoError(t, err)
+	var comm java.Tree
+	for _, n := range walkNodes(cu).nodes {
+		if cc, ok := n.(*golang.CommClause); ok {
+			comm = cc.Comm
+			break
+		}
+	}
+	require.NotNil(t, comm)
+
+	// when indenting stops after the communication
+	out := NewTabsAndIndentsVisitor(comm).Visit(cu, nil)
+
+	// then the body is left as it was
+	assert.Equal(t, src, printer.Print(out))
 }
 
 func TestTabsAndIndentsVisitorIndentsALaterImportDeclaration(t *testing.T) {

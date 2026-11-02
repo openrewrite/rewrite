@@ -421,8 +421,9 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 }
 
 // VisitCase indents a switch clause: the lead-in aligns the keyword with the
-// enclosing switch, and the body one level in. It visits Body itself, which
-// GoVisitor.VisitCase does not recurse into.
+// enclosing switch, and the body one level in. It visits Body itself rather
+// than through GoVisitor.VisitCase, so as to re-indent each statement before
+// descending into it.
 func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.reindentClauseLeadIn(c.Prefix))
 
@@ -543,16 +544,25 @@ func (v *TabsAndIndentsVisitor) visitOperand(e java.Expression, continues bool, 
 
 // VisitCommClause aligns a select clause the way VisitCase aligns a switch
 // clause: the `case` keyword sits with the enclosing `select`, its body one
-// level in.
+// level in. Like VisitCase, it visits the clause's parts itself, in the order
+// they are written.
 func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	cc = cc.WithPrefix(v.reindentClauseLeadIn(cc.Prefix))
 
-	if body := indentBody(v, cc.Body, p); !java.SameSlice(body, cc.Body) {
-		out := *cc
-		out.Body = body
-		cc = &out
+	comm := cc.Comm
+	if comm != nil {
+		if next, ok := v.Visit(comm, p).(java.Statement); ok {
+			comm = next
+		}
 	}
-	return v.GoVisitor.VisitCommClause(cc, p)
+	body := indentBody(v, cc.Body, p)
+	if comm == cc.Comm && java.SameSlice(body, cc.Body) {
+		return cc
+	}
+	out := *cc
+	out.Comm = comm
+	out.Body = body
+	return &out
 }
 
 func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement], p any) []java.RightPadded[java.Statement] {
