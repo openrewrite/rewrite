@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parses poetry.lock text into the {@link PoetryLock} model. poetry.lock is machine-emitted TOML
@@ -43,9 +45,27 @@ public final class PoetryLockReader {
         }
     }
 
+    private static final Pattern LOCK_VERSION = Pattern.compile("^lock-version\\s*=\\s*\"([^\"]*)\"\\s*$");
+
     private static PoetryLock doParse(String content) {
         String[] lines = content.split("\n", -1);
         int[] pos = {0};
+
+        // Poetry before 2.0 writes lock-version 2.0 (1.1 before 1.3, without the header comment), whose packages
+        // carry no groups; say so before any of those differences reads as a malformed lock
+        for (int i = lines.length - 1; i >= 0; i--) {
+            Matcher m = LOCK_VERSION.matcher(lines[i]);
+            if (m.matches()) {
+                if (!"2.1".equals(m.group(1))) {
+                    throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + m.group(1) +
+                            ", written by a Poetry release before 2.0; the native engine reads lock-version 2.1");
+                }
+                break;
+            }
+            if ("[metadata]".equals(lines[i].trim())) {
+                break;
+            }
+        }
 
         String header = MachineTomlReader.readHeader(lines, pos);
         if (header == null) {
