@@ -19,10 +19,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
@@ -35,7 +37,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.newSetFromMap;
-import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 
 @RequiredArgsConstructor
 @ToString
@@ -324,6 +325,14 @@ public class Substitutions {
      */
     public J toStatement(J j) {
         return j;
+    }
+
+    /**
+     * Parenthesizes a parameter or template result that takes the place of the tree at {@code cursor} where the
+     * template's language would otherwise group it differently.
+     */
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        return ParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 
     /**
