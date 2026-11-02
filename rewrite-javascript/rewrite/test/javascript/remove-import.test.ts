@@ -562,6 +562,43 @@ describe('RemoveImport visitor', () => {
     });
 
     describe('type imports', () => {
+        test('a value of the same name does not keep a type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {type ReactText} from 'react';
+
+                        declare const ReactText: number;
+                        export const x = ReactText;
+                    `,
+                    `
+                        declare const ReactText: number;
+                        export const x = ReactText;
+                    `
+                )
+            );
+        });
+
+        test('a typeof query keeps a type-only import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("./store", "store"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import type {store} from './store';
+
+                        export type State = ReturnType<typeof store.getState>;
+                    `
+                )
+            );
+        });
+
         test('should remove type import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "Stats"));
@@ -2029,6 +2066,141 @@ describe('RemoveImport visitor', () => {
 
                         A();
                         C();
+                    `
+                )
+            );
+        });
+    });
+
+    describe('classic JSX', () => {
+        test('a member-scoped removal keeps a namespace import, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as React from 'react';
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal keeps an import-equals-require, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import React = require('react');
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a member-scoped removal keeps a require, which JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "ReactText"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        const React = require('react');
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('removing the namespace by name still removes it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "*"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as React from 'react';
+
+                        export const A = () => <div/>;
+                    `,
+                    `
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+    });
+
+    describe('module marker', () => {
+        test('a file with JSX gets no marker', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react", "forwardRef"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import {forwardRef} from 'react';
+
+                        const A = () => <div/>;
+                    `,
+                    `
+                        const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('an .mts file is a module without one', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                {
+                    ...typescript(
+                        `
+                            import {readFile} from 'fs';
+
+                            const a = 1;
+                        `,
+                        `
+                            const a = 1;
+                        `
+                    ),
+                    ext: 'mts'
+                }
+            );
+        });
+
+        test('the marker goes after a trailing comment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        const a = 1;
+                        // trailing
+                    `,
+                    `
+                        const a = 1;
+                        // trailing
+
+                        export {};
                     `
                 )
             );

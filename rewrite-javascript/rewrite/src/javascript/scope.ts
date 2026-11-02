@@ -233,6 +233,29 @@ export function namesReferencedWithin(node: unknown, cacheKey: object = node as 
     return names;
 }
 
+/**
+ * As {@link namesReferencedWithin}, less the names read only as values. An export clause reads
+ * with any meaning, so its names are kept.
+ */
+export function namesReferencedAsTypesWithin(node: unknown): ReadonlySet<string> {
+    const names = new Set<string>();
+    treesIn(node).forEach(tree => readReferences(tree, undefined, undefined, 'value', (identifier, reading, scopes) => {
+        if (reading !== undefined && reading !== 'value' && reading !== 'write' &&
+            !bindingFrame(scopes, identifier.simpleName, reading)) {
+            names.add(identifier.simpleName);
+        }
+    }));
+    return names;
+}
+
+/** The values a file's own top-level declarations bind, leaving out what its imports bind. */
+export function valuesDeclaredAtTopLevel(cu: JS.CompilationUnit): ReadonlySet<string> {
+    const statements = cu.statements.filter(s => s.element?.kind !== JS.Kind.Import);
+    return new Set([...declaredNames(statements), ...hoistedNames(statements)]
+        .filter(declaration => declaration.meanings.includes('value'))
+        .map(declaration => declaration.identifier.simpleName));
+}
+
 /** The scopes enclosing a node, innermost first, each paired with what {@link frameBindings} reads. */
 interface Frames {
     node: Tree;

@@ -565,6 +565,52 @@ describe('AddImport visitor', () => {
                 ));
             }
         });
+
+        test('drops an empty export, which the import makes redundant', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+                    `
+                )
+            );
+        });
+
+        test('keeps an empty export that carries a comment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
