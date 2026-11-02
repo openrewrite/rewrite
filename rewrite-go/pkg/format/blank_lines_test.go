@@ -51,3 +51,15 @@ func TestBlankLinesVisitorDropsTheBlankLinesAFileOpensWith(t *testing.T) {
 	// then
 	assert.Equal(t, "// Package p is a package.\npackage p\n", printer.Print(out))
 }
+
+func TestBlankLinesVisitorCapsTheBlankLinesAfterAComment(t *testing.T) {
+	// given runs of blank lines after comments, at the top level and in a block
+	cu, err := parser.NewGoParser().Parse("t.go", "// Copyright.\n\n\n\n// Package p is a package.\npackage p\n\nfunc F() {\n\tx := 1\n\t// a comment\n\n\n\n\t_ = x\n}\n")
+	require.NoError(t, err)
+
+	// when
+	out := NewBlankLinesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, "// Copyright.\n\n// Package p is a package.\npackage p\n\nfunc F() {\n\tx := 1\n\t// a comment\n\n\t_ = x\n}\n", printer.Print(out))
+}

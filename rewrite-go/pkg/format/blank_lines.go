@@ -65,12 +65,30 @@ func (v *BlankLinesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p a
 	return v.GoVisitor.VisitCompilationUnit(cu, p)
 }
 
+// VisitSpace caps each run of blank lines in s, ahead of its comments and
+// after each of them, at one.
 func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
-	if !strings.Contains(s.Whitespace(), "\n\n\n") {
-		return s
+	whitespace := s.Whitespace()
+	if strings.Contains(whitespace, "\n\n\n") {
+		whitespace = capInternalBlankLines(whitespace, 1)
 	}
-	s = java.MakeSpace(s.Comments(), capInternalBlankLines(s.Whitespace(), 1))
-	return s
+	var comments []java.Comment
+	for i, c := range s.Comments() {
+		if !strings.Contains(c.Suffix, "\n\n\n") {
+			continue
+		}
+		if comments == nil {
+			comments = append([]java.Comment(nil), s.Comments()...)
+		}
+		comments[i].Suffix = capInternalBlankLines(c.Suffix, 1)
+	}
+	if comments == nil {
+		if whitespace == s.Whitespace() {
+			return s
+		}
+		comments = s.Comments()
+	}
+	return java.MakeSpace(comments, whitespace)
 }
 
 func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
