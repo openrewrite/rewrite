@@ -638,16 +638,7 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
-            let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
-            if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
-                last = last.getLastToken(this.sourceFile);
-            }
-            return this.rightPadded(j, this.semicolonPrefix(n), (_ => {
-                return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers;
-            })?.(n));
+            return this.semicolonPadded(j, n);
         });
     }
 
@@ -843,12 +834,26 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    private semicolonPrefix = (node: ts.Node) => {
-        let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
-        if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement)) {
-            last = last.getLastToken(this.sourceFile);
+    private trailingSemicolon(node: ts.Node): ts.Node | undefined {
+        while (ts.isLabeledStatement(node)) {
+            node = node.statement;
         }
-        return last?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(last) : emptySpace;
+        const last = node.getChildAt(node.getChildCount(this.sourceFile) - 1, this.sourceFile);
+        return last?.kind === ts.SyntaxKind.SemicolonToken ? last : undefined;
+    }
+
+    private semicolonPrefix = (node: ts.Node) => {
+        const semicolon = this.trailingSemicolon(node);
+        return semicolon ? this.prefix(semicolon) : emptySpace;
+    }
+
+    private semicolonPadded<T extends J>(element: T, node: ts.Statement): J.RightPadded<T> {
+        const semicolon = this.trailingSemicolon(node);
+        return this.rightPadded(
+            element,
+            semicolon ? this.prefix(semicolon) : emptySpace,
+            semicolon ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
+        );
     }
 
     private keywordPrefix = (token: ts.PunctuationSyntaxKind, findSibling: (node: ts.Node) => ts.Node | undefined) => (node: ts.Node): J.Space => {
@@ -1542,14 +1547,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             static: this.rightPadded(true, this.prefix(this.findChildNode(node.body, ts.SyntaxKind.OpenBraceToken)!), emptyMarkers),
-            statements: node.body.statements.map(ce => this.rightPadded(
-                this.convert(ce),
-                ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            )),
+            statements: this.semicolonPaddedStatementList(node.body.statements),
             end: this.prefix(node.getLastToken()!)
         };
     }
@@ -3129,8 +3127,6 @@ export class JavaScriptParserVisitor {
     }
 
     visitIfStatement(node: ts.IfStatement): J.If {
-        const semicolonAfterThen = (node.thenStatement.getChildAt(node.thenStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
-        const semicolonAfterElse = (node.elseStatement?.getChildAt(node.elseStatement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken);
         return {
             kind: J.Kind.If,
             id: randomId(),
@@ -3143,21 +3139,13 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
-            thenPart: this.rightPadded(
-                this.convert(node.thenStatement),
-                semicolonAfterThen ? this.prefix(node.thenStatement.getLastToken()!) : emptySpace,
-                semicolonAfterThen ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
-            ),
+            thenPart: this.semicolonPadded(this.convert(node.thenStatement), node.thenStatement),
             elsePart: node.elseStatement && {
                 kind: J.Kind.IfElse,
                 id: randomId(),
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.ElseKeyword)!),
                 markers: emptyMarkers,
-                body: this.rightPadded(
-                    this.convert(node.elseStatement),
-                    semicolonAfterElse ? this.prefix(node.elseStatement.getLastToken()!) : emptySpace,
-                    semicolonAfterElse ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers
-                )
+                body: this.semicolonPadded(this.convert(node.elseStatement), node.elseStatement)
             }
         };
     }
@@ -3168,12 +3156,7 @@ export class JavaScriptParserVisitor {
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            body: this.rightPadded(this.visit(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers),
+            body: this.semicolonPadded(this.visit(node.statement), node.statement),
             whileCondition: this.leftPadded(
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.WhileKeyword)!),
                 {
@@ -3200,14 +3183,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
-            body: this.rightPadded(
-                this.convert(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            ),
+            body: this.semicolonPadded(this.convert(node.statement), node.statement),
         };
     }
 
@@ -3248,14 +3224,7 @@ export class JavaScriptParserVisitor {
                     }, this.suffix(node.incrementor)) :
                     this.rightPadded(this.newEmpty(this.prefix(this.findChildNode(node, ts.SyntaxKind.CloseParenToken)!)), emptySpace)]
             },
-            body: this.rightPadded(
-                this.convert(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            )
+            body: this.semicolonPadded(this.convert(node.statement), node.statement)
         };
     }
 
@@ -3286,14 +3255,7 @@ export class JavaScriptParserVisitor {
                 })(),
                 iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
-            body: this.rightPadded(
-                this.convert(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            )
+            body: this.semicolonPadded(this.convert(node.statement), node.statement)
         };
     }
 
@@ -3366,14 +3328,7 @@ export class JavaScriptParserVisitor {
                     })(),
                     iterable: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
                 },
-                body: this.rightPadded(
-                    this.convert(node.statement),
-                    this.semicolonPrefix(node.statement),
-                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: J.Markers.Semicolon,
-                        id: randomId()
-                    }) : emptyMarkers
-                )
+                body: this.semicolonPadded(this.convert(node.statement), node.statement)
             }
         };
     }
@@ -3421,14 +3376,7 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 tree: this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
             },
-            body: this.rightPadded(
-                this.convert(node.statement),
-                this.semicolonPrefix(node.statement),
-                node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    kind: J.Markers.Semicolon,
-                    id: randomId()
-                }) : emptyMarkers
-            ),
+            body: this.semicolonPadded(this.convert(node.statement), node.statement),
         };
     }
 
