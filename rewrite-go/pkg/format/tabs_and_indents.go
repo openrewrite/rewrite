@@ -67,11 +67,13 @@ func depthAt(parent *visitor.Cursor, node java.Tree) int {
 	for c := parent; c != nil; c = c.Parent() {
 		chain = append(chain, c.Value())
 	}
+	// A clause's expressions step out a level, to its `case` keyword, but never
+	// past the margin, where reduceIndentDepth stops the keyword too.
 	depth := 0
 	for i := len(chain) - 1; i > 0; i-- {
-		depth += indentDelta(chain[i], chain[i-1])
+		depth = max(0, depth+indentDelta(chain[i], chain[i-1]))
 	}
-	return depth + indentDelta(chain[0], node)
+	return max(0, depth+indentDelta(chain[0], node))
 }
 
 // indentDelta reports how many levels child sits in from parent, mirroring what
@@ -100,6 +102,18 @@ func indentDelta(parent, child java.Tree) int {
 		return listDelta([]java.RightPadded[java.Expression]{
 			{Element: p.Expr, After: p.Clazz.Tree.After},
 		}, child)
+	case *java.Case:
+		// A clause's expressions start at its keyword's level, one out from
+		// its body.
+		for _, rp := range p.Expressions.Elements {
+			if java.Tree(rp.Element) == child {
+				return listDelta(p.Expressions.Elements, child) - 1
+			}
+		}
+	case *golang.CommClause:
+		if p.Comm != nil && java.Tree(p.Comm) == child {
+			return -1
+		}
 	}
 	return 0
 }
@@ -416,13 +430,10 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.reindentClauseLeadIn(c.Prefix))
 
-	// Expressions that wrap sit one level in from the `case` keyword, which
-	// is the depth the body already runs at.
-	exprs := eachPadded(c.Expressions.Elements, func(rp java.RightPadded[java.Expression]) java.RightPadded[java.Expression] {
-		if fixed, ok := transformPrefix(rp.Element, v.reindentSpace).(java.Expression); ok {
-			rp.Element = fixed
-		}
-		return rp
+	// The expressions nest from the `case` keyword's level, and those that
+	// wrap sit one level in from it, which is the depth the body runs at.
+	exprs := atKeywordLevel(v, func() []java.RightPadded[java.Expression] {
+		return indentSubtrees(v, c.Expressions.Elements, p)
 	})
 	body := indentBody(v, c.Body.Elements, p)
 	if java.SameSlice(exprs, c.Expressions.Elements) && java.SameSlice(body, c.Body.Elements) {
@@ -540,9 +551,12 @@ func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) ja
 
 	comm := cc.Comm
 	if comm != nil {
-		if next, ok := v.Visit(comm, p).(java.Statement); ok {
-			comm = next
-		}
+		comm = atKeywordLevel(v, func() java.Statement {
+			if next, ok := v.Visit(comm, p).(java.Statement); ok {
+				return next
+			}
+			return comm
+		})
 	}
 	body := indentBody(v, cc.Body, p)
 	if comm == cc.Comm && java.SameSlice(body, cc.Body) {
@@ -552,6 +566,15 @@ func (v *TabsAndIndentsVisitor) VisitCommClause(cc *golang.CommClause, p any) ja
 	out.Comm = comm
 	out.Body = body
 	return &out
+}
+
+// atKeywordLevel runs visit at the level of a clause's `case` keyword, one out
+// from the body the clause's depth is set for.
+func atKeywordLevel[T any](v *TabsAndIndentsVisitor, visit func() T) T {
+	body := v.depth
+	v.depth = reduceIndentDepth(body)
+	defer func() { v.depth = body }()
+	return visit()
 }
 
 func indentBody(v *TabsAndIndentsVisitor, body []java.RightPadded[java.Statement], p any) []java.RightPadded[java.Statement] {

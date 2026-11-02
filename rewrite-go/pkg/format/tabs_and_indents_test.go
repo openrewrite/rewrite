@@ -41,6 +41,22 @@ func TestTabsAndIndentsVisitorSetsTheFilesDeclarationsAtTheMargin(t *testing.T) 
 	assert.Equal(t, "// Package p is a package.\npackage p\n\nimport \"fmt\"\n\nvar V = fmt.Sprint()\n\n// F does nothing.\nfunc F() {\n}\n\n//go:noinline\nfunc G() {}\n\n//go:generate stringer -type K\ntype K int\n", printer.Print(out))
 }
 
+func TestTabsAndIndentsVisitorNestsAClausesExpressionsFromItsKeyword(t *testing.T) {
+	// given a switch clause's expressions and a select clause's communication
+	// that open a call and a function literal on the keyword's line
+	src := "package p\n\nfunc f(x int, c chan int) {\n\tswitch {\n\tcase g(\n\tx,\n\t1):\n\tcase func() bool {\n\treturn true\n\t}():\n\t}\n\tselect {\n\tcase v := <-h(\n\tc):\n\t\t_ = v\n\tcase <-func() chan int {\n\treturn c\n\t}():\n\t}\n}\n"
+	cu, err := parser.NewGoParser().Parse("t.go", src)
+	require.NoError(t, err)
+
+	// when
+	out := NewTabsAndIndentsVisitor(nil).Visit(cu, nil)
+
+	// then they nest from the keyword's level, as gofmt nests them
+	want, err := gofmtSource("t.go", src)
+	require.NoError(t, err)
+	assert.Equal(t, want, printer.Print(out))
+}
+
 func TestTabsAndIndentsVisitorStopsAfterASelectClausesCommunication(t *testing.T) {
 	// given a select clause whose body, written after its communication, holds
 	// a statement indented too deep
