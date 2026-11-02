@@ -994,6 +994,51 @@ public class AutoFormatTests : RewriteTest
     }
 
     /// <summary>
+    /// Each replacement made from one template keeps its own prefix, at whatever depth it sits.
+    /// </summary>
+    [Fact]
+    public void TemplateReplacementsAtTwoDepthsKeepTheirPrefixes()
+    {
+        const string before =
+            "class C\n{\n\tvoid M(bool b)\n\t{\n\t\tConsole.Write(1);\n\t\tif (b)\n\t\t{\n\t\t\tConsole.Write(2);\n\t\t}\n\t}\n}\n";
+        RewriteRun(
+            spec => spec.SetRecipe(new WriteToWriteLineRecipe()),
+            CSharp(before, before.Replace("Console.Write(", "Console.WriteLine("))
+        );
+    }
+
+    /// <summary>
+    /// A visitor that visits a second source file formats it as if it had visited that one alone, even when a node
+    /// it inserts carries the same id in both.
+    /// </summary>
+    [Fact]
+    public void DeferredFormatStartsOverForEachSourceFile()
+    {
+        var tabIndented = _parser.Parse("class C\n{\n\tvoid M()\n\t{\n\t\tConsole.Write(1);\n\t}\n}\n");
+        var flush = _parser.Parse("class D\n{\nvoid M()\n{\nConsole.Write(1);\n}\n}\n");
+        var shared = FindFirst<MethodInvocation>(_parser.Parse("class E { void M() { Console.WriteLine(1); } }"))!;
+        var ctx = new ExecutionContext();
+
+        var alone = new ReplaceWithSharedNodeVisitor(shared).Visit(flush, ctx)!;
+        var visitor = new ReplaceWithSharedNodeVisitor(shared);
+        visitor.Visit(tabIndented, ctx);
+        var afterAnother = visitor.Visit(flush, ctx)!;
+
+        Assert.Equal(_printer.Print(alone), _printer.Print(afterAnother));
+    }
+
+    /// <summary>
+    /// Replaces every <c>Console.Write(1)</c> with the same <c>Console.WriteLine(1)</c> node and formats it.
+    /// </summary>
+    private class ReplaceWithSharedNodeVisitor(MethodInvocation shared) : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
+        {
+            return mi.Name.SimpleName == "Write" ? AutoFormat(shared.WithPrefix(mi.Prefix), ctx, Cursor) : mi;
+        }
+    }
+
+    /// <summary>
     /// A synthesized member is indented even when its prefix is also the class's, since that prefix ends a line.
     /// </summary>
     [Fact]
