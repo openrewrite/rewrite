@@ -820,6 +820,33 @@ public class TemplateApplyTests : RewriteTest
     }
 
     /// <summary>
+    /// A postfix <c>!</c> takes a primary operand, and a member access after a conditional access that ends in one
+    /// would join the conditional access.
+    /// </summary>
+    [Theory]
+    [InlineData("", "!", "b ?? c", "(b ?? c)!")]
+    [InlineData("", "!.ToString()", "b ?? c", "(b ?? c)!.ToString()")]
+    [InlineData("", "!", "-b", "(-b)!")]
+    [InlineData("", "!", "(int)b", "((int)b)!")]
+    [InlineData("", "!", "b as string", "(b as string)!")]
+    [InlineData("", "!", "b++", "b++!")]
+    [InlineData("", "!", "x?.y", "x?.y!")]
+    [InlineData("", "!", "x?.y!", "x?.y!!")]
+    [InlineData("", ".ToString()", "x?.ToString()!", "(x?.ToString()!).ToString()")]
+    [InlineData("", "[0]", "x?.y!", "(x?.y!)[0]")]
+    [InlineData("", ".Length", "x?.y!!", "(x?.y!!).Length")]
+    [InlineData("", ".Length", "x?[0].y!", "(x?[0].y!).Length")]
+    [InlineData("", ".Length", "x!", "x!.Length")]
+    [InlineData("", ".Length", "x?.y!.z", "x?.y!.z.Length")]
+    [InlineData("(object)", "", "x?.y!", "(object)x?.y!")]
+    public void CaptureAsOperandOfNullForgivingMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
     /// A cast takes a unary operand, and a member access or element access a primary one.
     /// </summary>
     [Theory]
@@ -903,6 +930,21 @@ public class TemplateApplyTests : RewriteTest
             CSharp(
                 "class C { int Twice(int i) => i + i; string M(int b) { return Twice(b).ToString(); } }",
                 "class C { int Twice(int i) => i + i; string M(int b) { return (b + b).ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ReplacementEndingConditionalAccessAsReceiverKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"NotNull({a})"),
+                CSharpTemplate.Expression($"{a}!")))),
+            CSharp(
+                "class C { T NotNull<T>(T t) => t; int M(string? s) { return NotNull(s?.Trim()).Length; } }",
+                "class C { T NotNull<T>(T t) => t; int M(string? s) { return (s?.Trim()!).Length; } }"
             )
         );
     }

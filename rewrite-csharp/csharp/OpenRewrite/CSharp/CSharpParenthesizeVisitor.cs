@@ -35,7 +35,8 @@ public static class CSharpParenthesizeVisitor
         // Fast exit: simple expression types never need parenthesization
         if (newTree is not (Binary or Unary or Ternary or Assignment or AssignmentOperation
             or TypeCast or CsBinary or CsUnary or IsPattern or RangeExpression
-            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf))
+            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf
+            or NullSafeExpression))
             return newTree;
 
         var originalTree = cursor.Value;
@@ -191,6 +192,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return MaybeWrapAssignment(q);
     }
 
+    public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, P p)
+    {
+        var n = _recursive ? base.VisitNullSafeExpression(nullSafeExpression, p) : nullSafeExpression;
+        return n is NullSafeExpression nse && NeedsParenthesesInSlot(nse) ? CSharpPrecedences.Parenthesize(nse) : n;
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
@@ -248,8 +255,9 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
     /// <summary>
     /// Whether <paramref name="expr"/> binds looser than its slot allows: a cast, <c>await</c> and a range take a
-    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access or
-    /// element access a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep their parentheses.
+    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access,
+    /// element access or postfix <c>!</c> a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep
+    /// their parentheses.
     /// </summary>
     private bool NeedsParenthesesInSlot(Expression expr)
     {
@@ -265,10 +273,17 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             FieldAccess fa when fa.Target.Id == expr.Id => PrimaryPrecedence,
             MethodInvocation mi when mi.Select?.Element.Id == expr.Id => PrimaryPrecedence,
             ArrayAccess aa when aa.Indexed.Id == expr.Id => PrimaryPrecedence,
+            NullSafeExpression nse when nse.Expression.Id == expr.Id => PrimaryPrecedence,
+            CsUnary { Operator.Element: CsUnary.OperatorKind.SuppressNullableWarning } cu
+                when cu.Expression.Id == expr.Id => PrimaryPrecedence,
             _ => null
         };
         if (required == null)
             return false;
+        // Bare, a member access after x?.y! would join the conditional access, as x?.y!.z does
+        if (parent is FieldAccess or MethodInvocation or ArrayAccess && expr is NullSafeExpression receiver &&
+            IsConditionalAccess(receiver.Expression))
+            return true;
         // x as T ends in a type, so the parser applies a switch or a with after it to all of x as T
         if (expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } &&
             parent is SwitchExpression or WithExpression)
@@ -284,6 +299,29 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             _ => CSharpPrecedences.GetPrecedence(expr)
         };
         return precedence < required || parent is TypeCast cast2 && CastReadsAsValue(cast2, expr);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="expr"/> is a conditional access such as <c>x?.y</c> or <c>x?[0].y!</c>, which a member
+    /// access printed after it would extend.
+    /// </summary>
+    private static bool IsConditionalAccess(Expression? expr)
+    {
+        while (expr != null)
+        {
+            if (expr is FieldAccess or MethodInvocation or ArrayAccess && expr.Markers.FindFirst<NullSafe>() != null)
+                return true;
+            expr = expr switch
+            {
+                FieldAccess fa => fa.Target,
+                MethodInvocation mi => mi.Select?.Element,
+                ArrayAccess aa => aa.Indexed,
+                NullSafeExpression nse => nse.Expression,
+                CsUnary { Operator.Element: CsUnary.OperatorKind.SuppressNullableWarning } cu => cu.Expression,
+                _ => null
+            };
+        }
+        return false;
     }
 
     /// <summary>
