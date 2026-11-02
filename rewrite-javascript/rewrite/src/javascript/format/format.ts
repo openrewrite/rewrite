@@ -26,6 +26,7 @@ import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
 import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
+import {AsyncLocalStorage} from "node:async_hooks";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
@@ -57,6 +58,22 @@ export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor):
 }
 
 /**
+ * Hears about each request to auto-format a tree made while it listens, so that a test harness can check that a
+ * recipe formats only what it changed.
+ */
+export interface FormattingListener {
+    /** AutoformatVisitor calls this before it formats `tree`, stopping after `stopAfter` when it is given. */
+    onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+}
+
+const formattingListener = new AsyncLocalStorage<FormattingListener>();
+
+/** Runs `run`, telling `listener` about the formatting it requests. */
+export function listenToFormatting<T>(listener: FormattingListener, run: () => Promise<T>): Promise<T> {
+    return formattingListener.run(listener, run);
+}
+
+/**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *
  * Style resolution order (first match wins):
@@ -77,6 +94,7 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
+        formattingListener.getStore()?.onFormat(tree, this.stopAfter, cursor);
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
             const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
@@ -1121,7 +1139,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case && this.isInsideCaseStatements(parent as J.Case, draft))) {
-                if (draft.kind != J.Kind.Case) {
+                if (draft.kind != J.Kind.Case && !this.opensCaseBody(parent, draft)) {
                     this.ensurePrefixHasNewLine(draft);
                 }
             }
@@ -1151,6 +1169,12 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
      * Check if a statement is inside a Case's statements container or body,
      * not inside the caseLabels container.
      */
+    /** A block that opens a case's statements stays on the line of its label, as in `case X: {`. */
+    private opensCaseBody(parent: J | undefined, statement: J): boolean {
+        return parent?.kind === J.Kind.Case && statement.kind === J.Kind.Block &&
+            (parent as J.Case).statements.elements[0]?.element.id === statement.id;
+    }
+
     private isInsideCaseStatements(caseNode: J.Case, statement: J): boolean {
         // Check if statement is in the statements container
         if (caseNode.statements.elements.some(s => s.element.id === statement.id)) {

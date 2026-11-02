@@ -481,9 +481,15 @@ export class TemplateEngine {
      * Converts a Type instance to a TypeScript type string.
      *
      * @param type The Type instance
+     * @param enclosing The types that `type` is a type argument or element type of
      * @returns A TypeScript type string
      */
-    private static typeToString(type: Type): string {
+    private static typeToString(type: Type, enclosing: Type[] = []): string {
+        // A recursive type, such as `type A = Array<A>`, is any where it holds itself
+        if (enclosing.includes(type)) {
+            return 'any';
+        }
+
         // Handle Type.Class and Type.ShallowClass - return their fully qualified names
         if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
             const classType = type as Type.Class;
@@ -518,8 +524,16 @@ export class TemplateEngine {
         // Handle Type.Array - render component type plus []
         if (type.kind === Type.Kind.Array) {
             const arrayType = type as Type.Array;
-            const componentTypeString = this.typeToString(arrayType.elemType);
+            const componentTypeString = this.typeToString(arrayType.elemType, [...enclosing, type]);
             return `${componentTypeString}[]`;
+        }
+
+        // An array, a map or any other generic type, with its type arguments
+        if (type.kind === Type.Kind.Parameterized) {
+            const parameterized = type as Type.Parameterized;
+            const base = this.typeToString(parameterized.type);
+            return base === 'any' || parameterized.typeParameters.length === 0 ? base :
+                `${base}<${parameterized.typeParameters.map(t => this.typeToString(t, [...enclosing, type])).join(', ')}>`;
         }
 
         // For other types, return 'any' as a fallback
@@ -756,17 +770,22 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
 }
 
 // FIXME: This is a heuristic to determine if the parent expects a statement child
-function expectsStatement(parentTree: J): boolean {
+function expectsStatement(parentTree: J, childId: string): boolean {
+    if (parentTree.kind === J.Kind.Case) {
+        // the labels of a case are expressions
+        return !(parentTree as J.Case).caseLabels.elements.some(label => label.element.id === childId);
+    }
     return parentTree.kind === J.Kind.Block ||
-        parentTree.kind === J.Kind.Case ||
         parentTree.kind === J.Kind.DoWhileLoop ||
         parentTree.kind === J.Kind.ForEachLoop ||
         parentTree.kind === J.Kind.ForLoop ||
         parentTree.kind === J.Kind.If ||
         parentTree.kind === J.Kind.IfElse ||
+        parentTree.kind === J.Kind.Label ||
         parentTree.kind === J.Kind.WhileLoop ||
         parentTree.kind === JS.Kind.CompilationUnit ||
-        parentTree.kind === JS.Kind.ForInLoop;
+        parentTree.kind === JS.Kind.ForInLoop ||
+        parentTree.kind === JS.Kind.WithStatement;
 }
 
 /** Whether the code opens with `{`, which is a block where a statement goes and an object literal elsewhere. */
@@ -782,7 +801,7 @@ export function replacedByObjectLiteral(tree: J, cursor: Cursor): boolean {
         return true;
     }
     const parentTree = cursor.parentTree()?.value;
-    return parentTree !== undefined && !expectsStatement(parentTree);
+    return parentTree !== undefined && !expectsStatement(parentTree, tree.id);
 }
 
 /**
@@ -913,9 +932,21 @@ export class TemplateApplier {
     private wrapTree(originalTree: J, resultToUse: J) {
         const parentTree = this.cursor?.parentTree()?.value;
 
+        // A `for` head holds each expression of its init and update in an expression statement, as the parser does
+        if (parentTree?.kind === J.Kind.ForLoopControl &&
+            (parentTree as J.ForLoop.Control).condition?.element.id !== originalTree.id) {
+            return isExpression(resultToUse) && resultToUse.kind !== JS.Kind.ExpressionStatement ? {
+                kind: JS.Kind.ExpressionStatement,
+                id: randomId(),
+                prefix: resultToUse.prefix,
+                markers: wrapperMarkers(resultToUse),
+                expression: {...resultToUse, prefix: emptySpace}
+            } as JS.ExpressionStatement : resultToUse;
+        }
+
         // Only apply wrapping logic if we have parent context
         if (parentTree) {
-            const parentExpectsStatement = expectsStatement(parentTree);
+            const parentExpectsStatement = expectsStatement(parentTree, originalTree.id);
             const originalIsStatement = isStatement(originalTree);
 
             const resultIsStatement = isStatement(resultToUse);
@@ -935,8 +966,9 @@ export class TemplateApplier {
                         expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
-            } else if (!parentExpectsStatement) {
-                // Expression context: wrap in StatementExpression if result is statement-only
+            } else if (!parentExpectsStatement && isExpression(originalTree)) {
+                // Expression context: wrap in StatementExpression if result is statement-only. A slot that held
+                // a statement-only node, such as an arrow function's block body, takes one unwrapped.
                 if (resultIsStatement && !resultIsExpression) {
                     const stmt = resultToUse as Statement;
                     resultToUse = {

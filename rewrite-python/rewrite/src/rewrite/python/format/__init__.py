@@ -13,16 +13,16 @@ from .tabs_and_indents_visitor import TabsAndIndentsVisitor
 from ...visitor import Cursor
 
 
-def auto_format(tree, p, stop_after=None, cursor: Optional[Cursor] = None):
+def auto_format(tree, p, stop_after=None, cursor: Optional[Cursor] = None, keep_indent: bool = False):
     try:
-        return AutoFormatVisitor(stop_after).visit(tree, p, cursor)
+        return AutoFormatVisitor(stop_after, keep_indent).visit(tree, p, cursor)
     except (ValueError, AttributeError):
         return tree
 
 
-def maybe_auto_format(before, after, p, stop_after=None, cursor: Optional[Cursor] = None):
+def maybe_auto_format(before, after, p, stop_after=None, cursor: Optional[Cursor] = None, keep_indent: bool = False):
     if before is not after:
-        return auto_format(after, p, stop_after, cursor)
+        return auto_format(after, p, stop_after, cursor, keep_indent)
     return after
 
 

@@ -25,7 +25,8 @@ import {
     rightPadded,
     space,
     Statement,
-    TrailingComma
+    TrailingComma,
+    Type
 } from "../java";
 import {JS} from "./tree";
 import {moduleNameOf} from "./add-import";
@@ -428,7 +429,8 @@ function dependencyLiteral(module: string, quote: string): J.Literal {
         prefix: emptySpace,
         markers: emptyMarkers,
         value: module,
-        valueSource: `${quote}${module}${quote}`
+        valueSource: `${quote}${module}${quote}`,
+        type: Type.Primitive.String
     };
 }
 

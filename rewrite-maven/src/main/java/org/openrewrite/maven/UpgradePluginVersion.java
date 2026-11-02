@@ -129,10 +129,7 @@ public class UpgradePluginVersion extends Recipe {
 
                             final String versionLookup;
                             if (maybeVersionValue.isPresent()) {
-                                String versionValue = maybeVersionValue.get();
-                                versionLookup = versionValue.startsWith("${") ?
-                                        resolvedPom.getValue(versionValue.trim()) :
-                                        versionValue;
+                                versionLookup = resolvedPom.getValue(maybeVersionValue.get().trim());
                             } else {
                                 if (hasManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId)) {
                                     return tag;
@@ -193,9 +190,10 @@ public class UpgradePluginVersion extends Recipe {
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
-                        if (version.trim().startsWith("${")) {
+                        // Only a whole property reference can be updated without changing other components of an expression.
+                        if (version.trim().matches("\\$\\{[^}]+}")) {
                             if (!newVersion.equals(getResolutionResult().getPom().getValue(version.trim()))) {
-                                doAfterVisit(new ChangePropertyValue(version, newVersion, false, false).getVisitor());
+                                doAfterVisit(new ChangePropertyValue(version.trim(), newVersion, false, false).getVisitor());
                             }
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));

@@ -5,7 +5,7 @@ from enum import Enum, auto
 from typing import Optional, List, Dict
 from uuid import UUID
 
-from rewrite import Marker
+from rewrite import Heavyweight, Marker
 from rewrite.utils import lst_dataclass, replace_if_changed
 
 
@@ -160,7 +160,7 @@ class ExecSyntax(Marker):
 
 
 @lst_dataclass
-class PythonResolutionResult(Marker):
+class PythonResolutionResult(Marker, Heavyweight):
     """Contains metadata about a Python project, parsed from pyproject.toml and uv.lock."""
 
     class PackageManager(Enum):
@@ -198,7 +198,7 @@ class PythonResolutionResult(Marker):
             return self if default_index is self._default_index else replace(self, _default_index=default_index)
 
     @lst_dataclass
-    class ResolvedDependency:
+    class ResolvedDependency(Heavyweight):
         _name: str
         _version: str
         _source: Optional[str]

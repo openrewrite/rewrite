@@ -91,6 +91,8 @@ type CheckVisitor struct {
 	V     recipe.TreeVisitor
 }
 
+func (*CheckVisitor) IsHeavyweight() {}
+
 // Visit runs the gate, then defers to the wrapped visitor when the gate
 // matches. RecipeRef operands are treated as "always matches" in-process
 // (they're wire-only placeholders).

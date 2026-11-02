@@ -196,6 +196,71 @@ def test_template_reindents_a_substituted_block_moved_deeper():
     )
 
 
+_three = template('3')
+
+
+class _ReplaceTwoWithThree(Recipe):
+    @property
+    def name(self) -> str:
+        return "test.ReplaceTwoWithThree"
+
+    @property
+    def display_name(self) -> str:
+        return "Test replace 2 with 3"
+
+    @property
+    def description(self) -> str:
+        return "Replaces each literal 2 with a template for 3."
+
+    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_literal(self, literal: j.Literal, p: ExecutionContext) -> Optional[J]:
+                return _three.apply(self.cursor) if literal.value == 2 else literal
+
+        return Visitor()
+
+
+def test_a_replaced_operand_keeps_the_indentation_of_its_continuation_line():
+    spec = RecipeSpec(recipe=_ReplaceTwoWithThree())
+    spec.rewrite_run(
+        python(
+            "a = (1 +\n"
+            "     2)\n"
+            "b = f(1,\n"
+            "      2)\n"
+            "c = [1,\n"
+            "     2]\n",
+            #
+            "a = (1 +\n"
+            "     3)\n"
+            "b = f(1,\n"
+            "      3)\n"
+            "c = [1,\n"
+            "     3]\n",
+        )
+    )
+
+
+def test_a_replaced_statement_keeps_the_indentation_of_its_block():
+    """The lines inside the result indent from there by the style's four spaces."""
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "def f():\n"
+            "  try:\n"
+            "    do_stuff()\n"
+            "  except KeyError:\n"
+            "    pass\n"
+            "  done()\n",
+            #
+            "def f():\n"
+            "  with suppress(KeyError):\n"
+            "      do_stuff()\n"
+            "  done()\n",
+        )
+    )
+
+
 def test_template_replacement_keeps_crlf_line_breaks():
     spec = RecipeSpec(recipe=_ReplaceTryWithWith())
     spec.rewrite_run(

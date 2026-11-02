@@ -261,6 +261,13 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
     public CSharpFormatStyle WithId(Guid id) =>
         id == Id ? this : new(id, _flags, IndentSize, TabSize, NewLine, LabelPositioning, SpacingAroundBinaryOperator);
 
+    /// <summary>This style, indenting with tabs or spaces and by the sizes given.</summary>
+    internal CSharpFormatStyle WithIndentation(bool useTabs, int indentSize, int tabSize) =>
+        useTabs == UseTabs && indentSize == IndentSize && tabSize == TabSize
+            ? this
+            : new(Tree.RandomId(), useTabs ? _flags | 1L << BitUseTabs : _flags & ~(1L << BitUseTabs),
+                indentSize, tabSize, NewLine, LabelPositioning, SpacingAroundBinaryOperator);
+
     // ── RPC serialization: 6 fields instead of 52 ──
     public void RpcSend(CSharpFormatStyle after, RpcSendQueue q)
     {

@@ -256,7 +256,9 @@ final class PackageManager {
                 } else if (version.tag.isNPM()) {
                     if (!dependency.behavior.isPeer() || installPeer) {
                         if (!hasCreatedNetworkTask(name, dependency.behavior.isRequired())) {
-                            networkTasks.add(new NetworkTask(name, options.getMinimumReleaseAgeMs() != null));
+                            networkTasks.add(new NetworkTask(name, options.getMinimumReleaseAgeMs() != null ||
+                                    options.getRelease().carriesPackageInstallMetadata() &&
+                                    (name.contains("linux") || name.contains("musl") || name.contains("glibc"))));
                         }
                     } else {
                         queuePeer(id);
@@ -394,6 +396,9 @@ final class PackageManager {
 
         Package pkg = lockfile.appendPackage(Package.fromNPM(lockfile, manifest, findResult.version,
                 findResult.packageVersion, Features.NPM));
+        if (options.getRelease().readsPackageExtensions()) {
+            lockfile.packageExtensions.extend(lockfile, pkg);
+        }
         if (version.tag == DependencyVersion.Tag.NPM && isExact(version.npm().version)) {
             lockfile.markExactPin(pkg.meta.id);
         }
@@ -417,7 +422,7 @@ final class PackageManager {
                     }
                 }
                 int first = index.get(0);
-                if (first < lockfile.packages.size()) {
+                if (!options.getRelease().rebindsPeersByTheirRange() && first < lockfile.packages.size()) {
                     Resolution.Tag resTag = lockfile.packages.get(first).resolution.tag;
                     DependencyVersion.Tag verTag = version.tag;
                     if (resTag == Resolution.Tag.NPM && verTag == DependencyVersion.Tag.NPM ||
@@ -430,7 +435,9 @@ final class PackageManager {
             }
         }
 
-        if (resolution < lockfile.packages.size()) {
+        if (resolution < lockfile.packages.size() &&
+                (!options.getRelease().rebindsPeersByTheirRange() || !behavior.isPeer() ||
+                 resolutionSatisfiesDependency(lockfile.packages.get(resolution).resolution, version))) {
             return new ResolvedPackageResult(lockfile.packages.get(resolution), false);
         }
 
@@ -576,6 +583,23 @@ final class PackageManager {
         Integer existingId = lockfile.getPackageID(pkg.nameHash, version, pkg.resolution);
         int id;
         if (existingId != null) {
+            if (options.getRelease().refreshesLocalFolders()) {
+                Package previous = lockfile.packages.get(existingId);
+                for (int row = pkg.dependenciesOff; row < pkg.dependenciesEnd(); row++) {
+                    Dependency added = lockfile.dependencies.get(row);
+                    for (int old = previous.dependenciesOff; old < previous.dependenciesEnd(); old++) {
+                        Dependency was = lockfile.dependencies.get(old);
+                        int target = lockfile.resolutions.get(old);
+                        if (added.nameHash == was.nameHash && added.behavior.bits == was.behavior.bits &&
+                                target < lockfile.packages.size() &&
+                                (added.version.eql(was.version, options.getRelease()) ||
+                                 resolutionSatisfiesDependency(lockfile.packages.get(target).resolution, added.version))) {
+                            lockfile.resolutions.set(row, target);
+                            break;
+                        }
+                    }
+                }
+            }
             pkg.meta.id = existingId;
             lockfile.packages.set(existingId, pkg);
             id = existingId;
@@ -742,6 +766,9 @@ final class PackageManager {
      * package count when enqueueing began); cannot-know where the first wait depends on manifest arrival order.
      */
     void resolve(int packagesBefore) {
+        if (options.getRelease().refreshesLocalFolders()) {
+            refreshLocalFolders();
+        }
         if (pendingTaskCount() == 0 && peerDependencies.isEmpty()) {
             return;
         }
@@ -783,6 +810,37 @@ final class PackageManager {
         List<String> peerOrder = peerArrivalOrder(peerPicks());
         if (!peerOrder.isEmpty()) {
             throw new CannotKnow(String.join("; ", peerOrder));
+        }
+    }
+
+    private void refreshLocalFolders() {
+        Set<Integer> seen = new HashSet<>();
+        ArrayDeque<Integer> pending = new ArrayDeque<>();
+        pending.add(0);
+        while (!pending.isEmpty()) {
+            int id = pending.removeFirst();
+            if (id >= lockfile.packages.size() || !seen.add(id)) {
+                continue;
+            }
+            Package pkg = lockfile.packages.get(id);
+            // Keep a snapshot: re-reading appends dependencies and replaces the package.
+            for (int row = pkg.dependenciesOff; row < pkg.dependenciesEnd(); row++) {
+                int target = lockfile.resolutions.get(row);
+                if (target >= lockfile.packages.size()) {
+                    continue;
+                }
+                Package child = lockfile.packages.get(target);
+                Dependency dep = lockfile.dependencies.get(row);
+                if (child.resolution.tag == Resolution.Tag.FOLDER && !folders.containsKey(child.resolution.value)) {
+                    int[] refreshed = folderResolution(Resolution.Tag.FOLDER, dep.version,
+                            child.resolution.value, dep);
+                    target = refreshed[0];
+                    lockfile.resolutions.set(row, target);
+                    Package replacement = lockfile.packages.get(target);
+                    enqueueDependencyList(replacement.dependenciesOff, replacement.dependenciesLen);
+                }
+                pending.add(target);
+            }
         }
     }
 
