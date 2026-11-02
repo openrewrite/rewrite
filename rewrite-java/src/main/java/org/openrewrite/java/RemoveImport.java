@@ -71,8 +71,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             Set<String> originalImports = new HashSet<>();
             boolean starImportOfOwner = false;
             for (J.Import cuImport : cu.getImports()) {
-                if (cuImport.getQualid().getType() != null) {
-                    originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
+                JavaType.FullyQualified importedType = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
+                if (importedType != null) {
+                    originalImports.add(importedType.getFullyQualifiedName().replace("$", "."));
                 }
                 if (!cuImport.isStatic() && "*".equals(cuImport.getClassName()) &&
                         cuImport.getPackageName().equals(owner)) {
