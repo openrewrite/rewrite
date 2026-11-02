@@ -125,8 +125,8 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        return b.withStatements(ListUtils.map(b.getStatements(), s ->
-                statement.isScope(s) ? null : s));
+        return b.withStatements(ListUtils.filter(b.getStatements(), s ->
+                !statement.isScope(s)));
     }
 
     @Override

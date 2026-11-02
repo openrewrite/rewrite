@@ -57,7 +57,7 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 // have been parsed into a node. Verifies the validator flags it.
 func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 	cu := &golang.CompilationUnit{
-		Prefix: java.Space{Whitespace: "package main"}, // non-whitespace stowed away
+		Prefix: java.MakeSpace(nil, "package main"), // non-whitespace stowed away
 	}
 	svc := &recipes.WhitespaceValidationService{}
 	errs := svc.Validate(cu)
@@ -74,14 +74,10 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 // re-emit as corrupted source, so the validator must catch both.
 func TestWhitespaceValidationService_DetectsBadComment(t *testing.T) {
 	lineSpansNewline := &golang.CompilationUnit{
-		Prefix: java.Space{
-			Comments: []java.Comment{{Multiline: false, Text: "a\nb", Suffix: "\n"}},
-		},
+		Prefix: java.MakeSpace([]java.Comment{{Multiline: false, Text: "a\nb", Suffix: "\n"}}, ""),
 	}
 	blockClosesEarly := &golang.CompilationUnit{
-		Prefix: java.Space{
-			Comments: []java.Comment{{Multiline: true, Text: " x */ y ", Suffix: "\n"}},
-		},
+		Prefix: java.MakeSpace([]java.Comment{{Multiline: true, Text: " x */ y ", Suffix: "\n"}}, ""),
 	}
 	svc := &recipes.WhitespaceValidationService{}
 	if errs := svc.Validate(lineSpansNewline); len(errs) == 0 {

@@ -3,13 +3,13 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
+from enum import Enum, IntFlag
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
-from rewrite.utils import replace_if_changed
+from rewrite.utils import lst_dataclass, lst_value_dataclass, replace_if_changed
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
@@ -49,7 +49,7 @@ class J(Tree):
         ...
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Comment(ABC):
     @property
     @abstractmethod
@@ -74,12 +74,12 @@ class Comment(ABC):
     def markers(self) -> Markers:
         return self._markers
 
-    def replace(self, **kwargs) -> 'Comment':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this Comment, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class TextComment(Comment):
     _multiline: bool
 
@@ -89,13 +89,13 @@ class TextComment(Comment):
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
-        object.__setattr__(self, '_multiline', _multiline)
-        object.__setattr__(self, '_text', _text)
-        object.__setattr__(self, '_suffix', _suffix)
-        object.__setattr__(self, '_markers', _markers)
+        self._multiline = _multiline  # ty: ignore[invalid-assignment]  # frozen to a checker only
+        self._text = _text  # ty: ignore[invalid-assignment]
+        self._suffix = _suffix  # ty: ignore[invalid-assignment]
+        self._markers = _markers  # ty: ignore[invalid-assignment]
 
 
-@dataclass(frozen=True, slots=True)
+@lst_value_dataclass
 class Space:
     _comments: List[Comment]
 
@@ -115,6 +115,27 @@ class Space:
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
+
+    @classmethod
+    def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
+        """A comment-free Space is the instance `shared` has for its whitespace, when there is one.
+        Every other Space is built fresh."""
+        if not comments:
+            shared = cls.shared(whitespace or '')
+            if shared is not None:
+                return shared
+        return cls(comments, whitespace)
+
+    @classmethod
+    def shared(cls, whitespace: str) -> Optional[Space]:
+        """As in Java's Space.shared, the one comment-free Space shared for `whitespace`, or None
+        when it is too long to share."""
+        if not whitespace:
+            return cls.EMPTY
+        if len(whitespace) > 50:
+            return None
+        shared = _SHARED_SPACES.get(whitespace)
+        return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:
@@ -164,6 +185,7 @@ class Space:
 
 Space.EMPTY = Space([], '')
 Space.SINGLE_SPACE = Space([], ' ')
+_SHARED_SPACES: Dict[str, Space] = {' ': Space.SINGLE_SPACE}
 
 
 class JavaSourceFile(J, SourceFile):
@@ -206,8 +228,34 @@ class MethodCall(Expression):
     __slots__ = ()
 
 
-class JavaType(ABC):
-    class FullyQualified:
+def _fully_qualified_repr(self) -> str:
+    """A type's identity, not its graph: `object` is reachable from nearly every
+    method signature, so expanding fields re-prints everything reachable at every
+    position it occupies. Assigned in each subclass body because `dataclass`
+    generates a `__repr__` unless the body defines one."""
+    return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
+
+
+# Mirrors Java, where every kind of type implements the `JavaType` interface. A nested class
+# cannot name the class that encloses it, so at runtime the nested bases resolve to this
+# placeholder and are rebased onto the real `JavaType` once its body has run.
+if not TYPE_CHECKING:
+    class JavaType:
+        __slots__ = ()
+
+    _JavaTypePlaceholder = JavaType
+
+
+class JavaType:
+    __slots__ = ()
+
+    class Flag(IntFlag):
+        """Bits of a type's ``flags_bit_map``, the same as Java's ``org.openrewrite.java.tree.Flag``."""
+        Static = 1 << 3
+
+    class FullyQualified(JavaType):
+        __slots__ = ()
+
         class Kind(Enum):
             Class = 0
             Enum = 1
@@ -215,35 +263,63 @@ class JavaType(ABC):
             Annotation = 3
             Record = 4
 
-    class Unknown(FullyQualified):
-        pass
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            return getattr(self, '_supertype', None)
 
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            return getattr(self, '_interfaces', None) or []
+
+    class Unknown(FullyQualified):
+        __slots__ = ()
+
+        # Carries no name to render, and a heap address would make the repr of every
+        # node holding one differ run to run.
+        def __repr__(self) -> str:
+            return 'JavaType.Unknown()'
+
+    # Identity equality, as for the other `lst_dataclass` types here: a type graph is
+    # cyclic through members and methods, and Java compares these on name and type
+    # parameters alone.
+    @lst_dataclass
     class Class(FullyQualified):
-        _flags_bit_map: int
-        _fully_qualified_name: str
-        _kind: JavaType.FullyQualified.Kind
-        _type_parameters: Optional[List[JavaType]]
-        _supertype: Optional[JavaType.FullyQualified]
-        _owning_class: Optional[JavaType.FullyQualified]
-        _annotations: Optional[List[JavaType.FullyQualified]]
-        _interfaces: Optional[List[JavaType.FullyQualified]]
-        _members: Optional[List[JavaType.Variable]]
-        _methods: Optional[List[JavaType.Method]]
+        _flags_bit_map: int = 0
+        _fully_qualified_name: str = ''
+        # `Kind` lives on the base, which a nested class body cannot see, so the
+        # declaration-time default is filled in once the module is loaded.
+        _kind: Optional[JavaType.FullyQualified.Kind] = None
+        _type_parameters: Optional[List[JavaType]] = None
+        _supertype: Optional[JavaType.FullyQualified] = None
+        _owning_class: Optional[JavaType.FullyQualified] = None
+        _annotations: Optional[List[JavaType.FullyQualified]] = None
+        _interfaces: Optional[List[JavaType.FullyQualified]] = None
+        _members: Optional[List[JavaType.Variable]] = None
+        _methods: Optional[List[JavaType.Method]] = None
+
+        __repr__ = _fully_qualified_repr
+
+        def __post_init__(self):
+            if self._kind is None:
+                self._kind = JavaType.FullyQualified.Kind.Class
 
         @property
         def fully_qualified_name(self) -> str:
             return self._fully_qualified_name
 
     class ShallowClass(Class):
-        pass
+        __slots__ = ()
 
+    @lst_dataclass
     class Parameterized(FullyQualified):
-        _type: JavaType.FullyQualified
-        _type_parameters: Optional[List[JavaType]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _type_parameters: Optional[List[JavaType]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def type_parameters(self) -> Optional[List[JavaType]]:
@@ -256,13 +332,26 @@ class JavaType(ABC):
                 return t.fully_qualified_name
             return ''
 
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
+
+    @lst_dataclass
     class Annotation(FullyQualified):
-        _type: JavaType.FullyQualified
-        _values: Optional[List[JavaType.Annotation.ElementValue]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _values: Optional[List[JavaType.Annotation.ElementValue]] = None
+
+        __repr__ = _fully_qualified_repr
 
         @property
         def type(self) -> JavaType.FullyQualified:
-            return self._type
+            return cast(JavaType.FullyQualified, self._type)
 
         @property
         def values(self) -> List[JavaType.Annotation.ElementValue]:
@@ -274,6 +363,16 @@ class JavaType(ABC):
             if t is not None and hasattr(t, 'fully_qualified_name'):
                 return t.fully_qualified_name
             return ''
+
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
 
         class ElementValue(ABC):
             """Base class for annotation element values."""
@@ -324,22 +423,22 @@ class JavaType(ABC):
                 return self._reference_values
 
     @dataclass(slots=True)
-    class GenericTypeVariable:
-        _name: str = field(default="")
-        _variance: GenericTypeVariable.Variance = field(default=None)
-        _bounds: Optional[List[JavaType]] = field(default=None)
-
+    class GenericTypeVariable(JavaType):
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+        _name: str = field(default="")
+        _variance: JavaType.GenericTypeVariable.Variance = field(default=Variance.Invariant)
+        _bounds: Optional[List[JavaType]] = field(default=None)
 
         @property
         def name(self) -> str:
             return self._name
 
         @property
-        def variance(self) -> GenericTypeVariable.Variance:
+        def variance(self) -> JavaType.GenericTypeVariable.Variance:
             return self._variance
 
         @property
@@ -347,7 +446,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Union:
+    class Union(JavaType):
         """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -356,7 +455,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Intersection:
+    class Intersection(JavaType):
         """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -364,7 +463,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]:
             return self._bounds if self._bounds is not None else []
 
-    class Primitive(Enum):
+    class Primitive(JavaType, Enum):
         Boolean = 0
         Byte = 1
         Char = 2
@@ -385,7 +484,7 @@ class JavaType(ABC):
             return super()._missing_(value)
 
     @dataclass(slots=True)
-    class Method:
+    class Method(JavaType):
         _flags_bit_map: int = field(default=0)
         _declaring_type: Optional[JavaType.FullyQualified] = field(default=None)
         _name: str = field(default="")
@@ -444,7 +543,7 @@ class JavaType(ABC):
             return self._declared_formal_type_names
 
     @dataclass(slots=True)
-    class Variable:
+    class Variable(JavaType):
         _flags_bit_map: int = field(default=0)
         _name: str = field(default="")
         _owner: Optional[JavaType] = field(default=None)
@@ -472,7 +571,7 @@ class JavaType(ABC):
             return self._annotations
 
     @dataclass(slots=True)
-    class Array:
+    class Array(JavaType):
         _elem_type: Optional[JavaType] = field(default=None)
         _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
@@ -485,12 +584,19 @@ class JavaType(ABC):
             return self._annotations
 
 
+if not TYPE_CHECKING:
+    for _nested in vars(JavaType).values():
+        if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
+            _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
+    del _nested, _JavaTypePlaceholder
+
+
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JRightPadded(Generic[T]):
     _element: T
 
@@ -527,7 +633,7 @@ class JRightPadded(Generic[T]):
         return [x.element for x in padded_list]
 
     @classmethod
-    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[Union[J2, JRightPadded[J2]]]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2 | JRightPadded[J2]]) -> List[JRightPadded[J2]]:
         # Helper to extract element - handles both wrapped JRightPadded and unwrapped elements
         def get_element(t):
             return t.element if isinstance(t, JRightPadded) else t
@@ -564,7 +670,7 @@ class JRightPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JLeftPadded(Generic[T]):
     _before: Space
 
@@ -598,7 +704,7 @@ class JLeftPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True, slots=True)
+@lst_dataclass
 class JContainer(Generic[J2]):
     _before: Space
 
@@ -641,13 +747,7 @@ class JContainer(Generic[J2]):
             return self._t._elements
 
         def replace(self, **kwargs) -> JContainer[J3]:
-            """Replace fields of the container using keyword arguments."""
-            if 'elements' in kwargs:
-                elements = kwargs['elements']
-                if self._t._elements is elements:
-                    return self._t
-                return JContainer(self._t._before, elements, self._t._markers)
-            return self._t
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 

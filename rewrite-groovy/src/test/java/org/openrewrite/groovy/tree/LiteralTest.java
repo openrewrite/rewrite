@@ -16,7 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -454,6 +457,55 @@ class LiteralTest implements RewriteTest {
     }
 
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8980")
+    @Test
+    void gStringInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def t = 1
+              def label = ("build.${t}")
+              def cast = ( "build.${t}" ) as String
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                J.Parentheses<?> parens = (J.Parentheses<?>) ((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer();
+                assertThat(requireNonNull(parens).getTree()).isInstanceOf(G.GString.class);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8981")
+    @Test
+    void statementsInsideGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              def x = true
+              def s = "${if (x) { return 'a' }; return ''}"
+              def t = \"""#!/bin/bash
+              ${if (x) {
+                  return 'b'
+              }
+              return ''
+              }
+              \"""
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                G.GString gString = (G.GString) requireNonNull(((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer());
+                J.Block block = (J.Block) ((G.GString.Value) gString.getStrings().getFirst()).getTree();
+                assertThat(block.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                assertThat(block.getStatements()).satisfiesExactly(
+                  s -> assertThat(s).isInstanceOf(J.If.class),
+                  s -> assertThat(s).isInstanceOf(J.Return.class)
+                );
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
     @Test
     void stringWithMultipleBackslashes() {
@@ -532,5 +584,75 @@ class LiteralTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "'''a'''' | a'",
+      "'''a''''' | a''",
+      "\"\"\"a\"\"\"\" | a\"",
+      "\"\"\"a\"\"\"\"\" | a\"\"",
+      "''''''' | '",
+    })
+    void tripleQuotedStringEndingWithQuotes(String literal, String value) {
+        rewriteRun(
+          groovy("def s = " + literal + " + 'b'", spec -> spec.beforeRecipe(cu -> {
+              J.Binary concat = (J.Binary) requireNonNull(((J.VariableDeclarations) cu.getStatements().getFirst())
+                .getVariables().getFirst().getInitializer());
+              J.Literal left = (J.Literal) concat.getLeft();
+              assertThat(left.getValueSource()).isEqualTo(literal);
+              assertThat(left.getValue()).isEqualTo(value);
+          }))
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @Test
+    void tripleQuotedStringEndingWithQuoteInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def s = ('''a'''') + ('b')
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapeSequencesInString() {
+        rewriteRun(
+          groovy("def s = \"x\\ny\\tz\\u2605q\\\\r\\$w\"", spec -> spec.beforeRecipe(cu -> {
+              J.Literal literal = initializerOf(cu);
+              assertThat(literal.getValue()).isEqualTo("x\ny\tz\u2605q\\r$w");
+              assertThat(literal.getValueSource()).isEqualTo("\"x\\ny\\tz\\u2605q\\\\r\\$w\"");
+          }))
+        );
+    }
+
+    @Test
+    void slashyStringDoesNotProcessEscapes() {
+        rewriteRun(
+          groovy("def s = /x\\ny/", spec -> spec.beforeRecipe(cu ->
+            assertThat(initializerOf(cu).getValue()).isEqualTo("x\\ny")))
+        );
+    }
+
+    @Test
+    void escapeSequenceInGStringFragment() {
+        rewriteRun(
+          groovy("def id = 1\ndef s = \"x\\ny${id}\"", spec -> spec.beforeRecipe(cu -> {
+              G.GString gString = (G.GString) requireNonNull(((J.VariableDeclarations) cu.getStatements().get(1))
+                .getVariables().getFirst().getInitializer());
+              J.Literal fragment = (J.Literal) gString.getStrings().getFirst();
+              assertThat(fragment.getValue()).isEqualTo("x\ny");
+              assertThat(fragment.getValueSource()).isEqualTo("x\\ny");
+          }))
+        );
+    }
+
+    private static J.Literal initializerOf(G.CompilationUnit cu) {
+        return requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().getFirst())
+          .getVariables().getFirst().getInitializer());
     }
 }

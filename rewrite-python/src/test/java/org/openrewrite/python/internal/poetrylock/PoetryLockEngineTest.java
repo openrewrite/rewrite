@@ -38,7 +38,7 @@ import static org.openrewrite.python.internal.poetrylock.PoetryLockFixtures.reso
 
 /**
  * Golden scenarios replay Poetry 2.4.1 runs against pypi.org (see the fixture README); the
- * recorded index/metadata responses under {@code /poetrylock/http/} keep the tests offline.
+ * recorded index/metadata responses under {@code /lock/poetry/http/} keep the tests offline.
  */
 class PoetryLockEngineTest {
 

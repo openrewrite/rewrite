@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+
+using OpenRewrite.Core;
 
 namespace OpenRewrite.Core.Rpc;
 
@@ -28,6 +31,21 @@ namespace OpenRewrite.Core.Rpc;
 /// </summary>
 public class RpcReceiveQueue
 {
+    /// <summary>
+    /// Memoizes <see cref="FromJavaTypeName"/>, which scans every loaded assembly for a name a
+    /// receive resolves once per tree node. A plugin assembly can make a name that resolved to
+    /// null resolve, so an entry records the generation it was resolved in and an assembly load
+    /// makes every entry from an earlier generation a miss.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, (int Generation, Type? Type)> TypeByJavaName = new();
+
+    private static int _assemblyGeneration;
+
+    static RpcReceiveQueue()
+    {
+        AppDomain.CurrentDomain.AssemblyLoad += (_, _) => Interlocked.Increment(ref _assemblyGeneration);
+    }
+
     private readonly Queue<RpcObjectData> _batch = new();
     private readonly IDictionary<int, object> _refs;
     private readonly Func<List<RpcObjectData>>? _pull;
@@ -51,6 +69,10 @@ public class RpcReceiveQueue
         _sourceFileType = sourceFileType;
         _treeCodec = treeCodec;
     }
+
+    /// <summary>Messages already pulled and not yet taken, which a caller can drain without asking
+    /// the remote for another page.</summary>
+    internal int Buffered => _batch.Count;
 
     public RpcObjectData Take()
     {
@@ -94,6 +116,7 @@ public class RpcReceiveQueue
     public T? Receive<T>(T? before, Func<T, T>? onChange)
     {
         var message = Take();
+        var held = before;
         int? @ref = null;
         switch (message.State)
         {
@@ -127,7 +150,7 @@ public class RpcReceiveQueue
                     before = ExtractValue<T>(message.Value);
                 }
                 if (@ref != null && before != null)
-                    _refs[@ref.Value] = before;
+                    Record(@ref.Value, before);
                 goto case CHANGE; // Intentional fall-through
             case CHANGE:
                 T? after;
@@ -163,8 +186,9 @@ public class RpcReceiveQueue
                 {
                     after = before;
                 }
+                after = KeepHeldMarkers(held, after);
                 if (@ref != null && after != null)
-                    _refs[@ref.Value] = after;
+                    Record(@ref.Value, after);
                 return after;
             default:
                 throw new InvalidOperationException($"Unknown state: {message.State}");
@@ -314,7 +338,7 @@ public class RpcReceiveQueue
             else if (typeof(Marker).IsAssignableFrom(typeof(T)))
             {
                 // Unknown marker type from Java — use UnknownMarker as fallback
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             }
             else
             {
@@ -346,7 +370,7 @@ public class RpcReceiveQueue
         if (type.IsInterface || type.IsAbstract)
         {
             if (typeof(Marker).IsAssignableFrom(type))
-                return (T)(object)new UnknownMarker(Guid.NewGuid());
+                return (T)(object)new UnknownMarker(Tree.RandomId());
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
@@ -395,6 +419,53 @@ public class RpcReceiveQueue
     /// Deserializes a non-codec object that was sent inline in the ADD message.
     /// The value is typically a JsonElement from System.Text.Json deserialization.
     /// </summary>
+    private readonly List<(int Ref, bool Known, object? Previous)> _recorded = [];
+
+    private void Record(int @ref, object value)
+    {
+        var known = _refs.TryGetValue(@ref, out var previous);
+        _recorded.Add((@ref, known, previous));
+        _refs[@ref] = value;
+    }
+
+    /// <summary>
+    /// Forgets the refs this queue recorded, when the transfer it was reading failed part way.
+    /// </summary>
+    public void RollBackRefs()
+    {
+        for (var i = _recorded.Count - 1; i >= 0; i--)
+        {
+            var (@ref, known, previous) = _recorded[i];
+            if (known)
+            {
+                _refs[@ref] = previous!;
+            }
+            else
+            {
+                _refs.Remove(@ref);
+            }
+        }
+        _recorded.Clear();
+    }
+
+    /// <summary>
+    /// Java sends a marker it has no type for back as a generic one, which names no type for
+    /// this side to rebuild. Where the marker it stands for is still held here, that one is kept.
+    /// </summary>
+    private static T? KeepHeldMarkers<T>(T? held, T? received)
+    {
+        if (held is not Markers before || received is not Markers after ||
+            !after.MarkerList.Any(m => m is UnknownMarker))
+        {
+            return received;
+        }
+        return (T)(object)after.WithMarkerList(after.MarkerList
+            .Select(m => m is UnknownMarker
+                ? before.MarkerList.FirstOrDefault(kept => kept.Id == m.Id && kept is not UnknownMarker) ?? m
+                : m)
+            .ToList());
+    }
+
     internal static T DeserializeInline<T>(string javaTypeName, object value)
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
@@ -415,10 +486,19 @@ public class RpcReceiveQueue
             {
                 var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
                     ? Guid.Parse(idProp.GetString()!)
-                    : Guid.NewGuid();
-                return (T)(object)new UnknownMarker(id);
+                    : Tree.RandomId();
+                var unknown = new UnknownMarker(id, javaTypeName);
+                foreach (var property in je.EnumerateObject())
+                {
+                    // what begins with @ is Jackson's own, not the marker's
+                    if (property.Name != "id" && !property.Name.StartsWith('@'))
+                    {
+                        unknown.Data[property.Name] = property.Value.Clone();
+                    }
+                }
+                return (T)(object)unknown;
             }
-            return (T)(object)new UnknownMarker(Guid.NewGuid());
+            return (T)(object)new UnknownMarker(Tree.RandomId());
         }
 
         if (value is JsonElement jeNormal)
@@ -438,7 +518,20 @@ public class RpcReceiveQueue
     /// <summary>
     /// Maps a Java type name to its C# Type. Reverse of RpcSendQueue.ToJavaTypeName.
     /// </summary>
-    private static Type? FromJavaTypeName(string javaTypeName)
+    internal static Type? FromJavaTypeName(string javaTypeName)
+    {
+        var generation = Volatile.Read(ref _assemblyGeneration);
+        if (TypeByJavaName.TryGetValue(javaTypeName, out var cached) && cached.Generation == generation)
+            return cached.Type;
+
+        // Stamped with the generation read before resolving, so a store that lands after a load
+        // carries the earlier generation and is rejected rather than surviving as a stale miss.
+        var resolved = ResolveJavaTypeName(javaTypeName);
+        TypeByJavaName[javaTypeName] = (generation, resolved);
+        return resolved;
+    }
+
+    private static Type? ResolveJavaTypeName(string javaTypeName)
     {
         // Known direct mappings
         return javaTypeName switch

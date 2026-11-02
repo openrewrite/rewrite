@@ -19,8 +19,16 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func TestRenamePackage_RewritesImportPath(t *testing.T) {
@@ -222,4 +230,37 @@ func TestRenamePackage_RewritesProjectWide(t *testing.T) {
 			consumer,
 		),
 	)
+}
+
+func TestRenamePackage_LeavesTheVisitedImportsUntouched(t *testing.T) {
+	// given
+	source := "package main\n\nimport \"github.com/old/foo\"\n\nfunc main() { _ = foo.Hello() }\n"
+	cu, err := parser.NewGoParser().Parse("main.go", source)
+	require.NoError(t, err)
+	r := &recipes.RenamePackage{OldPackagePath: "github.com/old/foo", NewPackagePath: "github.com/new/foo"}
+
+	// when
+	after := r.Editor().Visit(cu, recipe.NewExecutionContext())
+
+	// then
+	assert.NotSame(t, cu, after)
+	assert.Equal(t, source, printer.Print(cu))
+	assert.Equal(t, "package main\n\nimport \"github.com/new/foo\"\n\nfunc main() { _ = foo.Hello() }\n", printer.Print(after))
+}
+
+func TestRenamePackage_LeavesTheVisitedPackageDeclUntouched(t *testing.T) {
+	// given
+	source := "package old\n\nfunc Util() {}\n"
+	cu, err := parser.NewGoParser().Parse("internal/old/util.go", source)
+	require.NoError(t, err)
+	cu.Markers = java.AddMarker(cu.Markers, golang.NewGoProject("myapp", "example.com/myapp"))
+	r := &recipes.RenamePackage{OldPackagePath: "example.com/myapp/internal/old", NewPackagePath: "example.com/myapp/internal/new"}
+
+	// when
+	after := r.Editor().Visit(cu, recipe.NewExecutionContext())
+
+	// then
+	assert.NotSame(t, cu, after)
+	assert.Equal(t, source, printer.Print(cu))
+	assert.Equal(t, "package new\n\nfunc Util() {}\n", printer.Print(after))
 }

@@ -573,4 +573,16 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void execFormWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              RUN ["echo" , "a",	"b"  ,"c"]
+              """
+          )
+        );
+    }
 }

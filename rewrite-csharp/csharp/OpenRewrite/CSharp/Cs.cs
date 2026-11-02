@@ -941,31 +941,66 @@ public sealed class SizeOf(
     Guid id,
     Space prefix,
     Markers markers,
-    Expression expression,
+    ControlParentheses<TypeTree> clazz,
     JavaType? type
 ) : Cs, Expression, IEquatable<SizeOf>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public Expression Expression { get; } = expression;
+    public ControlParentheses<TypeTree> Clazz { get; } = clazz;
     public JavaType? Type { get; } = type;
 
     public SizeOf WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Expression, Type);
+        id == Id ? this : new(id, Prefix, Markers, Clazz, Type);
     public SizeOf WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Type);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, Type);
     public SizeOf WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Type);
-    public SizeOf WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Type);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, Type);
+    public SizeOf WithClazz(ControlParentheses<TypeTree> clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, Type);
     public SizeOf WithType(JavaType? type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Expression, type);
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Clazz, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(SizeOf? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as SizeOf);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A C# typeof expression, e.g. typeof(int).
+/// </summary>
+public sealed class TypeOf(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<TypeTree> clazz,
+    JavaType? type
+) : Cs, Expression, IEquatable<TypeOf>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<TypeTree> Clazz { get; } = clazz;
+    public JavaType? Type { get; } = type;
+
+    public TypeOf WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Clazz, Type);
+    public TypeOf WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, Type);
+    public TypeOf WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, Type);
+    public TypeOf WithClazz(ControlParentheses<TypeTree> clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, Type);
+    public TypeOf WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Clazz, type);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeOf? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeOf);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -2622,26 +2657,26 @@ public sealed class UsingStatement(
     Guid id,
     Space prefix,
     Markers markers,
-    JLeftPadded<Expression> expressionPadded,
+    ControlParentheses<Expression> expression,
     Statement statement
 ) : Cs, Statement, IEquatable<UsingStatement>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JLeftPadded<Expression> ExpressionPadded { get; } = expressionPadded;
+    public ControlParentheses<Expression> Expression { get; } = expression;
     public Statement Statement { get; } = statement;
 
     public UsingStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, ExpressionPadded, Statement);
+        id == Id ? this : new(id, Prefix, Markers, Expression, Statement);
     public UsingStatement WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ExpressionPadded, Statement);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Statement);
     public UsingStatement WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ExpressionPadded, Statement);
-    public UsingStatement WithExpressionPadded(JLeftPadded<Expression> expressionPadded) =>
-        ReferenceEquals(expressionPadded, ExpressionPadded) ? this : new(Id, Prefix, Markers, expressionPadded, Statement);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Statement);
+    public UsingStatement WithExpression(ControlParentheses<Expression> expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Statement);
     public UsingStatement WithStatement(Statement statement) =>
-        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, ExpressionPadded, statement);
+        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, Expression, statement);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

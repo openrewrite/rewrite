@@ -123,13 +123,13 @@ class TabsAndIndentsStatistics {
     private totalSpaceIndents = 0;
     private totalTabIndents = 0;
 
-    // Track all observed indent sizes to compute GCD
-    private observedIndents: number[] = [];
+    // How often a block was seen indenting its statements by each width past the enclosing block's
+    private readonly levelWidths = new Map<number, number>();
 
-    recordSpaceIndent(spaceCount: number): void {
+    recordSpaceIndent(width: number): void {
         this.totalSpaceIndents++;
-        if (spaceCount > 0) {
-            this.observedIndents.push(spaceCount);
+        if (width > 0) {
+            this.levelWidths.set(width, (this.levelWidths.get(width) ?? 0) + 1);
         }
     }
 
@@ -141,23 +141,14 @@ class TabsAndIndentsStatistics {
         // Determine if using tabs or spaces
         const useTabs = this.totalTabIndents > this.totalSpaceIndents;
 
-        // Find indent size by computing GCD of all observed indents
-        // This correctly handles 2-space files where we see 2, 4, 6, 8... (all multiples of 2)
+        // The width most statements agree on, so a stray misindented line is outvoted
         let detectedIndentSize = 4; // Default
-        if (this.observedIndents.length > 0) {
-            // Compute GCD of all observed indents
-            let gcd = this.observedIndents[0];
-            for (let i = 1; i < this.observedIndents.length; i++) {
-                gcd = this.computeGcd(gcd, this.observedIndents[i]);
-                if (gcd === 1) break; // Can't get smaller than 1
-            }
-            // Only use common indent sizes (2, 4, 8)
-            if (gcd === 2 || gcd === 4 || gcd === 8) {
-                detectedIndentSize = gcd;
-            } else if (gcd > 0 && gcd % 4 === 0) {
-                detectedIndentSize = 4;
-            } else if (gcd > 0 && gcd % 2 === 0) {
-                detectedIndentSize = 2;
+        let votes = 0;
+        for (const size of [2, 4, 8]) {
+            const count = this.levelWidths.get(size) ?? 0;
+            if (count > votes) {
+                detectedIndentSize = size;
+                votes = count;
             }
         }
 
@@ -171,15 +162,6 @@ class TabsAndIndentsStatistics {
             indentChainedMethods: true,
             indentAllChainedCallsInAGroup: false
         };
-    }
-
-    private computeGcd(a: number, b: number): number {
-        while (b !== 0) {
-            const temp = b;
-            b = a % b;
-            a = temp;
-        }
-        return a;
     }
 }
 
@@ -272,23 +254,32 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
         super();
     }
 
+    /** The indent of the statements in each enclosing block, innermost last. */
+    private readonly enclosing: number[] = [];
+
     protected async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
-        // Check indentation of statements in the block
+        const outer = this.enclosing[this.enclosing.length - 1] ?? 0;
+        let own: number | undefined;
         for (const stmt of block.statements) {
             const whitespace = stmt.element.prefix?.whitespace;
-            if (whitespace) {
-                this.analyzeIndent(whitespace);
-            }
+            const indent = whitespace ? this.analyzeIndent(whitespace, outer) : undefined;
+            own ??= indent;
         }
-        return super.visitBlock(block, p);
+        this.enclosing.push(own ?? outer);
+        try {
+            return await super.visitBlock(block, p);
+        } finally {
+            this.enclosing.pop();
+        }
     }
 
-    private analyzeIndent(whitespace: string): void {
+    /** Records the indent `whitespace` ends in, relative to `outer`, and returns it if it is spaces. */
+    private analyzeIndent(whitespace: string, outer: number): number | undefined {
         const newlineIndex = whitespace.lastIndexOf('\n');
-        if (newlineIndex < 0) return;
+        if (newlineIndex < 0) return undefined;
 
         const indent = whitespace.substring(newlineIndex + 1);
-        if (indent.length === 0) return;
+        if (indent.length === 0) return 0;
 
         // Check first character to determine type
         if (indent[0] === '\t') {
@@ -300,10 +291,10 @@ class FindIndentVisitor extends JavaScriptVisitor<any> {
                 if (char === ' ') spaceCount++;
                 else break;
             }
-            if (spaceCount > 0) {
-                this.stats.recordSpaceIndent(spaceCount);
-            }
+            this.stats.recordSpaceIndent(spaceCount - outer);
+            return spaceCount;
         }
+        return undefined;
     }
 }
 

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
+import {isExpression} from "../../../src/javascript/parser-utils";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 
@@ -56,6 +57,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -84,6 +86,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -114,6 +117,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -146,6 +150,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -176,6 +181,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -205,6 +211,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             // Should NOT match - needs at least 1 leading statement
@@ -242,6 +249,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             // Should match - zero leading statements
@@ -290,6 +298,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -378,6 +387,7 @@ describe('variadic statement matching and expansion', () => {
         }`;
 
         spec.recipe = fromVisitor(matchAndReplaceFunction(pat, tmpl));
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             typescript(
@@ -422,5 +432,47 @@ describe('variadic statement matching and expansion', () => {
                 }`
             )
         );
+    });
+
+    test('a statement substituted for a statement placeholder is not wrapped as an expression', () => {
+        const first = capture();
+        const second = capture();
+        spec.recipe = fromVisitor(matchAndReplaceFunction(
+            pattern`{
+                ${first}
+                ${second}
+            }`,
+            template`{
+                ${second}
+                ${first}
+            }`));
+        spec.cycles = 1;
+
+        return spec.rewriteRun({
+            ...typescript(
+                `function foo() {
+                    const a = 1;
+                    return a;
+                }`,
+                `
+                function foo() {
+                    return a;
+                    const a = 1;
+                }`
+            ),
+            afterRecipe: async (cu: JS.CompilationUnit) => {
+                const wrapped: string[] = [];
+                await new class extends JavaScriptVisitor<number> {
+                    protected override async visitExpressionStatement(statement: JS.ExpressionStatement, p: number): Promise<J | undefined> {
+                        const expression: J = statement.expression;
+                        if (!isExpression(expression)) {
+                            wrapped.push(expression.kind);
+                        }
+                        return super.visitExpressionStatement(statement, p);
+                    }
+                }().visit(cu, 0);
+                expect(wrapped).toEqual([]);
+            }
+        });
     });
 });

@@ -104,8 +104,8 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*java.ParseError)(nil)), "org.openrewrite.tree.ParseError")
 
 	// Non-tree types that Java needs valueType for
-	RegisterValueType(reflect.TypeOf(java.Space{}), "org.openrewrite.java.tree.Space")
-	RegisterValueType(reflect.TypeOf(java.Markers{}), "org.openrewrite.marker.Markers")
+	RegisterValueType(reflect.TypeOf(java.EmptySpace), "org.openrewrite.java.tree.Space")
+	RegisterValueType(reflect.TypeOf(java.EmptyMarkers), "org.openrewrite.marker.Markers")
 	RegisterValueType(reflect.TypeOf(java.Comment{}), "org.openrewrite.java.tree.TextComment")
 
 	// Go-specific marker valueType registrations (for send-side type resolution)
@@ -120,9 +120,11 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.ImplicitForClauses{}), "org.openrewrite.golang.marker.ImplicitForClauses")
 	RegisterValueType(reflect.TypeOf(golang.Builtin{}), "org.openrewrite.golang.marker.Builtin")
 	RegisterValueType(reflect.TypeOf(golang.PartialTypeAttribution{}), "org.openrewrite.golang.marker.PartialTypeAttribution")
+	RegisterValueType(reflect.TypeOf(golang.BuildConstraint{}), "org.openrewrite.golang.marker.BuildConstraint")
 	RegisterValueType(reflect.TypeOf(golang.StructTag{}), "org.openrewrite.golang.marker.StructTag")
 	RegisterValueType(reflect.TypeOf(golang.StructTagQuote{}), "org.openrewrite.golang.marker.StructTagQuote")
 	RegisterValueType(reflect.TypeOf(golang.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
+	RegisterValueType(reflect.TypeOf(golang.ChanDirMarker{}), "org.openrewrite.golang.tree.ChanDirMarker")
 	RegisterValueType(reflect.TypeOf(java.SearchResult{}), "org.openrewrite.marker.SearchResult")
 	RegisterValueType(reflect.TypeOf(java.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
 	RegisterValueType(reflect.TypeOf(golang.Semicolon{}), "org.openrewrite.java.marker.Semicolon")
@@ -247,6 +249,9 @@ func init() {
 	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.BuildToolFailure"} })
 	RegisterFactory("org.openrewrite.marker.Generated", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.Generated"} })
 	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.DeserializationError"} })
+	for level, javaType := range markupJavaTypes {
+		RegisterFactory(javaType, func() any { return java.Markup{Level: level} })
+	}
 	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
 	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return java.SearchResult{} })
 	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before Space)
@@ -263,9 +268,11 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.ImplicitForClauses", func() any { return golang.ImplicitForClauses{} })
 	RegisterFactory("org.openrewrite.golang.marker.Builtin", func() any { return golang.Builtin{} })
 	RegisterFactory("org.openrewrite.golang.marker.PartialTypeAttribution", func() any { return golang.PartialTypeAttribution{} })
+	RegisterFactory("org.openrewrite.golang.marker.BuildConstraint", func() any { return golang.BuildConstraint{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return golang.StructTag{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTagQuote", func() any { return golang.StructTagQuote{} })
 	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return golang.TrailingComma{} })
+	RegisterFactory("org.openrewrite.golang.tree.ChanDirMarker", func() any { return golang.ChanDirMarker{} })
 	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the
 	// previous GenericMarker fallback for the same Java FQN.
 	RegisterFactory("org.openrewrite.java.marker.Semicolon", func() any { return golang.Semicolon{} })
@@ -281,8 +288,8 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ModuleRef", func() any { return golang.GoModuleRef{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$PackageModule", func() any { return golang.GoPackageModule{} })
 
-	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.Space{} })
-	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.Markers{} })
+	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.EmptySpace })
+	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.EmptyMarkers })
 	RegisterFactory("org.openrewrite.java.tree.TextComment", func() any { return java.Comment{} })
 
 	// Padding types — needed when Java sends ADD messages for new padding

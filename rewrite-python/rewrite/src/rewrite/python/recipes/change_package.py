@@ -17,7 +17,7 @@ ChangePackage recipe for Python that delegates to Java's ChangePackage.
 
 This recipe changes package/module references from one name to another.
 """
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from rewrite import Recipe, option
 from rewrite.decorators import categorize
@@ -26,6 +26,7 @@ from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
+@dataclass
 class ChangePackage(Recipe):
     """
     Change package/module references from one name to another.
@@ -40,33 +41,23 @@ class ChangePackage(Recipe):
         )
     """
 
-    old_package_name: str = field(metadata=option(
+    old_package_name: str = field(default="", metadata=option(
         display_name="Old package name",
         description="The package/module name to change from.",
         example="collections"
     ))
 
-    new_package_name: str = field(metadata=option(
+    new_package_name: str = field(default="", metadata=option(
         display_name="New package name",
         description="The package/module name to change to.",
         example="collections.abc"
     ))
 
-    recursive: bool = field(metadata=option(
+    recursive: bool = field(default=True, metadata=option(
         display_name="Recursive",
         description="When enabled, also rename subpackages.",
         required=False
     ))
-
-    def __init__(
-        self,
-        old_package_name: str = "",
-        new_package_name: str = "",
-        recursive: bool = True
-    ):
-        self.old_package_name = old_package_name
-        self.new_package_name = new_package_name
-        self.recursive = recursive
 
     @property
     def name(self) -> str:

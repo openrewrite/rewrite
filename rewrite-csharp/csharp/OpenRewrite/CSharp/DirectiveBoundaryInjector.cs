@@ -55,7 +55,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         var indices = FindDirectiveIndices(block.End);
         if (indices.Count > 0)
         {
-            var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+            var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
             block = block.WithMarkers(block.Markers.Add(marker));
         }
 
@@ -69,7 +69,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         var indices = FindDirectiveIndices(compilationUnit.Eof);
         if (indices.Count > 0)
         {
-            var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+            var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
             compilationUnit = compilationUnit.WithMarkers(compilationUnit.Markers.Add(marker));
         }
 
@@ -82,7 +82,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         if (indices.Count == 0)
             return node;
 
-        var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
+        var marker = new DirectiveBoundaryMarker(Tree.RandomId(), indices);
         var newMarkers = node.Markers.Add(marker);
         return J.SetMarkers(node, newMarkers);
     }

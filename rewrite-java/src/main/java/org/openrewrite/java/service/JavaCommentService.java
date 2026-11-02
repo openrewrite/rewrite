@@ -116,8 +116,8 @@ public class JavaCommentService extends CommentService {
         }
         J j = (J) tree;
         //noinspection DataFlowIssue
-        return j.withComments(ListUtils.map(j.getComments(), c ->
-                c instanceof TextComment && text.equals(((TextComment) c).getText()) ? null : c));
+        return j.withComments(ListUtils.filter(j.getComments(), c ->
+                !(c instanceof TextComment && text.equals(((TextComment) c).getText()))));
     }
 
     @Override

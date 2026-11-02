@@ -1506,6 +1506,7 @@ class MavenParserTest implements RewriteTest {
                 """
             ), mavenCtx);
             mavenCtx.setMavenSettings(settings);
+            MavenSettingsAutoLoadingExtension.withMavenCentralMirror(mavenCtx);
 
             rewriteRun(
               recipeSpec -> recipeSpec.executionContext(mavenCtx),
@@ -2812,7 +2813,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void notInheritedPluginFromParent() {
+    void notInheritedPluginsApplyOnlyToTheDeclaringPom() {
         rewriteRun(
           mavenProject("a",
             pomXml(
@@ -2827,10 +2828,11 @@ class MavenParserTest implements RewriteTest {
                       <artifactId>a</artifactId>
                   </project>
                 """,
-              spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins())
-                  .isEmpty()
-              )
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).isEmpty();
+                  assertThat(pom.getPluginManagement()).isEmpty();
+              })
             )
           ),
           mavenProject("b",
@@ -2844,6 +2846,15 @@ class MavenParserTest implements RewriteTest {
                         <packaging>pom</packaging>
 
                         <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <inherited>false</inherited>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <version>3.2.5</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
                           <plugins>
                               <plugin>
                                   <inherited>false</inherited>
@@ -2856,7 +2867,12 @@ class MavenParserTest implements RewriteTest {
                           </plugins>
                         </build>
                     </project>
-                """
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).extracting(Plugin::getArtifactId).containsExactly("maven-compiler-plugin");
+                  assertThat(pom.getPluginManagement()).extracting(Plugin::getArtifactId).containsExactly("maven-surefire-plugin");
+              })
             )
           )
         );
@@ -3287,6 +3303,68 @@ class MavenParserTest implements RewriteTest {
                 assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Runtime)).isNotEmpty();
                 assertThat(resolution.findDependencies("org.glassfish.jaxb", "jaxb-runtime", Scope.Compile)).isEmpty();
                 assertThat(resolution.findDependencies("jakarta.xml.bind", "jakarta.xml.bind-api", Scope.Compile)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void runtimeScopedDirectDependencyIsNotOnProvidedClasspath() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>2.15.0</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Test)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Provided)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void transitiveRuntimeScopedDependencyIsNotOnProvidedClasspath() {
+        // org.openrewrite:rewrite-maven declares com.github.ben-manes.caffeine:caffeine with
+        // <scope>runtime</scope> in its own pom; it should not leak onto the compile-time
+        // "provided" classpath of a project that merely compile-depends on rewrite-maven.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                    <version>8.81.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Provided)).isEmpty();
             })
           )
         );

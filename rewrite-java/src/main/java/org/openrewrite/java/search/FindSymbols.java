@@ -141,8 +141,29 @@ public class FindSymbols extends Recipe {
                 JavaType.Method methodType = md.getMethodType();
                 if (methodType != null) {
                     String params = methodType.getParameterTypes().stream()
-                            .map(TypeUtils::asFullyQualified)
-                            .map(fq -> fq != null ? fq.getClassName() : "?")
+                            .map(type -> {
+                                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+                                if (fq != null) {
+                                    return fq.getClassName();
+                                }
+                                if (type instanceof JavaType.Primitive) {
+                                    JavaType.Primitive primitive = (JavaType.Primitive) type;
+                                    switch (primitive) {
+                                        case Boolean:
+                                        case Byte:
+                                        case Char:
+                                        case Double:
+                                        case Float:
+                                        case Int:
+                                        case Long:
+                                        case Short:
+                                            return primitive.getKeyword();
+                                        default:
+                                            break;
+                                    }
+                                }
+                                return "?";
+                            })
                             .collect(joining(", "));
                     JavaType returnJavaType = methodType.getReturnType();
                     JavaType.FullyQualified returnFq = TypeUtils.asFullyQualified(returnJavaType);

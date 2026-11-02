@@ -637,7 +637,7 @@ public interface JavaType {
             if (!(o instanceof Class)) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+                   getTypeParameters().equals(aClass.getTypeParameters());
         }
 
         @Override
@@ -785,6 +785,11 @@ public interface JavaType {
         public interface ElementValue {
             JavaType getElement();
 
+            /**
+             * Null when the element's value is itself null, which the Java language forbids but
+             * peers such as C# permit ({@code [Foo(null)]}).
+             */
+            @Nullable
             Object getValue();
         }
 
@@ -807,8 +812,7 @@ public interface JavaType {
             }
 
             @Override
-            public Object getValue() {
-                //noinspection DataFlowIssue
+            public @Nullable Object getValue() {
                 return constantValue != null ? constantValue : referenceValue;
             }
         }
@@ -833,8 +837,10 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
-                //noinspection DataFlowIssue
-                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+                // Neither array is set when the argument was a null array literal, which C#
+                // allows (`[Foo(null)]`) and sends over RPC.
+                Object[] values = constantValues != null ? constantValues : referenceValues;
+                return values == null ? emptyList() : Arrays.asList(values);
             }
         }
 
@@ -988,7 +994,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Parameterized)) return false;
             Parameterized that = (Parameterized) o;
-            return Objects.equals(type, that.type) && Arrays.equals(typeParameters, that.typeParameters);
+            return Objects.equals(getType(), that.getType()) && getTypeParameters().equals(that.getTypeParameters());
         }
 
         @Override
@@ -1076,8 +1082,10 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof GenericTypeVariable)) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
+            List<JavaType> bounds = getBounds(), thatBounds = that.getBounds();
             return name.equals(that.name) && variance == that.variance &&
-                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
+                   (variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty() ||
+                    !bounds.isEmpty() && bounds.equals(thatBounds));
         }
 
         @Override
@@ -1151,7 +1159,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Array)) return false;
             Array array = (Array) o;
-            return Objects.equals(elemType, array.elemType);
+            return Objects.equals(getElemType(), array.getElemType());
         }
 
         @Override
@@ -1662,9 +1670,9 @@ public interface JavaType {
             if (!(o instanceof Method)) return false;
             Method method = (Method) o;
             return Objects.equals(name, method.name) &&
-                   Objects.equals(declaringType, method.declaringType) &&
-                   Objects.equals(returnType, method.returnType) &&
-                   Arrays.equals(parameterTypes, method.parameterTypes);
+                   Objects.equals(getDeclaringType(), method.getDeclaringType()) &&
+                   Objects.equals(getReturnType(), method.getReturnType()) &&
+                   getParameterTypes().equals(method.getParameterTypes());
         }
 
         @Override
@@ -1762,9 +1770,10 @@ public interface JavaType {
             return this;
         }
 
-        public Variable unsafeSet(String name, JavaType owner, @Nullable JavaType type,
+        public Variable unsafeSet(String name, long flagsBitMap, JavaType owner, @Nullable JavaType type,
                                   FullyQualified @Nullable [] annotations) {
             this.name = name;
+            this.flagsBitMap = flagsBitMap;
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = annotations;
@@ -1792,7 +1801,7 @@ public interface JavaType {
             if (this == o) return true;
             if (!(o instanceof Variable)) return false;
             Variable variable = (Variable) o;
-            return Objects.equals(name, variable.name) && Objects.equals(owner, variable.owner);
+            return Objects.equals(name, variable.name) && Objects.equals(getOwner(), variable.getOwner());
         }
 
         @Override

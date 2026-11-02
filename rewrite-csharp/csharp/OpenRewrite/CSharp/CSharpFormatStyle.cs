@@ -255,11 +255,18 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
 
     /// <summary>Default style matching Roslyn/Visual Studio defaults (Allman style).</summary>
     public static CSharpFormatStyle Default { get; } = new(
-        Guid.NewGuid(), DefaultFlags, indentSize: 4, tabSize: 4, newLine: "\n",
+        Tree.RandomId(), DefaultFlags, indentSize: 4, tabSize: 4, newLine: "\n",
         labelPositioning: 1, spacingAroundBinaryOperator: 0);
 
     public CSharpFormatStyle WithId(Guid id) =>
         id == Id ? this : new(id, _flags, IndentSize, TabSize, NewLine, LabelPositioning, SpacingAroundBinaryOperator);
+
+    /// <summary>This style, indenting with tabs or spaces and by the sizes given.</summary>
+    internal CSharpFormatStyle WithIndentation(bool useTabs, int indentSize, int tabSize) =>
+        useTabs == UseTabs && indentSize == IndentSize && tabSize == TabSize
+            ? this
+            : new(Tree.RandomId(), useTabs ? _flags | 1L << BitUseTabs : _flags & ~(1L << BitUseTabs),
+                indentSize, tabSize, NewLine, LabelPositioning, SpacingAroundBinaryOperator);
 
     // ── RPC serialization: 6 fields instead of 52 ──
     public void RpcSend(CSharpFormatStyle after, RpcSendQueue q)

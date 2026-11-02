@@ -124,7 +124,7 @@ internal static class GitCli
                 WorkingDirectory = workDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                RedirectStandardInput = stdin != null,
+                RedirectStandardInput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
@@ -142,8 +142,8 @@ internal static class GitCli
             if (stdin != null)
             {
                 process.StandardInput.Write(stdin);
-                process.StandardInput.Close();
             }
+            process.StandardInput.Close();
 
             if (!process.WaitForExit((int)Timeout.TotalMilliseconds))
             {

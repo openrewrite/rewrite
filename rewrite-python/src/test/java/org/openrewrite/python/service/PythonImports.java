@@ -79,6 +79,11 @@ final class PythonImports {
                 JContainer.build(Space.SINGLE_SPACE, padded, Markers.EMPTY));
     }
 
+    /** A statement reading {@code dotted}, as against an import binding it. */
+    static Statement use(String dotted) {
+        return new Py.ExpressionStatement(randomId(), name(dotted));
+    }
+
     /** A dotted name as the parser models it outside an import qualid: no empty target. */
     private static Expression name(String dotted) {
         String[] parts = dotted.split("\\.");

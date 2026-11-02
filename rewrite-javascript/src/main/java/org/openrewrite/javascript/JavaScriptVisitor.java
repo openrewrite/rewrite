@@ -140,7 +140,13 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             d = (JS.Delete) temp;
         }
-        return d;
+        Statement tempStatement = (Statement) visitStatement(d, p);
+        if (!(tempStatement instanceof JS.Delete)) {
+            return tempStatement;
+        } else {
+            d = (JS.Delete) tempStatement;
+        }
+        return d.withExpression(requireNonNull(visitAndCast(d.getExpression(), p)));
     }
 
     public J visitExpressionStatement(JS.ExpressionStatement statement, P p) {
@@ -961,6 +967,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             return temp;
         } else {
             f = (JS.ForOfLoop) temp;
+        }
+        if (f.getAwait() != null) {
+            f = f.withAwait(visitSpace(f.getAwait(), JsSpace.Location.FOR_OF_LOOP_AWAIT, p));
         }
         return f.withLoop(requireNonNull(visitAndCast(f.getLoop(), p)));
     }

@@ -59,8 +59,8 @@ type paddedStep struct {
 var (
 	planCache    sync.Map // reflect.Type -> []fieldStep
 	uuidType     = reflect.TypeOf(uuid.UUID{})
-	spaceType    = reflect.TypeOf(java.Space{})
-	markersType  = reflect.TypeOf(java.Markers{})
+	spaceType    = reflect.TypeOf(java.EmptySpace)
+	markersType  = reflect.TypeOf(java.EmptyMarkers)
 	jType        = reflect.TypeOf((*java.J)(nil)).Elem()
 	treeType     = reflect.TypeOf((*java.Tree)(nil)).Elem()
 	javaTypeType = reflect.TypeOf((*java.JavaType)(nil)).Elem()

@@ -56,7 +56,7 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         forceConsistentCasingInFileNames: false,
     };
 
-    const host = ts.createCompilerHost(compilerOptions);
+    const host = withCachedLibFiles(ts.createCompilerHost(compilerOptions), compilerOptions);
     // Default node resolution from each file's on-disk location, falling back to the
     // explicit reference roots when a dependency isn't co-located with the own package.
     host.resolveModuleNameLiterals = (moduleLiterals, containingFile) =>
@@ -153,6 +153,32 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
     }
 
     return [...byFqn.values()];
+}
+
+/**
+ * Every package's program loads TypeScript's default lib: 93 files, 3 MB of declarations, against a
+ * typical package's few KB. Parsed and bound once and shared by every program after, as a language
+ * service shares them across projects, a package costs only its own files.
+ */
+const LIB_SOURCE_FILES = new Map<string, ts.SourceFile>();
+
+function withCachedLibFiles(host: ts.CompilerHost, options: ts.CompilerOptions): ts.CompilerHost {
+    const libDir = path.dirname(ts.getDefaultLibFilePath(options)) + path.sep;
+    const getSourceFile = host.getSourceFile;
+    host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
+        if (!fileName.startsWith(libDir)) {
+            return getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+        }
+        let sourceFile = LIB_SOURCE_FILES.get(fileName);
+        if (sourceFile === undefined) {
+            sourceFile = getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+            if (sourceFile) {
+                LIB_SOURCE_FILES.set(fileName, sourceFile);
+            }
+        }
+        return sourceFile;
+    };
+    return host;
 }
 
 function arity(cls: Type.Class): number {

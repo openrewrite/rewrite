@@ -1,0 +1,262 @@
+{"header":"fill-range 7.0.1: every call its own tests (test/custom-expand.js, test/errors.js, test/invalid.js, test/matching.js, test/options.js, test/padding.js, test/ranges.js, test/special.js, test/steps.js, test/verify-matches.js) make, with its answer; generate/upstream-calls.js generate/upstream/fill-range.js <checkout> 7.0.1"}
+{"test":"test/custom-expand.js > custom function for expansions: > should expose the current value as the first param.","fn":"fill","args":[1,5,{"$":"function","name":""}],"out":[1,2,3,4,5]}
+{"test":"test/custom-expand.js > custom function for expansions: > should expose the character code for non-integers","fn":"fill","args":["a","e",{"$":"function","name":""}],"out":["a","b","c","d","e"]}
+{"test":"test/custom-expand.js > custom function for expansions: > should expose padding `maxLength` on options","fn":"fill","args":["01","05",{"$":"function","name":""}],"out":["0001","0002","0003","0004","0005"]}
+{"test":"test/custom-expand.js > custom function for expansions: > should expose the index as the fifth param.","fn":"fill","args":["a","e",{"$":"function","name":""}],"out":["a0","b1","c2","d3","e4"]}
+{"test":"test/errors.js > error handling > should throw when range arguments are invalid and `strictRanges` is true","fn":"fill","args":["0a","0z",{"strictRanges":true}],"threw":{"$":"error","name":"RangeError","message":"Invalid range arguments: [ '0a', '0z' ]"}}
+{"test":"test/errors.js > error handling > should throw when range arguments are invalid and `strictRanges` is true","fn":"fill","args":["","*",2,{"strictRanges":true}],"threw":{"$":"error","name":"RangeError","message":"Invalid range arguments: [ '', '*' ]"}}
+{"test":"test/errors.js > error handling > should throw when args are incompatible","fn":"fill","args":["a8",10,{"strictRanges":true}],"threw":{"$":"error","name":"RangeError","message":"Invalid range arguments: [ 'a8', 10 ]"}}
+{"test":"test/errors.js > error handling > should throw when args are incompatible","fn":"fill","args":[1,"zz",{"strictRanges":true}],"threw":{"$":"error","name":"RangeError","message":"Invalid range arguments: [ 1, 'zz' ]"}}
+{"test":"test/errors.js > error handling > should throw when the step is bad.","fn":"fill","args":["1","10","z",{"strictRanges":true}],"threw":{"$":"error","name":"TypeError","message":"Expected step \"z\" to be a number"}}
+{"test":"test/errors.js > error handling > should throw when the step is bad.","fn":"fill","args":["a","z","a",{"strictRanges":true}],"threw":{"$":"error","name":"TypeError","message":"Expected step \"a\" to be a number"}}
+{"test":"test/errors.js > error handling > should throw when the step is bad.","fn":"fill","args":["a","z","0a",{"strictRanges":true}],"threw":{"$":"error","name":"TypeError","message":"Expected step \"0a\" to be a number"}}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","0f"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","10","ff"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","10.f"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","10f"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","20","2f"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","20","f2"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","2f"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","2f","2"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","f2"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","ff"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1","ff","2"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1.1","2.1"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1.2","2"],"out":[]}
+{"test":"test/invalid.js > invalid ranges > should return an empty array when options.strict is not true","fn":"fill","args":["1.20","2"],"out":[]}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,8,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,8,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,10,{"toRegex":true}],"out":"[2-9]|10"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,100,{"toRegex":true}],"out":"[2-9]|[1-9][0-9]|100"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,100,{"toRegex":true}],"out":"[2-9]|[1-9][0-9]|100"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,10,{"toRegex":true}],"out":"-[1-9]|-?10|[0-9]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,10,2,{"toRegex":true}],"out":"0|2|4|6|8|10|-(?:2|4|6|8|10)"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in descending order","fn":"fill","args":[8,2,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in descending order","fn":"fill","args":[8,2,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges for numbers in descending order","fn":"fill","args":[8,2,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[8,2,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[8,2,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[8,2,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[8,2,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[2,8,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[2,8,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/matching.js > when options.toRegex is used > should create regex ranges when a step is given","fn":"fill","args":[2,8,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/options.js > options > options.stringify > should cast values to strings","fn":"fill","args":["1","10","1",{"stringify":true}],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/options.js > options > options.stringify > should cast values to strings","fn":"fill","args":[2,10,"2",{"stringify":true}],"out":["2","4","6","8","10"]}
+{"test":"test/options.js > options > options.stringify > should cast values to strings","fn":"fill","args":[2,10,1,{"stringify":true}],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/options.js > options > options.stringify > should cast values to strings","fn":"fill","args":[2,10,3,{"stringify":true}],"out":["2","5","8"]}
+{"test":"test/options.js > options > options.transform > should cast values to strings","fn":"fill","args":["1","10","1",{"transform":{"$":"function","name":"transform"}}],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/options.js > options > options.transform > should cast values to strings","fn":"fill","args":[2,10,"2",{"transform":{"$":"function","name":"transform"}}],"out":["2","4","6","8","10"]}
+{"test":"test/options.js > options > options.transform > should cast values to strings","fn":"fill","args":[2,10,1,{"transform":{"$":"function","name":"transform"}}],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/options.js > options > options.transform > should cast values to strings","fn":"fill","args":[2,10,3,{"transform":{"$":"function","name":"transform"}}],"out":["2","5","8"]}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,8,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,10,{"toRegex":true}],"out":"[2-9]|10"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for numbers in ascending order","fn":"fill","args":[2,100,{"toRegex":true}],"out":"[2-9]|[1-9][0-9]|100"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,10,{"toRegex":true}],"out":"-[1-9]|-?10|[0-9]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,10,2,{"toRegex":true}],"out":"0|2|4|6|8|10|-(?:2|4|6|8|10)"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,0,2,{"toRegex":true}],"out":"0|-(?:2|4|6|8|10)"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges with positive and negative numbers","fn":"fill","args":[-10,-2,2,{"toRegex":true}],"out":"-(?:2|4|6|8|10)"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for numbers in descending order","fn":"fill","args":[8,2,{"toRegex":true}],"out":"[2-8]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges when a step is given","fn":"fill","args":[8,2,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges when a step is given","fn":"fill","args":[2,8,{"toRegex":true,"step":2}],"out":"2|4|6|8"}
+{"test":"test/options.js > options > options.toRegex > should support zero-padding","fn":"fill","args":["002","008",{"toRegex":true}],"out":"0{0,2}[2-8]"}
+{"test":"test/options.js > options > options.toRegex > should support zero-padding","fn":"fill","args":["02","08",{"toRegex":true}],"out":"0?[2-8]"}
+{"test":"test/options.js > options > options.toRegex > should support zero-padding","fn":"fill","args":["02","10",{"toRegex":true}],"out":"0?[2-9]|10"}
+{"test":"test/options.js > options > options.toRegex > should support zero-padding","fn":"fill","args":["002","100",{"toRegex":true}],"out":"0{0,2}[2-9]|0?[1-9][0-9]|100"}
+{"test":"test/options.js > options > options.toRegex > should support negative zero-padding","fn":"fill","args":["-002","-100",{"toRegex":true}],"out":"-0{0,3}[2-9]|-0{0,2}[1-9][0-9]|-0?100"}
+{"test":"test/options.js > options > options.toRegex > should support negative zero-padding","fn":"fill","args":["-02","-08",{"toRegex":true}],"out":"-0{0,2}[2-8]"}
+{"test":"test/options.js > options > options.toRegex > should support negative zero-padding","fn":"fill","args":["-02","-100",{"toRegex":true}],"out":"-0{0,3}[2-9]|-0{0,2}[1-9][0-9]|-0?100"}
+{"test":"test/options.js > options > options.toRegex > should support negative zero-padding","fn":"fill","args":["-02","100",{"toRegex":true}],"out":"-0{0,2}[12]|0{0,2}[0-9]|0?[1-9][0-9]|100"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for alpha chars defined in ascending order","fn":"fill","args":["a","b",{"toRegex":true}],"out":"[a-b]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for alpha chars defined in ascending order","fn":"fill","args":["A","b",{"toRegex":true}],"out":"[A-b]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for alpha chars defined in ascending order","fn":"fill","args":["Z","a",{"toRegex":true}],"out":"[Z-a]"}
+{"test":"test/options.js > options > options.toRegex > should create regex ranges for alpha chars defined in descending order","fn":"fill","args":["z","A",{"toRegex":true}],"out":"[A-z]"}
+{"test":"test/options.js > options > options.wrap > should not wrap regex ranges with a single condition in parentheses","fn":"fill","args":[2,8,{"toRegex":true,"wrap":true}],"out":"[2-8]"}
+{"test":"test/options.js > options > options.wrap > should wrap regex ranges in parentheses","fn":"fill","args":[2,10,{"toRegex":true,"wrap":true}],"out":"(?:[2-9]|10)"}
+{"test":"test/options.js > options > options.wrap > should wrap regex ranges in parentheses","fn":"fill","args":[2,100,{"toRegex":true,"wrap":true}],"out":"(?:[2-9]|[1-9][0-9]|100)"}
+{"test":"test/options.js > options > options.wrap > should wrap ranges with positive and negative numbers in parentheses","fn":"fill","args":[-10,-2,2,{"toRegex":true,"wrap":true}],"out":"(?:-(?:2|4|6|8|10))"}
+{"test":"test/options.js > options > options.wrap > should wrap ranges with positive and negative numbers in parentheses","fn":"fill","args":[-10,0,2,{"toRegex":true,"wrap":true}],"out":"(?:0|-(?:2|4|6|8|10))"}
+{"test":"test/options.js > options > options.wrap > should wrap ranges with positive and negative numbers in parentheses","fn":"fill","args":[-10,10,2,{"toRegex":true,"wrap":true}],"out":"(?:0|2|4|6|8|10|-(?:2|4|6|8|10))"}
+{"test":"test/options.js > options > options.wrap > should wrap ranges with positive and negative numbers in parentheses","fn":"fill","args":[-10,10,{"toRegex":true,"wrap":true}],"out":"(?:-[1-9]|-?10|[0-9])"}
+{"test":"test/options.js > options > options.capture > should wrap the returned string in parans","fn":"fill","args":[-10,10,2,{"toRegex":true,"capture":true}],"out":"(0|2|4|6|8|10|-(2|4|6|8|10))"}
+{"test":"test/options.js > options > options.capture > should wrap the returned string in parans","fn":"fill","args":[-10,10,{"toRegex":true,"capture":true}],"out":"(-[1-9]|-?10|[0-9])"}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["01","03"],"out":["01","02","03"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["01","3"],"out":["01","02","03"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["1","03"],"out":["01","02","03"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["0001","0003"],"out":["0001","0002","0003"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["-10","00"],"out":["-10","-09","-08","-07","-06","-05","-04","-03","-02","-01","000"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["05","010"],"out":["005","006","007","008","009","010"]}
+{"test":"test/padding.js > padding: numbers > should pad incremented numbers:","fn":"fill","args":["05","100"],"out":["005","006","007","008","009","010","011","012","013","014","015","016","017","018","019","020","021","022","023","024","025","026","027","028","029","030","031","032","033","034","035","036","037","038","039","040","041","042","043","044","045","046","047","048","049","050","051","052","053","054","055","056","057","058","059","060","061","062","063","064","065","066","067","068","069","070","071","072","073","074","075","076","077","078","079","080","081","082","083","084","085","086","087","088","089","090","091","092","093","094","095","096","097","098","099","100"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["03","01"],"out":["03","02","01"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["3","01"],"out":["03","02","01"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["003","1"],"out":["003","002","001"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["003","001"],"out":["003","002","001"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["3","001"],"out":["003","002","001"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers:","fn":"fill","args":["03","001"],"out":["003","002","001"]}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["03","01",{"toRegex":true}],"out":"0?[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["3","01",{"toRegex":true}],"out":"0?[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["003","1",{"toRegex":true}],"out":"0{0,2}[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["003","001",{"toRegex":true}],"out":"0{0,2}[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["3","001",{"toRegex":true}],"out":"0{0,2}[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["03","001",{"toRegex":true}],"out":"0{0,2}[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad decremented numbers with regex source string","fn":"fill","args":["001","020",{"toRegex":true}],"out":"0{0,2}[1-9]|0?1[0-9]|0?20"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["03","01",{"toRegex":true,"strictZeros":true}],"out":"0[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["3","01",{"toRegex":true,"strictZeros":true}],"out":"0[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["003","1",{"toRegex":true,"strictZeros":true}],"out":"00[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["003","001",{"toRegex":true,"strictZeros":true}],"out":"00[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["3","001",{"toRegex":true,"strictZeros":true}],"out":"00[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["03","001",{"toRegex":true,"strictZeros":true}],"out":"00[1-3]"}
+{"test":"test/padding.js > padding: numbers > should pad with strict zeros","fn":"fill","args":["001","020",{"toRegex":true,"strictZeros":true}],"out":"00[1-9]|01[0-9]|020"}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["1","05","3"],"out":["01","04"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["1","5","03"],"out":["01","04"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["1","5","0003"],"out":["0001","0004"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["1","005","3"],"out":["001","004"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["00","1000","200"],"out":["0000","0200","0400","0600","0800","1000"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["0","01000","200"],"out":["00000","00200","00400","00600","00800","01000"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["001","5","3"],"out":["001","004"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["02","10",2],"out":["02","04","06","08","10"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["002","10",2],"out":["002","004","006","008","010"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["002","010",2],"out":["002","004","006","008","010"]}
+{"test":"test/padding.js > padding: numbers > should pad stepped numbers","fn":"fill","args":["-04",4,2],"out":["-04","-02","000","002","004"]}
+{"test":"test/ranges.js > ranges > alphabetical > should increment alphabetical ranges","fn":"fill","args":["a"],"out":["a"]}
+{"test":"test/ranges.js > ranges > alphabetical > should increment alphabetical ranges","fn":"fill","args":["a","a"],"out":["a"]}
+{"test":"test/ranges.js > ranges > alphabetical > should increment alphabetical ranges","fn":"fill","args":["a","b"],"out":["a","b"]}
+{"test":"test/ranges.js > ranges > alphabetical > should increment alphabetical ranges","fn":"fill","args":["a","e"],"out":["a","b","c","d","e"]}
+{"test":"test/ranges.js > ranges > alphabetical > should increment alphabetical ranges","fn":"fill","args":["A","E"],"out":["A","B","C","D","E"]}
+{"test":"test/ranges.js > ranges > alphabetical > should decrement alphabetical ranges","fn":"fill","args":["E","A"],"out":["E","D","C","B","A"]}
+{"test":"test/ranges.js > ranges > alphabetical > should decrement alphabetical ranges","fn":"fill","args":["a","C"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C"]}
+{"test":"test/ranges.js > ranges > alphabetical > should decrement alphabetical ranges","fn":"fill","args":["z","m"],"out":["z","y","x","w","v","u","t","s","r","q","p","o","n","m"]}
+{"test":"test/ranges.js > ranges > alphanumeric > should increment alphanumeric ranges","fn":"fill","args":["9","B"],"out":["9",":",";","<","=",">","?","@","A","B"]}
+{"test":"test/ranges.js > ranges > alphanumeric > should increment alphanumeric ranges","fn":"fill","args":["A","10"],"out":["A","@","?",">","=","<",";",":","9","8","7","6","5","4","3","2","1"]}
+{"test":"test/ranges.js > ranges > alphanumeric > should increment alphanumeric ranges","fn":"fill","args":["a","10"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A","@","?",">","=","<",";",":","9","8","7","6","5","4","3","2","1"]}
+{"test":"test/ranges.js > ranges > alphanumeric > should step alphanumeric ranges","fn":"fill","args":["9","B",3],"out":["9","<","?","B"]}
+{"test":"test/ranges.js > ranges > alphanumeric > should decrement alphanumeric ranges","fn":"fill","args":["C","9"],"out":["C","B","A","@","?",">","=","<",";",":","9"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["a"],"out":["a"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["a","a"],"out":["a"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["a","b"],"out":["a","b"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["a","e"],"out":["a","b","c","d","e"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should increment alphabetical ranges","fn":"fill","args":["A","E"],"out":["A","B","C","D","E"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["E","A"],"out":["E","D","C","B","A"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["a","C"],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C"]}
+{"test":"test/ranges.js > ranges > ranges: letters > should decrement alphabetical ranges","fn":"fill","args":["z","m"],"out":["z","y","x","w","v","u","t","s","r","q","p","o","n","m"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1"],"out":["1"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1","1"],"out":["1"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1","2"],"out":["1","2"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1","10"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1","3"],"out":["1","2","3"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["5","8"],"out":["5","6","7","8"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *string* ranges","fn":"fill","args":["1","9"],"out":["1","2","3","4","5","6","7","8","9"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *number* ranges","fn":"fill","args":[1,3],"out":[1,2,3]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *number* ranges","fn":"fill","args":[1,9],"out":[1,2,3,4,5,6,7,8,9]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical *number* ranges","fn":"fill","args":[5,8],"out":[5,6,7,8]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical ranges that are a combination of number and string","fn":"fill","args":["1",9],"out":["1","2","3","4","5","6","7","8","9"]}
+{"test":"test/ranges.js > ranges > numbers > should increment numerical ranges that are a combination of number and string","fn":"fill","args":["2",5],"out":["2","3","4","5"]}
+{"test":"test/ranges.js > ranges > numbers > should decrement numerical *string* ranges","fn":"fill","args":["0","-5"],"out":["0","-1","-2","-3","-4","-5"]}
+{"test":"test/ranges.js > ranges > numbers > should decrement numerical *string* ranges","fn":"fill","args":["-1","-5"],"out":["-1","-2","-3","-4","-5"]}
+{"test":"test/ranges.js > ranges > numbers > should decrement numerical *number* ranges","fn":"fill","args":[-10,-1],"out":[-10,-9,-8,-7,-6,-5,-4,-3,-2,-1]}
+{"test":"test/ranges.js > ranges > numbers > should decrement numerical *number* ranges","fn":"fill","args":[0,-5],"out":[0,-1,-2,-3,-4,-5]}
+{"test":"test/ranges.js > ranges > numbers > should handle *string* ranges ranges that are positive and negative:","fn":"fill","args":["9","-4"],"out":["9","8","7","6","5","4","3","2","1","0","-1","-2","-3","-4"]}
+{"test":"test/ranges.js > ranges > numbers > should handle *string* ranges ranges that are positive and negative:","fn":"fill","args":["-5","5"],"out":["-5","-4","-3","-2","-1","0","1","2","3","4","5"]}
+{"test":"test/ranges.js > ranges > numbers > should handle *number* ranges ranges that are positive and negative:","fn":"fill","args":[9,-4],"out":[9,8,7,6,5,4,3,2,1,0,-1,-2,-3,-4]}
+{"test":"test/ranges.js > ranges > numbers > should handle *number* ranges ranges that are positive and negative:","fn":"fill","args":[-5,5],"out":[-5,-4,-3,-2,-1,0,1,2,3,4,5]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["-5","-0","-1"],"out":["-5","-4","-3","-2","-1","0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["1","-0",1],"out":["1","0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["1","-0",0],"out":["1","0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["1","-0","0"],"out":["1","0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["1","-0","1"],"out":["1","0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["-0","-0","1"],"out":["0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["-0","0","1"],"out":["0"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":["-0","5","1"],"out":["0","1","2","3","4","5"]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":[{"$":"number","value":"-0"},5],"out":[0,1,2,3,4,5]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":[5,{"$":"number","value":"-0"},5],"out":[5,0]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":[5,{"$":"number","value":"-0"},2],"out":[5,3,1]}
+{"test":"test/special.js > special cases > negative zero > should handle negative zero","fn":"fill","args":[0,5,2],"out":[0,2,4]}
+{"test":"test/special.js > special cases > negative zero > should adjust padding for negative numbers:","fn":"fill","args":["-01","5"],"out":["-01","000","001","002","003","004","005"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10","1"],"out":["1","2","3","4","5","6","7","8","9","10"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10","2"],"out":["1","3","5","7","9"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["0","1000","200"],"out":["0","200","400","600","800","1000"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","10",2],"out":["1","3","5","7","9"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","20","2"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["1","20","20"],"out":["1"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["10","1","2"],"out":["10","8","6","4","2"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["10","1","-2"],"out":["10","8","6","4","2"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["10","1","2"],"out":["10","8","6","4","2"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,"2"],"out":[2,4,6,8,10]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,1],"out":[2,3,4,5,6,7,8,9,10]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,2],"out":[2,4,6,8,10]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,3],"out":[2,5,8]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[0,5,2],"out":[0,2,4]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[5,0,2],"out":[5,3,1]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[1,5,2],"out":[1,3,5]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10",2],"out":["2","4","6","8","10"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,10,"2"],"out":[2,4,6,8,10]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10",1],"out":["2","3","4","5","6","7","8","9","10"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":[2,"10","2"],"out":["2","4","6","8","10"]}
+{"test":"test/steps.js > steps > steps: numbers > should increment ranges using the given step","fn":"fill","args":["2",10,"3"],"out":["2","5","8"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["0","-10","-2"],"out":["0","-2","-4","-6","-8","-10"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-0","-10","-2"],"out":["0","-2","-4","-6","-8","-10"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-1","-10","-2"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-1","-10","2"],"out":["-1","-3","-5","-7","-9"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["1","10","2"],"out":["1","3","5","7","9"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["1","20","2"],"out":["1","3","5","7","9","11","13","15","17","19"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["1","20","20"],"out":["1"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["10","1","-2"],"out":["10","8","6","4","2"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-10","0","2"],"out":["-10","-8","-6","-4","-2","0"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-10","-0","2"],"out":["-10","-8","-6","-4","-2","0"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["-0","-10","0"],"out":["0","-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (strings)","fn":"fill","args":["0","-10","-0"],"out":["0","-1","-2","-3","-4","-5","-6","-7","-8","-9","-10"]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-10,0,2],"out":[-10,-8,-6,-4,-2,0]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-10,-2,2],"out":[-10,-8,-6,-4,-2]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-2,-10,1],"out":[-2,-3,-4,-5,-6,-7,-8,-9,-10]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[0,-10,2],"out":[0,-2,-4,-6,-8,-10]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-2,-10,2],"out":[-2,-4,-6,-8,-10]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-2,-10,3],"out":[-2,-5,-8]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges using the given step (numbers)","fn":"fill","args":[-9,9,3],"out":[-9,-6,-3,0,3,6,9]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges when negative zero is passed","fn":"fill","args":[-10,{"$":"number","value":"-0"},2],"out":[-10,-8,-6,-4,-2,0]}
+{"test":"test/steps.js > steps > steps: numbers > should fill in negative ranges when negative zero is passed","fn":"fill","args":[{"$":"number","value":"-0"},-10,2],"out":[0,-2,-4,-6,-8,-10]}
+{"test":"test/steps.js > steps > steps: letters > should use increments with alphabetical ranges","fn":"fill","args":["z","a",-2],"out":["z","x","v","t","r","p","n","l","j","h","f","d","b"]}
+{"test":"test/steps.js > steps > steps: letters > should use increments with alphabetical ranges","fn":"fill","args":["a","e",2],"out":["a","c","e"]}
+{"test":"test/steps.js > steps > steps: letters > should use increments with alphabetical ranges","fn":"fill","args":["E","A",2],"out":["E","C","A"]}
+{"test":"test/steps.js > steps > options: step > should use the step defined on the options:","fn":"fill","args":["a","e",{"step":2}],"out":["a","c","e"]}
+{"test":"test/steps.js > steps > options: step > should use the step defined on the options:","fn":"fill","args":["E","A",{"step":2}],"out":["E","C","A"]}
+{"test":"test/verify-matches.js > validate ranges > should support equal numbers:","fn":"fill","args":[1,1,{"toRegex":true}],"out":"1"}
+{"test":"test/verify-matches.js > validate ranges > should support equal numbers:","fn":"fill","args":[65443,65443,{"toRegex":true}],"out":"65443"}
+{"test":"test/verify-matches.js > validate ranges > should support equal numbers:","fn":"fill","args":[192,1000,{"toRegex":true}],"out":"19[2-9]|[2-9][0-9]{2}|1000"}
+{"test":"test/verify-matches.js > validate ranges > should support large numbers:","fn":"fill","args":[100019999300000,100020000300000,{"toRegex":true}],"out":"10001999930000[0-9]|1000199993000[1-9][0-9]|100019999300[1-9][0-9]{2}|10001999930[1-9][0-9]{3}|1000199993[1-9][0-9]{4}|100019999[4-9][0-9]{5}|100020000[0-2][0-9]{5}|100020000300000"}
+{"test":"test/verify-matches.js > validate ranges > should support repeated digits:","fn":"fill","args":[10331,20381,{"toRegex":true}],"out":"1033[1-9]|103[4-9][0-9]|10[4-9][0-9]{2}|1[1-9][0-9]{3}|20[0-2][0-9]{2}|203[0-7][0-9]|2038[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support repeated zeros:","fn":"fill","args":[10031,20081,{"toRegex":true}],"out":"1003[1-9]|100[4-9][0-9]|10[1-9][0-9]{2}|1[1-9][0-9]{3}|200[0-7][0-9]|2008[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support repeated zeros:","fn":"fill","args":[10000,20000,{"toRegex":true}],"out":"1000[0-9]|100[1-9][0-9]|10[1-9][0-9]{2}|1[1-9][0-9]{3}|20000"}
+{"test":"test/verify-matches.js > validate ranges > should support zero one:","fn":"fill","args":[10301,20101,{"toRegex":true}],"out":"1030[1-9]|103[1-9][0-9]|10[4-9][0-9]{2}|1[1-9][0-9]{3}|200[0-9]{2}|2010[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support repetead ones:","fn":"fill","args":[102,111,{"toRegex":true}],"out":"10[2-9]|11[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support small diffs:","fn":"fill","args":[102,110,{"toRegex":true}],"out":"10[2-9]|110"}
+{"test":"test/verify-matches.js > validate ranges > should support small diffs:","fn":"fill","args":[102,130,{"toRegex":true}],"out":"10[2-9]|1[12][0-9]|130"}
+{"test":"test/verify-matches.js > validate ranges > should support random ranges:","fn":"fill","args":[4173,7981,{"toRegex":true}],"out":"417[3-9]|41[89][0-9]|4[2-9][0-9]{2}|[56][0-9]{3}|7[0-8][0-9]{2}|79[0-7][0-9]|798[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support one digit numbers:","fn":"fill","args":[3,7,{"toRegex":true}],"out":"[3-7]"}
+{"test":"test/verify-matches.js > validate ranges > should support one digit at bounds:","fn":"fill","args":[1,9,{"toRegex":true}],"out":"[1-9]"}
+{"test":"test/verify-matches.js > validate ranges > should support power of ten:","fn":"fill","args":[1000,8632,{"toRegex":true}],"out":"100[0-9]|10[1-9][0-9]|1[1-9][0-9]{2}|[2-7][0-9]{3}|8[0-5][0-9]{2}|86[0-2][0-9]|863[0-2]"}
+{"test":"test/verify-matches.js > validate ranges > should work with numbers of varying lengths:","fn":"fill","args":[1030,20101,{"toRegex":true}],"out":"103[0-9]|10[4-9][0-9]|1[1-9][0-9]{2}|[2-9][0-9]{3}|1[0-9]{4}|200[0-9]{2}|2010[01]"}
+{"test":"test/verify-matches.js > validate ranges > should work with numbers of varying lengths:","fn":"fill","args":[13,8632,{"toRegex":true}],"out":"1[3-9]|[2-9][0-9]|[1-9][0-9]{2}|[1-7][0-9]{3}|8[0-5][0-9]{2}|86[0-2][0-9]|863[0-2]"}
+{"test":"test/verify-matches.js > validate ranges > should support small ranges:","fn":"fill","args":[9,11,{"toRegex":true}],"out":"9|1[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support small ranges:","fn":"fill","args":[19,21,{"toRegex":true}],"out":"19|2[01]"}
+{"test":"test/verify-matches.js > validate ranges > should support big ranges:","fn":"fill","args":[90,98009,{"toRegex":true}],"out":"9[0-9]|[1-9][0-9]{2,3}|[1-8][0-9]{4}|9[0-7][0-9]{3}|9800[0-9]"}
+{"test":"test/verify-matches.js > validate ranges > should support big ranges:","fn":"fill","args":[999,10000,{"toRegex":true}],"out":"999|[1-9][0-9]{3}|10000"}
+{"test":"differences","fn":"fill","args":["1","3",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["1","2","3"]}
+{"test":"differences","fn":"fill","args":["a","c",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["a","b","c"]}
+{"test":"differences","fn":"fill","args":["01","03",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["01","02","03"]}
+{"test":"differences","fn":"fill","args":["1","10","3",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["1","4","7","10"]}
+{"test":"differences","fn":"fill","args":["-1","2",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["-1","0","1","2"]}
+{"test":"differences","fn":"fill","args":["a","A",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A"]}
+{"test":"differences","fn":"fill","args":["3","1",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["3","2","1"]}
+{"test":"differences","fn":"fill","args":["a","e","x",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["1","5","+",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["1","5","|",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["1","5",">",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["0","-0",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["0"]}
+{"test":"differences","fn":"fill","args":["1","20",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20"]}
+{"test":"differences","fn":"fill","args":["1.1","2",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["a","1",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["a","`","_","^","]","\\","[","Z","Y","X","W","V","U","T","S","R","Q","P","O","N","M","L","K","J","I","H","G","F","E","D","C","B","A","@","?",">","=","<",";",":","9","8","7","6","5","4","3","2","1"]}
+{"test":"differences","fn":"fill","args":["","2",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["1","9","2~",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":[]}
+{"test":"differences","fn":"fill","args":["10","1","-3",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["10","7","4","1"]}
+{"test":"differences","fn":"fill","args":["z","a","5",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["z","u","p","k","f","a"]}
+{"test":"differences","fn":"fill","args":["001","10",{"expand":true,"nodupes":true,"keepEscaping":true}],"out":["001","002","003","004","005","006","007","008","009","010"]}

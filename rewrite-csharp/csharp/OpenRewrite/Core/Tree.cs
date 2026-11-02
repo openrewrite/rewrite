@@ -18,8 +18,22 @@ namespace OpenRewrite.Core;
 /// <summary>
 /// The base interface for all LST (Lossless Semantic Tree) elements.
 /// </summary>
-public interface Tree
+public interface Tree : IHeavyweight
 {
+    /// <summary>
+    /// An id names a node and carries no secret, so it is drawn in userspace from a per-thread
+    /// generator: a tree draws one per node, and the OS entropy source behind
+    /// <see cref="Guid.NewGuid"/> costs a syscall per draw. Mirrors Java's <c>Tree.randomId()</c>.
+    /// </summary>
+    static Guid RandomId()
+    {
+        Span<byte> b = stackalloc byte[16];
+        System.Random.Shared.NextBytes(b);
+        b[6] = (byte)((b[6] & 0x0F) | 0x40); // version 4
+        b[8] = (byte)((b[8] & 0x3F) | 0x80); // variant IETF
+        return new Guid(b, bigEndian: true);
+    }
+
     Guid Id { get; }
 
     Markers Markers { get; }

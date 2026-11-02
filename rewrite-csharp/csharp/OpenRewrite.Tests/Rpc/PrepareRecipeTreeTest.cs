@@ -120,4 +120,56 @@ public class PrepareRecipeTreeTest
             .ToList();
         Assert.Equal(new object?[] { "a", "b", "c" }, texts);
     }
+
+    private sealed class EitherOptionRecipe : global::OpenRewrite.Core.Recipe
+    {
+        [global::OpenRewrite.Core.Option(DisplayName = "First", Description = "First alternative.",
+            Required = false)]
+        public string? First { get; set; }
+
+        [global::OpenRewrite.Core.Option(DisplayName = "Second", Description = "Second alternative.",
+            Required = false)]
+        public string? Second { get; set; }
+
+        public override string DisplayName => "Either option";
+        public override string Description => "A recipe needing at least one of two optional options.";
+
+        public override IEnumerable<string> Validate()
+        {
+            if (string.IsNullOrEmpty(First) && string.IsNullOrEmpty(Second))
+                yield return "At least one of `First` or `Second` must be set.";
+        }
+
+        public override JavaVisitor<ExecutionContext> GetVisitor() => new CSharpVisitor<ExecutionContext>();
+    }
+
+    [Fact]
+    public void PrepareRecipe_ThrowsWhenRecipeValidateReportsAProblem()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var ex = Assert.ThrowsAny<Exception>(() =>
+            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(EitherOptionRecipe).FullName! })
+                .GetAwaiter().GetResult());
+
+        Assert.Contains("At least one of `First` or `Second` must be set.", ex.Message);
+    }
+
+    [Fact]
+    public void PrepareRecipe_SucceedsWhenRecipeValidatePasses()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new EitherOptionRecipe(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var prepared = server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(EitherOptionRecipe).FullName!,
+            Options = new Dictionary<string, object?> { ["First"] = "value" }
+        }).GetAwaiter().GetResult();
+
+        Assert.Equal(typeof(EitherOptionRecipe).FullName, prepared.Descriptor.Name);
+    }
 }

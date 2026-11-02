@@ -128,6 +128,14 @@ export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Marker
     };
 }
 
+/**
+ * Removes every marker of the given kind, returning `markers` itself when none has that kind.
+ */
+export function removeMarkerByKind(markers: Markers, kind: Marker["kind"]): Markers {
+    const kept = markers.markers.filter(m => m.kind !== kind);
+    return kept.length === markers.markers.length ? markers : {...markers, markers: kept};
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
@@ -267,6 +275,10 @@ export function markupDebug<T extends { markers: Markers }>(t: T, message: strin
  * Helper to add a markup marker to a tree node.
  */
 function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    if (t.markers.markers.some(m => m.kind === markup.kind &&
+        (m as Markup).message === markup.message && (m as Markup).detail === markup.detail)) {
+        return t;
+    }
     return {
         ...t,
         markers: {

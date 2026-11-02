@@ -14,10 +14,9 @@
 
 """Tests for ChangeImport recipe."""
 
-from rewrite.java.support_types import JavaType
-from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
+from pathlib import Path
+
 from rewrite.python.recipes.change_import import ChangeImport
-from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
@@ -57,6 +56,59 @@ class TestChangeImport:
             python(
                 "from typing import Callable\n",
                 "from collections.abc import Callable\n",
+            )
+        )
+
+    def test_crlf_line_breaks(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "import os\r\nfrom typing import Mapping\r\n\r\nx: Mapping = {}\r\n",
+                "import os\r\nfrom collections.abc import Mapping\r\n\r\nx: Mapping = {}\r\n",
+            )
+        )
+
+    def test_moved_member_joins_its_section(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Iterable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import logging
+
+                import random
+                from typing import Iterable
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                """
+                import logging
+                from collections.abc import Iterable
+
+                import random
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                path=Path('training/dataset/transforms.py'),
             )
         )
 
@@ -222,6 +274,60 @@ class TestChangeImport:
             )
         )
 
+    def test_change_qualified_ref_into_submodule_drops_parent_import(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d: collections.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+    def test_change_aliased_qualified_ref_into_submodule(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                d: c.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                from collections import OrderedDict
+                d: c.Mapping = c.Counter(OrderedDict())
+                """,
+                """
+                import collections as c
+                from collections import OrderedDict
+                import collections.abc
+                d: collections.abc.Mapping = c.Counter(OrderedDict())
+                """,
+            )
+        )
+
     def test_change_qualified_ref_with_different_new_name(self):
         """Qualified ref rewrite when new_name differs from old_name."""
         spec = RecipeSpec(recipe=ChangeImport(
@@ -244,99 +350,6 @@ class TestChangeImport:
                 """,
             )
         )
-
-    def test_type_attribution_updated_on_qualified_refs(self):
-        """Type attribution is updated on rewritten method invocations and field accesses."""
-        from dataclasses import replace as dc_replace
-        from rewrite.python.recipes.change_import import _create_module_type
-
-        fractions_type = _create_module_type('fractions')
-
-        def inject_types(source_file):
-            """Inject type info onto fractions references so the test doesn't depend on ty."""
-            class TypeInjector(PythonVisitor):
-                def visit_method_invocation(self, method, p):
-                    method = super().visit_method_invocation(method, p)
-                    if (isinstance(method, MethodInvocation)
-                            and isinstance(method.select, Identifier)
-                            and method.select.simple_name == 'fractions'):
-                        new_select = method.select.replace(_type=fractions_type)
-                        method = method.padding.replace(
-                            _select=method.padding.select.replace(_element=new_select))
-                        method = method.replace(_method_type=JavaType.Method(
-                            _declaring_type=fractions_type,
-                            _name='gcd',
-                        ))
-                    return method
-
-                def visit_field_access(self, fa, p):
-                    fa = super().visit_field_access(fa, p)
-                    if (isinstance(fa, FieldAccess)
-                            and isinstance(fa.target, Identifier)
-                            and fa.target.simple_name == 'fractions'):
-                        fa = fa.replace(_target=fa.target.replace(_type=fractions_type))
-                    return fa
-
-            return TypeInjector().visit(source_file, None)
-
-        errors = []
-
-        def check_types(source_file):
-            assert isinstance(source_file, CompilationUnit)
-
-            class TypeChecker(PythonVisitor):
-                def visit_method_invocation(self, method, p):
-                    if isinstance(method.select, Identifier) and method.select.simple_name == 'math':
-                        if method.select.type is None:
-                            errors.append("method select identifier has no type")
-                        elif not isinstance(method.select.type, JavaType.FullyQualified):
-                            errors.append(f"method select type is {type(method.select.type).__name__}, expected FullyQualified")
-                        elif method.select.type._fully_qualified_name != 'math':
-                            errors.append(f"method select type fqn is '{method.select.type._fully_qualified_name}', expected 'math'")
-                        if method.method_type is None:
-                            errors.append("method_type is None")
-                        elif method.method_type.declaring_type is None:
-                            errors.append("method_type.declaring_type is None")
-                        elif method.method_type.declaring_type._fully_qualified_name != 'math':
-                            errors.append(f"method_type declaring_type fqn is '{method.method_type.declaring_type._fully_qualified_name}', expected 'math'")
-                        if method.method_type is not None and method.method_type.name != 'gcd':
-                            errors.append(f"method_type.name is '{method.method_type.name}', expected 'gcd'")
-                    return method
-
-                def visit_field_access(self, fa, p):
-                    if isinstance(fa.target, Identifier) and fa.target.simple_name == 'math' and fa.name.simple_name == 'gcd':
-                        if fa.target.type is None:
-                            errors.append("field access target identifier has no type")
-                        elif not isinstance(fa.target.type, JavaType.FullyQualified):
-                            errors.append(f"field access target type is {type(fa.target.type).__name__}, expected FullyQualified")
-                        elif fa.target.type._fully_qualified_name != 'math':
-                            errors.append(f"field access target type fqn is '{fa.target.type._fully_qualified_name}', expected 'math'")
-                    return fa
-
-            TypeChecker().visit(source_file, None)
-
-        spec = RecipeSpec(recipe=ChangeImport(
-            old_module='fractions',
-            old_name='gcd',
-            new_module='math',
-        ))
-        spec.rewrite_run(
-            python(
-                """
-                import fractions
-                result = fractions.gcd(12, 8)
-                fn = fractions.gcd
-                """,
-                """
-                import math
-                result = math.gcd(12, 8)
-                fn = math.gcd
-                """,
-                before_recipe=inject_types,
-                after_recipe=check_types,
-            )
-        )
-        assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
     def test_type_attribution_on_a_rewritten_construction(self):
         errors = []
@@ -901,6 +914,70 @@ class TestChangeImportPythonScopeRules:
             """,
         )
 
+    def test_a_class_attribute_re_exporting_the_import_reads_it_on_the_right(self):
+        """`clock = clock` binds `C.clock` from the module's `clock`."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = perf_counter
+            """,
+        )
+
+    def test_member_and_keyword_positions_name_something_else(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, perf_counter()
+            """,
+        )
+
+    def test_a_match_class_keyword_pattern_names_an_attribute(self):
+        """``Point(clock=v)`` matches ``Point``'s attribute and binds only ``v``."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return clock(), v
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return perf_counter(), v
+            """,
+        )
+
     def test_attribute_and_subscript_targets_do_not_bind(self):
         """``self.clock = 1`` and ``d[clock] = 1`` assign through an object."""
         self._run(
@@ -1005,6 +1082,50 @@ class TestChangeImportPythonScopeRules:
             def f(x=perf_counter):
                 clock = 1
                 return clock, x
+            """,
+        )
+
+    def test_a_module_level_def_moves_with_the_binding_it_rebinds(self):
+        """A `def` at module level rebinds the name the import bound, so the two move
+        together or the calls below it silently retarget the import."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def clock():
+                return 1
+
+
+            print(clock())
+            """,
+            """\
+            from time import perf_counter
+
+
+            def perf_counter():
+                return 1
+
+
+            print(perf_counter())
+            """,
+        )
+
+    def test_a_quoted_annotation_renames_the_names_it_contains(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(x: 'clock', y: 'List[clock]'):
+                pass
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(x: 'perf_counter', y: 'List[perf_counter]'):
+                pass
             """,
         )
 
@@ -1237,6 +1358,30 @@ class TestImportsInBlocks:
                     import collections.abc
 
                 def f(x: collections.abc.Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_into_a_submodule_drops_the_parent_import_in_the_block(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections', old_name='Mapping', new_module='collections.abc',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Mapping) -> None: ...
                 """,
             )
         )

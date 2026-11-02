@@ -17,6 +17,7 @@ package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
@@ -71,6 +72,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
     @Override
     public Xml.Document visitDocument(Xml.Document doc, P p) {
+        FormattingListener.beforeFormat(doc, stopAfter, getCursor());
         Xml.Document t = (Xml.Document) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(doc, p);
 
         t = (Xml.Document) new NormalizeFormatVisitor<>(stopAfter).visit(t, p);

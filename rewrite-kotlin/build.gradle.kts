@@ -4,13 +4,13 @@ import org.openrewrite.codegen.dsl.LanguageDescriptor
 
 plugins {
     id("org.openrewrite.build.language-library")
-    kotlin("jvm") version "2.4.10"
+    kotlin("jvm") version "2.4.20"
 }
 
 // When bumping this version, also update the kotlin-bom platform version
 // in rewrite-gradle/build.gradle.kts and rewrite-maven/build.gradle.kts so
 // the kotlin-stdlib alignment stays in lockstep across modules.
-val kotlinVersion = "2.4.10"
+val kotlinVersion = "2.4.20"
 
 recipeDependencies {
     parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
@@ -65,16 +65,7 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 
     // For driving kotlinc with the rewrite-kotlin compiler plugin loaded in tests.
-    testImplementation("dev.zacsweers.kctfork:core:0.13.0")
-}
-
-configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "org.bouncycastle") {
-            useVersion("1.84")
-            because("CVE-2026-3505, CVE-2026-5598, CVE-2026-5588, CVE-2026-0636")
-        }
-    }
+    testImplementation("dev.zacsweers.kctfork:core:0.14.0")
 }
 
 java {
@@ -86,18 +77,12 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_1_8)
-        // Required to override `FirPropertyChecker.check`, whose signature uses
-        // context parameters as of Kotlin 2.2. Scoped to this module because the
-        // recipe DSL compiler plugin in `org.openrewrite.kotlin.recipe.internal`
-        // depends on it.
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
-        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
@@ -119,7 +104,7 @@ val generatedScopesDir = layout.buildDirectory.dir("generated/source/recipeDsl/m
 // (java/yaml/xml/maven/json/properties/toml/hcl/python/csharp/scala/javascript/groovy)
 // are codegen'd from their `.class` files on the compile classpath.
 
-val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::class) {
+val generateLanguageScopes = tasks.register<GenerateLanguageScopesTask>("generateLanguageScopes") {
     visitorClasspath.from(configurations.named("compileClasspath"))
     outputDir.set(generatedScopesDir)
     languages.set(listOf(
@@ -155,7 +140,7 @@ sourceSets.named("main") {
 
 val generatedCompilerVersionDir = layout.buildDirectory.dir("generated/source/compilerVersion/main/kotlin")
 
-val generateCompilerVersion by tasks.registering {
+val generateCompilerVersion = tasks.register("generateCompilerVersion") {
     val outputDir = generatedCompilerVersionDir
     val version = kotlinVersion
     inputs.property("kotlinVersion", version)

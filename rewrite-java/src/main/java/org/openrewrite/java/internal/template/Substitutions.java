@@ -27,6 +27,7 @@ import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,6 +61,15 @@ public class Substitutions {
         return splicedParameterIds.add(parameter.getId()) ?
                 parameter :
                 new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
+    }
+
+    public boolean isParameter(J j) {
+        for (Object parameter : parameters) {
+            if (parameter instanceof J && ((J) parameter).getId().equals(j.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String substitute() {
@@ -153,7 +163,9 @@ public class Substitutions {
                 newObjectParameter(fqn, index) :
                 newPrimitiveParameter(fqn, index);
 
-        parameters[index] = ((J) parameter).withPrefix(Space.EMPTY);
+        // A spliced parameter takes the placeholder's whitespace and keeps its own comments
+        Space prefix = ((J) parameter).getPrefix();
+        parameters[index] = ((J) parameter).withPrefix(prefix.withWhitespace(""));
         return s;
     }
 
@@ -301,6 +313,19 @@ public class Substitutions {
         return ListUtils.map(js, this::unsubstitute);
     }
 
+    @SuppressWarnings("unchecked")
+    public <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+        return ListUtils.map(js, j -> (J2) toStatement(unsubstitute(j)));
+    }
+
+    /**
+     * The tree that takes a statement's place. In Kotlin an expression stands as a statement only inside a
+     * wrapper the parser adds, and a substituted expression needs the same wrapper.
+     */
+    public J toStatement(J j) {
+        return j;
+    }
+
     /**
      * Resolve generic type variable identifiers in the template AST to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
@@ -364,6 +389,16 @@ public class Substitutions {
             }
 
             @Override
+            @SuppressWarnings("unchecked")
+            public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Integer integer) {
+                JRightPadded<T> r = super.visitRightPadded(right, loc, integer);
+                if (r != null && loc == JRightPadded.Location.BLOCK_STATEMENT && r.getElement() instanceof J) {
+                    return r.withElement((T) toStatement((J) r.getElement()));
+                }
+                return r;
+            }
+
+            @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 J param = maybeParameter(method.getName(), method);
                 if (param instanceof Expression) {
@@ -420,6 +455,11 @@ public class Substitutions {
                 Integer param = parameterIndex(marker.getPrefix());
                 if (param != null) {
                     J j2 = spliceParameter(param);
+                    // Markers the parser put on the placeholder describe the position it occupied rather than the
+                    // placeholder itself — Groovy's `OmitParentheses`, say — so they belong to whatever takes it
+                    for (Marker m : replaced.getMarkers().getMarkers()) {
+                        j2 = j2.withMarkers(j2.getMarkers().addIfAbsent(m));
+                    }
                     return j2.withPrefix(j2.getPrefix().withWhitespace(replaced.getPrefix().getWhitespace()));
                 }
                 return null;

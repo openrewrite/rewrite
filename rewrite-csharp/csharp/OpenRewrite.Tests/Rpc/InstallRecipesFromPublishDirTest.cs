@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
@@ -136,8 +135,8 @@ public class InstallRecipesFromPublishDirTest : IDisposable
             }
             """);
 
-        RunDotnet($"pack \"{Path.Combine(depDir, "Dep.csproj")}\" -c Release -o \"{feed}\"");
-        RunDotnet($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release -o \"{feed}\"");
+        DotnetCli.Run($"pack \"{Path.Combine(depDir, "Dep.csproj")}\" -c Release -o \"{feed}\"");
+        DotnetCli.Run($"pack \"{Path.Combine(primaryDir, "Primary.csproj")}\" -c Release -o \"{feed}\"");
     }
 
     public void Dispose()
@@ -195,29 +194,5 @@ public class InstallRecipesFromPublishDirTest : IDisposable
             .GetAwaiter().GetResult();
         Assert.Equal(1, byPackageForm.RecipesInstalled);
         Assert.Equal("1.0.0", byPackageForm.Version);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
     }
 }

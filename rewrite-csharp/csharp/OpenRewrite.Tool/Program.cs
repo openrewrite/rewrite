@@ -33,7 +33,8 @@ if (logFile != null)
     loggerConfig.MinimumLevel.Debug()
         .WriteTo.File(logFile,
             outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-            flushToDiskInterval: TimeSpan.FromSeconds(1));
+            flushToDiskInterval: TimeSpan.FromSeconds(1),
+            shared: true);
 }
 
 Log.Logger = loggerConfig.CreateLogger();

@@ -185,11 +185,11 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                     }
                     Space firstStatementPrefix = cu.getStatements().get(0).getPrefix();
                     importToAdd = importToAdd.withPrefix(firstStatementPrefix
-                            .withComments(ListUtils.map(firstStatementPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                            .withComments(ListUtils.filter(firstStatementPrefix.getComments(), comment -> !(comment instanceof Javadoc)))
                             .withWhitespace(whitespace));
 
                     cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), stmt ->
-                            stmt.withComments(ListUtils.map(stmt.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                            stmt.withComments(ListUtils.filter(stmt.getComments(), comment -> comment instanceof Javadoc))
                     ));
                 }
             }
@@ -335,9 +335,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
         }
 
         // Check whether there is static-style access of the field in question
-        AtomicReference<Boolean> hasStaticFieldAccess = new AtomicReference<>(false);
-        new AddImport<P>.FindStaticFieldAccess().visit(compilationUnit, hasStaticFieldAccess);
-        return hasStaticFieldAccess.get();
+        return new AddImport<P>.FindStaticFieldAccess().reduce(compilationUnit, new AtomicReference<>(false)).get();
     }
 
     private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {

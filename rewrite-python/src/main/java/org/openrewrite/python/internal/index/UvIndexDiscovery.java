@@ -258,7 +258,7 @@ public final class UvIndexDiscovery {
             String username = env.getenv("UV_INDEX_" + key + "_USERNAME");
             String password = env.getenv("UV_INDEX_" + key + "_PASSWORD");
             if (username != null || password != null) {
-                return index.withUsername(username).withPassword(password);
+                return index.withUrl(Urls.stripUserinfo(index.getUrl())).withUsername(username).withPassword(password);
             }
         }
         return IndexDiscovery.fillFromUrlOrHost(index, credentials, env);

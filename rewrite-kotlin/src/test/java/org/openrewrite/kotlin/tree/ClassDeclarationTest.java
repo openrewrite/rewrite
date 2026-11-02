@@ -568,7 +568,6 @@ class ClassDeclarationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 for (Statement statement : cu.getStatements()) {
                     if (statement instanceof J.ClassDeclaration declaration) {
-                        J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final);
                         assertThat(J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final)).isTrue();
                     }
                 }

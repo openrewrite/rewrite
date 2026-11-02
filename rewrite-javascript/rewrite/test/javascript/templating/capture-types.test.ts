@@ -14,8 +14,16 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, JS, pattern, rewrite, template, typescript} from "../../../src/javascript";
-import {J, Type} from "../../../src/java";
+import {capture, JavaScriptVisitor, JS, param, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {emptySpace, J, Type} from "../../../src/java";
+import {TemplateEngine} from "../../../src/javascript/templating/engine";
+import {emptyMarkers} from "../../../src/markers";
+import {randomId} from "../../../src/uuid";
+
+/** A bound value carrying nothing but a type. */
+function typed(type: Type): J.Identifier {
+    return {kind: J.Kind.Identifier, id: randomId(), prefix: emptySpace, markers: emptyMarkers, annotations: [], simpleName: 'v', type};
+}
 
 describe('capture types', () => {
     const spec = new RecipeSpec();
@@ -78,6 +86,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),
@@ -105,6 +114,93 @@ describe('capture types', () => {
                 'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().currentNavigation();'
             )
         );
+    });
+
+    test('an untyped capture is typed by the value bound to it', () => {
+        // `Buffer.from` is overloaded and generic, so the overload it resolves to depends on the argument's type
+        const s = capture();
+        const rule = rewrite(() => ({
+            before: pattern`new Buffer(${s})`,
+            after: template`Buffer.from(${s})`
+        }));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitNewClass(newClass: J.NewClass, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, newClass) ?? newClass;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript('const s = "abc";\nconst b = new Buffer(s);', 'const s = "abc";\nconst b = Buffer.from(s);'),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const b = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                const returnType = (b.initializer!.element as J.MethodInvocation).methodType!.returnType as Type.Parameterized;
+                expect((returnType.typeParameters[0] as Type.Class).fullyQualifiedName).toBe('ArrayBuffer');
+            }
+        });
+    });
+
+    test('a parameter without a type of its own takes the type of the expression bound to it, which a list or a statement lacks', () => {
+        const node = capture({name: 'node', type: 'Foo'});
+        const values = new Map<string, J | J[]>([
+            ['node', {...typed(Type.Primitive.String), name: typed(Type.Primitive.Double)} as J],
+            ['flag', typed(Type.Primitive.Boolean)],
+            ['rest', [typed(Type.Primitive.String)]]
+        ]);
+        expect(TemplateEngine.parameterPreamble([
+            {value: (node as any).name},
+            {value: param('flag')},
+            {value: capture({name: 'rest', variadic: true})},
+            {value: {...typed(Type.Primitive.String), kind: J.Kind.ClassDeclaration}},
+            {value: {...typed(Type.Primitive.String), kind: JS.Kind.As}}
+        ], values)).toEqual(['let __PLACEHOLDER_0__: number;', 'let __PLACEHOLDER_1__: boolean;', 'let __PLACEHOLDER_4__: string;']);
+    });
+
+    test('a parameter of a generic type is declared with its type arguments', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}))
+            .orElse(rewrite(() => ({before: pattern`lookup(${x})`, after: template`${x}.get("k")`})));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                'const arr: number[] = [1];\nconst map = new Map<string, number>();\nhas(arr);\nlookup(map);',
+                'const arr: number[] = [1];\nconst map = new Map<string, number>();\narr.includes(1);\nmap.get("k");'
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const [includes, get] = [2, 3].map(i => (cu.statements[i].element as J.MethodInvocation).methodType!);
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+                expect(includes.returnType).toBe(Type.Primitive.Boolean);
+                expect((get.declaringType as Type.Class).fullyQualifiedName).toBe('Map');
+                expect(get.returnType).toBe(Type.Primitive.Double);
+            }
+        });
+    });
+
+    test('a parameter of a recursive generic type is declared with any where the type holds itself', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nhas(nested);',
+                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nnested.includes(1);'
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const includes = (cu.statements[2].element as J.MethodInvocation).methodType!;
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+            }
+        });
     });
 
     test('capture without type still works', () => {
@@ -180,6 +276,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),
@@ -276,9 +373,9 @@ describe('capture types', () => {
         );
     });
 
-    test('a declared type is not borrowed from a neighbour of the same shape', async () => {
+    test('a parameter\'s type is not borrowed from a neighbour of the same shape', async () => {
         // Each pair below agrees on parts, names and arity, so the AST cache either separates them
-        // on the declared type or serves the first one's tree for both
+        // on the parameter's type or serves the first one's tree for both
         const strPattern = pattern`${capture({name: 'v', type: Type.Primitive.String})} + z`;
         expect(((await strPattern.getAstPattern()) as J.Binary).left.type).toBe(Type.Primitive.String);
         const numPattern = pattern`${capture({name: 'v', type: Type.Primitive.Double})} + z`;
@@ -289,5 +386,14 @@ describe('capture types', () => {
         expect((await (strTemplate as any).getTemplateTree() as J.Identifier).type).toBe(Type.Primitive.String);
         const numTemplate = template`${capture({name: 'v', type: Type.Primitive.Double})}`;
         expect((await (numTemplate as any).getTemplateTree() as J.Identifier).type).toBe(Type.Primitive.Double);
+
+        // One template bound to values of different types parses once for each
+        const untyped = template`${capture('v')}`;
+        expect((await (untyped as any).getTemplateTree(false, new Map([['v', typed(Type.Primitive.String)]])) as J.Identifier).type)
+            .toBe(Type.Primitive.String);
+        expect((await (untyped as any).getTemplateTree(false, new Map([['v', typed(Type.Primitive.Double)]])) as J.Identifier).type)
+            .toBe(Type.Primitive.Double);
+        expect(await (untyped as any).getTemplateTree(false, new Map([['v', typed(Type.Primitive.String)]])))
+            .toBe(await (untyped as any).getTemplateTree(false, new Map([['v', typed(Type.Primitive.String)]])));
     });
 });

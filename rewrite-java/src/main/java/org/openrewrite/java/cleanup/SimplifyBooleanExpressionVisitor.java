@@ -163,7 +163,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = super.visitTernary(ternary, executionContext);
         if (j instanceof J.Ternary) {
             J.Ternary asTernary = (J.Ternary) j;
-            if (asTernary.getCondition() instanceof J.Unary) {
+            if (asTernary.getCondition() instanceof J.Unary &&
+                ((J.Unary) asTernary.getCondition()).getOperator() == J.Unary.Type.Not) {
                 Expression negated = maybeNegate(asTernary.getCondition());
                 if (negated != asTernary.getCondition()) {
                     j = asTernary
@@ -291,19 +292,19 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return false;
     }
 
-    private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");
-    private final MethodMatcher equals = new MethodMatcher("java.lang.String equals(java.lang.Object)");
+    private static final MethodMatcher IS_EMPTY = new MethodMatcher("java.lang.String isEmpty()");
+    private static final MethodMatcher EQUALS = new MethodMatcher("java.lang.String equals(java.lang.Object)");
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
-        if (isEmpty.matches(asMethod) &&
+        if (IS_EMPTY.matches(asMethod) &&
             select instanceof J.Literal &&
             select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
-        } else if (equals.matches(asMethod)) {
+        } else if (EQUALS.matches(asMethod)) {
             Expression arg = asMethod.getArguments().get(0);
             if (arg instanceof J.Literal && select instanceof J.Literal) {
                 return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));

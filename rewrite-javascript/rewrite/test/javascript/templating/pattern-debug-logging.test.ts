@@ -122,7 +122,6 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        calls.forEach((call, i) => console.log(`${i}: ${call}`));
         expect(calls.some(c => c.includes('❌ FAILED matching against'))).toBe(true);
         // At path may or may not appear depending on where mismatch occurred
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
@@ -171,7 +170,6 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        calls.forEach((call, i) => console.log(`${i}: ${call}`));
 
         // Should show path and operator mismatch
         expect(calls.some(c => c.includes('At path:'))).toBe(true);

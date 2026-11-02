@@ -31,26 +31,26 @@ import (
 // vanishingly rare — every J-conformant type carries one).
 func getPrefix(t java.Tree) java.Space {
 	if t == nil {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	rv := reflect.ValueOf(t)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return java.Space{}
+			return java.EmptySpace
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	f := rv.FieldByName("Prefix")
 	if !f.IsValid() {
-		return java.Space{}
+		return java.EmptySpace
 	}
 	if s, ok := f.Interface().(java.Space); ok {
 		return s
 	}
-	return java.Space{}
+	return java.EmptySpace
 }
 
 // withPrefix calls the node's `WithPrefix(Space) <T>` method to produce

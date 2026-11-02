@@ -121,7 +121,12 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip tests marked with requires_java_rpc if Java RPC is not available."""
+    """Mark the tests that take the Java RPC fixture, and skip the marked ones if Java RPC is not available."""
+    # The build runs the marked tests in a task of their own, the only one that re-runs on a Java-side change
+    for item in items:
+        if "java_rpc_client" in getattr(item, "fixturenames", ()):
+            item.add_marker(pytest.mark.requires_java_rpc)
+
     if not JAVA_RPC_AVAILABLE:
         skip_java_rpc = pytest.mark.skip(reason="Java RPC not available")
         for item in items:

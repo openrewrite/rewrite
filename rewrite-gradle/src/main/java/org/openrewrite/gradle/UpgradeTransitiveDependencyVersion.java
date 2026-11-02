@@ -21,8 +21,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -48,6 +50,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 
 import java.io.ByteArrayInputStream;
@@ -60,8 +63,8 @@ import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Preconditions.not;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -120,34 +123,29 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     List<String> onlyForConfigurations;
 
     /**
-     * This recipe needs to generate LST elements representing "constraints" and "because" method invocations.
-     * Aside from their parameterization with different arguments they are otherwise identical.
-     * GradleParser isn't particularly fast, so in a recipe run which involves more than one UpgradeTransitiveDependencyVersion
-     * it is much faster to produce these LST elements only once then manipulate their arguments.
-     * This largely mimics how caching works in JavaTemplate. If we create a Gradle/GroovyTemplate this could be refactored.
+     * Parse a constant Gradle snippet as a build script, so that a recipe adding code gets a tree the parser
+     * produced rather than one it assembled by hand, which is how printing and formatting stay correct.
+     * The result is cached on the execution context, as GradleParser is slow enough that reparsing the same
+     * snippet for every source file is noticeable.
      */
-    private static Map<String, Optional<JavaSourceFile>> snippetCache(ExecutionContext ctx) {
-        //noinspection unchecked
-        return (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
-                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<G.CompilationUnit>>());
-    }
-
     private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
-        return snippetCache(ctx)
-                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
-                                new Parser.Input(
-                                        Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
-                                        () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
-                                )), null, ctx)
-                        .findFirst()
-                        .map(maybeCu -> {
-                            maybeCu.getMarkers()
-                                    .findFirst(ParseExceptionResult.class)
-                                    .ifPresent(per -> {
-                                        throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + snippet);
-                                    });
-                            return (JavaSourceFile) maybeCu;
-                        }));
+        //noinspection unchecked
+        Map<String, Optional<JavaSourceFile>> cache = (Map<String, Optional<JavaSourceFile>>) ctx.getMessages()
+                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<JavaSourceFile>>());
+        return cache.computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
+                        new Parser.Input(
+                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                () -> new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8))
+                        )), null, ctx)
+                .findFirst()
+                .map(maybeCu -> {
+                    maybeCu.getMarkers()
+                            .findFirst(ParseExceptionResult.class)
+                            .ifPresent(per -> {
+                                throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + s);
+                            });
+                    return (JavaSourceFile) maybeCu;
+                }));
     }
 
     String displayName = "Upgrade transitive Gradle dependencies";
@@ -167,8 +165,41 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     }
 
     public static class DependencyVersionState {
-        Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
+        /**
+         * Per project, the version each transitive dependency is upgraded to, by the name of the configuration that
+         * constrains it.
+         */
+        Map<String, Map<GroupArtifact, Map<String, String>>> updatesPerProject = new LinkedHashMap<>();
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
+
+        /**
+         * Per project, the properties of BOMs imported through the Spring dependency management plugin that govern
+         * a transitive dependency to upgrade, mapped to the artifact each governs. Overriding the property replaces
+         * the resolution rule the plugin would otherwise require.
+         */
+        Map<String, Map<String, GroupArtifact>> bomPropertiesPerProject = new HashMap<>();
+
+        Set<String> gradlePropertiesKeys = new HashSet<>();
+
+        /**
+         * BOMs imported by any script in the build, since {@code apply from:} scripts and a root {@code subprojects}
+         * block import on behalf of a project whose own script says nothing.
+         */
+        List<GroupArtifactVersion> scriptImportedBoms = new ArrayList<>();
+
+        /**
+         * Extra properties any script declares, so an override is not written twice when the existing declaration
+         * lives in another script.
+         */
+        Set<String> declaredExtProperties = new HashSet<>();
+
+        /**
+         * Projects using the Spring dependency management plugin, whose updates are matched against the imported
+         * BOMs once the whole build has been scanned.
+         */
+        Map<String, SpringBomProperty.Project> projectsUsingDependencyManagement = new LinkedHashMap<>();
+
+        boolean bomPropertiesResolved;
         private boolean dependenciesToUpdateCalculated = false;
         private final Map<GroupArtifact, String> dependenciesToUpdate = new HashMap<>();
 
@@ -181,13 +212,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
          */
         private Map<GroupArtifact, String> dependenciesToUpdate(DependencyMatcher dependencyMatcher) {
             if (!dependenciesToUpdateCalculated) {
-                for (Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> entry : updatesPerProject.values()) {
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : entry.entrySet()) {
+                for (Map<GroupArtifact, Map<String, String>> entry : updatesPerProject.values()) {
+                    for (Map.Entry<GroupArtifact, Map<String, String>> update : entry.entrySet()) {
                         if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
                             continue;
                         }
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                        Map<String, String> configs = update.getValue();
+                        for (Map.Entry<String, String> config : configs.entrySet()) {
                             dependenciesToUpdate.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
                         }
                     }
@@ -205,7 +236,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> scanGradle = Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
@@ -256,31 +287,33 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         continue;
                                     }
 
+                                    GradleProject project = gradleProject;
                                     acc.updatesPerProject.get(getGradleProjectKey(gradleProject)).merge(
                                             new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
-                                            singletonMap(constraintConfig, selected),
+                                            singletonMap(constraintConfig.getName(), selected),
                                             (existing, update) -> {
-                                                Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
+                                                Map<String, String> all = new LinkedHashMap<>(existing);
                                                 all.putAll(update);
-                                                all.keySet().removeIf(c -> {
+                                                all.keySet().removeIf(name -> {
+                                                    GradleDependencyConfiguration c = project.getConfiguration(name);
                                                     if (c == null) {
                                                         return true; // TODO ?? how does this happen
                                                     }
 
-                                                    for (GradleDependencyConfiguration config : all.keySet()) {
+                                                    for (String config : all.keySet()) {
                                                         for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
-                                                            if (gc.getName().equals(config.getName())) {
+                                                            if (gc.getName().equals(config)) {
                                                                 return true;
                                                             }
                                                         }
 
                                                         // TODO there has to be a better way!
-                                                        if ("runtimeOnly".equals(c.getName())) {
-                                                            if ("implementation".equals(config.getName())) {
+                                                        if ("runtimeOnly".equals(name)) {
+                                                            if ("implementation".equals(config)) {
                                                                 return true;
                                                             }
-                                                        } else if ("testRuntimeOnly".equals(c.getName())) {
-                                                            if ("testImplementation".equals(config.getName()) || "implementation".equals(config.getName())) {
+                                                        } else if ("testRuntimeOnly".equals(name)) {
+                                                            if ("testImplementation".equals(config) || "implementation".equals(config)) {
                                                                 return true;
                                                             }
                                                         }
@@ -296,6 +329,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             }
                         }
                     }
+
+                    if (SpringBomProperty.isPluginApplied(gradleProject)) {
+                        acc.projectsUsingDependencyManagement.put(getGradleProjectKey(gradleProject),
+                                SpringBomProperty.Project.of(gradleProject));
+                    }
+                    for (GroupArtifactVersion bom : SpringBomProperty.importedBoms((JavaSourceFile) tree)) {
+                        if (!acc.scriptImportedBoms.contains(bom)) {
+                            acc.scriptImportedBoms.add(bom);
+                        }
+                    }
+                    acc.declaredExtProperties.addAll(SpringBomProperty.declaredProperties((JavaSourceFile) tree));
                 }
                 return super.visit(tree, ctx);
             }
@@ -457,6 +501,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return null;
             }
         });
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return scanGradle.isAcceptable(sourceFile, ctx) ||
+                        (sourceFile instanceof Properties.File && sourceFile.getSourcePath().endsWith("gradle.properties"));
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    // Only the keys matter: a BOM property defined here is updated in place rather than declared in the script
+                    for (Properties.Content content : ((Properties.File) tree).getContent()) {
+                        if (content instanceof Properties.Entry) {
+                            acc.gradlePropertiesKeys.add(((Properties.Entry) content).getKey());
+                        }
+                    }
+                    return tree;
+                }
+                return scanGradle.visit(tree, ctx);
+            }
+        };
     }
 
     @Override
@@ -475,6 +541,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t = tree;
                 if (t instanceof SourceFile) {
+                    resolveBomProperties(acc, dependencyMatcher, ctx);
                     SourceFile sf = (SourceFile) t;
                     if (updateProperties.isAcceptable(sf, ctx)) {
                         t = updateProperties.visitNonNull(t, ctx);
@@ -493,22 +560,63 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return t;
             }
 
-            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<String, String>> toUpdate, ExecutionContext ctx) {
                 Map<String, Set<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
-                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                SpringBomProperty.Project managed = acc.projectsUsingDependencyManagement.get(getGradleProjectKey(gp));
+                for (Map.Entry<GroupArtifact, Map<String, String>> update : toUpdate.entrySet()) {
+                    Map<String, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
                     String artifactId = update.getKey().getArtifactId();
-                    for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
-                        String configName = configToVersion.getKey().getName();
+                    for (Map.Entry<String, String> configToVersion : configs.entrySet()) {
+                        String configName = configToVersion.getKey();
                         String newVersion = configToVersion.getValue();
                         configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
                                 .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                    }
+                    // The model records each version the dependency management plugin changes as a strict constraint on
+                    // every configuration that resolves it, so the upgrade constrains those configurations too.
+                    // One rule cannot carry a different version per configuration.
+                    Set<String> versions = new HashSet<>(configs.values());
+                    if (managed != null && versions.size() == 1) {
+                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, versions.iterator().next());
+                        for (String resolving : managed.getResolvingConfigurations().getOrDefault(update.getKey(), emptySet())) {
+                            configsToUpdate.computeIfAbsent(resolving, it -> new HashSet<>()).add(gav);
+                        }
                     }
                 }
                 return gp.addOrUpdateConstraints(configsToUpdate, ctx);
             }
         };
+    }
+
+    // Which BOMs the build imports isn't known until every script has been scanned.
+    private void resolveBomProperties(DependencyVersionState acc, DependencyMatcher dependencyMatcher, ExecutionContext ctx) {
+        if (acc.bomPropertiesResolved) {
+            return;
+        }
+        acc.bomPropertiesResolved = true;
+        for (Map.Entry<String, SpringBomProperty.Project> project : acc.projectsUsingDependencyManagement.entrySet()) {
+            SpringBomProperty.Project bomProject = project.getValue();
+            for (Map.Entry<GroupArtifact, Map<String, String>> update :
+                    acc.updatesPerProject.getOrDefault(project.getKey(), emptyMap()).entrySet()) {
+                GroupArtifact ga = update.getKey();
+                if (!dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                    continue;
+                }
+                // One property cannot carry a different version per configuration
+                Set<String> versions = new HashSet<>(update.getValue().values());
+                if (versions.size() != 1) {
+                    continue;
+                }
+                SpringBomProperty property = SpringBomProperty.find(bomProject, acc.scriptImportedBoms, ga, ctx);
+                if (property != null && SpringBomProperty.isPublished(versions.iterator().next(),
+                        property.governedOnClasspath(bomProject, ga).keySet(),
+                        bomProject.getRepositories().getRepositories(), ctx)) {
+                    acc.bomPropertiesPerProject.computeIfAbsent(project.getKey(), k -> new HashMap<>()).put(property.getName(), ga);
+                    acc.versionPropNameToGA.put(property.getName(), ga);
+                }
+            }
+        }
     }
 
     @RequiredArgsConstructor
@@ -521,8 +629,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
-                if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                Map<GroupArtifact, Map<String, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
+                Map<String, GroupArtifact> bomProperties = gradleProject != null ? acc.bomPropertiesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
+                if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()) && !bomProperties.containsValue(ga))) {
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
@@ -546,27 +655,50 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             new AddConstraintsBlock(cu instanceof K.CompilationUnit)
                     ).visitNonNull(cu, ctx);
 
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
-                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                    for (Map.Entry<GroupArtifact, Map<String, String>> update : projectRequiredUpdates.entrySet()) {
+                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId()) || bomProperties.containsValue(update.getKey())) {
                             continue;
                         }
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                        Map<String, String> configs = update.getValue();
+                        for (Map.Entry<String, String> config : configs.entrySet()) {
+                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey(), new GroupArtifactVersion(update.getKey().getGroupId(),
                                     update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
                         }
                     }
 
                     // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
-                    if (gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                    if (SpringBomProperty.isPluginApplied(gradleProject)) {
                         cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
                     }
                 }
+                cu = overrideBomProperties(cu, bomProperties, ctx);
                 if (cu != tree) {
                     return cu;
                 }
             }
             return super.visit(tree, ctx);
+        }
+
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script itself is read
+        // too, since the scan misses a declaration an earlier recipe made this cycle. A declaration is only ever raised.
+        private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
+            Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
+            for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
+                String name = bomProperty.getKey();
+                String version = acc.dependenciesToUpdate(dependencyMatcher).get(bomProperty.getValue());
+                if (version == null || acc.gradlePropertiesKeys.contains(name)) {
+                    continue;
+                }
+                if (acc.declaredExtProperties.contains(name) || declaredInScript.contains(name)) {
+                    cu = (JavaSourceFile) new ExtraProperty.Matcher().propertyName(name).matchVariableDeclarations(false)
+                            .<ExecutionContext>asVisitor((property, c) -> new LatestRelease(null).compare(null, property.getValue(), version) < 0 ?
+                                    property.withValue(version).getTree() : property.getTree())
+                            .visitNonNull(cu, ctx);
+                } else {
+                    cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), name, version);
+                }
+            }
+            return cu;
         }
 
         @Override
@@ -665,7 +797,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         return arg;
                                     }
                                     J.Block body = (J.Block) lambda.getBody();
-                                    return lambda.withBody(body.withEnd(Space.format("\n")));
+                                    return lambda.withBody(body);
                                 })))
                                 .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
                                 .withPrefix(Space.format("\n\n"));
@@ -1180,7 +1312,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             J.Lambda becauseArg;
             if (!isKotlinDsl) {
                 becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
@@ -1188,12 +1319,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
                             @Override
@@ -1210,12 +1339,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
                             @Override
@@ -1226,9 +1353,27 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }.visitNonNull(it, 0))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             }
-            m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
-            return autoFormat(m, ctx, getCursor().getParentOrThrow());
+            return autoFormat(method.withArguments(addBecause(method.getArguments(), becauseArg)), ctx, getCursor().getParentOrThrow());
         }
+
+        private static List<Expression> addBecause(List<Expression> arguments, J.Lambda becauseArg) {
+            Expression last = arguments.get(arguments.size() - 1);
+            if (!(last instanceof J.Lambda) || !(((J.Lambda) last).getBody() instanceof J.Block)) {
+                return ListUtils.concat(ListUtils.filter(arguments, arg -> !(arg instanceof J.Empty)), becauseArg);
+            }
+            J.Lambda configuration = (J.Lambda) last;
+            J.Block body = (J.Block) configuration.getBody();
+            Statement becauseStatement = ((J.Block) becauseArg.getBody()).getStatements().get(0);
+            List<Statement> statements = ListUtils.mapLast(body.getStatements(), statement ->
+                    statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement ?
+                            ((Statement) requireNonNull(((J.Return) statement).getExpression())).withPrefix(statement.getPrefix()) :
+                            statement);
+            return ListUtils.mapLast(arguments, arg -> configuration.withBody(body.withStatements(ListUtils.concat(statements, becauseStatement))));
+        }
+    }
+
+    private static J.MethodInvocation withoutImplicitReturn(Statement statement) {
+        return (J.MethodInvocation) (statement instanceof J.Return ? requireNonNull(((J.Return) statement).getExpression()) : statement);
     }
 
     private static boolean withinBlock(Cursor cursor, String name) {

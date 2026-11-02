@@ -22,9 +22,11 @@ import org.openrewrite.quark.QuarkParser;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
+import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
+@CheckReturnValue
 public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     static SourceSpecs dir(String dir, SourceSpecs... sources) {
         return dir(dir, s -> {

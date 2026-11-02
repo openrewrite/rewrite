@@ -81,7 +81,8 @@ public final class PdmLockReader {
         List<String> groups = requireStringList(metadata, "groups", "[metadata]");
         List<String> strategy = requireStringList(metadata, "strategy", "[metadata]");
         String lockVersion = requireString(metadata, "lock_version", "[metadata]");
-        if (!"4.5.0".equals(lockVersion)) {
+        // 4.5.1 (PDM 2.28.1) adds only the opt-in lock_inputs tables, which the table loop rejects
+        if (!"4.5.0".equals(lockVersion) && !"4.5.1".equals(lockVersion)) {
             throw new PdmLockFormatException("Unsupported pdm.lock lock_version: " + lockVersion);
         }
         String contentHash = requireString(metadata, "content_hash", "[metadata]");

@@ -78,6 +78,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void typedDestructuredLambdaParams() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(pairs: List<Pair<Int, String>>) {
+                  pairs.forEach { (a: Int, b: String) -> println(a.toString() + b) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleDestructuredLambdaParams() {
         rewriteRun(
           kotlin(

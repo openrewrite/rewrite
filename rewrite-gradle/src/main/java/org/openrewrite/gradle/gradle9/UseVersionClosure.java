@@ -20,7 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.internal.GradleParseUtils;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -67,16 +67,16 @@ public class UseVersionClosure extends Recipe {
                         return s;
                     }
                     J.Lambda lambda = (J.Lambda) assignment.getAssignment();
-                    J.MethodInvocation template = GradleParseUtils.parseMethodInvocation(ctx, "version {\n}\n");
-                    J.Lambda templateLambda = (J.Lambda) template.getArguments().get(0);
-                    J.Block templateBody = (J.Block) templateLambda.getBody();
+                    // Replacing the outer statement rather than the assignment keeps the indentation, which in
+                    // Groovy sits on the J.Return that wraps an assignment inside a closure
+                    J.MethodInvocation shell = GroovyTemplate.builder("version {\n}")
+                            .build()
+                            .apply(new Cursor(getCursor(), s), s.getCoordinates().replace());
+                    J.Lambda shellLambda = (J.Lambda) shell.getArguments().get(0);
+                    J.Block shellBody = (J.Block) shellLambda.getBody();
                     J.Block originalBody = (J.Block) lambda.getBody();
-                    // Use the outer statement's prefix to preserve indentation (in Groovy, assignments
-                    // inside closures may be wrapped in J.Return, so the indentation is on the wrapper)
-                    return template
-                            .withPrefix(((J) s).getPrefix())
-                            .withArguments(singletonList(
-                                    templateLambda.withBody(templateBody.withStatements(originalBody.getStatements()).withEnd(originalBody.getEnd()))));
+                    return shell.withArguments(singletonList(
+                            shellLambda.withBody(shellBody.withStatements(originalBody.getStatements()).withEnd(originalBody.getEnd()))));
                 }));
             }
         });

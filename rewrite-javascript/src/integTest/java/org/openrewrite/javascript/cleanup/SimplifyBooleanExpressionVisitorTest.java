@@ -149,6 +149,37 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void bitwiseComplementConditionNotTreatedAsNegation() {
+        rewriteRun(
+          javascript(
+            """
+              function f(s) {
+                  return ~s.indexOf('/') ? a() : b();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void logicalNotTernaryConditionStillInverted() {
+        rewriteRun(
+          javascript(
+            """
+              function f(s) {
+                  return !s.startsWith('/') ? a() : b();
+              }
+              """,
+            """
+              function f(s) {
+                  return s.startsWith('/') ? b() : a();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simplifyBooleanLiterals() {
         rewriteRun(
           javascript(

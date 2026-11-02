@@ -28,6 +28,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.ProxyStatus;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
@@ -63,6 +64,14 @@ public class MavenPomDownloader {
             .withDelay(Duration.ofMillis(500))
             .withJitter(0.1)
             .withMaxRetries(5)
+            .build();
+
+    /**
+     * Repository reachability probes retry a timeout once rather than five times. Each probe of a host that accepts
+     * connections but never answers would otherwise wait out six timeouts before normalization moved on.
+     */
+    private static final RetryPolicy<Object> probeRetryPolicy = RetryPolicy.builder(retryPolicy.getConfig())
+            .withMaxRetries(1)
             .build();
 
     private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
@@ -151,13 +160,18 @@ public class MavenPomDownloader {
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
+        return sendRequest(request, retryPolicy);
+    }
+
+    private byte[] sendRequest(HttpSender.Request request, RetryPolicy<Object> policy)
+            throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
-            return Failsafe.with(retryPolicy).get(() -> {
+            return Failsafe.with(policy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
                         throw new HttpSenderResponseException(null, response.getCode(),
-                                new String(response.getBodyAsBytes()));
+                                new String(response.getBodyAsBytes()), ProxyStatus.parse(response.getHeaders()));
                     }
                     return response.getBodyAsBytes();
                 }
@@ -994,6 +1008,7 @@ public class MavenPomDownloader {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
+                    mavenCache.putNormalizedRepository(repository, null);
                     return null;
                 }
                 // An endpoint that has already failed to connect during this run is skipped rather
@@ -1121,7 +1136,7 @@ public class MavenPomDownloader {
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
         try {
-            sendRequest(request.build());
+            sendRequest(request.build(), probeRetryPolicy);
             return ReachabilityResult.success();
         } catch (Throwable t) {
             if (t instanceof HttpSenderResponseException) {
@@ -1320,11 +1335,19 @@ public class MavenPomDownloader {
 
         private final String body;
 
+        private final List<ProxyStatus> proxyStatus;
+
         public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
                                            String body) {
+            this(cause, responseCode, body, emptyList());
+        }
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+                                           String body, List<ProxyStatus> proxyStatus) {
             super(cause);
             this.responseCode = responseCode;
             this.body = body;
+            this.proxyStatus = proxyStatus;
         }
 
         /**
@@ -1344,7 +1367,7 @@ public class MavenPomDownloader {
         public String getMessage() {
             return responseCode == null ?
                     requireNonNull(getCause()).getMessage() :
-                    "HTTP " + responseCode;
+                    "HTTP " + responseCode + ProxyStatus.render(proxyStatus);
         }
 
         public boolean isAccessDenied() {

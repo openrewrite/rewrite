@@ -66,6 +66,17 @@ class ScalarTest implements RewriteTest {
     }
 
     @Test
+    void anchorBeforeTag() {
+        rewriteRun(
+          yaml(
+            """
+              key: &anchor !!str value
+              """
+          )
+        );
+    }
+
+    @Test
     void loneScalar() {
         rewriteRun(
           yaml(

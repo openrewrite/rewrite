@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
@@ -70,7 +69,7 @@ public class MarketplaceOriginAttributionTest : IDisposable
             }
             """);
         var publish = Path.Combine(dir, "publish");
-        RunDotnet($"publish \"{Path.Combine(dir, $"{id}.csproj")}\" -c Release -o \"{publish}\"");
+        DotnetCli.Run($"publish \"{Path.Combine(dir, $"{id}.csproj")}\" -c Release -o \"{publish}\"");
         return Path.Combine(publish, $"{id}.dll");
     }
 
@@ -106,21 +105,5 @@ public class MarketplaceOriginAttributionTest : IDisposable
 
         Assert.Equal(_alphaDll, alpha.PackageName);
         Assert.Equal(_betaDll, beta.PackageName);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true, RedirectStandardError = true,
-            UseShellExecute = false, CreateNoWindow = true
-        };
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException($"dotnet {arguments} failed ({process.ExitCode}):\n{stderr}\n{stdout}");
     }
 }

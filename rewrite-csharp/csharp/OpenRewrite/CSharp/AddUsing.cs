@@ -293,7 +293,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     }
 
     private UsingDirective CreateUsing(Space prefix) =>
-        new(Guid.NewGuid(),
+        new(Tree.RandomId(),
             prefix,
             Markers.Empty,
             new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
@@ -307,12 +307,12 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     private static TypeTree BuildNamespaceName(string ns)
     {
         var parts = ns.Split('.');
-        Expression name = new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], parts[0], null, null);
+        Expression name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], parts[0], null, null);
         for (var i = 1; i < parts.Length; i++)
         {
-            name = new FieldAccess(Guid.NewGuid(), Space.Empty, Markers.Empty, name,
+            name = new FieldAccess(Tree.RandomId(), Space.Empty, Markers.Empty, name,
                 new JLeftPadded<Identifier>(Space.Empty,
-                    new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], parts[i], null, null)),
+                    new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], parts[i], null, null)),
                 null);
         }
         return (TypeTree)J.SetPrefix((J)name, Space.SingleSpace);

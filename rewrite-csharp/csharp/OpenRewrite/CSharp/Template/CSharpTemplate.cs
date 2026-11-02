@@ -189,7 +189,7 @@ public sealed class CSharpTemplate
     /// <returns>The generated AST node with substitutions and prefix applied, but not formatted.
     /// The caller is responsible for formatting, e.g. via
     /// <see cref="CSharpVisitor{P}.AutoFormat{T}"/> (deferred batch) or
-    /// <see cref="AutoFormatExtensions.AutoFormat{T}"/> (immediate).</returns>
+    /// <see cref="Format.AutoFormatVisitor{P}.Format"/> (immediate).</returns>
     public J? Apply(Cursor cursor, MatchResult? values = null,
         CSharpCoordinates? coordinates = null)
     {
@@ -211,6 +211,8 @@ public sealed class CSharpTemplate
         {
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
         }
+
+        tree = TemplateEngine.RetainIds(tree, cursorJ);
 
         // Phase 2: coordinate application (prefix preservation)
         if (coordinates != null)
@@ -309,11 +311,35 @@ public sealed class CSharpTemplate
                 if (match != null)
                 {
                     var result = after.Apply(Cursor, values: match);
-                    return result != null ? AutoFormat(result, ctx, Cursor) : null;
+                    if (result == null)
+                    {
+                        return null;
+                    }
+                    return SameTokens(tree, result) ? tree : AutoFormat(result, ctx, Cursor);
                 }
             }
             return tree;
         }
+
+        /// <summary>
+        /// A pattern also matches code it treats as equivalent, like <c>x is null</c> for <c>x == null</c>,
+        /// so a template can write back the code it matched, which differs from it at most in formatting.
+        /// </summary>
+        private static bool SameTokens(J before, J after)
+        {
+            try
+            {
+                var printer = new CSharpPrinter<object>();
+                return Tokens(printer.Print(before)).SequenceEqual(Tokens(printer.Print(after)));
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private static IEnumerable<(int Kind, string Text)> Tokens(string code) =>
+            Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(code).Select(token => (token.RawKind, token.Text));
     }
 
 }

@@ -42,10 +42,11 @@ export class ScanningEditor extends ScanningRecipe<{ count: number }> {
     async editorWithData(acc: { count: number }): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends PlainTextVisitor<ExecutionContext> {
             async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
-                // Append the count from scanning to the text
-                return {
+                // Append the count from scanning to the text, unless an earlier cycle already did
+                const suffix = ` (count: ${acc.count})`;
+                return text.text.endsWith(suffix) ? text : {
                     ...text,
-                    text: text.text + ` (count: ${acc.count})`
+                    text: text.text + suffix
                 };
             }
         };

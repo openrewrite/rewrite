@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {RewriteRpc} from "./rewrite-rpc";
+import {DEFAULT_BATCH_SIZE, RewriteRpc} from "./rewrite-rpc";
 import {chunkedJsonDecoder} from "./message-decoder";
-import {chunkedJsonEncoder} from "./message-encoder";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
 import {DependencyWorkspace} from "../javascript/dependency-workspace";
+import {isMainThread, MessageChannel, MessagePort, parentPort, Worker, workerData} from "worker_threads";
+import {newPageBuffers, PageBuffers, PortMessageWriter, StdioRelay, WorkerPageChannel} from "./worker-transport";
 
 // Include all languages you want this server to support.
 import "../text";
@@ -29,9 +30,6 @@ import "../json";
 import "../yaml";
 import "../java";
 import "../javascript";
-
-// Not possible to set the stack size when executing from npx for security reasons
-require('v8').setFlagsFromString('--stack-size=8000');
 
 function initPyroscope(logger: rpc.Logger): any {
     // Strip trailing slashes: the SDK builds the ingest URL as `${serverAddress}/ingest`,
@@ -83,7 +81,7 @@ async function main() {
         .option('--log-file <log_path>', 'log file path')
         .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
         .option('--trace-rpc-messages', 'trace RPC messages at the protocol level')
-        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 1000)
+        .option('--batch-size <size>', `messages per page sent to the peer (default is ${DEFAULT_BATCH_SIZE})`, s => parseInt(s, 10))
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
         .parse();
 
@@ -126,8 +124,8 @@ async function main() {
         }
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    // signals are delivered to the main thread, which passes them on
+    parentPort!.on('message', shutdown);
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
@@ -141,6 +139,8 @@ async function main() {
 
     pyroscope = initPyroscope(logger);
 
+    const transport: { port: MessagePort, buffers: PageBuffers } = workerData.transport;
+
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
         // Parse incoming messages straight from their bytes: a large inbound message (e.g. a tree
@@ -148,10 +148,8 @@ async function main() {
         // overflows V8's ~512 MB string limit in the default `JSON.parse(buffer.toString())` decoder,
         // which drops the message and hangs the caller until it times out.
         new rpc.StreamMessageReader(process.stdin, {contentTypeDecoder: chunkedJsonDecoder}),
-        // Serialize outgoing messages without materializing the whole document as one JS string:
-        // a large PrepareRecipe response (a deep recipe tree) overflows the same limit in the
-        // default `Buffer.from(JSON.stringify(msg))` encoder.
-        new rpc.StreamMessageWriter(process.stdout, {contentTypeEncoder: chunkedJsonEncoder}),
+        // The main thread owns stdout, so outgoing messages go through it
+        new PortMessageWriter(transport.port),
         logger
     );
 
@@ -187,8 +185,27 @@ async function main() {
         batchSize: options.batchSize,
         logger: logger,
         metricsCsv: options.metricsCsv,
-        recipeInstallDir: recipeInstallDir
+        recipeInstallDir: recipeInstallDir,
+        pageChannel: new WorkerPageChannel(transport.port, transport.buffers)
     });
 }
 
-main().catch(console.error);
+if (isMainThread) {
+    // A thread's stack is sized when it starts, and the default is too shallow for the type checker
+    // on long chains of inferred return types, so the server runs on a thread started with more.
+    const channel = new MessageChannel();
+    const buffers = newPageBuffers();
+    const server = new Worker(__filename, {
+        argv: process.argv.slice(2),
+        stdin: true,
+        resourceLimits: {stackSizeMb: 8},
+        workerData: {transport: {port: channel.port2, buffers}},
+        transferList: [channel.port2]
+    });
+    new StdioRelay(process.stdin, process.stdout, server.stdin!, channel.port1, buffers);
+    process.on('SIGINT', () => server.postMessage('SIGINT'));
+    process.on('SIGTERM', () => server.postMessage('SIGTERM'));
+    server.on('exit', code => process.exit(code));
+} else {
+    main().catch(console.error);
+}

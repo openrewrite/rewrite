@@ -23,6 +23,7 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
@@ -52,7 +53,7 @@ import static java.util.stream.Collectors.toMap;
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleDependencyConfiguration implements Serializable, Attributed {
+public class GradleDependencyConfiguration implements Heavyweight, Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -452,6 +453,44 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return null;
     }
 
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx) {
+        return getPlatformManagedVersion(ga, repositories, ctx, bomGa -> null);
+    }
+
+    /**
+     * The version a platform imported by this configuration supplies for a coordinate, or null when no such
+     * platform governs it. A version supplied by a constraint rather than a platform is not reported here.
+     * <p>
+     * {@code bomVersionOverride} answers, for a platform's own coordinate, the version it is being upgraded to
+     * in the same run so the answer reflects the state the build is moving toward; it returns null when a
+     * platform's version is unchanged.
+     */
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx,
+                                                      Function<GroupArtifact, @Nullable String> bomVersionOverride) {
+        MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+        for (Dependency dependency : requested) {
+            if (!dependency.findAttribute(Category.class).filter(Category::isBom).isPresent()) {
+                continue;
+            }
+            GroupArtifactVersion bomGav = dependency.getGav();
+            String override = bomVersionOverride.apply(bomGav.asGroupArtifact());
+            if (override != null) {
+                bomGav = bomGav.withVersion(override);
+            }
+            try {
+                String managedVersion = downloader.download(bomGav, null, null, repositories)
+                        .resolve(emptyList(), downloader, ctx)
+                        .getManagedVersion(ga.getGroupId(), ga.getArtifactId(), null, null);
+                if (managedVersion != null) {
+                    return managedVersion;
+                }
+            } catch (MavenDownloadingException ignored) {
+                // A platform that cannot be downloaded cannot be shown to govern this coordinate
+            }
+        }
+        return null;
+    }
+
     public void unsafeSetExtendsFrom(List<GradleDependencyConfiguration> extendsFrom) {
         this.extendsFrom = extendsFrom;
     }
@@ -656,7 +695,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             }
             return it;
         }, repositories, ctx);
-        if (maybeUpdated == this) {
+        if (maybeUpdated == this && (constraints == null || constraints.stream().noneMatch(it ->
+                Objects.equals(it.getArtifactId(), constraint.getArtifactId()) &&
+                Objects.equals(it.getGroupId(), constraint.getGroupId())))) {
             maybeUpdated = addConstraint(constraint, repositories, ctx);
         }
         return maybeUpdated;

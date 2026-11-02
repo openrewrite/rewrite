@@ -18,8 +18,16 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.tree.MavenRepositoryCredentials;
+import org.openrewrite.maven.tree.MavenRepositoryMirror;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.util.Collections.singletonList;
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 /**
@@ -31,6 +39,8 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
  * should opt in explicitly via {@link MavenSettings#readMavenSettingsFromDisk(ExecutionContext)}.
  */
 public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
+
+    private static final String MIRROR_ID = "rewrite-mirror";
 
     @Override
     public void beforeAll(ExtensionContext context) {
@@ -48,6 +58,38 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
                                     mctx.getMirrors().isEmpty();
         if (nothingConfigured) {
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
+            withMavenCentralMirror(mctx);
         }
+    }
+
+    /**
+     * Adds the mirror of Maven Central that MAVEN_CENTRAL_MIRROR_URL, _USERNAME and _PASSWORD name, if they are set
+     * and nothing mirrors Central yet. For tests that set up their own context, which this extension leaves alone.
+     */
+    public static <T extends ExecutionContext> T withMavenCentralMirror(T ctx) {
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        String username = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
+        String password = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
+        MavenSettings settings = mctx.getSettings();
+        if (isNullOrEmpty(url) || isNullOrEmpty(username) || isNullOrEmpty(password) ||
+            mctx.getMirrors(settings).stream().anyMatch(mirror -> mirror.matches(MAVEN_CENTRAL))) {
+            return ctx;
+        }
+        if (settings != null) {
+            // Where there are settings, the downloader takes its mirrors from them
+            mctx.setMavenSettings(settings.merge(new MavenSettings(null, null, null,
+                    new MavenSettings.Mirrors(singletonList(new MavenSettings.Mirror(MIRROR_ID, url, "central", null, null))),
+                    new MavenSettings.Servers(singletonList(new MavenSettings.Server(MIRROR_ID, username, password, null))))));
+        } else {
+            // Beside the repositories and local repository the test set, which settings would replace
+            List<MavenRepositoryMirror> mirrors = new ArrayList<>(mctx.getMirrors());
+            mirrors.add(new MavenRepositoryMirror(MIRROR_ID, url, "central", null, null, null));
+            mctx.setMirrors(mirrors);
+            List<MavenRepositoryCredentials> credentials = new ArrayList<>(mctx.getCredentials());
+            credentials.add(new MavenRepositoryCredentials(MIRROR_ID, username, password));
+            mctx.setCredentials(credentials);
+        }
+        return ctx;
     }
 }

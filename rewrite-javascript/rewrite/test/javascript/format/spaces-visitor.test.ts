@@ -417,6 +417,16 @@ const d = {x, y, z};`
             )
         )
     });
+
+    test('type parameter bounds space around equals and before the closing bracket or comma', () => {
+        spec.recipe = fromVisitor(new SpacesVisitor(spaces()));
+        return spec.rewriteRun(
+            typescript(`type A<T extends X > = T;`, `type A<T extends X> = T;`),
+            typescript(`type B<T  =  X> = T;`, `type B<T = X> = T;`),
+            typescript(`type C<T extends X=  Y> = T;`, `type C<T extends X = Y> = T;`),
+            typescript(`function f<T extends X , U>() {}`, `function f<T extends X, U>() {}`)
+        )
+    });
 });
 
 class ClearInlineTypeThenSpaces extends JavaScriptVisitor<ExecutionContext> {

@@ -107,11 +107,11 @@ func TestParseTypeAssertionShape(t *testing.T) {
 	var seen int
 	forEachTypeAssertion(cu, func(ta *golang.TypeAssertion) {
 		seen++
-		if ws := ta.Left.After.Whitespace; ws != " " {
+		if ws := ta.Left.After.Whitespace(); ws != " " {
 			t.Errorf("space before the dot: got %q, want %q", ws, " ")
 		}
-		if len(ta.Left.After.Comments) != 1 {
-			t.Errorf("comment before the dot: got %d, want 1", len(ta.Left.After.Comments))
+		if len(ta.Left.After.Comments()) != 1 {
+			t.Errorf("comment before the dot: got %d, want 1", len(ta.Left.After.Comments()))
 		}
 		if ta.Type == nil {
 			t.Error("type assertion has no type")

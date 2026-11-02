@@ -32,7 +32,7 @@ final class Fixtures {
     }
 
     static String resource(String name) {
-        try (InputStream is = Fixtures.class.getResourceAsStream("/pipfilelock/" + name)) {
+        try (InputStream is = Fixtures.class.getResourceAsStream("/lock/pipenv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

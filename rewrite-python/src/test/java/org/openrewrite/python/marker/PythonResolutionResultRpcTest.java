@@ -15,12 +15,26 @@
  */
 package org.openrewrite.python.marker;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
+import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
+import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -33,6 +47,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PythonResolutionResultRpcTest {
@@ -65,6 +80,58 @@ class PythonResolutionResultRpcTest {
         assertThat(backEdge)
                 .as("the back-reference closing the cycle must resolve to the same instance")
                 .isSameAs(received);
+    }
+
+    @Test
+    void dependencyGroupsOverTheWire() throws IOException {
+        ResolvedDependency pytest = new ResolvedDependency("pytest", "8.0.0", null, new ArrayList<>());
+        ResolvedDependency pluggy = new ResolvedDependency("pluggy", "1.5.0", null, new ArrayList<>());
+        pytest.getDependencies().add(pluggy);
+        pluggy.getDependencies().add(pytest);
+        Dependency declared = new Dependency("PyTest", ">=8", singletonList("cov"), "python_version > '3'", pytest);
+
+        PythonResolutionResult marker = new PythonResolutionResult(UUID.randomUUID(), "my-app", "1.0.0",
+                null, null, "pyproject.toml", null, null,
+                emptyList(), emptyList(),
+                singletonMap("dev", asList(declared, new Dependency("unlocked", null, null, null, null))),
+                singletonMap("test", singletonList(declared)),
+                emptyList(), emptyList(),
+                asList(pytest, pluggy),
+                null, null);
+        PlainText sent = PlainText.builder().sourcePath(Paths.get("pyproject.toml")).text("").build();
+        sent = sent.withMarkers(sent.getMarkers().add(marker));
+
+        // two peers over pipes, so the marker crosses as the JSON a real peer would be sent
+        PipedOutputStream serverOut = new PipedOutputStream();
+        PipedOutputStream clientOut = new PipedOutputStream();
+        RewriteRpc server = peer(new PipedInputStream(clientOut), serverOut);
+        RewriteRpc client = peer(new PipedInputStream(serverOut), clientOut);
+        try {
+            server.print(sent);
+            PlainText received = client.getObject(sent.getId().toString(), PlainText.class.getName());
+            PythonResolutionResult read = received.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+
+            Dependency dev = read.getOptionalDependencies().get("dev").get(0);
+            assertThat(dev).isNotSameAs(declared);
+            assertThat(dev)
+                    .extracting(Dependency::getName, Dependency::getVersionConstraint, Dependency::getExtras, Dependency::getMarker)
+                    .containsExactly("PyTest", ">=8", singletonList("cov"), "python_version > '3'");
+            assertThat(dev.getResolved())
+                    .as("a declared dependency points at the entry of the resolved list, not at a copy of it")
+                    .isSameAs(read.getResolvedDependencies().get(0));
+            assertThat(read.getOptionalDependencies().get("dev").get(1).getResolved()).isNull();
+            assertThat(read.getDependencyGroups().get("test").get(0).getResolved()).isSameAs(dev.getResolved());
+            assertThat(read.findDependencyInAnyScope("unlocked")).isNotNull();
+            assertThat(read.getAllDeclaredDependencies()).hasSize(3);
+        } finally {
+            client.shutdown();
+            server.shutdown();
+        }
+    }
+
+    private static RewriteRpc peer(InputStream in, OutputStream out) {
+        JsonMessageFormatter formatter = new JsonMessageFormatter(new ParameterNamesModule());
+        return new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(formatter, in, out)), new RecipeMarketplace());
     }
 
     private static PythonResolutionResult sendAndReceive(PythonResolutionResult marker) {

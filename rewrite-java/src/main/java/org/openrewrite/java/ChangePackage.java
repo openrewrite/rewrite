@@ -44,7 +44,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangePackage extends Recipe {
+public class ChangePackage extends Recipe implements RenamingRecipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",
             example = "com.yourorg.foo")
@@ -65,6 +65,30 @@ public class ChangePackage extends Recipe {
 
     private boolean isRecursive() {
         return Boolean.TRUE.equals(recursive);
+    }
+
+    @Override
+    public String kindOfName() {
+        return ChangeType.JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldPackageName;
+    }
+
+    @Override
+    public String rename(String name) {
+        if (name.equals(oldPackageName)) {
+            return newPackageName;
+        } else if (name.startsWith(oldPackageName + ".")) {
+            String rest = name.substring(oldPackageName.length() + 1);
+            // a lowercase name after the package names a subpackage, and an uppercase one a type in it
+            if (isRecursive() || rest.isEmpty() || !Character.isLowerCase(rest.charAt(0))) {
+                return newPackageName + "." + rest;
+            }
+        }
+        return name;
     }
 
     @Override
@@ -361,7 +385,9 @@ public class ChangePackage extends Recipe {
             for (JavaType type : sf.getTypesInUse().getTypesInUse()) {
                 if (type instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                    if (fq.getPackageName().equals(changedPackage)) {
+                    // A package wildcard imports only top-level types. Nested types are
+                    // referenced through their enclosing type or a separate explicit import.
+                    if (fq.getOwningClass() == null && fq.getPackageName().equals(changedPackage)) {
                         usedFromChangedPackage.add(fq.getClassName());
                     }
                 }

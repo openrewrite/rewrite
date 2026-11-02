@@ -69,7 +69,6 @@ class GolangRecipeIntegTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-          .allowNonWhitespaceInWhitespace(true)
           .identifiers(false)
           .methodInvocations(false)
           .build());
@@ -91,7 +90,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -136,7 +135,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return super.visitSwitch(switch_, ctx);
               }
-          })).expectedCyclesThatMakeChanges(0).cycles(1),
+          })),
           go(
             """
               package main
@@ -176,7 +175,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -209,7 +208,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -413,7 +412,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return b;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -448,7 +447,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -481,7 +480,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return m;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -595,7 +594,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -606,9 +605,7 @@ class GolangRecipeIntegTest implements RewriteTest {
             """
               package main
 
-              import (
-              \t"net/http"
-              )
+              import "net/http"
 
               func world() {
               }

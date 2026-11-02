@@ -62,7 +62,8 @@ func (s *WhitespaceValidationService) IsValid(root java.Tree) bool {
 }
 
 var (
-	spaceType     = reflect.TypeOf(java.Space{})
+	spaceType     = reflect.TypeOf(java.EmptySpace)
+	markersType   = reflect.TypeOf(java.EmptyMarkers)
 	javaTypeIface = reflect.TypeOf((*java.JavaType)(nil)).Elem()
 )
 
@@ -81,6 +82,17 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 			return
 		}
 		if v.Kind() == reflect.Ptr {
+			// Space and Markers are pointer handles (*spaceData / *markersData).
+			if v.Type() == spaceType {
+				w.checkSpace(v.Interface().(java.Space), path)
+				return
+			}
+			if v.Type() == markersType {
+				for _, e := range v.Interface().(java.Markers).Entries() {
+					w.walk(reflect.ValueOf(e), path)
+				}
+				return
+			}
 			// Type graphs are cyclic by construction and hold no Space;
 			// stopping at them keeps the walk finite and cheap.
 			if v.Type().Implements(javaTypeIface) {
@@ -102,10 +114,6 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 			w.walk(v.MapIndex(k), path)
 		}
 	case reflect.Struct:
-		if v.Type() == spaceType {
-			w.checkSpace(v.Interface().(java.Space), path)
-			return
-		}
 		if v.Type().Implements(javaTypeIface) {
 			return
 		}
@@ -125,10 +133,10 @@ func (w *spaceWalker) walk(v reflect.Value, path string) {
 }
 
 func (w *spaceWalker) checkSpace(s java.Space, path string) {
-	if s.Whitespace != "" && !isWhitespaceOnly(s.Whitespace) {
-		w.errs = append(w.errs, fmt.Sprintf("%s: Space.Whitespace contains non-whitespace: %q", path, truncateForError(s.Whitespace, 80)))
+	if s.Whitespace() != "" && !isWhitespaceOnly(s.Whitespace()) {
+		w.errs = append(w.errs, fmt.Sprintf("%s: Space.Whitespace contains non-whitespace: %q", path, truncateForError(s.Whitespace(), 80)))
 	}
-	for i, c := range s.Comments {
+	for i, c := range s.Comments() {
 		if c.Suffix != "" && !isWhitespaceOnly(c.Suffix) {
 			w.errs = append(w.errs, fmt.Sprintf("%s: Comment[%d].Suffix contains non-whitespace: %q", path, i, truncateForError(c.Suffix, 80)))
 		}

@@ -34,8 +34,6 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static java.util.Collections.singletonMap;
-
 /**
  * Parser for Python source files.
  * <p>
@@ -80,9 +78,8 @@ public class PythonParser implements Parser {
         Stream<SourceFile> smallFileStream = Stream.empty();
         if (!smallFiles.isEmpty()) {
             PythonValidator<Integer> validator = new PythonValidator<>();
-            Map<String, String> options = languageLevel != null
-                    ? singletonMap("languageLevel", languageLevel.version())
-                    : null;
+            Map<String, String> options = PythonRewriteRpc.parseOptions(ctx,
+                    languageLevel == null ? null : languageLevel.version());
             smallFileStream = PythonRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
                     Py.CompilationUnit.class.getName(), ctx, options).map(source -> {
                 try {

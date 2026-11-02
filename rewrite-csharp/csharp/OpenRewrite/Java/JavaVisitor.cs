@@ -83,6 +83,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Label lbl => VisitLabel(lbl, p),
             Synchronized sync => VisitSynchronized(sync, p),
             TypeCast tc => VisitTypeCast(tc, p),
+            TypeParameters tps => VisitTypeParameters(tps, p),
             TypeParameter tp => VisitTypeParameter(tp, p),
             Package pkg => VisitPackage(pkg, p),
             ForLoop.Control flc => VisitForControl(flc, p),
@@ -1216,6 +1217,15 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     // -----------------------------------------------------------------------
     // TypeParameter : (neither)
     // -----------------------------------------------------------------------
+    public virtual J VisitTypeParameters(TypeParameters typeParameters, P p)
+    {
+        return typeParameters
+            .WithPrefix(VisitSpace(typeParameters.Prefix, p))
+            .WithMarkers(VisitMarkers(typeParameters.Markers, p))
+            .WithAnnotations(ListUtils.Map(typeParameters.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithParams(ListUtils.Map(typeParameters.Params, param => VisitRightPadded(param, p)));
+    }
+
     public virtual J VisitTypeParameter(TypeParameter typeParameter, P p)
     {
         return typeParameter

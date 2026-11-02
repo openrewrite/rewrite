@@ -1,6 +1,6 @@
 from typing import Optional, TypeVar, TYPE_CHECKING
 
-from rewrite.java.tree import extensions, J, JContainer, JRightPadded, JLeftPadded, Space
+from rewrite.java import extensions, J, JContainer, JRightPadded, JLeftPadded, Space
 
 if TYPE_CHECKING:
     from .visitor import PythonVisitor

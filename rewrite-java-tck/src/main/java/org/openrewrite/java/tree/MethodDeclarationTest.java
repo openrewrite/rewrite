@@ -18,12 +18,14 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings({"NullableProblems", "SequencedCollectionMethodCanBeUsed"})
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
@@ -35,6 +37,40 @@ class MethodDeclarationTest implements RewriteTest {
                   String foo() default "foo";
               }
               """
+          )
+        );
+    }
+
+    /**
+     * Explicit receiver parameters, see <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-8.html#jls-8.4.1">JLS §8.4.1</a>.
+     */
+    @Test
+    void receiverParameter() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+              class Outer {
+                  @Target(ElementType.TYPE_USE)
+                  @interface Ann {}
+
+                  void foo(@Ann Outer this) {}
+                  void bar(Outer this, int x) {}
+
+                  class Inner {
+                      Inner(@Ann Outer Outer.this) {}
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                    assertThat(method.getParameters().get(0)).isInstanceOf(J.VariableDeclarations.class);
+                    assertThat(((J.VariableDeclarations) method.getParameters().get(0)).getVariables().get(0).getSimpleName())
+                      .endsWith("this");
+                    return method;
+                }
+            }.visit(cu, 0))
           )
         );
     }
@@ -100,6 +136,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static void assertModifiers(J.CompilationUnit cu, J.Modifier.Type... expected) {
         J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
         assertThat(method.getModifiers()).map(J.Modifier::getType).containsExactly(expected);
@@ -158,6 +195,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("ConfusingMainMethod")
     @Issue("https://openjdk.org/jeps/512")
     @MinimumJava25
     @Nested

@@ -67,7 +67,7 @@ func TestParseProjectExcludesGitIgnored(t *testing.T) {
 		}
 	}
 	for _, want := range []string{"probe.go", "pkg/build/legit.go"} {
-		assert.Truef(t,parsed[want], "expected %q to be parsed, but it was not", want)
+		assert.Truef(t, parsed[want], "expected %q to be parsed, but it was not", want)
 	}
 	for _, unwanted := range []string{"build/generated/rootbuild.go", "sub/build/generated/subbuild.go"} {
 		assert.Falsef(t, parsed[unwanted], "expected gitignored %q to be excluded, but it was parsed", unwanted)

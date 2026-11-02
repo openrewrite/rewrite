@@ -67,7 +67,10 @@ export class Parse {
                         relativeTo: request.relativeTo
                     })!;
 
-                    const generator = parser.parse(...request.inputs);
+                    // an input without its text names a file for the parser to read
+                    const inputs = request.inputs.map(input =>
+                        typeof input === 'object' && input.text == null ? input.sourcePath : input);
+                    const generator = parser.parse(...inputs);
                     const resultIds: UUID[] = [];
 
                     for (let i = 0; i < request.inputs.length; i++) {

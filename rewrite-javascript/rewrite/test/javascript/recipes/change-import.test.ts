@@ -192,7 +192,7 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
-        test("adds import from target module", async () => {
+        test("merges into an existing import of the target module", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({
                 oldModule: "react-dom/test-utils",
@@ -213,8 +213,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { useState } from 'react';
-                            import { act } from 'react';
+                            import { act, useState } from 'react';
 
                             const [state, setState] = useState(0);
                             act(() => {});
@@ -577,8 +576,7 @@ describe("change-import", () => {
                             act(() => {});
                             `,
                             `
-                            import { act } from 'react';
-                            import React from 'react';
+                            import React, { act } from 'react';
 
                             const Component = () => <div>Hello</div>;
 
@@ -640,4 +638,51 @@ describe("change-import", () => {
         // Printing does not show a method type's module, so this is what pins the sibling's.
         expect(attribution).toEqual(["lodash-es.assign", "lodash.flatten"]);
     });
+
+    test("moving a reference typed by a large graph terminates", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new ChangeImport({
+            oldModule: "./token",
+            oldMember: "documentToken",
+            newModule: "./core-token"
+        });
+        const referenced: { name?: string, members?: number } = {};
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...typescript(
+                            `import { documentToken } from './token';\n\nconst d = documentToken;\nconsole.log(d);\n`,
+                            `import { documentToken } from './core-token';\n\nconst d = documentToken;\nconsole.log(d);\n`),
+                        path: "main.ts",
+                        afterRecipe: async (cu: any) => {
+                            await new class extends JavaScriptVisitor<any> {
+                                override async visitIdentifier(id: J.Identifier, p: any): Promise<J | undefined> {
+                                    const type = id.type;
+                                    if (id.simpleName === "documentToken" && referenced.name === undefined &&
+                                        type !== undefined && Type.isFullyQualified(type)) {
+                                        referenced.name = Type.FullyQualified.getFullyQualifiedName(type as any);
+                                        referenced.members = (type as Type.Class).members.length;
+                                    }
+                                    return id;
+                                }
+                            }().visit(cu, undefined);
+                        }
+                    } as any,
+                    {
+                        ...typescript(`export const documentToken: Document = document;`),
+                        path: "token.ts"
+                    },
+                    packageJson(`{"name": "test"}`)
+                )
+            );
+        }, { unsafeCleanup: true });
+
+        // `Document` reaches some 50k types, which is the only reason this case is large enough to
+        // guard the walk; with a primitive here the recipe finishes instantly and pins nothing.
+        expect(referenced.name).toBe("Document");
+        expect(referenced.members).toBeGreaterThan(100);
+    }, 30000);
 });

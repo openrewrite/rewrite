@@ -549,3 +549,27 @@ func describeOwner(o java.JavaType) string {
 	}
 	return "other"
 }
+
+func TestTypeAttributionVariableFlags(t *testing.T) {
+	src := "package main\n\ntype T struct {\n\tN int\n\tm int\n}\n\nvar V int\n\nfunc f(t T) {\n\tx := 1\n\t_, _, _, _ = t.N, t.m, V, x\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	require.NoError(t, err)
+
+	fieldFlags := map[string]int64{}
+	var memberFlags map[string]int64
+	forEachIdentifier(cu, func(i *java.Identifier) {
+		if i.FieldType != nil {
+			fieldFlags[i.Name] = i.FieldType.FlagsBitMap
+		}
+		if cls, ok := i.Type.(*java.JavaTypeClass); ok && cls.FullyQualifiedName == "main.T" {
+			memberFlags = map[string]int64{}
+			for _, member := range cls.Members {
+				memberFlags[member.Name] = member.FlagsBitMap
+			}
+		}
+	})
+
+	// Public is 1, Private is 2.
+	assert.Equal(t, map[string]int64{"N": 1, "m": 2, "V": 1, "t": 0, "x": 0}, fieldFlags)
+	assert.Equal(t, map[string]int64{"N": 1, "m": 2}, memberFlags)
+}

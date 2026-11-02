@@ -52,13 +52,26 @@ func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
 		c := *pe
 		return r.receiveParseError(&c, p.(*ReceiveQueue))
 	}
-	if gm, ok := t.(*golang.GoMod); ok {
-		c := *gm
+	// A peer that names a go.mod or go.sum node by id sends it on its own.
+	switch n := t.(type) {
+	case *golang.GoMod:
+		c := *n
 		return receiveGoMod(&c, p.(*ReceiveQueue))
-	}
-	if gs, ok := t.(*golang.GoSum); ok {
-		c := *gs
+	case *golang.GoModDirective:
+		c := *n
+		return recvGoModDirective(&c, p.(*ReceiveQueue))
+	case *golang.GoModBlock:
+		c := *n
+		return recvGoModBlock(&c, p.(*ReceiveQueue))
+	case *golang.GoModValue:
+		c := *n
+		return recvGoModValue(&c, p.(*ReceiveQueue)).(*golang.GoModValue)
+	case *golang.GoSum:
+		c := *n
 		return receiveGoSum(&c, p.(*ReceiveQueue))
+	case *golang.GoSumLine:
+		c := *n
+		return recvGoSumLine(&c, p.(*ReceiveQueue)).(*golang.GoSumLine)
 	}
 	return r.GoVisitor.Visit(t, p)
 }
@@ -395,7 +408,7 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	if td.Assign != nil {
 		beforeAssign = *td.Assign
 	}
-	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		lp := result.(java.LeftPadded[java.Space])
 		td.Assign = &lp
 	} else {
@@ -437,7 +450,7 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 		coerceToExpressionRP); after != nil {
 		ma.Variables = after
 	}
-	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
 		ma.Operator = result.(java.LeftPadded[java.Space])
 	}
 	if after := receiveTypedList(q, ma.Values,

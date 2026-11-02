@@ -30,7 +30,25 @@ export function parserInputRead(input: ParserInput): string {
     if (typeof input === "object") {
         return input.text;
     }
-    return fs.readFileSync(input).toString()
+    return decodeSourceBytes(fs.readFileSync(input));
+}
+
+/**
+ * Decodes the bytes of a source file to text. UTF-16 (little or big endian) is recognized by its byte order
+ * mark, since such a file is otherwise indistinguishable from binary content; anything else is read as UTF-8.
+ * A byte order mark is kept as a leading U+FEFF so that parsers can record it and printing restores it.
+ */
+export function decodeSourceBytes(bytes: Buffer): string {
+    if (bytes.length >= 2) {
+        if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+            return bytes.toString("utf16le");
+        } else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
+            // Buffer has no utf16be decoder, so swap the byte pairs of an even-length copy.
+            const even = Buffer.from(bytes.subarray(0, bytes.length - (bytes.length % 2)));
+            return even.swap16().toString("utf16le");
+        }
+    }
+    return bytes.toString();
 }
 
 export function parserInputFile(input: ParserInput): string {

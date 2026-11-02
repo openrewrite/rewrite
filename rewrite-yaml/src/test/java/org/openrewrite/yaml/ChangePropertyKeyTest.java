@@ -29,6 +29,229 @@ import java.util.List;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class ChangePropertyKeyTest implements RewriteTest {
+
+    @Test
+    void movePropertyWithTrailingInlineCommentIntoNewMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.http.client.factory", "spring.http.clients.imperative.factory", null, null, null)),
+          yaml(
+            """
+              spring:
+                http:
+                  client:
+                    factory: jdk # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+              """,
+            """
+              spring:
+                http: # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+                  clients.imperative.factory: jdk
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveParentAndTrailingCommentsBeforeSeveralRootSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old: # enable the profile
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+
+              z: x # unrelated
+              last: y
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  # enable the profile
+                  export.endpoint: url
+
+              z: x # unrelated
+              last: y
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentOnRemovedIntermediateParentWhenScopeRemains() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.metrics.export.prometheus", "a.prometheus.metrics.export", null, null, null)),
+          yaml(
+            """
+              a:
+                metrics:
+                  export:
+                    # default backend
+                    prometheus:
+                      enabled: true
+                  tags:
+                    application: test
+              z: x
+              """,
+            """
+              a:
+                metrics:
+                  tags:
+                    application: test
+                # default backend
+                prometheus.metrics.export:
+                  enabled: true
+              z: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void separateMovedAncestorCommentsFromPreviousScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "b.endpoint", null, null, null)),
+          yaml(
+            """
+              a: # parent comment
+                old: # child comment
+                  endpoint: url
+              z: x
+              """,
+            """
+              z: x
+              # parent comment
+              # child comment
+              b.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepParentCommentWhenExclusionsRetainTheParent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.settings", "a.new.settings", null, List.of("keep"), null)),
+          yaml(
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                    move: 2
+                other: true
+              """,
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                other: true
+                new.settings:
+                  move: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainCommentOnRemovedParentAsStandaloneComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.new.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old: # requires the tracing profile
+                  endpoint: url
+                other: true
+              """,
+            """
+              a:
+                other: true
+                # requires the tracing profile
+                new.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentAtDocumentEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old:
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingSiblingCommentWhenMovingIntoItsMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old:
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              z: x
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export.endpoint: url
+              z: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotCopyPreviousSiblingCommentWhenSourceMappingRemains() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.enabled", "a.new.enabled", null, null, null)),
+          yaml(
+            """
+              a:
+                previous: false # keep
+                old:
+                  enabled: true
+                  retained: x
+              """,
+            """
+              a:
+                previous: false # keep
+                old:
+                  retained: x
+                new.enabled: true
+              """
+          )
+        );
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangePropertyKey(

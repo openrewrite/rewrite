@@ -91,7 +91,7 @@ func TestHandleParseReportsPrintMismatchPerFile(t *testing.T) {
 	require.Truef(t, ok, "a.go should be a ParseError, got %T", byName["a.go"])
 	assert.Equal(t, "a.go", pe.SourcePath)
 
-	marker, ok := pe.Markers.Entries[0].(java.ParseExceptionResult)
+	marker, ok := pe.Markers.Entries()[0].(java.ParseExceptionResult)
 	require.True(t, ok)
 	assert.Contains(t, marker.Message, "a.go is not print idempotent.")
 	assert.Contains(t, marker.Message, "--- a/a.go")
@@ -228,7 +228,7 @@ func messageOf(t *testing.T, s *server, id string) string {
 	t.Helper()
 	pe, ok := s.localObjects[id].(*java.ParseError)
 	require.Truef(t, ok, "expected a ParseError, got %T", s.localObjects[id])
-	marker, ok := pe.Markers.Entries[0].(java.ParseExceptionResult)
+	marker, ok := pe.Markers.Entries()[0].(java.ParseExceptionResult)
 	require.True(t, ok)
 	return marker.Message
 }

@@ -557,10 +557,13 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     StringBuilder builder = new StringBuilder().append("\"\"\"");
                     for (String line : lines) {
                         builder.append('\n');
-                        shift(builder, indent);
-                        builder.append(line);
+                        if (!line.isEmpty()) {
+                            shift(builder, indent);
+                            builder.append(line);
+                        }
                     }
-                    literal = literal.withValueSource(builder.toString()).withValue(content);
+                    // every line moves by the same amount, which leaves the text block's value as it was
+                    literal = literal.withValueSource(builder.toString());
                 }
             }
         }

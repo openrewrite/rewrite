@@ -33,7 +33,7 @@ public class RpcSendQueueRefTest
     public void ChangedRefSlotIsReAddedInsteadOfChanged()
     {
         var sent = new List<RpcObjectData>();
-        var refs = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+        var refs = new RpcRefs();
         var q = new RpcSendQueue(100, batch => sent.AddRange(batch), refs, null, false);
 
         var t1 = new Payload { Value = 1 };

@@ -38,6 +38,25 @@ class TypeCastTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantCast")
+    @Test
+    void parenthesizedOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Object o = (Object) ("s");
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var o = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var cast = (J.TypeCast) o.getVariables().get(0).getInitializer();
+                assertThat(cast.getExpression()).isInstanceOf(J.Parentheses.class);
+            })
+          )
+        );
+    }
+
     @Test
     void annotatedArrayTypeCast() {
         rewriteRun(

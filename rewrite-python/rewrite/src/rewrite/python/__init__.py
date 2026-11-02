@@ -90,11 +90,27 @@ from rewrite.python.format import (
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
+from rewrite.python.binding_utils import (Binding, ImportBindings, import_bindings,
+                                          is_reference, resolves_in_scope)
 from rewrite.python.scope_utils import Scope, scope_of
+
+# Type-attribution diagnostics
+from rewrite.python.type_report import (
+    TypeEntry,
+    TypeReport,
+    diff_ty,
+    parse_for_types,
+    print_tree,
+    print_types,
+    render_method,
+    render_type,
+    build_type_report,
+)
 
 # Type-comparison helpers
 from rewrite.python.type_utils import (
     is_assignable_to,
+    is_of_type_with_name,
     is_of_type,
     is_of_class_type,
     is_string,
@@ -197,11 +213,28 @@ __all__ = [
     "maybe_remove_import",
     # Method matching
     "MethodMatcher",
+    # Type-attribution diagnostics
+    "TypeEntry",
+    "TypeReport",
+    "diff_ty",
+    "parse_for_types",
+    "print_tree",
+    "print_types",
+    "render_method",
+    "render_type",
+    "build_type_report",
     # Scoping
     "Scope",
     "scope_of",
+    # Import bindings
+    "Binding",
+    "ImportBindings",
+    "import_bindings",
+    "is_reference",
+    "resolves_in_scope",
     # Type-comparison helpers
     "is_assignable_to",
+    "is_of_type_with_name",
     "is_of_type",
     "is_of_class_type",
     "is_string",

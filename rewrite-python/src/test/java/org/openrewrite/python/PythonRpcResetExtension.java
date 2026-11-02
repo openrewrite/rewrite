@@ -21,11 +21,10 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 
 /**
- * JUnit 5 extension that ensures each test gets an isolated Python RPC channel.
+ * JUnit 5 extension that gives each test a clean Python RPC channel.
  * <p>
- * This follows the same pattern as JavaScript tests, where the RPC process is
- * shut down after each test to ensure complete isolation. This prevents any
- * state leakage between tests and ensures each test starts with a fresh RPC channel.
+ * Tests share one Python process, because starting one takes longer than most tests do.
+ * A failed test can leave a request half-finished, so after one the process is shut down instead of reset.
  * <p>
  * Usage:
  * <pre>
@@ -40,15 +39,16 @@ public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCal
 
     @Override
     public void beforeEach(ExtensionContext context) {
-        // Configure the factory with tracing on first use.
-        // The python version can be overridden via system property (e.g., by the py2CompatibilityTest suite).
+        // Configure the factory on first use.
+        // The python version can be overridden via system property (e.g., by the py2CompatibilityTest suite),
+        // and the build names the log and traces every RPC message to it only under -PverboseTests.
         if (!factoryConfigured) {
             String pythonVersion = System.getProperty("rewrite.python.version", "3");
             PythonRewriteRpc.setFactory(
               PythonRewriteRpc.builder()
                 .pythonVersion(pythonVersion)
-                .traceRpcMessages()
-                .log(java.nio.file.Paths.get("build/python-rpc.log"))
+                .traceRpcMessages(Boolean.getBoolean("rewrite.python.traceRpcMessages"))
+                .log(java.nio.file.Paths.get(System.getProperty("rewrite.python.rpcLog", "build/python-rpc.log")))
             );
             factoryConfigured = true;
         }
@@ -56,8 +56,14 @@ public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCal
 
     @Override
     public void afterEach(ExtensionContext context) {
-        // Shutdown after each test to ensure complete isolation
-        // This matches the JavaScript test pattern
-        PythonRewriteRpc.shutdownCurrent();
+        if (context.getExecutionException().isPresent()) {
+            PythonRewriteRpc.shutdownCurrent();
+            return;
+        }
+        try {
+            PythonRewriteRpc.resetCurrent();
+        } catch (RuntimeException e) {
+            PythonRewriteRpc.shutdownCurrent();
+        }
     }
 }

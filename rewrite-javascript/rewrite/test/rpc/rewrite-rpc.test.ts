@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, RecipeMarketplace, rootCursor} from "../../src";
+import {Cursor, JavaScript, Recipe, RecipeMarketplace, rootCursor} from "../../src";
 import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
 import {json, Json} from "../../src/json";
@@ -27,6 +27,7 @@ import {activate as activateCompositeWithJavaDelegate} from "../../fixtures/comp
 import {activate as activateJavaDelegatePrecondition} from "../../fixtures/java-delegate-precondition";
 import {
     findNodeResolutionResult,
+    findNodeRuntime,
     javascript,
     JavaScriptVisitor,
     JS,
@@ -37,6 +38,10 @@ import {
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
 import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
+import {Print} from "../../src/rpc/request/print";
+import {RpcObjectState} from "../../src/rpc/queue";
+import * as fs from "fs";
+import * as path from "path";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -100,6 +105,35 @@ describe("Rewrite RPC", () => {
         }
     ));
 
+    test("print subtrees whose text depends on what encloses them", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("const literal = { a: 1, b: 2 }, cast = <string>literal, first = items?.[0], called = a?.b();"),
+            beforeRecipe: async (cu: JS.CompilationUnit) => {
+                const printed: string[] = [];
+                const withoutCursor: string[] = [];
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async preVisit(tree: J, _: any): Promise<J | undefined> {
+                        const parent = this.cursor.parentTree()?.value?.kind;
+                        if (tree.kind === J.Kind.Block && parent === J.Kind.NewClass ||
+                            tree.kind === J.Kind.ControlParentheses && parent === J.Kind.TypeCast ||
+                            tree.kind === J.Kind.Identifier && (parent === J.Kind.ArrayAccess || parent === J.Kind.MethodInvocation) &&
+                            tree.markers.markers.length > 0) {
+                            printed.push(await client.print(tree, this.cursor.parent!));
+                            client.localObjects.set(tree.id.toString(), tree);
+                            withoutCursor.push(await client.connection.sendRequest(
+                                new rpc.RequestType<Print, string, Error>("Print"), new Print(tree.id, cu.kind)));
+                        }
+                        return tree;
+                    }
+                }).visit(cu, 0);
+                expect(printed).toEqual(["{ a: 1, b: 2 }", "<string>", "items?.", "a"]);
+                expect(withoutCursor).toEqual(["{ a: 1 b: 2 }", "(string)", "items?", "a?"]);
+                return cu;
+            }
+        }
+    ));
+
     test("parse", async () => {
         const sourceFile = (await client.parse([{
             text: "console.info('hello',)",
@@ -108,6 +142,34 @@ describe("Rewrite RPC", () => {
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse an input that names a file without giving its text", async () => {
+        await withDir(async dir => {
+            fs.writeFileSync(path.join(dir.path, "hello.ts"), "console.info('hello')");
+            const sourceFile = (await client.parse(
+                [{text: null, sourcePath: path.join(dir.path, "hello.ts")} as any],
+                JS.Kind.CompilationUnit, dir.path))[0];
+            expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
+            expect(sourceFile.sourcePath).toEqual("hello.ts");
+            expect(await client.print(sourceFile)).toEqual("console.info('hello')");
+        }, {unsafeCleanup: true});
+    });
+
+    test("a receive failure surfaces when the peer cannot roll it back, and the refs it sent are kept", async () => {
+        const toPeer = new PassThrough();
+        const fromPeer = new PassThrough();
+        // a peer that predates AbortGetObject answers it with "method not found", and still counts ref 3 as sent
+        const peer = rpc.createMessageConnection(new rpc.StreamMessageReader(toPeer), new rpc.StreamMessageWriter(fromPeer));
+        peer.onRequest("GetObject", (request: { id: string }) => request.id === "1" ?
+            [{state: RpcObjectState.ADD, value: "shared", ref: 3}, {state: RpcObjectState.ADD, ref: 7}, {state: RpcObjectState.END_OF_OBJECT}] :
+            [{state: RpcObjectState.ADD, ref: 3}, {state: RpcObjectState.END_OF_OBJECT}]);
+        peer.listen();
+
+        const receiver = new RewriteRpc(rpc.createMessageConnection(
+            new rpc.StreamMessageReader(fromPeer), new rpc.StreamMessageWriter(toPeer)), {});
+        await expect(receiver.getObject("1")).rejects.toThrow("Expected END_OF_OBJECT but got: ADD");
+        expect(await receiver.getObject("2")).toEqual("shared");
     });
 
     test("parse package.json with PackageJsonParser", async () => {
@@ -131,6 +193,19 @@ describe("Rewrite RPC", () => {
         expect(marker!.version).toEqual("1.0.0");
         expect(marker!.dependencies).toHaveLength(1);
         expect(marker!.dependencies[0].name).toEqual("lodash");
+    });
+
+    test("a package.json parsed over RPC carries the NodeRuntime of the parser", async () => {
+        const sourceFile = (await client.parse([{
+            text: JSON.stringify({name: "test-project", version: "1.0.0"}, null, 2),
+            sourcePath: "package.json"
+        }], Json.Kind.Document))[0];
+
+        expect(findNodeRuntime(sourceFile as Json.Document)).toMatchObject({
+            nodeVersion: process.version,
+            os: process.platform,
+            cpu: process.arch
+        });
     });
 
     test("getMarketplace", async () =>
@@ -334,6 +409,37 @@ describe("Rewrite RPC", () => {
         expect(response.editPreconditions).toContainEqual(
             {visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "gate"}}
         );
+    });
+
+    // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked for.
+    describe("causesAnotherCycle", () => {
+        class CausesAnotherCycle extends Recipe {
+            name = "org.openrewrite.example.text.causes-another-cycle"
+            displayName = "Causes another cycle"
+            description = "Causes another cycle."
+            readonly causesAnotherCycle = true
+        }
+
+        const prepare = (request: PrepareRecipe): Promise<PrepareRecipeResponse> =>
+            (client as any).connection.sendRequest(
+                new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), request);
+
+        beforeEach(() => serverMarketplace.install(CausesAnotherCycle, JavaScript));
+
+        test("omitted for hosts that did not ask for it", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.causes-another-cycle"));
+            expect(response).not.toHaveProperty("causesAnotherCycle");
+        });
+
+        test("omitted when false", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.with-recipe-list", {}, true));
+            expect(response).not.toHaveProperty("causesAnotherCycle");
+        });
+
+        test("sent when requested", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.causes-another-cycle", {}, true));
+            expect(response.causesAnotherCycle).toBe(true);
+        });
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {

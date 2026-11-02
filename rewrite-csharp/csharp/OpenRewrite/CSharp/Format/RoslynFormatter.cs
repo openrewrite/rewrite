@@ -35,6 +35,7 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu)
     {
+        FormattingListener.BeforeFormat(cu, null, null);
         return Format(cu, targetSubtree: null, stopAfter: null);
     }
 
@@ -74,8 +75,9 @@ public static class RoslynFormatter
             source = printer.Print(mvsCu);
         }
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var formatting = targetSubtree == null ? null : new HashSet<Guid> { targetSubtree.Id };
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, formatting);
 
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
@@ -248,8 +250,8 @@ public static class RoslynFormatter
         if (spans.Count == 0)
             return originalCu;
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, nodeIds);
 
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
@@ -400,11 +402,18 @@ public static class RoslynFormatter
         private readonly HashSet<Guid> _nodeIds = [];
         private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
-        public void Add(J node)
+        /// <summary>
+        /// Registers <paramref name="node"/>. Roslyn formats its prefix as well, unless the node took over the prefix
+        /// of the node at <paramref name="cursor"/>, as a template replacement does, and that prefix doesn't end in a
+        /// line break.
+        /// </summary>
+        public void Add(J node, Cursor? cursor = null)
         {
             var (id, prefix) = PrintableIdAndPrefix(node);
             _nodeIds.Add(id);
-            _preservedPrefixes[id] = prefix;
+            if (cursor?.Value is J replaced && ReferenceEquals(PrintableIdAndPrefix(replaced).prefix, prefix) &&
+                !(prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace).EndsWith('\n'))
+                _preservedPrefixes[id] = prefix;
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)

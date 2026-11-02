@@ -65,9 +65,6 @@ func (defaultMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrap
 		}
 		return wrapper("")
 	case java.Markup:
-		if m.Detail != "" {
-			return wrapper("(" + m.Message + ": " + m.Detail + ")")
-		}
 		return wrapper("(" + m.Message + ")")
 	}
 	return ""
@@ -100,13 +97,13 @@ func (searchOnlyMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWr
 type fencedMarkerPrinter struct{}
 
 func (fencedMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
-	if isFenceable(marker) {
-		return fmt.Sprintf("{{%s}}", marker.ID())
-	}
 	return ""
 }
 
 func (fencedMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
+	if isFenceable(marker) {
+		return fmt.Sprintf("{{%s}}", marker.ID())
+	}
 	return ""
 }
 

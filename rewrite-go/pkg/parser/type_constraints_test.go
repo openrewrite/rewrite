@@ -197,3 +197,16 @@ func TestUnionOfQualifiedNameAndSlice(t *testing.T) {
 	}
 	assertRoundTrip(t, src)
 }
+
+// go/parser accepts `~x` as an expression, and only the type checker objects.
+// J.Unary has no operator for it, so it is the same node as in a constraint.
+func TestTildeInExpressionPositionRoundTrips(t *testing.T) {
+	src := "package main\n\nvar a = 1\nvar b = ~ a\n"
+
+	cu, err := parser.NewGoParser().Parse("tilde.go", src)
+	require.NoError(t, err)
+
+	b := cu.Statements[1].Element.(*java.VariableDeclarations)
+	require.IsType(t, &golang.UnderlyingType{}, b.Variables[0].Element.Initializer.Element)
+	require.Equal(t, src, printer.Print(cu))
+}

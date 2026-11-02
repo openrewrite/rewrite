@@ -583,4 +583,25 @@ class DependencyUseStringNotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void declinesAComponentThatDoubleQuotesCannotSpell() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: '$notAnInterpolation'
+              }
+              """
+          )
+        );
+    }
 }

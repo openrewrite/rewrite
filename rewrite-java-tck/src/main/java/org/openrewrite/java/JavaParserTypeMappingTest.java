@@ -17,9 +17,11 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.JavaType.Parameterized;
@@ -27,11 +29,16 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import javax.tools.ToolProvider;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -552,5 +559,77 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             })
           )
         );
+    }
+
+    @TempDir
+    Path fixtureClasses;
+
+    @Test
+    void kindOfClasspathTypesFollowsTheirClassFileFlags() throws Exception {
+        JavaType.Class holder = parseClasspathHolder("""
+          package fixture;
+          public class Holder {
+              public Ann ann() { return null; }
+              public Iface iface() { return null; }
+              public Enm enm() { return null; }
+              public Cls cls() { return null; }
+              public Outer<String>.Inner inner() { return null; }
+          }
+          @interface Ann {}
+          interface Iface {}
+          enum Enm {}
+          class Cls {}
+          class Outer<T> { class Inner {} }
+          """);
+
+        assertThat(returnTypeOf(holder, "ann").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Annotation);
+        assertThat(returnTypeOf(holder, "iface").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+        assertThat(returnTypeOf(holder, "enm").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+        assertThat(returnTypeOf(holder, "cls").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+        assertThat(returnTypeOf(holder, "iface").getFlags()).contains(Flag.Interface, Flag.Abstract);
+
+        JavaType.FullyQualified innerOwner = returnTypeOf(holder, "inner").getOwningClass();
+        assertThat(innerOwner).isInstanceOf(JavaType.Parameterized.class);
+        assertThat(innerOwner.getFullyQualifiedName()).isEqualTo("fixture.Outer");
+    }
+
+    @MinimumJava17
+    @Test
+    void kindOfClasspathRecordFollowsItsClassFileFlags() throws Exception {
+        JavaType.Class holder = parseClasspathHolder("""
+          package fixture;
+          public class Holder {
+              public Rec rec() { return null; }
+          }
+          record Rec() {}
+          """);
+
+        assertThat(returnTypeOf(holder, "rec").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Record);
+    }
+
+    private JavaType.Class parseClasspathHolder(@Language("java") String fixture) throws Exception {
+        Path source = fixtureClasses.resolve("Holder.java");
+        Files.write(source, fixture.getBytes(StandardCharsets.UTF_8));
+        int exit = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+          "-d", fixtureClasses.toString(), source.toString());
+        assertThat(exit).isZero();
+
+        // The source uses only Holder, so the other fixture types are reached through Holder's member signatures.
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().classpath(singletonList(fixtureClasses)).build()
+          .parse("class A { fixture.Holder h; }")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalStateException("Could not parse the Holder use"));
+        J.VariableDeclarations field =
+          (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+        return (JavaType.Class) field.getType();
+    }
+
+    private static JavaType.Class returnTypeOf(JavaType.Class type, String methodName) {
+        return (JavaType.Class) type.getMethods().stream()
+          .filter(m -> m.getName().equals(methodName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("No method " + methodName))
+          .getReturnType();
     }
 }

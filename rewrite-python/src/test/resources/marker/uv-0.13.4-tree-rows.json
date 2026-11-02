@@ -1,0 +1,632 @@
+[
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version in '3.9.0'",
+  "b": "python_full_version == '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version in '3.9 3.10.0 3.11'",
+  "b": "python_full_version >= '3.9' and python_full_version < '3.12'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.9'",
+  "b": "python_full_version == '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.9.0'",
+  "b": "python_full_version == '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.9.0.*'",
+  "b": "python_full_version == '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.*'",
+  "b": "python_full_version >= '3' and python_full_version < '4'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version in '3.9 3.11'",
+  "b": "python_full_version == '3.9.*' or python_full_version == '3.11.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version in '3.9 3.10 3.11'",
+  "b": "python_full_version >= '3.9' and python_full_version < '3.12'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "implementation_version in '3.9 3.11'",
+  "b": "implementation_version == '3.9' or implementation_version == '3.11'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version not in '3.9 3.11'",
+  "b": "python_full_version < '3.9' or python_full_version == '3.10.*' or python_full_version >= '3.12'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version not in '3.9 3.10 3.11'",
+  "b": "python_full_version < '3.9' or python_full_version >= '3.12'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "implementation_version not in '3.9 3.11'",
+  "b": "implementation_version != '3.9' and implementation_version != '3.11'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version != '3.9'",
+  "b": "python_full_version != '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version >= '3.9.0'",
+  "b": "python_full_version >= '3.9'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version <= '3.9.0'",
+  "b": "python_full_version < '3.10'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.*'",
+  "b": "python_full_version >= '3' and python_full_version < '4'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version == '3.0.*'",
+  "b": "python_full_version == '3.0.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version < '3.17' or python_version < '3.18'",
+  "b": "python_full_version < '3.18'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version > '3.17' or python_version > '3.18' or python_version > '3.12'",
+  "b": "python_full_version >= '3.13'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version > '3.17.post4' or python_version > '3.18.post4'",
+  "b": "python_full_version >= '3.18'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version < '3.17' and python_version < '3.18'",
+  "b": "python_full_version < '3.17'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version <= '3.18' and python_version == '3.18'",
+  "b": "python_full_version == '3.18.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version <= '3.18' or python_version == '3.18'",
+  "b": "python_full_version < '3.19'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version <= '3.15' or (python_version <= '3.17' and python_version < '3.16')",
+  "b": "python_full_version < '3.16'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "(python_version > '3.17' or python_version > '3.16') and python_version > '3.15'",
+  "b": "python_full_version >= '3.17'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "(python_version > '3.17' or python_version > '3.16') and python_version > '3.15' and implementation_version == '1'",
+  "b": "implementation_version == '1' and python_full_version >= '3.17'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "('3.17' < python_version or '3.16' < python_version) and '3.15' < python_version and implementation_version == '1'",
+  "b": "implementation_version == '1' and python_full_version >= '3.17'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "extra == 'a' or extra == 'a'",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "extra == 'a' and extra == 'a' or extra == 'b'",
+  "b": "extra == 'a' or extra == 'b'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "((extra == 'a' and extra == 'b') and extra == 'c') and extra == 'b'",
+  "b": "extra == 'a' and extra == 'b' and extra == 'c'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "((extra == 'a' or extra == 'b') or extra == 'c') or extra == 'b'",
+  "b": "extra == 'a' or extra == 'b' or extra == 'c'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "extra == 'a' or (extra == 'a' and extra == 'b')",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "extra == 'a' and (extra == 'a' or extra == 'b')",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "(extra == 'a' and (extra == 'a' or extra == 'b')) or extra == 'd'",
+  "b": "extra == 'a' or extra == 'd'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "((extra == 'a' and extra == 'b') or extra == 'c') or extra == 'b'",
+  "b": "extra == 'b' or extra == 'c'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "((extra == 'a' or extra == 'b') and extra == 'c') and extra == 'b'",
+  "b": "extra == 'b' and extra == 'c'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "((extra == 'a' or extra == 'b') and extra == 'c') or extra == 'b'",
+  "b": "extra == 'b' or (extra == 'a' and extra == 'c')"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "(python_version < '3.1' or python_version < '3.2') and (python_version < '3.2' or python_version == '3.3')",
+  "b": "python_full_version < '3.2'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "extra == 'a' and (python_version < '3.12.0rc1' or python_version >= '3.12.0rc1')",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version != '3.10' or python_version > '3.12'",
+  "b": "python_full_version != '3.10.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version != '3.8' and python_version < '3.10'",
+  "b": "python_full_version < '3.8' or python_full_version == '3.9.*'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version != '3.8' and python_version != '3.9'",
+  "b": "python_full_version < '3.8' or python_full_version >= '3.10'"
+ },
+ {
+  "test": "test_simplification_extra_versus_other",
+  "kind": "simplifies",
+  "a": "extra != \"foo\" and (extra == \"bar\" or extra == \"baz\")",
+  "b": "(extra == 'bar' and extra != 'foo') or (extra == 'baz' and extra != 'foo')"
+ },
+ {
+  "test": "test_simplification_extra_versus_other",
+  "kind": "simplifies",
+  "a": "sys_platform != \"foo\" and (sys_platform == \"bar\" or sys_platform == \"baz\")",
+  "b": "sys_platform == 'bar' or sys_platform == 'baz'"
+ },
+ {
+  "test": "test_simplification_extra_versus_other",
+  "kind": "simplifies",
+  "a": "(extra != \"bar\" and (extra == \"foo\" or extra == \"baz\"))\n            or ((extra != \"foo\" and extra != \"bar\") and extra == \"baz\")",
+  "b": "(extra != 'bar' and extra == 'baz') or (extra != 'bar' and extra == 'foo')"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(os_name == 'Linux' and platform_system == 'win32')\n                or (os_name == 'Linux' and platform_system == 'win32' and sys_platform == 'a')\n                or (os_name == 'Linux' and platform_system == 'win32' and sys_platform == 'x')\n                or (os_name != 'Linux' and platform_system == 'win32' and sys_platform == 'x')\n                or (os_name == 'Linux' and platform_system != 'win32' and sys_platform == 'x')\n                or (os_name != 'Linux' and platform_system != 'win32' and sys_platform == 'x')",
+  "b": "(os_name == 'Linux' and platform_system == 'win32') or sys_platform == 'x'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "python_version > '3.7'",
+  "b": "python_full_version >= '3.8'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(python_version <= '3.7' and os_name == 'Linux') or python_version > '3.7'",
+  "b": "python_full_version >= '3.8' or os_name == 'Linux'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(implementation_name != 'pypy' and os_name == 'nt' and sys_platform == 'darwin') or (os_name == 'nt' and sys_platform == 'win32')",
+  "b": "os_name == 'nt' and sys_platform == 'win32'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(sys_platform == 'darwin' or sys_platform == 'win32') and ((implementation_name != 'pypy' and os_name == 'nt' and sys_platform == 'darwin') or (os_name == 'nt' and sys_platform == 'win32'))",
+  "b": "os_name == 'nt' and sys_platform == 'win32'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(sys_platform == 'darwin' or sys_platform == 'win32')\n                and ((platform_version != '1' and os_name == 'nt' and sys_platform == 'darwin') or (os_name == 'nt' and sys_platform == 'win32'))",
+  "b": "os_name == 'nt' and sys_platform == 'win32'"
+ },
+ {
+  "test": "test_complex_marker_simplification",
+  "kind": "simplifies",
+  "a": "(os_name == 'nt' and sys_platform == 'win32') or (os_name != 'nt' and (sys_platform == 'win32' or sys_platform == 'win64'))",
+  "b": "(os_name != 'nt' and sys_platform == 'win64') or sys_platform == 'win32'"
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version != '3.9.1'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version in 'foo'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version in '3.9.*'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version in '3.9, 3.10'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version in '3.9,3.10'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version in '3.9 or 3.10'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version < '3.12.0rc1' or python_version >= '3.12.0rc1'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "python_version != '3.10' or python_version < '3.12'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "sys_platform == 'win32' or sys_platform != 'win32'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "true",
+  "a": "'win32' == sys_platform or sys_platform != 'win32'",
+  "b": ""
+ },
+ {
+  "test": "test_marker_simplification",
+  "kind": "false",
+  "a": "python_version == '3.9.1'",
+  "b": ""
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'a'",
+  "b": "python_version == '1'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'a'",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'a'",
+  "b": "extra == 'b'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'b'",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'b'",
+  "b": "extra != 'a'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra != 'b'",
+  "b": "extra == 'a'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "disjoint",
+  "a": "extra != 'b'",
+  "b": "extra == 'b'"
+ },
+ {
+  "test": "test_extra_disjointness",
+  "kind": "disjoint",
+  "a": "extra == 'b'",
+  "b": "extra != 'b'"
+ },
+ {
+  "test": "test_arbitrary_disjointness",
+  "kind": "not_disjoint",
+  "a": "python_version == 'Linux'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'Linux'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "not_disjoint",
+  "a": "python_full_version == '3.7.*'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "disjoint",
+  "a": "python_version == '3.7'",
+  "b": "python_full_version == '3.8'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "not_disjoint",
+  "a": "python_version == '3.7'",
+  "b": "python_full_version == '3.7.2'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "disjoint",
+  "a": "python_version > '3.7'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_version_disjointness",
+  "kind": "not_disjoint",
+  "a": "python_version <= '3.7'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'Linux'",
+  "b": "platform_version == '3.7.1'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "implementation_version == '3.7.0'",
+  "b": "python_full_version == '3.7.1'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "os_name == 'Linux'",
+  "b": "os_name == 'OSX'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "os_name <= 'Linux'",
+  "b": "os_name == 'OSX'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name in 'OSXLinuxWindows'",
+  "b": "os_name == 'OSX'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "'OSX' in os_name",
+  "b": "'Linux' in os_name"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name in 'OSX'",
+  "b": "os_name in 'Linux'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name in 'OSXLinux'",
+  "b": "os_name == 'Windows'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "os_name in 'Windows'",
+  "b": "os_name not in 'Windows'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "'Windows' in os_name",
+  "b": "'Windows' not in os_name"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "'Windows' in os_name",
+  "b": "'Windows' in os_name"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "'Linux' in os_name",
+  "b": "os_name not in 'Linux'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "'Linux' not in os_name",
+  "b": "os_name in 'Linux'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'Linux' and os_name != 'OSX'",
+  "b": "os_name == 'Linux'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "os_name == 'Linux' and os_name != 'OSX'",
+  "b": "os_name == 'OSX'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'Linux' and extra != 'OSX'",
+  "b": "extra == 'Linux'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "extra == 'Linux' and extra != 'OSX'",
+  "b": "extra == 'OSX'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "not_disjoint",
+  "a": "extra == 'x1' and extra != 'x2'",
+  "b": "extra == 'x1'"
+ },
+ {
+  "test": "test_string_disjointness",
+  "kind": "disjoint",
+  "a": "extra == 'x1' and extra != 'x2'",
+  "b": "extra == 'x2'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'a' and platform_version == '1'",
+  "b": "os_name == 'a'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'a' or platform_version == '1'",
+  "b": "os_name == 'a'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "disjoint",
+  "a": "os_name == 'a' and platform_version == '1'",
+  "b": "os_name == 'a' and platform_version == '2'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "disjoint",
+  "a": "os_name == 'a' and platform_version == '1'",
+  "b": "'2' == platform_version and os_name == 'a'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "not_disjoint",
+  "a": "os_name == 'a' or platform_version == '1'",
+  "b": "os_name == 'a' or platform_version == '2'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "disjoint",
+  "a": "python_version >= '3.7' and implementation_name == 'pypy'",
+  "b": "python_version < '3.7'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "disjoint",
+  "a": "implementation_name == 'pypy' and python_version >= '3.7'",
+  "b": "implementation_name != 'pypy'"
+ },
+ {
+  "test": "test_combined_disjointness",
+  "kind": "disjoint",
+  "a": "implementation_name != 'pypy' and python_version >= '3.7'",
+  "b": "implementation_name == 'pypy'"
+ }
+]

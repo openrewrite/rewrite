@@ -132,8 +132,20 @@ class UvLockReaderTest {
     }
 
     @Test
+    void relativeExcludeNewerSentinelAndItsCommentComeTogether() {
+        String comment = UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT;
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\n\n[options]\nexclude-newer = \"0001-01-01T00:00:00Z\"\nexclude-newer-span = \"P1W\"\n"))
+          .isInstanceOf(UvLockFormatException.class)
+          .hasMessageContaining("comment");
+
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\n\n[options]\nexclude-newer = \"2024-01-01T00:00:00Z\" " + comment + "\n"))
+          .isInstanceOf(UvLockFormatException.class)
+          .hasMessageContaining("Trailing content");
+    }
+
+    @Test
     void unrecognizedRevisionThrows() {
-        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 4\n"))
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 6\n"))
           .isInstanceOf(UvLockFormatException.class)
           .hasMessageContaining("revision");
     }

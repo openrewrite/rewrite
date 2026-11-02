@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -40,6 +41,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Collections.addAll;
+import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
@@ -106,6 +108,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     @Override
+    @CheckReturnValue
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return doApply(scope, coordinates, true, parameters);
     }
@@ -120,7 +123,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
 
-        Substitutions substitutions = substitutions(parameters);
+        Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
@@ -139,6 +142,24 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return result != scope.getValue() && result instanceof Expression ?
                 (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
                 result;
+    }
+
+    /**
+     * The replacement keeps the prefix of the tree it replaces, comments included, so that tree passed back in as a
+     * parameter must not bring the same comments along a second time.
+     */
+    private static Object[] withoutCommentsOfReplacedTree(JavaCoordinates coordinates, Object[] parameters) {
+        if (coordinates.getMode() != JavaCoordinates.Mode.REPLACEMENT) {
+            return parameters;
+        }
+        Object[] params = parameters.clone();
+        for (int i = 0; i < params.length; i++) {
+            if (params[i] instanceof J && ((J) params[i]).getId().equals(coordinates.getTree().getId())) {
+                J replaced = (J) params[i];
+                params[i] = replaced.withPrefix(replaced.getPrefix().withComments(emptyList()));
+            }
+        }
+        return params;
     }
 
     private static String unmatchedCoordinatesMessage(Cursor scope, JavaCoordinates coordinates) {
@@ -192,6 +213,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

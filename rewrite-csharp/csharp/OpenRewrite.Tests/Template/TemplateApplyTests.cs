@@ -240,6 +240,119 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// The parser reads <c>x is Foo</c> as a type test and <c>x is "abc"</c> as a constant pattern,
+    /// so a capture after <c>is</c> builds whichever the printed text parses to.
+    /// </summary>
+    [Theory]
+    [InlineData("\"abc\"")]
+    [InlineData("-1")]
+    [InlineData("null")]
+    [InlineData("(1)")]
+    [InlineData("int.MaxValue")]
+    [InlineData("Foo")]
+    [InlineData("Foo.Bar")]
+    public void CaptureAfterIsMatchesFreshParse(string captured)
+    {
+        var expr = Capture.Expression("expr");
+        var value = Capture.Expression("value");
+        var tmpl = CSharpTemplate.Expression($"{expr} is {value}");
+        var values = new MatchResult(
+            new Dictionary<string, object>
+            {
+                ["expr"] = ParseExpression("x"),
+                ["value"] = ParseExpression(captured),
+            }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal($"x is {captured}", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
+    /// <summary>
+    /// A type test binds as a relational operator, and a pattern takes a shift expression.
+    /// </summary>
+    [Theory]
+    [InlineData("", " is Foo", "a == b", "(a == b) is Foo")]
+    [InlineData("", " is Foo", "a ?? b", "(a ?? b) is Foo")]
+    [InlineData("", " is Foo", "c ? a : b", "(c ? a : b) is Foo")]
+    [InlineData("", " is Foo", "c = a", "(c = a) is Foo")]
+    [InlineData("", " is Foo", "a + b", "a + b is Foo")]
+    [InlineData("", " is Foo", "a < b", "a < b is Foo")]
+    [InlineData("", " is Foo", "a as string", "a as string is Foo")]
+    [InlineData("", " is Foo", "x is Bar", "x is Bar is Foo")]
+    [InlineData("x is ", "", "a == b", "x is (a == b)")]
+    [InlineData("x is ", "", "a & b", "x is (a & b)")]
+    [InlineData("x is ", "", "c ? a : b", "x is (c ? a : b)")]
+    [InlineData("x is ", "", "a << b", "x is a << b")]
+    [InlineData("x is ", "", "a + b", "x is a + b")]
+    [InlineData("x is < ", "", "a == b", "x is < (a == b)")]
+    [InlineData("x is < ", "", "a + b", "x is < a + b")]
+    [InlineData("!", "", "x is Foo", "!(x is Foo)")]
+    [InlineData("", " == y", "x is Foo", "x is Foo == y")]
+    [InlineData("", ".ToString()", "x is Foo", "(x is Foo).ToString()")]
+    public void CaptureInTypeTestMatchesFreshParse(string before, string after, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
+    /// Each application builds nodes of its own, as Java's templates do, so two replacements share no id.
+    /// </summary>
+    [Fact]
+    public void EachApplicationHasItsOwnIds()
+    {
+        var a = Capture.Expression("a");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({a})");
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression("1") }, null);
+
+        var first = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+        var second = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        Assert.Empty(IdsOf(first).Intersect(IdsOf(second)));
+    }
+
+    /// <summary>
+    /// A capture keeps its id where it moves from the replaced code, and only once.
+    /// </summary>
+    [Fact]
+    public void CaptureKeepsItsIdOnceWhenItComesFromTheReplacedCode()
+    {
+        var a = Capture.Expression("a");
+        var cu = Parse("class C { void M(int x) { Console.Write(x); } }");
+        var write = FindFirst<MethodInvocation>(cu)!;
+        var x = write.Arguments.Elements[0].Element;
+        var match = CSharpPattern.Expression($"Console.Write({a})")
+            .Match(write, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu))!;
+
+        var result = CSharpTemplate.Expression($"Math.Max({a}, {a})")
+            .Apply(new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu), write), values: match)!;
+
+        var arguments = ((MethodInvocation)result).Arguments.Elements;
+        Assert.Equal(x.Id, arguments[0].Element.Id);
+        Assert.NotEqual(x.Id, arguments[1].Element.Id);
+        Assert.Equal(IdsOf(result).Count, IdsOf(result).Distinct().Count());
+    }
+
+    private static List<Guid> IdsOf(J tree)
+    {
+        var ids = new List<Guid>();
+        new IdCollector(ids).Visit(tree, 0);
+        return ids;
+    }
+
+    private class IdCollector(List<Guid> ids) : CSharpVisitor<int>
+    {
+        public override J? PostVisit(J tree, int p)
+        {
+            ids.Add(tree.Id);
+            return tree;
+        }
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {
@@ -585,10 +698,182 @@ public class TemplateApplyTests : RewriteTest
         // left = Binary(||, true, false), right = true
         // Template {left} && {right} should produce (true || false) && true
         RewriteRun(
-            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()),
+            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()).SetCycles(1),
             CSharp(
                 "class C { void M() { var x = true || false || true; } }",
                 "class C { void M() { var x = (true || false) && true; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void AutoParenthesizesCaptureOnRightOfSameOperator()
+    {
+        // f || g || h would parse as (f || g) || h
+        var cond = Capture.Expression("cond");
+        var other = Capture.Expression("other");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"{cond} ? true : {other}"),
+                CSharpTemplate.Expression($"{cond} || {other}")))),
+            CSharp(
+                "class C { bool M(bool f, bool g, bool h) { return f ? true : g || h; } }",
+                "class C { bool M(bool f, bool g, bool h) { return f || (g || h); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CaptureOnRightOfSameOperatorMatchesFreshParse()
+    {
+        // "x" + 1 + 2 is "x12", where "x" + (1 + 2) is "x3"
+        var right = Capture.Expression("right");
+        var tmpl = CSharpTemplate.Expression($"\"x\" + {right}");
+        var values = new MatchResult(
+            new Dictionary<string, object> { ["right"] = ParseExpression("1 + 2") }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal("\"x\" + (1 + 2)", printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
+
+    /// <summary>
+    /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
+    /// </summary>
+    [Theory]
+    [InlineData("-", "-b", "-(-b)")]
+    [InlineData("-", "--b", "-(--b)")]
+    [InlineData("-", "-1", "-(-1)")]
+    [InlineData("+", "+b", "+(+b)")]
+    [InlineData("+", "++b", "+(++b)")]
+    [InlineData("-", "+b", "-+b")]
+    [InlineData("-", "b--", "-b--")]
+    [InlineData("- ", "-b", "- -b")]
+    [InlineData("x-", "-b", "x-(-b)")]
+    [InlineData("x-", "-b * c", "x-(-b * c)")]
+    [InlineData("x+", "++b", "x+(++b)")]
+    [InlineData("x - ", "-b", "x - -b")]
+    public void CaptureAfterSignMatchesFreshParse(string before, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}"), captured, expected);
+    }
+
+    /// <summary>
+    /// A conditional access keeps the members after a <c>!</c> in its chain, which parentheses would take out of it.
+    /// </summary>
+    [Theory]
+    [InlineData("x?.ToString()!.Length")]
+    [InlineData("x?.ToString()![0]")]
+    [InlineData("x?.ToString()!.Trim()")]
+    public void CaptureOfConditionalAccessWithNullForgivingKeepsItsChain(string captured)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"Console.WriteLine({a})"), captured,
+            $"Console.WriteLine({captured})");
+    }
+
+    /// <summary>
+    /// A cast takes a unary operand, and a member access or element access a primary one.
+    /// </summary>
+    [Theory]
+    [InlineData("(object)", "", "b + c", "(object)(b + c)")]
+    [InlineData("(object)", "", "b ? c : d", "(object)(b ? c : d)")]
+    [InlineData("(object)", "", "b..c", "(object)(b..c)")]
+    [InlineData("(object)", "", "-b", "(object)-b")]
+    [InlineData("(object)", "", "(int)b", "(object)(int)b")]
+    [InlineData("(object)", "", "b++", "(object)b++")]
+    [InlineData("(int)", "", "-b", "(int)-b")]
+    [InlineData("(Foo)", "", "-b", "(Foo)(-b)")]
+    [InlineData("(Foo.Bar)", "", "-1", "(Foo.Bar)(-1)")]
+    [InlineData("(Foo)", "", "!b", "(Foo)!b")]
+    [InlineData("", ".ToString()", "b + c", "(b + c).ToString()")]
+    [InlineData("", ".ToString()", "-b", "(-b).ToString()")]
+    [InlineData("", ".ToString()", "(int)b", "((int)b).ToString()")]
+    [InlineData("", ".ToString()", "b ?? c", "(b ?? c).ToString()")]
+    [InlineData("", ".ToString()", "b++", "b++.ToString()")]
+    [InlineData("", ".ToString()", "b.c[0]", "b.c[0].ToString()")]
+    [InlineData("", ".Length", "b as string", "(b as string).Length")]
+    [InlineData("", ".Count()", "from x in xs select x", "(from x in xs select x).Count()")]
+    [InlineData("", ".Result", "await t", "(await t).Result")]
+    [InlineData("(object)", "", "await t", "(object)await t")]
+    [InlineData("", "[0]", "b ? c : d", "(b ? c : d)[0]")]
+    public void CaptureAsOperandOfCastOrMemberAccessMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
+    /// <c>await</c> and a range take a unary operand, a switch expression a range, and a with expression a switch
+    /// expression.
+    /// </summary>
+    [Theory]
+    [InlineData("", "..y", "x + 1", "(x + 1)..y")]
+    [InlineData("x..", "", "y - 1", "x..(y - 1)")]
+    [InlineData("x..", "", "^1", "x..^1")]
+    [InlineData("", " switch { _ => 0 }", "x + 1", "(x + 1) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x..y", "x..y switch { _ => 0 }")]
+    [InlineData("", " with { P = 1 }", "x ?? y", "(x ?? y) with { P = 1 }")]
+    [InlineData("", " switch { _ => 0 }", "x as Foo", "x as Foo switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo", "(x is Foo) switch { _ => 0 }")]
+    [InlineData("", " with { P = 1 }", "x as R", "x as R with { P = 1 }")]
+    [InlineData("", "..y", "x as Foo", "(x as Foo)..y")]
+    public void CaptureAsOperandOfAwaitRangeSwitchOrWithMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    [Theory]
+    [InlineData("b ?? c", "await (b ?? c)")]
+    [InlineData("(Task)b", "await (Task)b")]
+    [InlineData("b.Result", "await b.Result")]
+    public void CaptureAsOperandOfAwaitMatchesFreshParse(string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression(captured) }, null);
+
+        var result = CSharpTemplate.Expression($"await {a}")
+            .Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal(expected, printed);
+        // In a method that isn't async, await (b ?? c) would call a method named await
+        var reparsed = FindFirst<NamedVariable>(Parse($"class C {{ async void M() {{ var v = {printed}; }} }}"))!;
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, reparsed.Initializer!.Element));
+    }
+
+    [Fact]
+    public void ReplacementAsReceiverKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"Twice({a})"),
+                CSharpTemplate.Expression($"{a} + {a}")))),
+            CSharp(
+                "class C { int Twice(int i) => i + i; string M(int b) { return Twice(b).ToString(); } }",
+                "class C { int Twice(int i) => i + i; string M(int b) { return (b + b).ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ReplacementAfterSignKeepsItsSign()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"Negate({a})"),
+                CSharpTemplate.Expression($"-{a}")))),
+            CSharp(
+                "class C { int Negate(int i) => -i; int M(int b) { return -Negate(b); } }",
+                "class C { int Negate(int i) => -i; int M(int b) { return -(-b); } }"
             )
         );
     }
@@ -651,6 +936,24 @@ public class TemplateApplyTests : RewriteTest
     // ===============================================================
     // Recipe factories
     // ===============================================================
+
+    private static Expression ParseExpression(string code) =>
+        FindFirst<NamedVariable>(Parse($"class C {{ object v = {code}; }}"))!.Initializer!.Element;
+
+    /// <summary>
+    /// Applies <paramref name="tmpl"/> with its capture <c>a</c> bound to <paramref name="captured"/>, and checks
+    /// that the result prints <paramref name="expected"/> and is the tree the parser builds for that text.
+    /// </summary>
+    private static void AssertAppliesAsParsed(CSharpTemplate tmpl, string captured, string expected)
+    {
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = ParseExpression(captured) }, null);
+
+        var result = tmpl.Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        var printed = new CSharpPrinter<int>().Print(result);
+        Assert.Equal(expected, printed);
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(result, ParseExpression(printed)));
+    }
 
     private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));

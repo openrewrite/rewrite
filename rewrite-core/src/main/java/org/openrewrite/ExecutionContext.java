@@ -33,10 +33,20 @@ import static java.util.Objects.requireNonNull;
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
-public interface ExecutionContext extends RpcCodec<ExecutionContext> {
+public interface ExecutionContext extends RpcCodec<ExecutionContext>, Heavyweight {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
+
+    /**
+     * An optional {@code Duration} capping how long a single recipe may scan or edit a single source file.
+     * Once exceeded, that recipe's work on the file is abandoned and reported as an error, and the run continues.
+     * A {@link ScanningRecipe} whose scan is abandoned has an incomplete accumulator, so it generates no files and
+     * makes no edits for the rest of that cycle.
+     */
+    @Incubating(since = "8.93.0")
+    String SOURCE_FILE_TIMEOUT = "org.openrewrite.sourceFileTimeout";
+
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 

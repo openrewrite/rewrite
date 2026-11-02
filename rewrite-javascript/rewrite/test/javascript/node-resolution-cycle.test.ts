@@ -42,7 +42,7 @@ describe("cyclic resolved-dependency graph", () => {
         await sq.send(marker, undefined);
         const batch = sq.finish();
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
         const received = await rq.receive<NodeResolutionResult>(undefined);
 
         const a = received.dependencies[0].resolved!;

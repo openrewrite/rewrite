@@ -6,9 +6,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type
+from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type, Self
 from uuid import UUID
 
+from .heavyweight import Heavyweight
 from .markers import Markers
 from .style import NamedStyles, Style
 from .utils import id_to_int, replace_if_changed
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
 P = TypeVar('P')
 
 
-class Tree(ABC):
+class Tree(Heavyweight, ABC):
     __slots__ = ()
 
     # Identity is stored on subclasses as a 128-bit int in `_id` (the UUID's own
@@ -76,7 +77,7 @@ class Tree(ABC):
     def __hash__(self) -> int:
         return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
-    def replace(self, **kwargs) -> 'Tree':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this tree node, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 
@@ -217,7 +218,9 @@ class PrintOutputCapture(Generic[P]):
 @dataclass
 class _DefaultMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        return marker.print(cursor, comment_wrapper, False)
+        from .markers import Marker
+        # a marker of a type this side has no class for is held as a plain mapping
+        return marker.print(cursor, comment_wrapper, False) if isinstance(marker, Marker) else ""
 
 
 @dataclass
@@ -234,7 +237,8 @@ class _SearchMarkersOnlyPrinter(PrintOutputCapture.MarkerPrinter):
 class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     """Prints all markers with verbose=True (shows detail instead of message)."""
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        return marker.print(cursor, comment_wrapper, True)
+        from .markers import Marker
+        return marker.print(cursor, comment_wrapper, True) if isinstance(marker, Marker) else ""
 
 
 @dataclass

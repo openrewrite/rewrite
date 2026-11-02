@@ -260,4 +260,25 @@ class SdistMetadataReaderTest {
             throw new UncheckedIOException(e);
         }
     }
+
+    @Test
+    void requiresTxtSectionsBecomeMarkers() {
+        assertThat(SdistMetadataReader.parseRequiresTxt("""
+          six>=1.10
+          # comment
+
+          [socks]
+          pysocks
+
+          [:python_version < "3"]
+          enum34
+
+          [tls:sys_platform == "win32"]
+          pywin32
+          """)).containsExactly(
+          "six>=1.10",
+          "pysocks; extra == 'socks'",
+          "enum34; (python_version < \"3\")",
+          "pywin32; (sys_platform == \"win32\") and extra == 'tls'");
+    }
 }

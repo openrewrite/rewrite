@@ -100,7 +100,7 @@ public class BatchVisit implements RpcRequest {
 
                 if (deleted) {
                     localObjects.remove(request.getTreeId());
-                    break;
+                    return new BatchVisitResponse(results);
                 }
 
                 if (modified) {

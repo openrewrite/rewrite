@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
 
@@ -120,7 +119,7 @@ public class InstallRecipesDependencyActivationTest : IDisposable
             """);
 
         _publishDir = Path.Combine(_root, "publish");
-        RunDotnet($"publish \"{Path.Combine(primaryDir, "PrimaryPlugin.csproj")}\" " +
+        DotnetCli.Run($"publish \"{Path.Combine(primaryDir, "PrimaryPlugin.csproj")}\" " +
                   $"-c Release -o \"{_publishDir}\"");
     }
 
@@ -152,29 +151,5 @@ public class InstallRecipesDependencyActivationTest : IDisposable
         // marketplace by installing the dependent. It is resolved by binary integration
         // at composition time instead (see PrepareRecipeTreeTest).
         Assert.DoesNotContain("DepPlugin.DepRecipe", names);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
     }
 }

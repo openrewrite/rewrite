@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 
@@ -24,7 +25,7 @@ public class XmlSender : XmlVisitor<RpcSendQueue>
     {
         q.GetAndSend(x, n => n.Id);
         q.GetAndSend(x, n => n.Prefix);
-        q.GetAndSend(x, n => n.Markers);
+        q.GetAndSend(x, n => Reference.AsRef(n.Markers));
         return x;
     }
 

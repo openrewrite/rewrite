@@ -36,6 +36,11 @@ class PropertiesReferenceTest implements RewriteTest {
     @ValueSource(strings = {
       "application.properties",
       "application-test.properties",
+      "application-disable-security.properties",
+      "application-eu.west.properties",
+      "application-blue+green.properties",
+      "application-ops@eu.properties",
+      "application-prüfung.properties",
       "/foo/bar/application-test.properties",
     })
     @ParameterizedTest

@@ -103,12 +103,12 @@ func TestParseProjectRelativizesGoResolutionResultPath(t *testing.T) {
 	for _, obj := range s.localObjects {
 		switch sf := obj.(type) {
 		case *golang.GoMod:
-			for _, mrr := range resolutionResults(sf.Markers.Entries) {
+			for _, mrr := range resolutionResults(sf.Markers.Entries()) {
 				onGoMod++
 				assertMarkerPath(t, mrr.Path, sf.SourcePath, sf.SourcePath)
 			}
 		case *golang.GoSum:
-			for _, mrr := range resolutionResults(sf.Markers.Entries) {
+			for _, mrr := range resolutionResults(sf.Markers.Entries()) {
 				onGoSum++
 				assertMarkerPath(t, mrr.Path, filepath.Join(filepath.Dir(sf.SourcePath), "go.mod"), sf.SourcePath)
 			}

@@ -14,17 +14,19 @@
 
 """Which names a Python scope binds, and which scope binds a name at a given cursor."""
 
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set
+from typing import (Any, Callable, Dict, FrozenSet, Iterator, List, NamedTuple, Optional, Set,
+                    Union)
 
 from rewrite import Cursor
 from rewrite.java import J
-from rewrite.java.tree import (Assignment, AssignmentOperation, ClassDeclaration, ForEachLoop,
-                               Identifier, Import, Lambda, MethodDeclaration, Parentheses,
-                               VariableDeclarations)
+from rewrite.java.tree import (Assignment, AssignmentOperation, Case, ClassDeclaration,
+                               ForEachLoop, Identifier, Import, Lambda, MethodDeclaration,
+                               Parentheses, TypeParameters, VariableDeclarations)
 from rewrite.python.import_utils import get_alias_name, get_qualid_name
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, CompilationUnit,
-                                 ComprehensionExpression, ExpressionStatement, MultiImport, Star,
-                                 TypeHintedExpression, VariableScope)
+                                 ComprehensionExpression, ExpressionStatement, MatchCase,
+                                 MultiImport, Star, TypeAlias, TypeHintedExpression,
+                                 VariableScope)
 from rewrite.python.visitor import PythonVisitor
 
 _NO_NAMES: FrozenSet[str] = frozenset()
@@ -32,7 +34,46 @@ _NO_NAMES: FrozenSet[str] = frozenset()
 # The nodes _BindingScan answers for; everything else binds nothing and is not a scope.
 _SCOPES = (MethodDeclaration, Lambda, ClassDeclaration, ComprehensionExpression, CompilationUnit)
 
+# The declarations PEP 695 lets carry type parameters, each wrapped in an annotation scope.
+_TYPE_PARAM_HOLDERS = (MethodDeclaration, ClassDeclaration, TypeAlias)
+
+# The names a pattern can stand on without capturing: `_` matches anything, and the parser
+# spells the singletons as identifiers.
+_NOT_CAPTURED = frozenset({'_', 'None', 'True', 'False'})
+
+# The pattern kinds whose first child names the class matched, the attribute or the mapping
+# key, leaving the rest of the children to capture.
+_HEADED_PATTERNS = (MatchCase.Pattern.Kind.CLASS, MatchCase.Pattern.Kind.KEYWORD,
+                    MatchCase.Pattern.Kind.KEY_VALUE)
+
 _SCOPE_NAMES = 'org.openrewrite.python.scopeNames'
+
+
+def captures(pattern: Optional[J]) -> Iterator[Identifier]:
+    """The identifiers a ``case`` pattern binds: every bare name standing where the pattern
+    matches a value."""
+    if isinstance(pattern, Identifier):
+        if pattern.simple_name not in _NOT_CAPTURED:
+            yield pattern
+    elif isinstance(pattern, MatchCase):
+        yield from captures(pattern.pattern)
+    elif isinstance(pattern, Star):
+        yield from captures(pattern.expression)
+    elif isinstance(pattern, MatchCase.Pattern):
+        children = pattern.children
+        for child in (children[1:] if pattern.kind in _HEADED_PATTERNS else children):
+            yield from captures(child)
+
+
+class _Frame(NamedTuple):
+    """One link of the chain a reference resolves through."""
+
+    scope: J
+    # The class body statement holding the reference, None for every scope but a class body.
+    cut: Optional[J] = None
+    # Whether this is the declaration's PEP 695 annotation scope rather than the declaration's
+    # own: the two bind different names over different regions of the same node.
+    type_params: bool = False
 
 
 class Scope:
@@ -41,14 +82,15 @@ class Scope:
 
     __slots__ = ('_chain', '_index', '_cache')
 
-    def __init__(self, chain: List[J], index: int, cache: Dict[J, FrozenSet[str]]) -> None:
+    def __init__(self, chain: List[_Frame], index: int,
+                 cache: Dict[Any, FrozenSet[str]]) -> None:
         self._chain = chain
         self._index = index
         self._cache = cache
 
     def names(self) -> FrozenSet[str]:
-        """The names this scope binds itself, which is not what it reaches: for that, ask
-        :meth:`declares`."""
+        """The names this scope binds itself where the cursor stands, which is not what it
+        reaches: for that, ask :meth:`declares`."""
         return (_names(self._chain[self._index], self._cache)
                 if self._index < len(self._chain) else _NO_NAMES)
 
@@ -68,32 +110,35 @@ class Scope:
         a module-level binding, otherwise the ``def``, ``class``, ``lambda`` or comprehension
         holding it — or None where nothing in scope does. A caller holding a declaration asks
         whether this is the node it came from: anything nearer shadows it."""
-        for scope in self._chain[self._index:]:
-            if name in _names(scope, self._cache):
-                return scope
+        for index in range(self._index, len(self._chain)):
+            if name in _names(self._chain[index], self._cache):
+                return self._chain[index].scope
         return None
 
 
-def scope_of(cursor: Cursor) -> Scope:
+def scope_of(cursor: Cursor, binding: bool = False) -> Scope:
     """The innermost scope holding ``cursor``, which a visitor's own cursor rarely is: it
-    stands on whatever node it is visiting.
+    stands on whatever node it is visiting. ``binding`` marks a cursor on an identifier that
+    binds its name rather than reading it.
 
     Syntactic, because ``field_type`` cannot decide it: it is unset for every identifier
     when type attribution is unavailable.
     """
-    return Scope(_enclosing_scopes(cursor), 0, _names_cache(cursor))
+    chain = _enclosing_scopes(cursor)
+    return Scope([frame._replace(cut=None) for frame in chain] if binding else chain,
+                 0, _names_cache(cursor))
 
 
 class LocalBindings:
     """Whether an identifier is a local of some enclosing scope rather than a reference to a
     module-level import — :func:`scope_of` narrowed to that one question."""
 
-    def is_bound(self, cursor: Cursor, name: str) -> bool:
-        scope = scope_of(cursor).declaring_scope(name)
+    def is_bound(self, cursor: Cursor, name: str, binding: bool = False) -> bool:
+        scope = scope_of(cursor, binding).declaring_scope(name)
         return scope is not None and not isinstance(scope, CompilationUnit)
 
 
-def _names_cache(cursor: Cursor) -> Dict[J, FrozenSet[str]]:
+def _names_cache(cursor: Cursor) -> Dict[Any, FrozenSet[str]]:
     """Where a scan of one scope is kept, so a traversal scans each scope once. Hung on the
     compilation unit's cursor, which lives exactly as long as the visit of that file; the
     root cursor ``TreeVisitor`` starts from is a class attribute shared process-wide."""
@@ -107,33 +152,63 @@ def _names_cache(cursor: Cursor) -> Dict[J, FrozenSet[str]]:
     return {}
 
 
-def _names(scope: J, cache: Dict[J, FrozenSet[str]]) -> FrozenSet[str]:
-    names = cache.get(scope)
-    if names is None:
-        names = frozenset(_BindingScan(scope).run())
-        cache[scope] = names
-    return names
+def _names(frame: _Frame, cache: Dict[Any, FrozenSet[str]]) -> FrozenSet[str]:
+    """The names ``frame`` binds — for a class body, the ones bound before its cut, the
+    statement of it the reference sits in. A class body looks a name up in the module until
+    its own binding runs, so ``json = json`` re-exports the import."""
+    names = cache.get(frame)
+    if names is not None:
+        return names
+    if frame.type_params:
+        cache[frame] = names = _type_parameter_names(frame.scope)
+        return names
+    scope, cut = frame.scope, frame.cut
+    scan = _BindingScan(scope)
+    if cut is None or not isinstance(scope, ClassDeclaration):
+        cache[_Frame(scope)] = names = frozenset(scan.run())
+        return names
+    for stmt in scope.body.statements:
+        cache[_Frame(scope, stmt)] = frozenset(scan.names())
+        scan.run(stmt)
+    return cache.get(frame, frozenset(scan.names()))
 
 
-def _enclosing_scopes(cursor: Optional[Cursor]) -> List[J]:
+def _type_parameter_names(
+        scope: Union[MethodDeclaration, ClassDeclaration, TypeAlias]) -> FrozenSet[str]:
+    """The names a declaration's type parameters bind. A ``def`` holds them in a
+    ``TypeParameters`` and everything else in a container, and both hold the same list."""
+    held = scope.padding.type_parameters
+    if held is None:
+        return _NO_NAMES
+    parameters = held.type_parameters if isinstance(held, TypeParameters) else held.elements
+    return frozenset(parameter.name.simple_name for parameter in parameters
+                     if isinstance(parameter.name, Identifier))
+
+
+def _enclosing_scopes(cursor: Optional[Cursor]) -> List[_Frame]:
     """The scopes a reference resolves through, innermost first.
 
     A scope covers only the region Python evaluates inside it: a ``def``'s decorators,
     annotations and parameter defaults belong to the scope enclosing it. A class body is
     reachable only from directly within it, never from a function nested in it, nor from
-    a class nested in it.
+    a class nested in it. PEP 695 type parameters get a scope of their own around the
+    declaration carrying them — see :func:`_governs_type_params`.
     """
     path = _tree_path(cursor)
-    scopes: List[J] = []
+    frames: List[_Frame] = []
+    scopes = 0
     for i, node in enumerate(path):
-        if not isinstance(node, _SCOPES):
-            continue
-        if not _governs(node, i, path):
-            continue
-        if isinstance(node, ClassDeclaration) and scopes:
-            continue
-        scopes.append(node)
-    return scopes
+        if isinstance(node, _SCOPES) and _governs(node, i, path) and not (
+                isinstance(node, ClassDeclaration) and scopes):
+            scopes += 1
+            frames.append(_Frame(node, path[i - 2] if isinstance(node, ClassDeclaration)
+                                 and i >= 2 else None))
+        # The field test comes first because it rejects every node that cannot carry an
+        # annotation scope, and this loop runs over every node of every path.
+        if getattr(node, '_type_parameters', None) is not None and isinstance(
+                node, _TYPE_PARAM_HOLDERS) and _governs_type_params(node, i, path):
+            frames.append(_Frame(node, type_params=True))
+    return frames
 
 
 def _tree_path(cursor: Optional[Cursor]) -> List[Any]:
@@ -167,9 +242,38 @@ def _governs(scope: J, index: int, path: List[Any]) -> bool:
     return True
 
 
+def _governs_type_params(scope: Union[MethodDeclaration, ClassDeclaration, TypeAlias],
+                         index: int, path: List[Any]) -> bool:
+    """Whether ``scope``'s type parameters reach ``path[:index]``. PEP 695 evaluates the
+    declaration inside the scope holding them, so they cover its bounds and defaults, its
+    annotations and a class's bases, and everything nested deeper — but not the decorators
+    and parameter defaults the enclosing scope evaluates before that scope exists."""
+    if index == 0 or not _type_parameter_names(scope):
+        return False
+    child = path[index - 1]
+    if isinstance(scope, MethodDeclaration):
+        return (child is scope.body or child is scope.return_type_expression
+                or child is scope.padding.type_parameters
+                or _is_parameter_annotation(index, path))
+    if isinstance(scope, ClassDeclaration):
+        # `implements` carries the bases and the header keywords alike.
+        return (child is scope.body
+                or any(held is child for held in (scope.type_parameters or ()))
+                or any(base is child for base in (scope.implements or ())))
+    # A type alias has neither decorators nor parameters, so everything it holds is inside.
+    return True
+
+
 def _is_parameter_name(path: List[Any]) -> bool:
     return (len(path) > 1 and isinstance(path[1], VariableDeclarations.NamedVariable)
             and path[1].name is path[0])
+
+
+def _is_parameter_annotation(index: int, path: List[Any]) -> bool:
+    """Whether the path reaches a parameter's annotation, which hangs off the parameter
+    itself, while its name and its default hang off the ``NamedVariable`` under it."""
+    return (index >= 2 and isinstance(path[index - 1], VariableDeclarations)
+            and not isinstance(path[index - 2], VariableDeclarations.NamedVariable))
 
 
 def _bound_import_name(imp: Import, from_: Optional[Any]) -> str:
@@ -193,9 +297,14 @@ class _BindingScan(PythonVisitor[Any]):
         self._names: Set[str] = set()
         self._declared_elsewhere: Set[str] = set()
 
-    def run(self) -> Set[str]:
-        self.visit(self._scope, None)
+    def names(self) -> Set[str]:
         return self._names - self._declared_elsewhere
+
+    def run(self, node: Optional[J] = None) -> Set[str]:
+        """Scan ``node``, defaulting to the whole scope. Successive calls accumulate into one
+        set of names."""
+        self.visit(node if node is not None else self._scope, None)
+        return self.names()
 
     def _bind(self, target: Optional[J]) -> None:
         """Bind the names a target expression introduces. Attribute and subscript
@@ -242,6 +351,10 @@ class _BindingScan(PythonVisitor[Any]):
             return comp
         return super().visit_comprehension_expression(comp, p)
 
+    def visit_type_alias(self, alias: TypeAlias, p: Any) -> J:
+        self._bind(alias.name)
+        return super().visit_type_alias(alias, p)
+
     def visit_variable_scope(self, scope: VariableScope, p: Any) -> J:
         for name in scope.names:
             self._declared_elsewhere.add(name.simple_name)
@@ -261,6 +374,11 @@ class _BindingScan(PythonVisitor[Any]):
         for variable in var_decls.variables:
             self._bind(variable.name)
         return super().visit_variable_declarations(var_decls, p)
+
+    def visit_case(self, case: Case, p: Any) -> J:
+        for label in case.case_labels:
+            self._names.update(capture.simple_name for capture in captures(label))
+        return super().visit_case(case, p)
 
     def visit_assignment(self, assignment: Assignment, p: Any) -> J:
         self._bind(assignment.variable)

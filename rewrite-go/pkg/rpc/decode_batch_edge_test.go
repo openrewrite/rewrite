@@ -18,6 +18,7 @@ package rpc
 
 import (
 	"testing"
+
 	"github.com/stretchr/testify/require"
 )
 

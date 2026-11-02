@@ -138,6 +138,21 @@ class RegistryDiscoveryTest {
     }
 
     @Test
+    void nerfDartAuthTokenMatchesRegistryWithExplicitDefaultPort() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(new Npmrc(NpmrcScope.User, Map.of(
+                                "registry", "https://artifactory.example.com/artifactory/api/npm/npm-internalfacing/",
+                                "//artifactory.example.com/artifactory/api/npm/npm-internalfacing/:_authToken", "${ARTIFACTORY_IDENTITY_TOKEN}")),
+                        new Npmrc(NpmrcScope.Project, Map.of(
+                                "always-auth", "false",
+                                "registry", "https://artifactory.example.com:443/artifactory/api/npm/npm-internalfacing/"))),
+                env(Map.of("ARTIFACTORY_IDENTITY_TOKEN", "s3cret")));
+        assertThat(registries.getDefaultRegistry().getUrl())
+                .isEqualTo("https://artifactory.example.com:443/artifactory/api/npm/npm-internalfacing/");
+        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("s3cret");
+    }
+
+    @Test
     void base64PasswordDecodedOntoRegistry() {
         NodeRegistries registries = RegistryDiscovery.discover(ctx(),
                 marker(npmrc(Map.of(
@@ -198,6 +213,46 @@ class RegistryDiscoveryTest {
         NodeRegistries registries = RegistryDiscovery.discover(ctx,
                 marker(npmrc(Map.of("registry", "https://corp.example/"))), env(Map.of()));
         assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("vtok");
+    }
+
+    @Test
+    void unresolvedNpmrcCredentialsAreKeptAsWrittenAndRecorded() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(npmrc(Map.of(
+                        "registry", "https://corp.example/npm/",
+                        "//corp.example/npm/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        NodeRegistry registry = registries.getDefaultRegistry();
+        assertThat(registry.getAuthToken()).isEqualTo("${NPM_TOKEN}");
+        assertThat(registry.isUnresolvedPlaceholders()).as("the URL itself is usable").isFalse();
+        assertThat(registry.getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+    }
+
+    @Test
+    void unresolvedScopedNpmrcCredentialsAreKeptAsWritten() {
+        NodeRegistries registries = RegistryDiscovery.discover(ctx(),
+                marker(npmrc(Map.of(
+                        "@corp:registry", "https://corp.example/npm/",
+                        "//corp.example/npm/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        NodeRegistry registry = registries.getByScope().get("@corp");
+        assertThat(registry.getAuthToken()).isEqualTo("${NPM_TOKEN}");
+        assertThat(registry.isUnresolvedPlaceholders()).isFalse();
+        assertThat(registry.getUnresolvedCredentialPlaceholders()).containsExactly("${NPM_TOKEN}");
+    }
+
+    @Test
+    void unresolvedNpmrcCredentialsStillWinOverViewCredentials() {
+        ExecutionContext ctx = ctx();
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(List.of(
+                new NodeRegistryCredentials("corp.example", "vtok", null, null)));
+
+        NodeRegistries registries = RegistryDiscovery.discover(ctx,
+                marker(npmrc(Map.of(
+                        "registry", "https://corp.example/",
+                        "//corp.example/:_authToken", "${NPM_TOKEN}"))),
+                env(Map.of()));
+        assertThat(registries.getDefaultRegistry().getAuthToken()).isEqualTo("${NPM_TOKEN}");
     }
 
     @Test

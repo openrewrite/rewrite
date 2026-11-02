@@ -470,7 +470,7 @@ class ChangeMethodNameTest implements RewriteTest {
         assertThat(reservedKeyword.failures()).singleElement()
           .matches(f -> "newMethodName".equals(f.getProperty()))
           .matches(f -> "this".equals(f.getInvalidValue()))
-          .matches(f -> "should not be a Java Reserved Keyword.".equals(f.getMessage()));
+          .matches(f -> "should not be a reserved keyword.".equals(f.getMessage()));
     }
 
     @Test
@@ -480,7 +480,7 @@ class ChangeMethodNameTest implements RewriteTest {
         assertThat(reservedLiteral.failures()).singleElement()
           .matches(f -> "newMethodName".equals(f.getProperty()))
           .matches(f -> "null".equals(f.getInvalidValue()))
-          .matches(f -> "should not be a Java Reserved Literal.".equals(f.getMessage()));
+          .matches(f -> "should not be a reserved literal.".equals(f.getMessage()));
     }
 
     @Test
@@ -490,6 +490,16 @@ class ChangeMethodNameTest implements RewriteTest {
         assertThat(invalidPattern.failures()).singleElement()
           .matches(f -> "newMethodName".equals(f.getProperty()))
           .matches(f -> "123".equals(f.getInvalidValue()))
-          .matches(f -> "should be a valid Java method name.".equals(f.getMessage()));
+          .matches(f -> "should be a valid method name.".equals(f.getMessage()));
+    }
+
+    @Test
+    void validateMethodPatternSuppliedAsNewMethodName() {
+        Validated<Object> methodPattern = new ChangeMethodName("a.Clazz method(..)", "Console.WriteX(System.String)", null, null).validate();
+        assertThat(methodPattern.isValid()).isFalse();
+        assertThat(methodPattern.failures()).singleElement()
+          .matches(f -> "newMethodName".equals(f.getProperty()))
+          .matches(f -> "Console.WriteX(System.String)".equals(f.getInvalidValue()))
+          .matches(f -> "should be just the new name of the method, not a method pattern.".equals(f.getMessage()));
     }
 }

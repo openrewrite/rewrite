@@ -8,7 +8,8 @@
  *     https://www.apache.org/licenses/LICENSE-2.0
  */
 plugins {
-    `kotlin-dsl`
+    // `kotlin-dsl` without java-gradle-plugin, whose jar check warns on every rebuild that buildSrc declares no plugins
+    `kotlin-dsl-base`
 }
 
 repositories {

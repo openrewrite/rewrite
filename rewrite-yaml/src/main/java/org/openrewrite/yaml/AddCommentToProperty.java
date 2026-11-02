@@ -24,7 +24,10 @@ import org.openrewrite.internal.NameCaseConvention.Compiled;
 import org.openrewrite.trait.Comments;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Arrays;
 import java.util.Iterator;
+
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -35,7 +38,7 @@ public class AddCommentToProperty extends Recipe {
     String propertyKey;
 
     @Option(displayName = "Comment",
-            description = "The comment to add to the property.",
+            description = "The comment to add to the property. A multi-line comment is added as one comment line per line.",
             example = "This property is deprecated")
     String comment;
 
@@ -74,13 +77,17 @@ public class AddCommentToProperty extends Recipe {
                 NameCaseConvention.LOWER_CAMEL :
                 NameCaseConvention.EXACT).compile(propertyKey);
 
+        String commentText = Arrays.stream(comment.split("\\R"))
+                .map(line -> line.isEmpty() ? line : " " + line)
+                .collect(joining("\n"));
+
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (keyMatcher.matchesGlob(prop)) {
-                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), e)).comment(" " + comment);
+                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), e)).comment(commentText);
                 }
                 return e;
             }

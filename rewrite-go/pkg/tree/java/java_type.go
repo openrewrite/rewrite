@@ -131,6 +131,7 @@ type JavaTypeMethod struct {
 func (*JavaTypeMethod) isJavaType() {}
 
 type JavaTypeVariable struct {
+	FlagsBitMap int64
 	Name        string
 	Owner       JavaType
 	Type        JavaType

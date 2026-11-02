@@ -67,7 +67,6 @@ class NestedReturnEditCorruptionTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-                .allowNonWhitespaceInWhitespace(true)
                 .identifiers(false)
                 .methodInvocations(false)
                 .build());

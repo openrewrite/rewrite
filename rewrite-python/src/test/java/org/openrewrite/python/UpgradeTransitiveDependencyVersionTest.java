@@ -223,7 +223,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void addToConstraintDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("certifi", ">=2024.1.1", "tool.uv.constraint-dependencies", null)),
+          spec -> spec.recipe(new AddDependency("certifi", ">=2024.1.1", "tool.uv.constraint-dependencies", null, null)),
           pyproject(
             """
               [project]

@@ -22,11 +22,16 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Value
@@ -78,6 +83,16 @@ public class ChangeDependencyClassifier extends Recipe {
                 if (isDependencyTag(groupId, artifactId) ||
                         (Boolean.TRUE.equals(changeManagedDependency) && isManagedDependencyTag(groupId, artifactId))) {
                     Optional<Xml.Tag> classifier = tag.getChild("classifier");
+                    if (isDependencyTag(groupId, artifactId) && !tag.getChild("version").isPresent() &&
+                            !Objects.equals(tag.getChildValue("classifier").orElse(null), newClassifier) &&
+                            !isTargetManaged(tag)) {
+                        ResolvedDependency dependency = findDependency(tag);
+                        if (dependency != null) {
+                            doAfterVisit(new AddToTagVisitor<>(tag,
+                                    Xml.Tag.build("<version>" + dependency.getVersion() + "</version>"),
+                                    new MavenTagInsertionComparator(tag.getChildren())));
+                        }
+                    }
                     if (classifier.isPresent()) {
                         if (newClassifier == null) {
                             doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false, true));
@@ -89,6 +104,30 @@ public class ChangeDependencyClassifier extends Recipe {
                     }
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private boolean isTargetManaged(Xml.Tag tag) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                String dependencyGroup = pom.getValue(tag.getChildValue("groupId").orElse(pom.getGroupId()));
+                String dependencyArtifact = pom.getValue(tag.getChildValue("artifactId").orElse(""));
+                String dependencyType = pom.getValue(tag.getChildValue("type").orElse("jar"));
+                if (pom.getManagedDependency(dependencyGroup, dependencyArtifact, dependencyType, pom.getValue(newClassifier)) != null) {
+                    return true;
+                }
+                // A definition in a source POM will receive the same classifier change. Imported
+                // BOMs and external parents cannot be edited and do not manage the new coordinate.
+                if (Boolean.TRUE.equals(changeManagedDependency)) {
+                    ResolvedManagedDependency managed = pom.getManagedDependency(dependencyGroup, dependencyArtifact,
+                            dependencyType, pom.getValue(tag.getChildValue("classifier").orElse(null)));
+                    MavenResolutionResult current = getResolutionResult();
+                    while (managed != null && current != null && current.getPom().getRequested().getSourcePath() != null) {
+                        if (current.getPom().getRequested().getDependencyManagement().contains(managed.getRequested())) {
+                            return true;
+                        }
+                        current = current.getParent();
+                    }
+                }
+                return false;
             }
         };
     }

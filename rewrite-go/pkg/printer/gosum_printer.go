@@ -17,6 +17,7 @@ package printer
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func PrintGoSum(gs *golang.GoSum) string {
@@ -25,6 +26,16 @@ func PrintGoSum(gs *golang.GoSum) string {
 
 func PrintGoSumWithMarkers(gs *golang.GoSum, mp MarkerPrinter) string {
 	return printGoSum(gs, NewPrintOutputCaptureWithMarkers(mp))
+}
+
+func (p *GoPrinter) VisitGoSum(gs *golang.GoSum, param any) java.Tree {
+	printGoSum(gs, param.(*PrintOutputCapture))
+	return gs
+}
+
+func (p *GoPrinter) VisitGoSumLine(l *golang.GoSumLine, param any) java.Tree {
+	printGoSumLine(l, param.(*PrintOutputCapture))
+	return l
 }
 
 func printGoSum(gs *golang.GoSum, out *PrintOutputCapture) string {

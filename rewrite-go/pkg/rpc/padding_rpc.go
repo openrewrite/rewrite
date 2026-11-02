@@ -36,7 +36,7 @@ func sendRightPadded(s Sender, rp any, q *SendQueue) {
 		q.GetAndSend(rp, func(v any) any { return rightPaddedElement(v) }, nil)
 	}
 	// After space
-	q.GetAndSend(rp, func(v any) any { return rightPaddedAfter(v) },
+	q.GetAndSend(rp, func(v any) any { return spaceRef(rightPaddedAfter(v)) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(rp, func(v any) any { return rightPaddedMarkers(v) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
@@ -50,7 +50,7 @@ func sendRightPaddedBool(elem bool, after java.Space, markers java.Markers, q *S
 	// Element: boolean (raw value)
 	q.Put(RpcObjectData{State: Add, Value: elem})
 	// After: Space
-	q.Send(after, nil, func(v any) { sendSpace(v.(java.Space), q) })
+	q.Send(spaceRef(after), nil, func(v any) { sendSpace(v.(java.Space), q) })
 	q.Send(markers, nil, func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
 
@@ -58,13 +58,13 @@ func sendRightPaddedBool(elem bool, after java.Space, markers java.Markers, q *S
 // Matches JavaSender.visitLeftPadded: before, element, markers
 func sendLeftPadded(s Sender, lp any, q *SendQueue) {
 	// Before space
-	q.GetAndSend(lp, func(v any) any { return leftPaddedBefore(v) },
+	q.GetAndSend(lp, func(v any) any { return spaceRef(leftPaddedBefore(v)) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	// Element: dispatch based on type
 	elem := leftPaddedElement(lp)
 	switch elem.(type) {
 	case java.Space:
-		q.GetAndSend(lp, func(v any) any { return leftPaddedElement(v) },
+		q.GetAndSend(lp, func(v any) any { return spaceRef(leftPaddedElement(v)) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 	case java.J:
 		q.GetAndSend(lp, func(v any) any { return leftPaddedElement(v) },
@@ -81,7 +81,7 @@ func sendLeftPadded(s Sender, lp any, q *SendQueue) {
 // Matches JavaSender.visitContainer: before, elements (list of right-padded), markers
 func sendContainer(s Sender, c any, q *SendQueue) {
 	// Before space
-	q.GetAndSend(c, func(v any) any { return containerBefore(v) },
+	q.GetAndSend(c, func(v any) any { return spaceRef(containerBefore(v)) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	// Elements (list of RightPadded)
 	q.GetAndSendList(c,
@@ -147,6 +147,19 @@ func receiveLeftPaddedParts(r Receiver, q *ReceiveQueue, before any) (java.Space
 func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
 	return leftPaddedFromElement(beforeSpace, elem, markers)
+}
+
+// receiveLeftPaddedSpaceVal receives a Space-valued JLeftPadded, type-directed rather
+// than inferred: a Space is a *spaceData and an empty one erases to a nil interface, so
+// leftPaddedFromElement would mis-build it as LeftPadded[J]. Every LeftPadded[java.Space]
+// slot (array dimension, `:=`/`=` operator, type-assertion) must receive through here.
+func receiveLeftPaddedSpaceVal(r Receiver, q *ReceiveQueue, before any) any {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	var sp java.Space
+	if elem != nil {
+		sp = elem.(java.Space)
+	}
+	return java.LeftPadded[java.Space]{Before: beforeSpace, Element: sp, Markers: markers}
 }
 
 // receiveLeftPaddedEnum receives an enum-valued JLeftPadded field, returning the typed
@@ -260,7 +273,7 @@ func rightPaddedMarkers(rp any) any {
 	case java.RightPadded[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -461,7 +474,7 @@ func leftPaddedMarkers(lp any) any {
 	case java.LeftPadded[bool]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -567,7 +580,7 @@ func containerMarkers(c any) any {
 	case java.Container[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 

@@ -72,7 +72,7 @@ func TestParameterizedTypeRoundTrip_TypeParametersNoChange(t *testing.T) {
 	ptID := uuid.New()
 	typeParams := &java.Container[java.Expression]{
 		Elements: []java.RightPadded[java.Expression]{
-			{Element: makeIdent("string"), Markers: java.Markers{}},
+			{Element: makeIdent("string"), Markers: java.EmptyMarkers},
 		},
 	}
 	before := &java.ParameterizedType{
@@ -111,7 +111,7 @@ func TestParameterizedTypeRoundTrip_TypeParametersChange(t *testing.T) {
 		Clazz: makeIdent("List"),
 		TypeParameters: &java.Container[java.Expression]{
 			Elements: []java.RightPadded[java.Expression]{
-				{Element: makeIdent("int"), Markers: java.Markers{}},
+				{Element: makeIdent("int"), Markers: java.EmptyMarkers},
 			},
 		},
 	}
@@ -143,7 +143,7 @@ func TestCompositeRoundTrip_ElementsNoChange(t *testing.T) {
 	compID := uuid.New()
 	elements := java.Container[java.Expression]{
 		Elements: []java.RightPadded[java.Expression]{
-			{Element: makeIdent("a"), Markers: java.Markers{}},
+			{Element: makeIdent("a"), Markers: java.EmptyMarkers},
 		},
 	}
 	before := &golang.Composite{

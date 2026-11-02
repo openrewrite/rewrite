@@ -28,9 +28,10 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -181,7 +182,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
 
     public static class Scanned {
         boolean usingType;
-        List<SourceFile> rootPoms = new ArrayList<>();
+        Set<UUID> rootPoms = new HashSet<>();
     }
 
     @Override
@@ -198,7 +199,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 document.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mavenResolutionResult -> {
                     if (mavenResolutionResult.getParent() == null) {
-                        acc.rootPoms.add(document);
+                        acc.rootPoms.add(document.getId());
                     }
                 });
                 if (acc.usingType) {
@@ -235,7 +236,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml maven = super.visitDocument(document, ctx);
 
-                if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document)) {
+                if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document.getId())) {
                     ResolvedPom pom = getResolutionResult().getPom();
                     String convertedVersion = pom.getValue(version);
                     if (convertedVersion == null) {

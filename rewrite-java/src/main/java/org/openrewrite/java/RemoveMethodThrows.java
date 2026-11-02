@@ -29,8 +29,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -149,12 +151,18 @@ public class RemoveMethodThrows extends Recipe {
                         return a.withArguments(remaining);
                     }
 
+                    /**
+                     * A method type reached once as {@code J.MethodDeclaration#methodType} and again as
+                     * its name's type has to come back as one instance, which the LST is asserted on.
+                     */
+                    private final Map<JavaType.Method, JavaType.Method> rewritten = new IdentityHashMap<>();
+
                     @Override
                     public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
                         JavaType jt = super.visitType(javaType, ctx);
                         if (jt instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) jt)) {
-                            JavaType.Method mt = (JavaType.Method) jt;
-                            return mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te)));
+                            return rewritten.computeIfAbsent((JavaType.Method) jt, mt ->
+                                    mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te))));
                         }
                         return jt;
                     }

@@ -16,13 +16,70 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference", "GrMethodMayBeStatic"})
 class BinaryTest implements RewriteTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8958")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a[0,1]",
+      "a[0,1][2]",
+      "a[[0,1], [2,3]]",
+      "a[(0),1]",
+      "a[([0,1]),2]",
+      "a[b[0,1],2]",
+      "a[*xs]",
+      "a[0,*xs]",
+      "a[0,1] = 2",
+      "a[0,1]; b[2]",
+      "a[0..1,2]",
+      "a[ /* first */ 0 /* before comma */, /* second */ 1 /* end */ ]",
+      "a[\n    0, // first index\n    1\n]",
+      "commandLine ['cmd', '/c'] + azCmd"
+    })
+    void multiIndexAccess(String source) {
+        rewriteRun(
+          groovy(source)
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a[0]",
+      "a[[0,1]]",
+      "a[([0,1])]",
+      "a[[*xs]]",
+      "commandLine(['cmd', '/c'] + azCmd)"
+    })
+    void singleIndexAccessAndListLiteral(String source) {
+        rewriteRun(
+          groovy(source)
+        );
+    }
+
+    @Test
+    void multiIndexListCanBeMovedOutsideAccess() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitBinary(G.Binary binary, ExecutionContext ctx) {
+                  return binary.getRight().withPrefix(binary.getPrefix());
+              }
+          })),
+          groovy("def indices = a[0,1]", "def indices = [0,1]")
+        );
+    }
 
     @SuppressWarnings("GroovyConstantConditional")
     @Test

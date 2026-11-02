@@ -233,8 +233,8 @@ class IndexDiscoveryTest {
 
         assertThat(indexes).hasSize(1);
         PythonPackageIndex index = indexes.get(0);
-        // only the userinfo portion is percent-encoded
-        assertThat(index.getUrl()).isEqualTo("https://alice:p%40ss%3Aw0rd@corp.example.com/simple");
+        // credentials move out of the URL, which reaches lock files and failure reports
+        assertThat(index.getUrl()).isEqualTo("https://corp.example.com/simple");
         assertThat(index.isUnresolvedPlaceholders()).isFalse();
         // URL-embedded credentials are surfaced decoded
         assertThat(index.getUsername()).isEqualTo("alice");
@@ -242,7 +242,7 @@ class IndexDiscoveryTest {
     }
 
     @Test
-    void partiallyResolvedUserinfoFlagsIndex() {
+    void partiallyResolvedUserinfoIsSentAsWrittenAndRecorded() {
         Toml.Document doc = pipfile("""
           [[source]]
           name = "corp"
@@ -254,15 +254,16 @@ class IndexDiscoveryTest {
           env(Map.of("INDEX_USER", "alice"), home));
 
         assertThat(indexes).hasSize(1);
-        assertThat(indexes.get(0).getUrl())
-          .isEqualTo("https://alice:%24%7BINDEX_PASS%7D@corp.example.com/simple");
-        assertThat(indexes.get(0).isUnresolvedPlaceholders()).isTrue();
-        // the encoded placeholder must never be surfaced as a literal password
-        assertThat(indexes.get(0).getPassword()).isNull();
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://corp.example.com/simple");
+        assertThat(indexes.get(0).isUnresolvedPlaceholders()).isFalse();
+        assertThat(indexes.get(0).getUnresolvedCredentialPlaceholders()).containsExactly("${INDEX_PASS}");
+        // as pip would, the credentials are taken from the URL, the unexpanded placeholder included
+        assertThat(indexes.get(0).getUsername()).isEqualTo("alice");
+        assertThat(indexes.get(0).getPassword()).isEqualTo("${INDEX_PASS}");
     }
 
     @Test
-    void unsetVariableStaysLiteralAndFlagsIndex() {
+    void unsetCredentialVariableIsSentAsWrittenAndRecorded() {
         Toml.Document doc = pipfile("""
           [[source]]
           name = "corp"
@@ -272,9 +273,27 @@ class IndexDiscoveryTest {
 
         List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx(), doc, null, env(Map.of(), home));
         assertThat(indexes).hasSize(1);
-        assertThat(indexes.get(0).getUrl()).isEqualTo("https://${UNSET_TOKEN}@corp.example.com/simple");
-        assertThat(indexes.get(0).isUnresolvedPlaceholders()).isTrue();
-        assertThat(indexes.get(0).getUsername()).isNull();
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://corp.example.com/simple");
+        assertThat(indexes.get(0).isUnresolvedPlaceholders()).isFalse();
+        assertThat(indexes.get(0).getUnresolvedCredentialPlaceholders()).containsExactly("${UNSET_TOKEN}");
+        assertThat(indexes.get(0).getUsername()).isEqualTo("${UNSET_TOKEN}");
+    }
+
+    @Test
+    void unsetCredentialVariableStillWinsOverViewCredentials() {
+        Toml.Document doc = pipfile("""
+          [[source]]
+          name = "corp"
+          url = "https://${UNSET_TOKEN}@corp.example.com/simple"
+          verify_ssl = true
+          """);
+        ExecutionContext ctx = ctx();
+        PythonExecutionContextView.view(ctx).setIndexCredentials(List.of(
+          new PythonIndexCredentials("corp.example.com", "viewuser", "viewpass")));
+
+        List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx, doc, null, env(Map.of(), home));
+        assertThat(indexes.get(0).getUsername()).isEqualTo("${UNSET_TOKEN}");
+        assertThat(indexes.get(0).getPassword()).isNull();
     }
 
     @Test
@@ -410,13 +429,36 @@ class IndexDiscoveryTest {
     }
 
     @Test
+    void pipIndexUrlCredentialsMoveOutOfTheUrl() {
+        List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx(), null, null,
+          env(Map.of("PIP_INDEX_URL", "https://alice:hunter2@env.example.com/simple"), home));
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://env.example.com/simple");
+        assertThat(indexes.get(0).getUsername()).isEqualTo("alice");
+        assertThat(indexes.get(0).getPassword()).isEqualTo("hunter2");
+    }
+
+    @Test
+    void credentialsLeaveTheUrlEvenWhenTheHostIsUnresolved() {
+        Toml.Document doc = pipfile("""
+          [[source]]
+          name = "corp"
+          url = "https://alice:hunter2@${UNSET_HOST}/simple"
+          verify_ssl = true
+          """);
+
+        List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx(), doc, null, env(Map.of(), home));
+        assertThat(indexes.get(0).isUnresolvedPlaceholders()).isTrue();
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://${UNSET_HOST}/simple");
+    }
+
+    @Test
     void lockSourcesExpandPlaceholders() {
         List<Map<String, Object>> lockSources = List.of(
           Map.of("name", "corp", "url", "https://${LOCK_USER}@lock.example.com/simple", "verify_ssl", true));
 
         List<PythonPackageIndex> indexes = IndexDiscovery.discover(ctx(), null, lockSources,
           env(Map.of("LOCK_USER", "carol"), home));
-        assertThat(indexes.get(0).getUrl()).isEqualTo("https://carol@lock.example.com/simple");
+        assertThat(indexes.get(0).getUrl()).isEqualTo("https://lock.example.com/simple");
         assertThat(indexes.get(0).getUsername()).isEqualTo("carol");
     }
 

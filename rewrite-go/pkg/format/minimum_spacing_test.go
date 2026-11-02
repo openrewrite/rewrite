@@ -22,7 +22,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -58,6 +62,22 @@ func TestFormatsTreeWithNoWhitespace(t *testing.T) {
 	}
 }
 
+func TestMinimumViableSpacingLeavesTheVisitedTreeUntouched(t *testing.T) {
+	// given an if and a switch whose conditions run into their keywords
+	cu, err := parser.NewGoParser().Parse("t.go", "package p\n\nfunc f(x bool) {\n\tif x {\n\t}\n\tswitch x {\n\t}\n}\n")
+	require.NoError(t, err)
+	stripped := stripAllSpaces(reflect.ValueOf(cu)).Interface().(java.Tree)
+	before := printer.Print(stripped)
+
+	// when
+	out := NewMinimumViableSpacingVisitor(nil).Visit(stripped, nil)
+
+	// then
+	assert.Equal(t, before, printer.Print(stripped))
+	assert.Contains(t, printer.Print(out), "if x{")
+	assert.Contains(t, printer.Print(out), "switch x{")
+}
+
 // stripAllSpaces returns v with every Space replaced by the empty one.
 func stripAllSpaces(v reflect.Value) reflect.Value {
 	d := shapeOf(v.Type())
@@ -65,7 +85,7 @@ func stripAllSpaces(v reflect.Value) reflect.Value {
 		return v
 	}
 	if d.isSpace {
-		return reflect.ValueOf(java.Space{})
+		return reflect.ValueOf(java.EmptySpace)
 	}
 	if d.isMarkers {
 		return v

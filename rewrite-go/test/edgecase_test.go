@@ -404,8 +404,8 @@ func TestParseByteOrderMark(t *testing.T) {
 	if !cu.CharsetBomMarked {
 		t.Error("CharsetBomMarked should be set")
 	}
-	if cu.Prefix.Whitespace != "" {
-		t.Errorf("Prefix should not hold the BOM, got %q", cu.Prefix.Whitespace)
+	if cu.Prefix.Whitespace() != "" {
+		t.Errorf("Prefix should not hold the BOM, got %q", cu.Prefix.Whitespace())
 	}
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)

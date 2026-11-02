@@ -139,6 +139,19 @@ export const DEFAULT_TRACKED_EXCLUSIONS = [
     "**/*.bundle.js"
 ];
 
+/** Lets `**` cross dot directories such as pnpm's `node_modules/.pnpm`, as .gitignore patterns do. */
+function exclusionMatcher(exclusions: string[]): picomatch.Matcher {
+    return picomatch(exclusions, {dot: true});
+}
+
+/**
+ * Git lists a symlink or submodule as a file even where it is a directory, and lists
+ * deleted files while they are still tracked.
+ */
+function isRegularFile(filePath: string): boolean {
+    return fs.statSync(filePath, {throwIfNoEntry: false})?.isFile() ?? false;
+}
+
 /**
  * Source file extensions for JavaScript/TypeScript.
  */
@@ -517,8 +530,7 @@ export class ProjectParser {
                 const trimmed = line.trim();
                 if (trimmed) {
                     const fullPath = path.join(this.projectPath, trimmed);
-                    // git ls-files can return deleted files that are still tracked
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
@@ -536,9 +548,8 @@ export class ProjectParser {
             for (const line of untracked.stdout.split("\n")) {
                 const trimmed = line.trim();
                 if (trimmed) {
-                    // Untracked files should exist, but check anyway for robustness
                     const fullPath = path.join(this.projectPath, trimmed);
-                    if (fs.existsSync(fullPath)) {
+                    if (isRegularFile(fullPath)) {
                         files.push(fullPath);
                     }
                 }
@@ -560,7 +571,7 @@ export class ProjectParser {
      */
     private async discoverFilesWithWalk(): Promise<string[]> {
         const files: string[] = [];
-        const isExcluded = picomatch(this.exclusions);
+        const isExcluded = exclusionMatcher(this.exclusions);
 
         const walk = async (dir: string, relativePath: string = "") => {
             let entries: fs.Dirent[];
@@ -605,7 +616,7 @@ export class ProjectParser {
 
         // Check exclusion patterns with relative path
         const relativePath = path.relative(this.projectPath, filePath);
-        const isExcluded = picomatch(exclusions);
+        const isExcluded = exclusionMatcher(exclusions);
         if (isExcluded(relativePath)) {
             return false;
         }

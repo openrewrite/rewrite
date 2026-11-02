@@ -72,8 +72,8 @@ func TestMethodWithReceiverIsWrapped(t *testing.T) {
 	require.NotNil(t, wrapper.Declaration, "wrapper must carry the inner *java.MethodDeclaration")
 	require.Len(t, wrapper.Receiver.Elements, 1, "expected a single receiver element")
 	// The prefix (the blank line before `func`) belongs on the outermost node.
-	require.Equalf(t, "\n\n", wrapper.Prefix.Whitespace, "expected wrapper to carry the prefix %q", "\n\n")
-	require.False(t, wrapper.Declaration.Prefix.Whitespace != "" || len(wrapper.Declaration.Prefix.Comments) != 0, "inner declaration must be prefix-less")
+	require.Equalf(t, "\n\n", wrapper.Prefix.Whitespace(), "expected wrapper to carry the prefix %q", "\n\n")
+	require.False(t, wrapper.Declaration.Prefix.Whitespace() != "" || len(wrapper.Declaration.Prefix.Comments()) != 0, "inner declaration must be prefix-less")
 }
 
 // With the prefix on the wrapper but `//go:` directives still on the inner

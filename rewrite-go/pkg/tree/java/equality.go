@@ -42,13 +42,19 @@ func SameSlice[T any](a, b []T) bool {
 // SpaceEqual reports whether two Spaces are unchanged: equal whitespace and the
 // same comments slice (the visitor preserves the comments slice when unchanged).
 func SpaceEqual(a, b Space) bool {
-	return a.Whitespace == b.Whitespace && SameSlice(a.Comments, b.Comments)
+	if a == b {
+		return true
+	}
+	return a.Whitespace() == b.Whitespace() && SameSlice(a.Comments(), b.Comments())
 }
 
 // MarkersEqual reports whether two Markers are unchanged: same ID and the same
 // entries slice.
 func MarkersEqual(a, b Markers) bool {
-	return a.ID == b.ID && SameSlice(a.Entries, b.Entries)
+	if a == b {
+		return true
+	}
+	return a.GetID() == b.GetID() && SameSlice(a.Entries(), b.Entries())
 }
 
 // LeftPaddedEqual reports whether two LeftPadded values are unchanged.

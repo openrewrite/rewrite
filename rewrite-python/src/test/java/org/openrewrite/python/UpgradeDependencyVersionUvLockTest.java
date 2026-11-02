@@ -40,7 +40,7 @@ import static org.openrewrite.python.Assertions.uvLock;
 
 /**
  * End-to-end recipe test of native uv.lock regeneration against recorded pypi.org
- * responses (fixtures under {@code /uvlock/}); the expected lock is byte-identical
+ * responses (fixtures under {@code /lock/uv/}); the expected lock is byte-identical
  * to what uv 0.10.11 wrote for the same edit.
  */
 class UpgradeDependencyVersionUvLockTest implements RewriteTest {
@@ -123,8 +123,43 @@ class UpgradeDependencyVersionUvLockTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Timeout(120)
+    void indexUrlCredentialsAreNotWrittenToTheLock() {
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of());
+        String pyproject = """
+          [project]
+          name = "fixture-i"
+          version = "0.1.0"
+          requires-python = ">=3.12"
+          dependencies = [
+              "six==%s",
+              "iniconfig>=2.0",
+          ]
+
+          [tool.uv]
+
+          [[tool.uv.index]]
+          name = "pypi"
+          url = "https://alice:hunter2@pypi.org/simple"
+          default = true
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null))
+            .executionContext(ctx),
+          pyproject(pyproject.formatted("1.16.0"), pyproject.formatted("1.17.0")),
+          uvLock(
+            resource("i-minimal-update/uv.lock.v1"),
+            s -> s.noTrim().after(actual -> {
+                assertThat(actual).doesNotContain("hunter2");
+                return resource("i-minimal-update/uv.lock.v2");
+            })
+          )
+        );
+    }
+
     private static String resource(String name) {
-        try (InputStream is = UpgradeDependencyVersionUvLockTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = UpgradeDependencyVersionUvLockTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

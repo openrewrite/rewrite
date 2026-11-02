@@ -23,6 +23,8 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -209,6 +211,31 @@ class MemberReferenceTest implements RewriteTest {
                 Foo.Bar(1).method(::unresolved)
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void constructorReferenceWithReceiverKeepsMethodTypeOnName() {
+        rewriteRun(
+          kotlin(
+            """
+              class Outer {
+                  class Inner
+              }
+              val f = Outer::Inner
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType> nameTypes = new ArrayList<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MemberReference visitMemberReference(J.MemberReference ref, Integer p) {
+                        nameTypes.add(ref.getReference().getType());
+                        return ref;
+                    }
+                }.visit(cu, 0);
+                assertThat(nameTypes).singleElement().isInstanceOf(JavaType.Method.class);
+            })
           )
         );
     }

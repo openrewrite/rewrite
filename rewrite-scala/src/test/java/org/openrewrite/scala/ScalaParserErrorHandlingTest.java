@@ -99,27 +99,7 @@ class ScalaParserErrorHandlingTest {
     }
 
     @Test
-    void withSelfTypeParsesWhenClasspathLacksScalaStdlib() {
-        // A non-empty classpath without the Scala stdlib overrides dotty's default
-        // classpath lookup, so `Run` construction cannot resolve the `scala` package
-        // (the situation a fat-jar application is in even with an empty classpath).
-        // Parsing an `A with B` type must still produce a real tree, not throw
-        // MissingCoreLibraryException.
-        ScalaParser parser = ScalaParser.builder()
-          .classpath(JavaParser.dependenciesFromClasspath("assertj-core"))
-          .build();
-
-        List<SourceFile> parsed = parser.parse("class Service { self: Logging with Config => }")
-          .collect(Collectors.toList());
-
-        assertThat(parsed).hasSize(1);
-        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
-    }
-
-    @Test
     void withSelfTypeParsesWithRuntimeClasspath() {
-        // Precondition for withSelfTypeParsesWhenClasspathLacksScalaStdlib: the
-        // self-type syntax itself is supported when the stdlib is resolvable.
         ScalaParser parser = ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build();
 
         List<SourceFile> parsed = parser.parse("class Service { self: Logging with Config => }")

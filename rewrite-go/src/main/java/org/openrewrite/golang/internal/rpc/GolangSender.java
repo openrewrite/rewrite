@@ -21,10 +21,16 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import org.openrewrite.rpc.Reference;
 
+import java.util.Objects;
+
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 public class GolangSender extends GolangVisitor<RpcSendQueue> {
@@ -41,9 +47,16 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, x -> spaceRef(x.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(j, mk -> asRef(withoutNulls(mk.getMarkers())));
         return j;
+    }
+
+    // An LST stored while ChanDirMarker had no codec holds null in its place, which the engine cannot receive.
+    private static Markers withoutNulls(Markers markers) {
+        return markers.getMarkers().contains(null) ?
+                markers.withMarkers(ListUtils.filter(markers.getMarkers(), Objects::nonNull)) :
+                markers;
     }
 
     @Override
@@ -56,7 +69,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(cu, c -> c.getPadding().getPackageDecl(), el -> visitRightPadded(el, q));
         q.getAndSend(cu, Go.CompilationUnit::getImportsContainer, c -> visitContainer(c, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Go.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, x -> spaceRef(x.getEof()), space -> visitSpace(getValueNonNull(space), q));
         return cu;
     }
 
@@ -108,11 +121,11 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitSliceExpr(Go.SliceExpr slice, RpcSendQueue q) {
         q.getAndSend(slice, Go.SliceExpr::getIndexed, el -> visit(el, q));
-        q.getAndSend(slice, Go.SliceExpr::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, x -> spaceRef(x.getOpenBracket()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(slice, s -> s.getPadding().getLow(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, s -> s.getPadding().getHigh(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, Go.SliceExpr::getMax, el -> visit(el, q));
-        q.getAndSend(slice, Go.SliceExpr::getCloseBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, x -> spaceRef(x.getCloseBracket()), space -> visitSpace(getValueNonNull(space), q));
         return slice;
     }
 
@@ -126,7 +139,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
 
     @Override
     public J visitMapType(Go.MapType mapType, RpcSendQueue q) {
-        q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(mapType, x -> spaceRef(x.getOpenBracket()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
         q.getAndSend(mapType, Go.MapType::getValue, el -> visit(el, q));
         q.getAndSend(mapType, m -> Reference.asRef(m.getType()), type -> visitType(getValueNonNull(type), q));
@@ -266,7 +279,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitCommClause(Go.CommClause commClause, RpcSendQueue q) {
         q.getAndSend(commClause, Go.CommClause::getComm, el -> visit(el, q));
-        q.getAndSend(commClause, Go.CommClause::getColon, space -> visitSpace(space, q));
+        q.getAndSend(commClause, x -> spaceRef(x.getColon()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(commClause, c -> c.getPadding().getBody(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         return commClause;
     }
@@ -307,7 +320,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     @Override
     public J visitGoVariadic(Go.Variadic variadic, RpcSendQueue q) {
         q.getAndSend(variadic, Go.Variadic::getElement, el -> visit(el, q));
-        q.getAndSend(variadic, Go.Variadic::getDots, space -> visitSpace(space, q));
+        q.getAndSend(variadic, x -> spaceRef(x.getDots()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(variadic, Go.Variadic::isPostfix);
         q.getAndSend(variadic, v -> Reference.asRef(v.getType()), type -> visitType(getValueNonNull(type), q));
         return variadic;
@@ -348,20 +361,6 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
-        }
-
-        @Override
-        public J visitImport(J.Import importStmt, RpcSendQueue q) {
-            q.getAndSend(importStmt, i -> i.getPadding().getStatic(), s -> visitLeftPadded(s, q));
-            // Convert FieldAccess qualid to Literal for Go
-            q.getAndSend(importStmt, i -> {
-                J.FieldAccess fa = i.getQualid();
-                String name = fa.getSimpleName();
-                return new J.Literal(fa.getId(), fa.getPrefix(), fa.getMarkers(),
-                        name, "\"" + name + "\"", null, JavaType.Primitive.String);
-            }, id -> visit(id, q));
-            q.getAndSend(importStmt, i -> i.getPadding().getAlias(), alias -> visitLeftPadded(alias, q));
-            return importStmt;
         }
     }
 }

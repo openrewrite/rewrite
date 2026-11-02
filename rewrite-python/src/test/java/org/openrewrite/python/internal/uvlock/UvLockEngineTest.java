@@ -33,6 +33,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,7 +47,7 @@ import static org.openrewrite.python.internal.uvlock.UvLockFixtures.resource;
 /**
  * Golden scenarios replay uv 0.10.11 runs against pypi.org (see the fixture README):
  * the engine's output for the same edit must be byte-identical to what real uv wrote.
- * Recorded index/metadata responses under {@code /uvlock/http/} keep the tests offline.
+ * Recorded index/metadata responses under {@code /lock/uv/http/} keep the tests offline.
  */
 class UvLockEngineTest {
 
@@ -285,6 +286,169 @@ class UvLockEngineTest {
         assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.engine-edited"));
     }
 
+    @Test
+    void configuredUvReleaseRewritesAChangedPreRevision3LockInItsOwnShape() {
+        // uv stamps the whole file at its revision and gives every artifact, the untouched iniconfig too, its upload time
+        stubPypiSix();
+        http.route("https://pypi.org/simple/iniconfig/", resource("off1-add-leaf/http/iniconfig-listing-json"));
+        PythonExecutionContextView.view(ctx).setUvVersion("0.10.11");
+        Result result = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.after-change-current-uv"));
+
+        Result unchanged = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml").replace("six==1.16.0", "six>=1.16"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(unchanged.getErrorMessage()).isNull();
+        assertThat(unchanged.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"));
+    }
+
+    @Test
+    void lockSatisfyingTheManifestByMeaningIsKeptVerbatimUntilAnythingElseChanges() {
+        // uv compares provides-extras as a set and specifiers by value, so neither reordering nor a trailing zero rewrites
+        String pyproject = resource("g-optional-deps/pyproject.toml")
+          .replace("\"six>=1.16\"", "\"six>=1.16.0\"")
+          .replace("cli = [\n    \"click>=8.1\",\n]\nyaml = [\n    \"pyyaml>=6.0\",\n]", "yaml = [\n    \"pyyaml>=6.0\",\n]\ncli = [\n    \"click>=8.1\",\n]");
+        assertThat(pyproject).contains("yaml = [\n    \"pyyaml>=6.0\",\n]\ncli");
+        Result result = UvLockEngine.regenerate(pyproject, resource("g-optional-deps/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("g-optional-deps/uv.lock"));
+
+        // once anything else in the lock changes, uv writes the metadata fresh from the manifest
+        result = UvLockEngine.regenerate(pyproject + "\n[tool.uv]\nconstraint-dependencies = [\"six>=1\"]\n",
+          resource("g-optional-deps/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("[manifest]\nconstraints = [{ name = \"six\", specifier = \">=1\" }]")
+          .contains("{ name = \"six\", specifier = \">=1.16.0\" }")
+          .contains("provides-extras = [\"yaml\", \"cli\"]");
+
+        // a lock written before provides-extras existed (version 1 without a revision) is never judged on it
+        String revisionless = resource("g-optional-deps/uv.lock")
+          .replace("revision = 3\n", "")
+          .replace("provides-extras = [\"cli\", \"yaml\"]\n", "");
+        result = UvLockEngine.regenerate(resource("g-optional-deps/pyproject.toml"), revisionless, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(revisionless);
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void declaredGroupsAreRecordedAsUvNormalizesThem() {
+        String pyproject = resource("f-dep-groups/pyproject.toml").replace("lint = [", "Lint = [");
+        Result result = UvLockEngine.regenerate(pyproject, resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("f-dep-groups/uv.lock"));
+
+        result = UvLockEngine.regenerate(pyproject + "test_integration = []\n", resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("lint = [{ name = \"pyflakes\"").contains("\ntest-integration = []\n");
+
+        // an empty legacy dev-dependencies list still declares the dev group
+        String withEmptyDev = resource("g-optional-deps/uv.lock").replace("provides-extras = [\"cli\", \"yaml\"]\n",
+          "provides-extras = [\"cli\", \"yaml\"]\n\n[package.metadata.requires-dev]\ndev = []\n");
+        result = UvLockEngine.regenerate(resource("g-optional-deps/pyproject.toml") + "\n[tool.uv]\ndev-dependencies = []\n",
+          withEmptyDev, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(withEmptyDev);
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void includedGroupsAreRecordedFlattenedIntoTheIncludingGroup() {
+        String pyproject = resource("f-dep-groups/pyproject.toml")
+          .replace("dev = [\n    \"iniconfig>=2.0\",\n]", "dev = [\n    { include-group = \"Lint\" },\n    \"iniconfig>=2.0\",\n]");
+        String lock = resource("f-dep-groups/uv.lock").replace(
+          "dev = [{ name = \"iniconfig\", specifier = \">=2.0\" }]",
+          "dev = [\n    { name = \"iniconfig\", specifier = \">=2.0\" },\n    { name = \"pyflakes\", specifier = \">=3.0\" },\n]");
+        assertThat(pyproject).contains("include-group");
+        assertThat(lock).contains("{ name = \"pyflakes\", specifier = \">=3.0\" },\n]");
+        Result result = UvLockEngine.regenerate(pyproject, lock, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(lock);
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void tablesWrittenAsDottedKeysOrInlineTablesReadAsTheirTable() {
+        String table = "[project.optional-dependencies]\ncli = [\n    \"click>=8.1\",\n]\nyaml = [\n    \"pyyaml>=6.0\",\n]";
+        String base = resource("g-optional-deps/pyproject.toml");
+        assertThat(base).contains(table);
+        String dotted = base.replace(table, "").replace("dependencies = [",
+          "optional-dependencies.cli = [\"click>=8.1\"]\n\"optional-dependencies\".yaml = [\"pyyaml>=6.0\"]\ndependencies = [");
+        String inline = base.replace(table, "").replace("dependencies = [",
+          "optional-dependencies = { cli = [\"click>=8.1\"], yaml = [\"pyyaml>=6.0\"] }\ndependencies = [");
+        for (String pyproject : new String[]{dotted, inline}) {
+            Result result = UvLockEngine.regenerate(pyproject, resource("g-optional-deps/uv.lock"), ctx);
+            assertThat(result.getErrorMessage()).as(pyproject).isNull();
+            assertThat(result.getLockFileContent()).as(pyproject).isEqualTo(resource("g-optional-deps/uv.lock"));
+        }
+    }
+
+    // a lock uv 0.13.4 rewrites reads every locked package's files anew
+    private void routeDepGroupsListings() {
+        http.route("https://pypi.org/simple/six/", resource("http/six-listing-json"));
+        http.route("https://pypi.org/simple/iniconfig/", resource("off1-add-leaf/http/iniconfig-listing-json"));
+        http.route("https://pypi.org/simple/pyflakes/", resource("off3-cascade-flake8/http/pyflakes-listing-json"));
+    }
+
+    @Test
+    void defaultGroupsAreRecordedOnTheProjectFromRevisionFive() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeDepGroupsListings();
+        String pyproject = resource("f-dep-groups/pyproject.toml") + "\n[tool.uv]\ndefault-groups = [\"Lint\", \"dev\"]\n";
+        Result result = UvLockEngine.regenerate(pyproject, resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getLockFileContent()).isEqualTo(resource("f-dep-groups/uv.lock"));
+
+        String removal = pyproject.replace("lint = [\n    \"pyflakes>=3.0\",\n]\n", "");
+        result = UvLockEngine.regenerate(removal, resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("source = { virtual = \".\" }\ndefault-groups = [\"dev\", \"lint\"]\n");
+
+        // the implicit default is not recorded
+        result = UvLockEngine.regenerate(removal.replace("[\"Lint\", \"dev\"]", "[\"dev\"]"), resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getLockFileContent()).doesNotContain("default-groups");
+    }
+
+    @Test
+    void aChangedLockListsItsPackagesInUvsOrder() {
+        // an older release could leave a package out of order, and uv 0.13.4 sorts them by name and version
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeDepGroupsListings();
+        String lock = resource("f-dep-groups/uv.lock");
+        int start = lock.indexOf("[[package]]\nname = \"fixture-f\"");
+        int end = lock.indexOf("[[package]]", start + 1);
+        String outOfOrder = lock.substring(0, start) + lock.substring(end) + "\n" + lock.substring(start, end).trim() + "\n";
+        String removal = resource("f-dep-groups/pyproject.toml").replace("lint = [\n    \"pyflakes>=3.0\",\n]\n", "");
+        Result result = UvLockEngine.regenerate(removal, outOfOrder, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        String written = result.getLockFileContent();
+        assertThat(written.indexOf("name = \"fixture-f\"")).isLessThan(written.indexOf("name = \"iniconfig\""));
+    }
+
+    @Test
+    void gitDeclarationsRecordAsUvWritesThem() {
+        // forms recorded by uv 0.13.4 in the corpus locks
+        assertThat(UvLockMetadataBuilder.recordedGit("git+https://github.com/hauntsaninja/mypy_primer@e1f6fe93da5de0cbaf0ab00341d05968a0331fae"))
+          .isEqualTo("https://github.com/hauntsaninja/mypy_primer?rev=e1f6fe93da5de0cbaf0ab00341d05968a0331fae");
+        assertThat(UvLockMetadataBuilder.recordedGit("git+https://github.com/Unity-Technologies/ml-agents.git#subdirectory=ml-agents-envs"))
+          .isEqualTo("https://github.com/Unity-Technologies/ml-agents.git?subdirectory=ml-agents-envs");
+        assertThat(UvLockMetadataBuilder.recordedGit("git+https://github.com/huggingface/OpenEnv.git"))
+          .isEqualTo("https://github.com/huggingface/OpenEnv.git");
+
+        // with both a revision and a subdirectory the order of uv's parameters is not settled here
+        assertThat(UvLockMetadataBuilder.recordedGit("git+https://github.com/a/b@v1#subdirectory=c")).isNull();
+        assertThat(UvLockMetadataBuilder.recordedGit("git+https://github.com/a/b@feature/x")).isNull();
+
+        // the user before the host is not a revision
+        assertThat(UvLockMetadataBuilder.recordedGit("git+ssh://git@github.com/a/b.git"))
+          .isEqualTo("ssh://git@github.com/a/b.git");
+    }
+
     // ---- structured failures ----
 
     @Test
@@ -364,7 +528,7 @@ class UvLockEngineTest {
     }
 
     @Test
-    void removingDirectorySourcedDependencyIsUnsupported() {
+    void removingDirectorySourcedDependencyDropsItsEntry() {
         Result result = UvLockEngine.regenerate(
           """
             [project]
@@ -378,30 +542,18 @@ class UvLockEngineTest {
             """,
           resource("v-directory/uv.lock"),
           ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("foo");
-        assertThat(http.requests).isEmpty();
-    }
-
-    @Test
-    void removingUrlSourcedDependencyIsUnsupported() {
-        Result result = UvLockEngine.regenerate(
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(
           """
-            [project]
-            name = "urlsdist"
-            version = "0.1.0"
+            version = 1
+            revision = 3
             requires-python = ">=3.9"
-            dependencies = []
 
-            [tool.uv.sources]
-            six = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz" }
-            """,
-          resource("t-url-source/uv.lock"),
-          ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+            [[package]]
+            name = "dirdep"
+            version = "0.1.0"
+            source = { virtual = "." }
+            """);
         assertThat(http.requests).isEmpty();
     }
 
@@ -850,6 +1002,40 @@ class UvLockEngineTest {
           .contains("{ name = \"target\", extra = [\"alpha\", \"zeta\"] }");
     }
 
+    @Test
+    void excludeNewerSelectsAmongFilesUploadedBeforeTheCutoffOfTheirPackage() {
+        // a week before this moment, the fixture's P1W span, puts the cutoff at 2026-10-14T00:00:00Z
+        ctx.putMessage(UvLockEngine.CURRENT_TIME, Instant.parse("2026-10-21T00:00:00Z"));
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.17.0-py3-none-any.whl", "url": "https://files.pythonhosted.org/f3/six-1.17.0-py3-none-any.whl", "hashes": {"sha256": "aaaa"}, "upload-time": "2026-10-13T23:59:59.999Z"},
+            {"filename": "six-1.18.0-py3-none-any.whl", "url": "https://files.pythonhosted.org/f3/six-1.18.0-py3-none-any.whl", "hashes": {"sha256": "bbbb"}, "upload-time": "2026-10-14T00:00:00Z"},
+            {"filename": "six-1.19.0-py3-none-any.whl", "url": "https://files.pythonhosted.org/f3/six-1.19.0-py3-none-any.whl", "hashes": {"sha256": "cccc"}}
+          ]}
+          """);
+        http.route("https://files.pythonhosted.org/f3/six-1.17.0-py3-none-any.whl.metadata",
+          "Metadata-Version: 2.1\nName: six\nVersion: 1.17.0\n");
+        Result result = UvLockEngine.regenerate(
+          resource("m4-exclude-newer-span/pyproject.toml").replace("six==1.16.0", "six>=1.17"),
+          resource("m4-exclude-newer-span/uv.lock"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("version = \"1.17.0\"")
+          .doesNotContain("1.18.0")
+          .doesNotContain("1.19.0");
+
+        // exclude-newer-package lifts the cutoff for one package
+        http.route("https://files.pythonhosted.org/f3/six-1.19.0-py3-none-any.whl.metadata",
+          "Metadata-Version: 2.1\nName: six\nVersion: 1.19.0\n");
+        String lifted = resource("m4-exclude-newer-span/uv.lock").replace("exclude-newer-span = \"P1W\"\n",
+          "exclude-newer-span = \"P1W\"\n\n[options.exclude-newer-package]\nsix = false\n");
+        result = UvLockEngine.regenerate(
+          resource("m4-exclude-newer-span/pyproject.toml").replace("six==1.16.0", "six>=1.17"), lifted, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("version = \"1.19.0\"");
+    }
+
     // ---- lazy wheel metadata: listing advertises no PEP 658 sidecar ----
 
     @Test
@@ -886,6 +1072,292 @@ class UvLockEngineTest {
         assertThat(http.requests).contains(
           "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl.metadata",
           "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl");
+    }
+
+    @Test
+    void requirementsOnOnePackageUnderDifferentMarkersForkTheLockAndShareAnEdge() {
+        byte[] wheel = tinyWheel("six-1.18.0.dist-info", """
+          Metadata-Version: 2.1
+          Name: six
+          Version: 1.18.0
+          Requires-Dist: iniconfig>=2.0; sys_platform == 'win32'
+          Requires-Dist: iniconfig>=2.0; sys_platform == 'linux'
+          """);
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.18.0-py2.py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl",
+             "hashes": {"sha256": "9f7b21c8a5c48e271941bcbcca206c8e10ab1a624b2a60875bd0ab5a4ec53ec1"},
+             "size": %d,
+             "requires-python": ">=3.6"}
+          ]}
+          """.formatted(wheel.length));
+        http.route("https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl", wheel);
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "fixture-i"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "six==1.18.0",
+                "iniconfig>=2.0",
+            ]
+            """,
+          resource("i-minimal-update/uv.lock.v2"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("""
+            resolution-markers = [
+                "sys_platform == 'win32'",
+                "sys_platform == 'linux'",
+                "sys_platform != 'linux' and sys_platform != 'win32'",
+            ]
+            """)
+          .contains("""
+            dependencies = [
+                { name = "iniconfig", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+            ]
+            """);
+    }
+
+    @Test
+    void movingAPackageAGitPackageDependsOnRequiresResolution() {
+        byte[] wheel = tinyWheel("six-1.18.0.dist-info", "Metadata-Version: 2.1\nName: six\nVersion: 1.18.0\n");
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.18.0-py2.py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl",
+             "hashes": {"sha256": "9f7b21c8a5c48e271941bcbcca206c8e10ab1a624b2a60875bd0ab5a4ec53ec1"},
+             "size": %d,
+             "requires-python": ">=3.6"}
+          ]}
+          """.formatted(wheel.length));
+        http.route("https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl", wheel);
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "gitdep"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = ["gitpkg", "six==1.18.0"]
+
+            [tool.uv.sources]
+            gitpkg = { git = "https://github.com/example/gitpkg", tag = "1.0" }
+            """,
+          """
+            version = 1
+            revision = 3
+            requires-python = ">=3.12"
+
+            [[package]]
+            name = "gitdep"
+            version = "0.1.0"
+            source = { virtual = "." }
+            dependencies = [
+                { name = "gitpkg" },
+                { name = "six" },
+            ]
+
+            [package.metadata]
+            requires-dist = [
+                { name = "gitpkg", git = "https://github.com/example/gitpkg?tag=1.0" },
+                { name = "six", specifier = "==1.17.0" },
+            ]
+
+            [[package]]
+            name = "gitpkg"
+            version = "1.0"
+            source = { git = "https://github.com/example/gitpkg?tag=1.0#0123456789abcdef0123456789abcdef01234567" }
+            dependencies = [
+                { name = "six" },
+            ]
+
+            [[package]]
+            name = "six"
+            version = "1.17.0"
+            source = { registry = "https://pypi.org/simple" }
+            wheels = [
+                { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+            ]
+            """,
+          ctx);
+        // the lock records no requirements for a git package, so nothing shows it still accepts six 1.18.0
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+    }
+
+    @Test
+    void retargetingARegistryDeclarationToGitRequiresResolution() {
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "fixture-i"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "six @ git+https://github.com/benjaminp/six@1.17.0",
+                "iniconfig>=2.0",
+            ]
+            """,
+          resource("i-minimal-update/uv.lock.v2"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+    }
+
+    @Test
+    void addedPep508GitDeclarationIsUnsupported() {
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "fixture-i"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "six==1.17.0",
+                "iniconfig>=2.0",
+                "mylib @ git+https://github.com/example/mylib@v1",
+            ]
+            """,
+          resource("i-minimal-update/uv.lock.v2"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("mylib");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void extrasAddedToAGitDeclarationAreNotIgnored() {
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "gitprobe"
+            version = "0.1.0"
+            requires-python = ">=3.9"
+            dependencies = ["six[extra]"]
+
+            [tool.uv.sources]
+            six = { git = "https://github.com/benjaminp/six", tag = "1.17.0" }
+            """,
+          resource("u-git-source/uv.lock"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+    }
+
+    @Test
+    void retargetFromGitToTheRegistryKeepsTheExtrasDeclaredWithIt() {
+        byte[] wheel = tinyWheel("six-1.18.0.dist-info", """
+          Metadata-Version: 2.1
+          Name: six
+          Version: 1.18.0
+          Provides-Extra: fast
+          Requires-Dist: iniconfig; extra == 'fast'
+          """);
+        byte[] iniconfig = tinyWheel("iniconfig-2.3.0.dist-info",
+          "Metadata-Version: 2.1\nName: iniconfig\nVersion: 2.3.0\n");
+        http.route("https://pypi.org/simple/iniconfig/", """
+          {"files": [
+            {"filename": "iniconfig-2.3.0-py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/iniconfig-2.3.0-py3-none-any.whl",
+             "hashes": {"sha256": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12"},
+             "size": %d,
+             "requires-python": ">=3.8"}
+          ]}
+          """.formatted(iniconfig.length));
+        http.route("https://files.pythonhosted.org/lazy/iniconfig-2.3.0-py3-none-any.whl", iniconfig);
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.18.0-py2.py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl",
+             "hashes": {"sha256": "9f7b21c8a5c48e271941bcbcca206c8e10ab1a624b2a60875bd0ab5a4ec53ec1"},
+             "size": %d,
+             "requires-python": ">=3.6"}
+          ]}
+          """.formatted(wheel.length));
+        http.route("https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl", wheel);
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "gitprobe"
+            version = "0.1.0"
+            requires-python = ">=3.9"
+            dependencies = ["six[fast]==1.18.0"]
+            """,
+          resource("u-git-source/uv.lock"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("{ name = \"six\", extra = [\"fast\"] }");
+    }
+
+    @Test
+    void gitSourceWrittenInlineUnderToolUvIsNotARegistryPackage() {
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "gitprobe"
+            version = "0.1.0"
+            requires-python = ">=3.9"
+            dependencies = ["six"]
+
+            [tool.uv]
+            sources = { six = { git = "https://github.com/benjaminp/six", tag = "1.17.0" } }
+            """,
+          resource("u-git-source/uv.lock"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("u-git-source/uv.lock"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void aChangedLockRecordsEachIndexAsItIsConfigured() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        byte[] wheel = tinyWheel("six-1.18.0.dist-info", "Metadata-Version: 2.1\nName: six\nVersion: 1.18.0\n");
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.18.0-py2.py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl",
+             "hashes": {"sha256": "9f7b21c8a5c48e271941bcbcca206c8e10ab1a624b2a60875bd0ab5a4ec53ec1"},
+             "size": %d,
+             "requires-python": ">=3.6"}
+          ]}
+          """.formatted(wheel.length));
+        http.route("https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl", wheel);
+        http.route("https://pypi.org/simple/iniconfig/", """
+          {"files": [
+            {"filename": "iniconfig-2.3.0-py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/packages/01/ini/iniconfig-2.3.0-py3-none-any.whl",
+             "hashes": {"sha256": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12"},
+             "size": 7484,
+             "requires-python": ">=3.8"}
+          ]}
+          """);
+        // a lock written against https://pypi.org/simple/ records the configured form once anything changes
+        String before = resource("i-minimal-update/uv.lock.v2")
+          .replace("https://pypi.org/simple\"", "https://pypi.org/simple/\"");
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "fixture-i"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "six==1.18.0",
+                "iniconfig>=2.0",
+            ]
+            """,
+          before,
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("registry = \"https://pypi.org/simple\"")
+          .doesNotContain("registry = \"https://pypi.org/simple/\"");
     }
 
     private static byte[] tinyWheel(String distInfoPrefix, String metadata) {

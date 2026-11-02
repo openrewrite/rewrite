@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.License
@@ -87,12 +85,12 @@ fun License.configureForFirstPartyGo() {
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
 }
 
-val licenseGo by tasks.registering(LicenseCheck::class) {
+val licenseGo = tasks.register<LicenseCheck>("licenseGo") {
     description = "Check license headers on first-party Go files"
     configureForFirstPartyGo()
 }
 
-val licenseFormatGo by tasks.registering(LicenseFormat::class) {
+val licenseFormatGo = tasks.register<LicenseFormat>("licenseFormatGo") {
     description = "Apply license headers to first-party Go files"
     configureForFirstPartyGo()
 }
@@ -145,6 +143,7 @@ val prepareGoRpcSources = tasks.register<Sync>("prepareGoRpcSources") {
         include("vendor/**")
         exclude("**/*_test.go")
         exclude("**/testdata/**")
+        exclude("cmd/rpc/test_recipes.go")
     }
     // rewrite-go is published under the Moderne Source Available License, so the
     // packaged RPC source ships the module's MSAL LICENSE.md (not the repo-root
@@ -165,7 +164,7 @@ listOf("processResources", "sourcesJar", "licenseMain", "assemble").forEach {
 val goBuild = tasks.register<Exec>("goBuild") {
     workingDir = projectDir
     // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)
-    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
+    commandLine("go", "build", "-tags", "rpctest", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
 
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
@@ -207,39 +206,6 @@ testing {
 // Go Test Support Tasks
 // ============================================
 
-// Configuration to collect classpath for the Java RPC server
-val javaRpcClasspath by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    extendsFrom(configurations.getByName("runtimeClasspath"))
-}
-
-dependencies {
-    javaRpcClasspath(project(":rewrite-maven"))
-}
-
-// Task to generate classpath file for Java RPC server testing from Go
-val generateTestClasspath by tasks.registering {
-    group = "golang"
-    description = "Generate classpath file for Java RPC server (used by Go tests)"
-
-    val outputFile = file("test-classpath.txt")
-    outputs.file(outputFile)
-
-    dependsOn(tasks.named("compileJava"))
-
-    doLast {
-        val classpath = (
-            javaRpcClasspath.files +
-            tasks.named("compileJava").get().outputs.files +
-            tasks.named("processResources").get().outputs.files
-        ).distinctBy { it.absolutePath }
-         .joinToString(File.pathSeparator) { it.absolutePath }
-        outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
-    }
-}
-
 val junitXmlFile = file("build/test-results/gotest/junit.xml")
 
 val goTest = tasks.register<Exec>("goTest") {
@@ -254,8 +220,6 @@ val goTest = tasks.register<Exec>("goTest") {
         "--format", gotestFormat,
         "--", "-count=1", "./...")
 
-    dependsOn(generateTestClasspath)
-
     inputs.files(fileTree(projectDir) {
         include("**/*.go")
         include("go.mod")
@@ -263,12 +227,18 @@ val goTest = tasks.register<Exec>("goTest") {
         exclude("build/**")
         exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(file("test-classpath.txt"))
+    inputs.files(fileTree(projectDir) {
+        include("**/testdata/**")
+        include("src/test/resources/**")
+        exclude("build/**")
+        exclude("vendor/**")
+    }).withPropertyName("goTestData").withPathSensitivity(PathSensitivity.RELATIVE)
+    // marker_guard_test.go and quote_test.go read these Java sources directly
+    inputs.files(listOf("rewrite-go", "rewrite-core", "rewrite-java").map { rootProject.file("$it/src/main/java") })
+        .withPropertyName("javaSources").withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }
-
-ImportJUnitXmlReports.register(tasks, goTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(goTest)

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
 using OpenRewrite.Core.Rpc;
 
 namespace OpenRewrite.Core;
@@ -56,9 +57,9 @@ public sealed class ParseError(
     public static ParseError Build(string sourcePath, string source, Exception ex)
     {
         var marker = ParseExceptionResult.Build("CSharpParser", ex);
-        var markers = new Markers(Guid.NewGuid(), new List<Marker> { marker });
+        var markers = new Markers(Tree.RandomId(), new List<Marker> { marker });
         return new ParseError(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             markers,
             sourcePath,
             "UTF-8",
@@ -72,7 +73,7 @@ public sealed class ParseError(
     public void RpcSend(ParseError after, RpcSendQueue q)
     {
         q.GetAndSend(after, e => e.Id);
-        q.GetAndSend(after, e => (object)e.Markers);
+        q.GetAndSend(after, e => Reference.AsRef(e.Markers));
         q.GetAndSend(after, e => e.SourcePath);
         q.GetAndSend(after, e => e.CharsetName);
         q.GetAndSend(after, e => (object)e.CharsetBomMarked);

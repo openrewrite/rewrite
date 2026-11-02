@@ -20,28 +20,22 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.style.Style;
 
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -114,11 +108,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                 }
 
                 if ("publishAlwaysIf".equals(m.getSimpleName())) {
-                    J.MethodInvocation publishingTemplate = develocityPublishAlwaysIfDsl(getIndent(getCursor().firstEnclosing(G.CompilationUnit.class)), ctx);
-                    if (publishingTemplate == null) {
-                        return m;
-                    }
-
+                    J.MethodInvocation publishingTemplate = publishingOnlyIf(m, "true");
                     return publishingTemplate.withArguments(ListUtils.mapFirst(publishingTemplate.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -137,11 +127,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             }
 
             if (m.getSimpleName().startsWith("publishOnFailure") && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildScan"))) {
-                J.MethodInvocation publishingTemplate = develocityPublishOnFailureIfDsl(getIndent(getCursor().firstEnclosing(G.CompilationUnit.class)), ctx);
-                if (publishingTemplate == null) {
-                    return m;
-                }
-
+                J.MethodInvocation publishingTemplate = publishingOnlyIf(m, "!it.buildResult.failures.empty");
                 if ("publishOnFailure".equals(m.getSimpleName()) && noArguments(m.getArguments())) {
                     return publishingTemplate;
                 }
@@ -236,55 +222,10 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             return null;
         }
 
-        private J.@Nullable MethodInvocation develocityPublishAlwaysIfDsl(String indent, ExecutionContext ctx) {
-            StringBuilder ge = new StringBuilder("\ndevelocity {\n");
-            ge.append(indent).append("buildScan {\n");
-            ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
-            ge.append(indent).append("}\n");
-            ge.append("}\n");
-
-            G.CompilationUnit cu = GradleParser.builder().build()
-                    .parseInputs(singletonList(
-                            Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                    .map(requireParsed(G.CompilationUnit.class))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
-
-            J.MethodInvocation develocity = (J.MethodInvocation) cu.getStatements().get(0);
-            J.MethodInvocation buildScan = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) develocity.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
-            return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) buildScan.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
-        }
-
-        private J.@Nullable MethodInvocation develocityPublishOnFailureIfDsl(String indent, ExecutionContext ctx) {
-            StringBuilder ge = new StringBuilder("\ndevelocity {\n");
-            ge.append(indent).append("buildScan {\n");
-            ge.append(indent).append(indent).append("publishing.onlyIf { !it.buildResult.failures.empty }\n");
-            ge.append(indent).append("}\n");
-            ge.append("}\n");
-
-            G.CompilationUnit cu = GradleParser.builder().build()
-                    .parseInputs(singletonList(
-                            Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                    .map(requireParsed(G.CompilationUnit.class))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
-
-            J.MethodInvocation develocity = (J.MethodInvocation) cu.getStatements().get(0);
-            J.MethodInvocation buildScan = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) develocity.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
-            return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) buildScan.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
-        }
-
-        private String getIndent(G.CompilationUnit cu) {
-            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-            if (style.getUseTabCharacter()) {
-                return "\t";
-            } else {
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < style.getIndentSize(); i++) {
-                    sb.append(" ");
-                }
-                return sb.toString();
-            }
+        private J.MethodInvocation publishingOnlyIf(J.MethodInvocation replacing, String condition) {
+            return GroovyTemplate.builder("publishing.onlyIf { " + condition + " }")
+                    .build()
+                    .apply(getCursor(), replacing.getCoordinates().replace());
         }
     }
 }

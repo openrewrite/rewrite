@@ -20,12 +20,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -47,6 +49,8 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
     private static final MethodMatcher SOURCE_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project sourceCompatibility(..)", true);
     private static final MethodMatcher TARGET_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project targetCompatibility(..)", true);
+    private static final MethodMatcher ANDROID_SOURCE_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions sourceCompatibility(..)");
+    private static final MethodMatcher ANDROID_TARGET_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions targetCompatibility(..)");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -109,19 +113,19 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (visited instanceof G.CompilationUnit) {
                     G.CompilationUnit c = (G.CompilationUnit) visited;
                     if (!sourceCompatibilityFound) {
-                        c = addGroovyCompatibilityType(c, "source", ctx);
+                        c = addGroovyCompatibilityType(c, "source", getCursor());
                     }
                     if (!targetCompatibilityFound) {
-                        c = addGroovyCompatibilityType(c, "target", ctx);
+                        c = addGroovyCompatibilityType(c, "target", getCursor());
                     }
                     return c;
                 } else if (visited instanceof K.CompilationUnit) {
                     K.CompilationUnit c = (K.CompilationUnit) visited;
                     if (!sourceCompatibilityFound) {
-                        c = addKotlinCompatibilityType(c, "source", ctx);
+                        c = addKotlinCompatibilityType(c, "source", getCursor(), ctx);
                     }
                     if (!targetCompatibilityFound) {
-                        c = addKotlinCompatibilityType(c, "target", ctx);
+                        c = addKotlinCompatibilityType(c, "target", getCursor(), ctx);
                     }
                     return c;
                 }
@@ -163,21 +167,22 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (SOURCE_COMPATIBILITY_METHOD.matches(m) || SOURCE_COMPATIBILITY_DSL.matches(m)) {
+                boolean matchedSourceCompatibility = SOURCE_COMPATIBILITY_DSL.matches(m) || ANDROID_SOURCE_COMPATIBILITY.matches(m);
+                boolean matchedTargetCompatibility = TARGET_COMPATIBILITY_DSL.matches(m) || ANDROID_TARGET_COMPATIBILITY.matches(m);
+                if (matchedSourceCompatibility || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
                     sourceCompatibilityFound = true;
                 }
-                if (TARGET_COMPATIBILITY_METHOD.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+                if (matchedTargetCompatibility || TARGET_COMPATIBILITY_METHOD.matches(m)) {
                     targetCompatibilityFound = true;
                 }
-                return handleMethodInvocation(m);
+                return handleMethodInvocation(m, matchedSourceCompatibility, matchedTargetCompatibility);
             }
         });
     }
 
     // Variables a compatibility assignment reads from; the version lives in their initializer, not the assignment.
     private Set<String> findCompatibilityVariables(Tree tree) {
-        Set<String> names = new HashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        return new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, Set<String> names) {
                 if (assignment.getAssignment() instanceof J.Identifier && isCompatibilityAssignment(assignment)) {
@@ -185,35 +190,42 @@ public class UpdateJavaCompatibility extends Recipe {
                 }
                 return super.visitAssignment(assignment, names);
             }
-        }.visit(tree, names);
-        return names;
+        }.reduce(tree, new HashSet<>());
     }
 
-    private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
-        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
-                    .parse(ctx, targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            c = c.withStatements(ListUtils.concatAll(c.getStatements(),
-                    ListUtils.mapFirst(sourceFile.getStatements(), s -> s.withPrefix(Space.format("\n")))));
+    private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, Cursor scope) {
+        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing) &&
+                !c.getStatements().isEmpty()) {
+            Statement last = c.getStatements().get(c.getStatements().size() - 1);
+            return GroovyTemplate.builder(targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
+                    .build()
+                    .apply(new Cursor(scope, c), last.getCoordinates().after());
         }
         return c;
     }
 
-    private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+    private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, Cursor scope, ExecutionContext ctx) {
         if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
             J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
             if (withExistingJavaMethod != c) {
                 return (K.CompilationUnit) withExistingJavaMethod;
             }
 
-            K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
-                    .isKotlinScript(true)
-                    .build().parse(ctx, "\n\njava {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+            List<Statement> statements = c.getStatements().get(0) instanceof J.Block ?
+                    ((J.Block) c.getStatements().get(0)).getStatements() : emptyList();
+            if (statements.isEmpty()) {
+                return c;
+            }
+            Statement last = statements.get(statements.size() - 1);
+            K.CompilationUnit updated = KotlinTemplate.builder("java {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
+                    .build()
+                    .apply(new Cursor(scope, c), last.getCoordinates().after());
+            // Gradle scripts set their top-level blocks apart with a blank line, which a coordinate places but
+            // does not style
+            return updated.withStatements(ListUtils.mapFirst(updated.getStatements(), first -> first instanceof J.Block ?
+                    ((J.Block) first).withStatements(ListUtils.mapLast(((J.Block) first).getStatements(),
+                            s -> s.withPrefix(Space.format("\n\n")))) :
+                    first));
         }
         return c;
     }
@@ -290,7 +302,7 @@ public class UpdateJavaCompatibility extends Recipe {
         return declarationStyle != null && declarationStyle != currentStyle;
     }
 
-    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m) {
+    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, boolean matchedSourceCompatibility, boolean matchedTargetCompatibility) {
         if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
             List<Expression> args = m.getArguments();
 
@@ -323,10 +335,10 @@ public class UpdateJavaCompatibility extends Recipe {
             return m;
         }
 
-        if (SOURCE_COMPATIBILITY_DSL.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+        if (matchedSourceCompatibility || matchedTargetCompatibility) {
             if (compatibilityType != null && (
-                    (compatibilityType == CompatibilityType.source && !SOURCE_COMPATIBILITY_DSL.matches(m)) ||
-                            (compatibilityType == CompatibilityType.target && !TARGET_COMPATIBILITY_DSL.matches(m)))) {
+                    (compatibilityType == CompatibilityType.source && !matchedSourceCompatibility) ||
+                            (compatibilityType == CompatibilityType.target && !matchedTargetCompatibility))) {
                 return m;
             }
 

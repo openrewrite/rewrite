@@ -66,7 +66,11 @@ class FindMavenSettingsTest implements RewriteTest {
           spec -> spec
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
-            .dataTable(EffectiveMavenSettings.Row.class, rows -> assertThat(rows).hasSize(2)),
+            .dataTable(EffectiveMavenSettings.Row.class, rows -> assertThat(rows)
+              .hasSize(2)
+              .allSatisfy(row -> assertThat(row.getMavenSettings())
+                .contains("<id>spring-milestones</id>")
+                .doesNotContain("@ref"))),
           pomXml(
             """
               <project>

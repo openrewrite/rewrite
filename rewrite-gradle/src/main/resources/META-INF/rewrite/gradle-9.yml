@@ -41,6 +41,10 @@ recipeList:
   - org.openrewrite.gradle.plugins.UpgradePluginVersion:
       pluginIdPattern: com.gradle.develocity
       newVersion: 4.x
+  # Earlier versions use dependency-resolution APIs removed in Gradle 9
+  - org.openrewrite.gradle.plugins.UpgradePluginVersion:
+      pluginIdPattern: io.spring.dependency-management
+      newVersion: 1.1.7
   # PMD's targetJdk is deprecated in 9.6 and has no replacement
   - org.openrewrite.gradle.gradle9.RemovePmdTargetJdk
   # CreateStartScripts.exitEnvironmentVar became a no-op and is deprecated in 9.6

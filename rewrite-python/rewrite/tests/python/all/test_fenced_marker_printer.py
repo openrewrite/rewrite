@@ -27,6 +27,8 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
+
 from rewrite import Marker, Markers, Tree
 from rewrite.markers import SearchResult, Markup
 from rewrite.java import J, Identifier
@@ -132,6 +134,41 @@ def test_default_marker_printer_renders_comment_marker():
     out = _print("x = 1\n", None, marker)
 
     assert out == "/*~~(FINDME)~~>*/x = 1\n"
+
+
+@pytest.mark.parametrize("marker_printer", [None, MP.DEFAULT])
+def test_default_marker_printer_renders_markup(marker_printer):
+    # the default printer asks every marker to print itself, as the host's does
+    out = _print("x = 1\n", marker_printer, Markup.warn("deprecated"))
+
+    assert out == "/*~~(deprecated)~~>*/x = 1\n"
+
+
+@pytest.mark.parametrize("detail, printed", [
+    ("why", "(why)"),
+    # with no detail to show, the message, as the host prints it
+    (None, "(deprecated)"),
+    ("", "()"),
+])
+def test_verbose_marker_printer_renders_markup_detail(detail, printed):
+    out = _print("x = 1\n", MP.VERBOSE, Markup.warn("deprecated", detail))
+
+    assert out == f"/*~~{printed}~~>*/x = 1\n"
+
+
+@pytest.mark.parametrize("marker_printer", [None, MP.DEFAULT, MP.SEARCH_MARKERS_ONLY])
+def test_empty_description_prints_as_the_host_prints_it(marker_printer):
+    out = _print("x = 1\n", marker_printer, SearchResult(uuid4(), ""))
+
+    assert out == "/*~~()~~>*/x = 1\n"
+
+
+@pytest.mark.parametrize("marker_printer", [None, MP.DEFAULT, MP.VERBOSE, MP.SEARCH_MARKERS_ONLY, MP.FENCED])
+def test_marker_of_a_type_only_the_host_knows_prints_nothing(marker_printer):
+    # the receiver holds such a marker as a mapping of its wire fields
+    opaque = {"kind": "org.openrewrite.marker.GitProvenance", "id": str(uuid4())}
+
+    assert _print("x = 1\n", marker_printer, opaque) == "x = 1\n"
 
 
 # --- handle_print (the RPC seam that maps the wire name to a printer) ---------

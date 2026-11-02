@@ -74,6 +74,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     private final @Nullable List<PrepareRecipeResponse> childResponses;
 
+    private final boolean causesAnotherCycle;
+
     @Override
     public String getName() {
         return descriptor.getName();
@@ -82,6 +84,13 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public String getDisplayName() {
         return descriptor.getDisplayName();
+    }
+
+    @Override
+    public String getInstanceName() {
+        // Not every peer sends an instance name (Python doesn't)
+        //noinspection ConstantValue
+        return descriptor.getInstanceName() != null ? descriptor.getInstanceName() : super.getInstanceName();
     }
 
     @Override
@@ -113,6 +122,11 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public List<Maintainer> getMaintainers() {
         return descriptor.getMaintainers();
+    }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return causesAnotherCycle;
     }
 
     @Override

@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
@@ -59,6 +60,13 @@ public interface JavaParser extends Parser {
      * type attribution from the class in {@link JavaSourceSet} marker.
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
+
+    /**
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to list the jars at the end of the
+     * classpath from an index that every parser in the JVM shares. Tests set it, since they build a parser per test.
+     * The index outlives the parsers and holds what it read until memory runs short.
+     */
+    String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
 
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
@@ -235,6 +243,7 @@ public interface JavaParser extends Parser {
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -244,7 +253,8 @@ public interface JavaParser extends Parser {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
-        protected final List<NamedStyles> styles = new ArrayList<>();
+        protected boolean typeAttribution = true;
+        protected List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
             super(J.CompilationUnit.class);
@@ -252,6 +262,15 @@ public interface JavaParser extends Parser {
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return (B) this;
+        }
+
+        /**
+         * When false, javac stops after entering symbols: declarations are typed, but expressions are not.
+         * Attributing code whose dependencies are missing can take hours in javac's error recovery.
+         */
+        public B typeAttribution(boolean typeAttribution) {
+            this.typeAttribution = typeAttribution;
             return (B) this;
         }
 
@@ -265,10 +284,11 @@ public interface JavaParser extends Parser {
         @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            this.typeCacheConfigured = true;
             return (B) this;
         }
 
-        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+        public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }
@@ -376,6 +396,11 @@ public interface JavaParser extends Parser {
             return javaTypeFactory;
         }
 
+        protected JavaTypeCache resolvedTypeCache() {
+            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            return javaTypeCache;
+        }
+
         @Override
         public abstract P build();
 
@@ -388,6 +413,7 @@ public interface JavaParser extends Parser {
         public Builder<P, B> clone() {
             Builder<P, B> clone = (Builder<P, B>) super.clone();
             clone.javaTypeCache = this.javaTypeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }

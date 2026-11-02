@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 
 /**
  * Parser for pyproject.toml files that delegates to TomlParser and attaches a
@@ -45,23 +44,28 @@ import static java.util.Collections.emptyMap;
 public class PyProjectTomlParser implements Parser {
 
     private final TomlParser tomlParser = new TomlParser();
-    private final Map<String, String> subprocessEnvironment;
 
     @Nullable
     private final Path installedEnv;
 
     public PyProjectTomlParser() {
-        this(emptyMap(), null);
+        this((Path) null);
     }
 
     /**
-     * @param subprocessEnvironment environment for the {@code uv} resolution subprocess
-     * @param installedEnv          an already-installed virtual env for this project's dependencies,
-     *                              read in preference to running {@code uv} when no lock file exists
+     * @param installedEnv the project's dependency environment, which the marker resolves against when no
+     *                     lock file exists, or null to leave such a marker unresolved
      */
-    public PyProjectTomlParser(Map<String, String> subprocessEnvironment, @Nullable Path installedEnv) {
-        this.subprocessEnvironment = subprocessEnvironment;
+    public PyProjectTomlParser(@Nullable Path installedEnv) {
         this.installedEnv = installedEnv;
+    }
+
+    /**
+     * @deprecated Use {@link #PyProjectTomlParser(Path)}. The parser runs no {@code uv} process of its own.
+     */
+    @Deprecated
+    public PyProjectTomlParser(Map<String, String> subprocessEnvironment, @Nullable Path installedEnv) {
+        this(installedEnv);
     }
 
     @Override
@@ -100,7 +104,6 @@ public class PyProjectTomlParser implements Parser {
         PythonResolutionResult.PackageManager pm = marker.getPackageManager();
         List<ResolvedDependency> resolvedDeps;
         boolean lockPresent;
-        boolean uvManaged = false;
         if (pm == PythonResolutionResult.PackageManager.Poetry) {
             lockPresent = Files.exists(pyprojectDir.resolve("poetry.lock"));
             resolvedDeps = PoetryLockParser.findAndParse(pyprojectDir, relativeTo);
@@ -111,7 +114,6 @@ public class PyProjectTomlParser implements Parser {
             lockPresent = Files.exists(pyprojectDir.resolve("uv.lock"));
             resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
             pm = PythonResolutionResult.PackageManager.Uv;
-            uvManaged = true;
         }
         if (!resolvedDeps.isEmpty()) {
             return PythonResolutionLinker.applyPyproject(marker, resolvedDeps, pm);
@@ -121,26 +123,11 @@ public class PyProjectTomlParser implements Parser {
             return marker;
         }
 
-        // No lock file: read the caller-installed env if one was provided. Installed dists are
-        // ground truth for any package manager.
+        // No lock file: installed dists are ground truth for any package manager
         if (installedEnv != null) {
             List<ResolvedDependency> installed = InstalledEnvParser.parse(installedEnv);
             if (!installed.isEmpty()) {
                 return PythonResolutionLinker.applyPyproject(marker, installed, marker.getPackageManager());
-            }
-        }
-        // Else resolve into a content-hash-cached workspace, the same way requirements.txt and
-        // setup.cfg already do — only for uv-managed projects (a Poetry/Pdm pyproject is not
-        // valid `uv pip install` input).
-        if (uvManaged) {
-            try {
-                Path workspace = DependencyWorkspace.getOrCreateWorkspace(doc.printAll(), subprocessEnvironment);
-                List<ResolvedDependency> frozen = RequirementsTxtParser.parseFreezeOutput(workspace);
-                if (!frozen.isEmpty()) {
-                    return PythonResolutionLinker.applyPyproject(marker, frozen, pm);
-                }
-            } catch (RuntimeException e) {
-                // uv unavailable or the install failed — leave the marker unresolved, as before.
             }
         }
         return marker;

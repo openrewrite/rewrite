@@ -99,6 +99,92 @@ class AddCommentToPropertyTest implements RewriteTest {
     }
 
     @Test
+    void multilineCommentBecomesOneCommentLinePerLine() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToProperty("management.metrics.enabled",
+            "Deprecated\nThis property is deprecated because of reasons\n", null, null)),
+          yaml(
+            """
+              management:
+                metrics:
+                  enabled: true
+              """,
+            """
+              management:
+                metrics:
+                  # Deprecated
+                  # This property is deprecated because of reasons
+                  enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineCommentKeepsBlankLines() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToProperty("server.port", "Check port\n\nSee docs", null, null)),
+          yaml(
+            "server.port: 8080",
+            """
+              # Check port
+              #
+              # See docs
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddDuplicateCommentAtTopOfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToProperty("server.port", "Check port", null, null)),
+          yaml(
+            """
+              # Check port
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentAboveDocumentStartDoesNotCount() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToProperty("server.port", "Check port", null, null)),
+          yaml(
+            """
+              # Check port
+              ---
+              server.port: 8080
+              """,
+            """
+              # Check port
+              ---
+              # Check port
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddDuplicateMultilineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToProperty("server.port", "Check port\r\nSee docs", null, null)),
+          yaml(
+            """
+              # Unrelated
+              # Check port
+              # See docs
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
     void globPatternMatchesMultipleProperties() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToProperty("management.metrics.*.enabled", "Deprecated", null, null)),

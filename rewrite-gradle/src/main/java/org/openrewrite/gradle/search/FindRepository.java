@@ -207,7 +207,11 @@ public class FindRepository extends Recipe {
 
         @Override
         public J.Literal visitLiteral(J.Literal literal, StringBuilder builder) {
-            builder.append(literal.getValue());
+            Object parent = getCursor().getParentTreeCursor().getValue();
+            // A template's own fragment spells the characters between the delimiters that the enclosing visit adds,
+            // while a literal inside an interpolation is spelled by its own delimiters
+            boolean fragment = parent instanceof G.GString || parent instanceof K.StringTemplate;
+            builder.append(fragment && literal.getValueSource() != null ? literal.getValueSource() : literal.getValue());
             return super.visitLiteral(literal, builder);
         }
 

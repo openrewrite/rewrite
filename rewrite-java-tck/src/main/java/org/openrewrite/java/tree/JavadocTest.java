@@ -17,15 +17,26 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -2590,6 +2601,29 @@ class JavadocTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @Test
+    void linkToMissingClassWithUnreadableClasspathJar(@TempDir Path dir) throws IOException {
+        // Each classpath package listing throws CompletionFailure once. Entering A fails on package a,
+        // and the parser only reports that. B then enters normally, and its link is the first lookup of
+        // package missing.
+        Path unreadable = Files.write(dir.resolve("unreadable.jar"), "not a zip archive".getBytes(UTF_8));
+        List<SourceFile> parsed = JavaParser.fromJavaVersion()
+          .classpath(singletonList(unreadable))
+          .build()
+          .parse(new InMemoryExecutionContext(), """
+            package a;
+            class A {}
+            """, """
+            package a;
+            /**
+             * {@link missing.Missing#isBetween(java.util.Date, java.util.Date)}
+             */
+            class B {}
+            """)
+          .collect(toList());
+        assertThat(parsed).hasSize(2).allMatch(J.CompilationUnit.class::isInstance);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")

@@ -28,14 +28,18 @@ export function asRef<T extends {} | undefined>(obj: T): T extends undefined ? u
     try {
         // Spread would create a new object. This can be used multiple times on the
         // same object without changing the reference.
-        (obj as any)[REFERENCE_KEY] = true;
+        markRef(obj);
         return obj as any;
     } catch {
         // The object is frozen/sealed/non-extensible. Clone to a new object.
-        const cloned = {...obj as any};
-        cloned[REFERENCE_KEY] = true;
-        return cloned;
+        return markRef({...obj as any});
     }
+}
+
+// Not enumerable, so a copy made by spreading or by a draft is not a ref unless it is marked itself.
+function markRef<T>(obj: T): T {
+    Object.defineProperty(obj, REFERENCE_KEY, {value: true, enumerable: false, configurable: true});
+    return obj;
 }
 
 export function isRef(obj: any): obj is Reference {

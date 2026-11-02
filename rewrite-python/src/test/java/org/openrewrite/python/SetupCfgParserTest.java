@@ -25,10 +25,13 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -54,20 +57,28 @@ class SetupCfgParserTest {
     }
 
     @Test
-    void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws Exception {
+    void markerContainsDependenciesWithoutWritingIntoProject(@TempDir Path tempDir) throws Exception {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
+        // Unique content, so a workspace cached by an earlier run cannot skip the resolution.
         Files.writeString(tempDir.resolve("setup.cfg"), """
+                # %s
                 [metadata]
                 name = myapp
                 version = 1.0.0
 
                 [options]
+                package_dir =
+                    = src
+                packages = myapp
                 install_requires =
                     requests>=2.28.0
-                """);
+                """.formatted(UUID.randomUUID()));
         // setup.py is required for uv pip install to recognize the project
         Files.writeString(tempDir.resolve("setup.py"), "from setuptools import setup; setup()");
+        Files.createDirectories(tempDir.resolve("src/myapp"));
+        Files.writeString(tempDir.resolve("src/myapp/__init__.py"), "");
+        List<Path> projectFiles = listFiles(tempDir);
 
         SetupCfgParser parser = new SetupCfgParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("setup.cfg"));
@@ -87,5 +98,12 @@ class SetupCfgParserTest {
         assertThat(marker.getResolvedDependencies().stream().map(ResolvedDependency::getName))
                 .contains("requests");
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+        assertThat(listFiles(tempDir)).isEqualTo(projectFiles);
+    }
+
+    private static List<Path> listFiles(Path dir) throws IOException {
+        try (Stream<Path> walk = Files.walk(dir)) {
+            return walk.map(dir::relativize).sorted().collect(toList());
+        }
     }
 }

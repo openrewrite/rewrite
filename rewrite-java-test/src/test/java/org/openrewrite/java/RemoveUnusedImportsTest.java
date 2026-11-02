@@ -159,7 +159,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import lombok.val;
 
               public class Foo {
-                  val myField = 10.0;
+                  void test() {
+                      val myVariable = 10.0;
+                  }
               }
               """
           )
@@ -1308,7 +1310,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package com.Source.mine;
@@ -1687,7 +1688,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeMultipleImportsWhileUnfoldingWildcard() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.Set;
@@ -1711,6 +1711,33 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wildcardWhoseUnfoldedImportsAreAllDuplicatesPassesItsCommentOn() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              // collections
+              import java.util.*;
+              import java.io.File;
+
+              class A {
+                 List<File> l;
+              }
+              """,
+            """
+              import java.util.List;
+              // collections
+              import java.io.File;
+
+              class A {
+                 List<File> l;
               }
               """
           )
@@ -2572,6 +2599,38 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               class Test {
                   Outer.@Nullable Inner[] items;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStaticStarImportOfLowercaseClass() {
+        rewriteRun(
+          java(
+            """
+              package org.foo;
+              public class functions {
+                  public static Object avg(String s) { return null; }
+                  public static Object col(String s) { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import static org.foo.functions.*;
+              class Test {
+                  Object a = avg("key");
+                  Object c = col("value");
+              }
+              """,
+            """
+              import static org.foo.functions.avg;
+              import static org.foo.functions.col;
+              class Test {
+                  Object a = avg("key");
+                  Object c = col("value");
               }
               """
           )

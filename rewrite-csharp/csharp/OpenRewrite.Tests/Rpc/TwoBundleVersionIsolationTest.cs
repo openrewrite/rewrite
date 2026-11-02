@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
 
@@ -193,11 +192,11 @@ public class TwoBundleVersionIsolationTest : IDisposable
         // DLL + the dep DLL (DepPlugin.dll) from the corresponding dep version. The two
         // DepPlugin.dll files are identical in name/FQN but differ in content — that's the point.
         _publishDirA = Path.Combine(_root, "publishA");
-        RunDotnet($"publish \"{Path.Combine(primaryADir, "PrimaryA.csproj")}\" " +
+        DotnetCli.Run($"publish \"{Path.Combine(primaryADir, "PrimaryA.csproj")}\" " +
                   $"-c Release -o \"{_publishDirA}\"");
 
         _publishDirB = Path.Combine(_root, "publishB");
-        RunDotnet($"publish \"{Path.Combine(primaryBDir, "PrimaryB.csproj")}\" " +
+        DotnetCli.Run($"publish \"{Path.Combine(primaryBDir, "PrimaryB.csproj")}\" " +
                   $"-c Release -o \"{_publishDirB}\"");
     }
 
@@ -247,29 +246,5 @@ public class TwoBundleVersionIsolationTest : IDisposable
         Assert.Single(b.RecipeList);
         Assert.Equal("child-v1", a.RecipeList[0].Descriptor.DisplayName);
         Assert.Equal("child-v2", b.RecipeList[0].Descriptor.DisplayName);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
     }
 }

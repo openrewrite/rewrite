@@ -48,7 +48,11 @@ func TestMarshalKeepsFloatsFloating(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// when
-			data, err := json.Marshal(RpcObjectData{State: Change, Value: tc.value})
+			var out []RpcObjectData
+			q := NewSendQueue(1000, func(b []RpcObjectData) { out = append(out, b...) }, NewReferenceMap())
+			q.Put(RpcObjectData{State: Change, Value: tc.value})
+			q.Flush()
+			data, err := json.Marshal(out[0])
 
 			// then
 			require.NoError(t, err)
@@ -106,7 +110,12 @@ func TestDecodeBatchCanonicalizesNestedNumbers(t *testing.T) {
 func TestNumbersSurviveTheReturnLeg(t *testing.T) {
 	for _, value := range []any{int64(1), int64(math.MaxInt64), bigWire("300000000000000000000"), 3e20, 1.5, 3.0} {
 		// when
-		data, err := json.Marshal([]RpcObjectData{{State: Change, Value: value}})
+		// Through the queue, which is where a value is shaped for the wire.
+		var out []RpcObjectData
+		q := NewSendQueue(1000, func(b []RpcObjectData) { out = append(out, b...) }, NewReferenceMap())
+		q.Put(RpcObjectData{State: Change, Value: value})
+		q.Flush()
+		data, err := json.Marshal(out)
 		require.NoError(t, err)
 		batch, err := DecodeBatch(data, nil)
 

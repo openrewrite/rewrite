@@ -590,4 +590,114 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterKeepsItsComments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("foo".equals(method.getSimpleName())) {
+                      return JavaTemplate.builder("bar(#{any(int)})")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      foo(/* keep */ 1);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      bar(/* keep */ 1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedExpressionPassedAsParameterKeepsItsCommentsOnce() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+                  if ("o".equals(ident.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation m &&
+                      "println".equals(m.getSimpleName())) {
+                      return JavaTemplate.builder("String.valueOf(#{any()})")
+                        .build()
+                        .apply(getCursor(), ident.getCoordinates().replace(), ident);
+                  }
+                  return ident;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(Object o) {
+                      System.out.println(/* keep */ o);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Object o) {
+                      System.out.println(/* keep */ String.valueOf(o));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedStatementPassedAsParameterKeepsItsCommentsInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("toString".equals(method.getSimpleName()) && getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                      return JavaTemplate.builder("if (o != null) {\n#{any()};\n}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(Object o) {
+                      // keep
+                      o.toString();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Object o) {
+                      // keep
+                      if (o != null) {
+                          o.toString();
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

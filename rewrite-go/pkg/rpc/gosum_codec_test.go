@@ -23,6 +23,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func TestGoSumRPCRoundTrip(t *testing.T) {
@@ -57,6 +58,16 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGoSumLineRoundTripsOnItsOwn(t *testing.T) {
+	gs, err := parser.ParseGoSumFile("go.sum", "github.com/a/b v1.0.0/go.mod h1:bbbb=\n")
+	require.NoError(t, err)
+
+	got, ok := roundTripNode(t, gs.Lines[0].Element, &golang.GoSumLine{}).(*golang.GoSumLine)
+
+	require.True(t, ok)
+	require.Equal(t, "github.com/a/b v1.0.0/go.mod h1:bbbb=", printer.PrintWithCursor(got, nil, nil))
+}
+
 func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	content := "github.com/x/y v1.2.3 h1:aaaa=\n" +
 		"github.com/x/y v1.2.3/go.mod h1:bbbb=\n"
@@ -64,17 +75,30 @@ func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	require.NoError(t, err, "parse error")
 	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\nrequire github.com/x/y v1.2.3\n")
 	require.NoError(t, err, "marker parse error")
-	before.Markers.Entries = append(before.Markers.Entries, *mrr)
+	before.Markers = java.AddMarker(before.Markers, *mrr)
 
 	seed := &golang.GoSum{Ident: before.Ident}
 	got := roundTripNode(t, before, seed).(*golang.GoSum)
 
 	var found *golang.GoResolutionResult
-	for i := range got.Markers.Entries {
-		if r, ok := got.Markers.Entries[i].(golang.GoResolutionResult); ok {
+	for i := range got.Markers.Entries() {
+		if r, ok := got.Markers.Entries()[i].(golang.GoResolutionResult); ok {
 			found = &r
 		}
 	}
-	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
+	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
+}
+
+func TestEmptyGoSumSendsAnEmptyLinesList(t *testing.T) {
+	// given
+	gs, err := parser.ParseGoSumFile("go.sum", "")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gs, &golang.GoSum{Ident: gs.Ident}).(*golang.GoSum)
+
+	// then
+	require.NotNil(t, got.Lines)
+	require.Empty(t, got.Lines)
 }

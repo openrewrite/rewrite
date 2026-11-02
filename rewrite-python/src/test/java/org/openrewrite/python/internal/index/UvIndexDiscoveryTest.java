@@ -327,6 +327,8 @@ class UvIndexDiscoveryTest {
         // uv prefers env credentials over URL-embedded ones for named indexes
         assertThat(indexes.get(0).getIndex().getUsername()).isEqualTo("envuser");
         assertThat(indexes.get(0).getIndex().getPassword()).isEqualTo("envpass");
+        // the unused URL credentials still leave the URL, which uv.lock records as the registry
+        assertThat(indexes.get(0).getIndex().getUrl()).isEqualTo("https://corp.example.com/simple");
     }
 
     @Test
@@ -340,6 +342,7 @@ class UvIndexDiscoveryTest {
         List<UvIndex> indexes = discover(doc, Map.of());
         assertThat(indexes.get(0).getIndex().getUsername()).isEqualTo("alice");
         assertThat(indexes.get(0).getIndex().getPassword()).isEqualTo("p@ss");
+        assertThat(indexes.get(0).getIndex().getUrl()).isEqualTo("https://corp.example.com/simple");
     }
 
     @Test
@@ -378,8 +381,7 @@ class UvIndexDiscoveryTest {
 
         List<UvIndex> indexes = discover(doc, Map.of("INDEX_USER", "alice"));
         // uv takes config URLs literally; no placeholder expansion
-        assertThat(indexes.get(0).getIndex().getUrl())
-          .isEqualTo("https://${INDEX_USER}@corp.example.com/simple");
+        assertThat(indexes.get(0).getIndex().getUrl()).isEqualTo("https://corp.example.com/simple");
         assertThat(indexes.get(0).getIndex().isUnresolvedPlaceholders()).isFalse();
         assertThat(indexes.get(0).getIndex().getUsername()).isEqualTo("${INDEX_USER}");
     }
