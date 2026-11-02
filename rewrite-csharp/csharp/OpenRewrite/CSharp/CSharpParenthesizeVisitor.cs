@@ -404,6 +404,10 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         if (parent is Ternary conditional)
             return conditional.Condition.Id == expr.Id && CSharpPrecedences.GetPrecedence(expr) < 0;
 
+        // An interpolation's format starts at its first : that no parentheses enclose, so $"{c ? a : b}" doesn't parse
+        if (parent is Interpolation)
+            return expr is Ternary hole && hole.Markers.FindFirst<NullCoalescing>() == null;
+
         if (parent is IsPattern)
         {
             // CsBinary with Or/And inside IsPattern is a pattern combinator, not a

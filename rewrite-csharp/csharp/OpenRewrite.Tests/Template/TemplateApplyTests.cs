@@ -840,6 +840,20 @@ public class TemplateApplyTests : RewriteTest
     }
 
     /// <summary>
+    /// The format of an interpolation starts at its first <c>:</c> that no parentheses enclose.
+    /// </summary>
+    [Theory]
+    [InlineData("$\"{", "}\"", "c ? d : e", "$\"{(c ? d : e)}\"")]
+    [InlineData("$\"{", ":F2}\"", "c ? d : e", "$\"{(c ? d : e):F2}\"")]
+    [InlineData("$\"{x,", "}\"", "c ? 1 : 2", "$\"{x,(c ? 1 : 2)}\"")]
+    [InlineData("$\"{", "}\"", "a ?? b", "$\"{a ?? b}\"")]
+    public void CaptureInInterpolationMatchesFreshParse(string before, string after, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
     /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
     /// </summary>
     [Theory]
@@ -1037,6 +1051,21 @@ public class TemplateApplyTests : RewriteTest
             CSharp(
                 "class C { T NotNull<T>(T t) => t; int M(string? s) { return NotNull(s?.Trim()).Length; } }",
                 "class C { T NotNull<T>(T t) => t; int M(string? s) { return (s?.Trim()!).Length; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConditionalReplacingTheExpressionOfAnInterpolationTakesParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"YesNo({a})"),
+                CSharpTemplate.Expression($"{a} ? \"yes\" : \"no\"")))),
+            CSharp(
+                "class C { string YesNo(bool b) => \"\"; string M(bool b) => $\"{YesNo(b)}\"; }",
+                "class C { string YesNo(bool b) => \"\"; string M(bool b) => $\"{(b ? \"yes\" : \"no\")}\"; }"
             )
         );
     }
