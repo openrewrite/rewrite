@@ -48,6 +48,27 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('should remove named import with string literal module export name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("./styles.module.css", "link-a"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {"link-a" as linkA, "link-b" as linkB} from './styles.module.css';
+
+                        console.log(linkB);
+                    `,
+                    `
+                        import {"link-b" as linkB} from './styles.module.css';
+
+                        console.log(linkB);
+                    `
+                )
+            );
+        });
+
         test('should remove entire import when only one named import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));

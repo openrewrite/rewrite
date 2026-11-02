@@ -323,16 +323,16 @@ public interface JS extends J {
         @With
         Markers markers;
 
-        JRightPadded<J.Identifier> propertyName;
+        JRightPadded<Expression> propertyName;
 
         @With
         Expression alias;
 
-        public J.Identifier getPropertyName() {
+        public Expression getPropertyName() {
             return propertyName.getElement();
         }
 
-        public JS.Alias withPropertyName(J.Identifier propertyName) {
+        public JS.Alias withPropertyName(Expression propertyName) {
             return getPadding().withPropertyName(this.propertyName.withElement(propertyName));
         }
 
@@ -343,13 +343,15 @@ public interface JS extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return propertyName.getElement().getType();
+            return propertyName.getElement() instanceof J.Literal ? alias.getType() : propertyName.getElement().getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public Alias withType(@Nullable JavaType type) {
-            return withPropertyName(propertyName.getElement().withType(type));
+            return propertyName.getElement() instanceof J.Literal ?
+                    withAlias(alias.withType(type)) :
+                    withPropertyName(propertyName.getElement().withType(type));
         }
 
         @Transient
@@ -377,11 +379,11 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Alias t;
 
-            public JRightPadded<J.Identifier> getPropertyName() {
+            public JRightPadded<Expression> getPropertyName() {
                 return t.propertyName;
             }
 
-            public JS.Alias withPropertyName(JRightPadded<J.Identifier> propertyName) {
+            public JS.Alias withPropertyName(JRightPadded<Expression> propertyName) {
                 return t.propertyName == propertyName ? t : new JS.Alias(t.id, t.prefix, t.markers, propertyName, t.alias);
             }
         }

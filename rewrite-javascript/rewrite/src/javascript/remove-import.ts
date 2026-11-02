@@ -2,7 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {isIdentifier, J} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
-import {isObjectBindingPattern, JS, JSX} from "./tree";
+import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 import {randomId} from "../uuid";
@@ -605,11 +605,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         if (spec?.kind === JS.Kind.Alias) {
             // Handle aliased import: import { foo as bar }
             // Return the original name (foo)
-            const alias = spec as JS.Alias;
-            const propertyName = alias.propertyName.element;
-            if (propertyName?.kind === J.Kind.Identifier) {
-                return (propertyName as J.Identifier).simpleName;
-            }
+            return moduleExportName((spec as JS.Alias).propertyName.element);
         } else if (spec?.kind === J.Kind.Identifier) {
             // Handle regular import: import { foo }
             return (spec as J.Identifier).simpleName;

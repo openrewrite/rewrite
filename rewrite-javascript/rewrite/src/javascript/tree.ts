@@ -130,7 +130,7 @@ export namespace JS {
      */
     export interface Alias extends JS, Expression {
         readonly kind: typeof Kind.Alias;
-        readonly propertyName: J.RightPadded<J.Identifier>;
+        readonly propertyName: J.RightPadded<J.Identifier | J.Literal>;
         readonly alias: Expression;
     }
 
@@ -983,6 +983,11 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
 
 export function isObjectBindingPattern(tree: any): tree is JS.ObjectBindingPattern {
     return tree?.kind === JS.Kind.ObjectBindingPattern;
+}
+
+/** The name a module export is known by, whether spelled as an identifier or as a string literal (`"a-b"`). */
+export function moduleExportName(name: J.Identifier | J.Literal): string {
+    return name.kind === J.Kind.Identifier ? name.simpleName : String(name.value);
 }
 
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
