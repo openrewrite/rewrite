@@ -85,7 +85,7 @@ public class OpenRewriteModelBuilder {
             gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
             connector.useBuildDistribution();
         } else {
-            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", defaultGradleVersion());
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "9.8.2");
             connector.useGradleVersion(gradleVersion);
         }
         connector
@@ -221,13 +221,6 @@ public class OpenRewriteModelBuilder {
             out.write(buf, 0, n);
         }
         return out.toByteArray();
-    }
-
-    // Gradle 8.14's Kotlin DSL compiler fails on Java 25 with an IllegalArgumentException parsing the Java version
-    private static String defaultGradleVersion() {
-        String javaVersion = System.getProperty("java.specification.version");
-        int feature = Integer.parseInt(javaVersion.startsWith("1.") ? javaVersion.substring(2) : javaVersion);
-        return feature >= 25 ? "9.8.2" : "8.14.5";
     }
 
     private static boolean isGradle9OrLater(@Nullable String version) {
