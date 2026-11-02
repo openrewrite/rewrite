@@ -4728,7 +4728,7 @@ public class GroovyParserVisitor {
         }
         matcher.appendTail(sb);
         String multiLineRemoved = sb.toString();
-        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
+        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open, -1)[0])
                 .collect(joining("\n"));
     }
 
