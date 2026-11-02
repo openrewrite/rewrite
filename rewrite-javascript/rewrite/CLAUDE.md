@@ -320,13 +320,11 @@ reads `exports` or `module.exports` anywhere, inside a function too. There `mayb
 `require`, `exports` or `module`, as an AMD factory's are, does not count.
 
 A new `require` goes among the file's leading requires, the run after a shebang and any directives
-(`'use strict'`, `'use client'`, ...) that every other top-level statement follows, so nothing at
-top level reads the binding before it is initialised. A member joins a `const` destructuring
-`require` of its module there that has no rest element, or else gets `const {m} = require('mod')`
-at the end of the run. A whole module gets `const name = require('mod')`. A file with no leading
-requires takes it first, behind any triple-slash directives (`/// <reference … />`,
-`<amd-module>`, `<amd-dependency>`) in front of its first statement, since TypeScript reads them
-only ahead of every statement.
+(`'use strict'`, `'use client'`, `/// {directive}`, ...)
+that every other top-level statement follows, so nothing at top level reads the binding before it
+is initialised. A member joins a `const` destructuring `require` of its module there that has no
+rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
+`const name = require('mod')`. A file with no leading requires takes it first.
 
 ### When `maybeBind` returns `undefined`
 

@@ -909,10 +909,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 : emptyMarkers;
 
             if (insertionIndex === prologueLength(compilationUnit)) {
-                // The file has no import yet, so the new one opens its body, after any shebang and
-                // directives. It takes the place of the statement it goes before, along with the
-                // triple-slash directives in front of it, and the statement keeps its other comments
-                // and gets a blank line of its own.
                 // The `after` space should be empty since any semicolon is printed after it
                 const next = compilationUnit.statements[insertionIndex];
                 draft.statements = [
@@ -1728,9 +1724,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Determine the appropriate spacing before the import statement
      */
     private determineImportPrefix(compilationUnit: JS.CompilationUnit, insertionIndex: number): J.Space {
-        // If the import opens the file's body, at the beginning or after a shebang and directives,
-        // use the prefix of the statement it goes before: its whitespace, and its comments up to the
-        // last triple-slash directive, which has to stay ahead of the import (the rest stay on that statement)
         if (insertionIndex === prologueLength(compilationUnit) && insertionIndex < compilationUnit.statements.length) {
             const nextPrefix = compilationUnit.statements[insertionIndex].element?.prefix;
             return nextPrefix ? splitAtBodyStart(nextPrefix).ahead : emptySpace;
@@ -1762,7 +1755,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return lastImportIndex + 1;
         }
 
-        // No imports found, insert at the beginning of the body
         return prologueLength(compilationUnit);
     }
 
@@ -1810,20 +1802,11 @@ function newIdentifier(name: string): J.Identifier {
     };
 }
 
-/**
- * A quoted string standing as a statement of its own, such as `'use strict'`, `'use client'` or
- * `'use server'`: a directive, where it opens the file. A parenthesized string or a template literal
- * is an ordinary expression.
- */
 function isDirective(statement: J | undefined): boolean {
     const expression = statement?.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
     return quoteOf(expression) !== undefined;
 }
 
-/**
- * How many statements open `cu` ahead of its body: a shebang, then the directive prologue. A directive
- * applies only as long as nothing else goes before it, so a statement the file gains goes after them.
- */
 function prologueLength(cu: JS.CompilationUnit): number {
     const statements = cu.statements;
     let length = 0;
@@ -1834,13 +1817,7 @@ function prologueLength(cu: JS.CompilationUnit): number {
     return length;
 }
 
-/**
- * The prefix of the statement a new import or require goes before at the start of the file's body,
- * split between the two. The new statement takes the whitespace and the comments up to the last
- * triple-slash directive, since TypeScript reads one only among the comments that lead the file
- * (`processCommentPragmas` scans the leading comment ranges, nothing after the first statement). The
- * statement keeps its other comments, a plain `///` one among them, after a blank line of its own.
- */
+// Keep comments through the last triple-slash directive ahead of the import.
 function splitAtBodyStart(prefix: J.Space): {ahead: J.Space; behind: J.Space} {
     let ahead = prefix.comments.length;
     while (ahead > 0 && !isTripleSlashDirective(prefix.comments[ahead - 1])) {
@@ -1854,16 +1831,11 @@ function splitAtBodyStart(prefix: J.Space): {ahead: J.Space; behind: J.Space} {
 
 const TRIPLE_SLASH_DIRECTIVES = ['<reference', '<amd-module', '<amd-dependency'];
 
-/**
- * A triple-slash directive: `/// <reference … />`, `/// <amd-module … />` or `/// <amd-dependency … />`.
- * TypeScript recognises one by `tripleSlashDirectivePrefixRegex`, `^///\s*<`, so a fourth slash, as in
- * `//// <reference … />`, makes it an ordinary comment.
- */
 function isTripleSlashDirective(comment: Comment): boolean {
     if (comment.kind !== J.Kind.TextComment || (comment as TextComment).multiline) {
         return false;
     }
-    // The parser keeps a line comment's text without its leading `//`
+    // TextComment.text excludes the leading //.
     const text = (comment as TextComment).text;
     if (!text.startsWith('/')) {
         return false;
@@ -1895,8 +1867,6 @@ function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.
     if (next === undefined) {
         return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
     }
-    // The new statement takes the place of the one it goes before, along with the triple-slash
-    // directives in front of it, and that statement gets a blank line of its own.
     const {ahead, behind} = splitAtBodyStart(next.prefix);
     return {
         ...cu,
