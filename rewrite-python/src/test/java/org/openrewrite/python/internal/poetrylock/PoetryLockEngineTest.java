@@ -102,6 +102,32 @@ class PoetryLockEngineTest {
     }
 
     @Test
+    void movingADeclarationBetweenGroupsDefersToResolution() {
+        // six leaves main for dev, so poetry records it under groups = ["dev"]; the version alone is unchanged
+        String original = resource("e-groups/pyproject.toml");
+        String edited = original.replace("six = \"1.16.0\"\n", "")
+                .replace("iniconfig = \"2.0.0\"", "iniconfig = \"2.0.0\"\nsix = \"1.16.0\"");
+        Result result = PoetryLockEngine.regenerate(edited, original, resource("e-groups/poetry.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+        assertThat(result.getFailure().getDetail()).contains("from [main] to [dev]");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void changingADeclarationsMarkerDefersToResolution() {
+        String original = resource("e-groups/pyproject.toml");
+        String edited = original.replace("six = \"1.16.0\"",
+                "six = { version = \"1.16.0\", markers = \"python_version < '3.12'\" }");
+        Result result = PoetryLockEngine.regenerate(edited, original, resource("e-groups/poetry.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("more than the version of six");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
     void lockOutOfDateBeforeTheEditIsRefused() {
         stubPypiSix();
         // attrs is declared but absent from the lock, whose hash records the manifest without it. poetry relocks that

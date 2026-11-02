@@ -93,6 +93,31 @@ class PdmLockEngineTest {
     }
 
     @Test
+    void movingADeclarationBetweenGroupsDefersToResolution() {
+        // six leaves default for test, so pdm records it under groups = ["test"]; the version alone is unchanged
+        String original = resource("d-groups/pyproject.toml");
+        String edited = original.replace("dependencies = [\"six==1.16.0\"]", "dependencies = []")
+                .replace("test = [\"iniconfig==2.0.0\"]", "test = [\"iniconfig==2.0.0\", \"six==1.16.0\"]");
+        Result result = PdmLockEngine.regenerate(edited, original, resource("d-groups/pdm.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("six");
+        assertThat(result.getFailure().getDetail()).contains("from [default] to [test]");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void changingADeclarationsMarkerDefersToResolution() {
+        String original = resource("d-groups/pyproject.toml");
+        String edited = original.replace("\"six==1.16.0\"", "\"six==1.16.0; python_version < '3.12'\"");
+        Result result = PdmLockEngine.regenerate(edited, original, resource("d-groups/pdm.lock"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("more than the version of six");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
     void lockOutOfDateBeforeTheEditIsRefused() {
         stubPypiSix();
         // attrs is declared but absent from the lock, whose hash records the manifest without it. pdm relocks that
