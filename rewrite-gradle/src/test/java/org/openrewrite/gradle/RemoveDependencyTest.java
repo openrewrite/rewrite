@@ -543,7 +543,7 @@ class RemoveDependencyTest implements RewriteTest {
             """
               plugins {
                   id 'java'
-                  id "org.openrewrite.rewrite" version "7.41.0"
+                  id "org.openrewrite.rewrite" version "7.39.0"
               }
               
               group = 'org.example'
