@@ -63,3 +63,16 @@ func TestBlankLinesVisitorCapsTheBlankLinesAfterAComment(t *testing.T) {
 	// then
 	assert.Equal(t, "// Copyright.\n\n// Package p is a package.\npackage p\n\nfunc F() {\n\tx := 1\n\t// a comment\n\n\t_ = x\n}\n", printer.Print(out))
 }
+
+func TestBlankLinesVisitorCountsALineOfSpacesOrTabsAsBlank(t *testing.T) {
+	// given blank lines holding an indent, against a struct's brace, between
+	// statements and after a comment
+	cu, err := parser.NewGoParser().Parse("t.go", "package p\n\ntype T struct {\n\t\n\tA int\n}\n\nfunc F() {\n\tx := 1\n\t\n\t\n\t\n\t// a comment\n \n\t\n\t_ = x\n}\n")
+	require.NoError(t, err)
+
+	// when
+	out := NewBlankLinesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, "package p\n\ntype T struct {\n\tA int\n}\n\nfunc F() {\n\tx := 1\n\n\t// a comment\n\n\t_ = x\n}\n", printer.Print(out))
+}

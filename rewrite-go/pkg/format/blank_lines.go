@@ -68,19 +68,17 @@ func (v *BlankLinesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p a
 // VisitSpace caps each run of blank lines in s, ahead of its comments and
 // after each of them, at one.
 func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
-	whitespace := s.Whitespace()
-	if strings.Contains(whitespace, "\n\n\n") {
-		whitespace = capInternalBlankLines(whitespace, 1)
-	}
+	whitespace := capInternalBlankLines(s.Whitespace(), 1)
 	var comments []java.Comment
 	for i, c := range s.Comments() {
-		if !strings.Contains(c.Suffix, "\n\n\n") {
+		suffix := capInternalBlankLines(c.Suffix, 1)
+		if suffix == c.Suffix {
 			continue
 		}
 		if comments == nil {
 			comments = append([]java.Comment(nil), s.Comments()...)
 		}
-		comments[i].Suffix = capInternalBlankLines(c.Suffix, 1)
+		comments[i].Suffix = suffix
 	}
 	if comments == nil {
 		if whitespace == s.Whitespace() {
@@ -147,11 +145,8 @@ func stripLeadingBlankLines(ws string) string {
 	if start < 0 {
 		return ws
 	}
-	end := start
-	for end < len(ws) && ws[end] == '\n' {
-		end++
-	}
-	if end-start < 2 {
+	end, breaks := lineBreakRun(ws, start)
+	if breaks < 2 {
 		return ws
 	}
 	return ws[:start] + "\n" + ws[end:]
@@ -162,6 +157,9 @@ func stripLeadingBlankLines(ws string) string {
 // 0–2 newlines untouched.
 func capInternalBlankLines(ws string, max int) string {
 	allowed := max + 1
+	if strings.Count(ws, "\n") <= allowed {
+		return ws
+	}
 	var b strings.Builder
 	b.Grow(len(ws))
 	i := 0
@@ -171,19 +169,27 @@ func capInternalBlankLines(ws string, max int) string {
 			i++
 			continue
 		}
-		// Count run length.
-		j := i
-		for j < len(ws) && ws[j] == '\n' {
-			j++
+		end, breaks := lineBreakRun(ws, i)
+		if breaks > allowed {
+			b.WriteString(strings.Repeat("\n", allowed))
+		} else {
+			b.WriteString(ws[i:end])
 		}
-		run := j - i
-		if run > allowed {
-			run = allowed
-		}
-		for k := 0; k < run; k++ {
-			b.WriteByte('\n')
-		}
-		i = j
+		i = end
 	}
 	return b.String()
+}
+
+// lineBreakRun measures the run of line breaks starting at ws[start], and
+// returns where it ends and how many breaks it holds. A line holding only
+// spaces or tabs is blank, so the run goes on through it.
+func lineBreakRun(ws string, start int) (end, breaks int) {
+	for i := start; i < len(ws); i++ {
+		if ws[i] == '\n' {
+			end, breaks = i+1, breaks+1
+		} else if ws[i] != ' ' && ws[i] != '\t' {
+			break
+		}
+	}
+	return end, breaks
 }
