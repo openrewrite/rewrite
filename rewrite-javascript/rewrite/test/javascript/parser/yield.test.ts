@@ -13,10 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as path from "node:path";
+import * as ts from "typescript";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 
 import {JavaScriptVisitor, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
+
+/** What the compiler reports for `file`, under the options the project type-checks its tests with. */
+function typeErrors(file: string): string[] {
+    const tsconfig = path.resolve(__dirname, '../../../tsconfig.test.json');
+    const config = ts.getParsedCommandLineOfConfigFile(tsconfig, {noEmit: true}, {
+        ...ts.sys,
+        onUnRecoverableConfigFileDiagnostic: d => {
+            throw new Error(ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+        }
+    })!;
+    const program = ts.createProgram([file], config.options);
+    return ts.getPreEmitDiagnostics(program, program.getSourceFile(file))
+        .map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+}
 
 describe('yield mapping', () => {
     const spec = new RecipeSpec();
@@ -32,6 +48,8 @@ describe('yield mapping', () => {
             typescript('yield')
         ));
     test('a yield whose value a recipe drops', () => {
+        // The recipe below builds a yield without a value, which only the compiler can object to
+        expect(typeErrors(__filename)).toEqual([]);
         const dropValue = new RecipeSpec();
         dropValue.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitYield(aYield: J.Yield, p: any): Promise<J | undefined> {
