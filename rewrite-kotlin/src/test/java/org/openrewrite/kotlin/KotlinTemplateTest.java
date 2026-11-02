@@ -1485,4 +1485,88 @@ class KotlinTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void parenthesizeWithKotlinPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "both" -> "#{any(kotlin.Int)} and #{any(kotlin.Int)}";
+                      case "either" -> "#{any(kotlin.Boolean)} || #{any(kotlin.Boolean)}";
+                      case "union" -> "#{any(kotlin.Int)} or #{any(kotlin.Int)}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return KotlinTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0),
+                      method.getArguments().get(1));
+              }
+          })),
+          kotlin(
+            """
+              fun both(a: Int, b: Int) = a and b
+              fun either(a: Boolean, b: Boolean) = a || b
+              fun union(a: Int, b: Int) = a or b
+              fun test(x: Int, a: Int, b: Int, flag: Boolean?, p: Boolean, q: Boolean) {
+                  val bits = x or both(a, b)
+                  val choice = flag ?: either(p, q)
+                  val pair = x to union(a, b)
+              }
+              """,
+            """
+              fun both(a: Int, b: Int) = a and b
+              fun either(a: Boolean, b: Boolean) = a || b
+              fun union(a: Int, b: Int) = a or b
+              fun test(x: Int, a: Int, b: Int, flag: Boolean?, p: Boolean, q: Boolean) {
+                  val bits = x or (a and b)
+                  val choice = flag ?: (p || q)
+                  val pair = x to (a or b)
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parenthesizeParametersWithKotlinPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "not" -> "!#{any(kotlin.Boolean)}";
+                      case "toNumber" -> "#{any(kotlin.Int)} as Number";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return KotlinTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+              }
+          })),
+          kotlin(
+            """
+              fun not(b: Boolean) = !b
+              fun toNumber(i: Int): Number = i
+              fun test(a: Int, l: List<Int>) {
+                  val absent = not(a !in l)
+                  val negated = toNumber(-a)
+              }
+              """,
+            """
+              fun not(b: Boolean) = !b
+              fun toNumber(i: Int): Number = i
+              fun test(a: Int, l: List<Int>) {
+                  val absent = !(a !in l)
+                  val negated = -a as Number
+              }
+              """
+          ));
+    }
 }
