@@ -139,8 +139,9 @@ class SpacesVisitor(PythonVisitor):
             return v
 
         if v.padding.initializer is not None and v.padding.initializer.element is not None:
-            use_space = self._style.around_operators.eq_in_named_parameter or v.variable_type is not None
-            use_space |= self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
+            # As PEP 8 asks, an annotated parameter's default takes spaces
+            use_space = self._style.around_operators.eq_in_named_parameter or \
+                self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
 
             v = v.padding.replace(
                 initializer=space_before_left_padded(v.padding.initializer, use_space))
