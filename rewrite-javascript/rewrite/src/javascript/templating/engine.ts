@@ -840,14 +840,37 @@ export function opensWithBrace(templateParts: TemplateStringsArray): boolean {
 }
 
 /** Whether code opening with `{` that replaces `tree`, which `cursor` points at, is an object literal. */
-export function replacedByObjectLiteral(tree: J, cursor: Cursor): boolean {
+export async function replacedByObjectLiteral(tree: J, cursor: Cursor): Promise<boolean> {
     if (tree.kind === J.Kind.Block) {
         return false;
     } else if (!isStatement(tree)) {
         return true;
     }
-    const parentTree = cursor.parentTree()?.value;
+    const parentTree = await replacedParent(tree, cursor);
     return parentTree !== undefined && !expectsStatement(parentTree, tree.id);
+}
+
+/**
+ * The tree that holds `tree`. The cursor points at `tree`, at what it stands in for, or at a tree that
+ * holds it, as where a recipe applies a template to a child of the node it visits.
+ */
+async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | undefined> {
+    const owner = cursor?.value;
+    let holder: J | undefined;
+    if (isTree(owner) && owner.id !== tree.id) {
+        await new class extends JavaScriptVisitor<undefined> {
+            protected override async preVisit(t: J, p: undefined): Promise<J | undefined> {
+                if (holder === undefined && t.id === tree.id) {
+                    holder = this.cursor.parentTree()?.value;
+                }
+                if (holder !== undefined) {
+                    this.stopAfterPreVisit();
+                }
+                return t;
+            }
+        }().visit(owner, undefined);
+    }
+    return holder ?? cursor?.parentTree()?.value;
 }
 
 /**
@@ -895,7 +918,8 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        let resultToUse = this.wrapTree(originalTree, this.ast);
+        const parentTree = await replacedParent(originalTree, this.cursor);
+        let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
         // A replaced node spliced back in as a capture carries its own trailing markers
         const trailing = trailingMarkers(originalTree);
         const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
@@ -975,9 +999,7 @@ export class TemplateApplier {
         return {...laidOut!, id: resultToUse.id};
     }
 
-    private wrapTree(originalTree: J, resultToUse: J) {
-        const parentTree = this.cursor?.parentTree()?.value;
-
+    private wrapTree(originalTree: J, resultToUse: J, parentTree: J | undefined) {
         // A `for` head holds each expression of its init and update in an expression statement, as the parser does
         if (parentTree?.kind === J.Kind.ForLoopControl &&
             (parentTree as J.ForLoop.Control).condition?.element.id !== originalTree.id) {
