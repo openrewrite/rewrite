@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeSpec} from "../../../src/test";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
 
-import {typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('yield mapping', () => {
     const spec = new RecipeSpec();
@@ -30,6 +31,29 @@ describe('yield mapping', () => {
             //language=typescript
             typescript('yield')
         ));
+    test('a yield whose value a recipe drops', () => {
+        const dropValue = new RecipeSpec();
+        dropValue.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitYield(aYield: J.Yield, p: any): Promise<J | undefined> {
+                const visited = await super.visitYield(aYield, p) as J.Yield;
+                if (!visited.value) {
+                    return visited;
+                }
+                const bare: J.Yield = {
+                    kind: J.Kind.Yield,
+                    id: visited.id,
+                    prefix: visited.prefix,
+                    markers: visited.markers,
+                    implicit: visited.implicit
+                };
+                return bare;
+            }
+        });
+        return dropValue.rewriteRun(
+            //language=typescript
+            typescript('function* g() {\n    yield 42;\n}', 'function* g() {\n    yield;\n}')
+        );
+    });
     test('delegated', () =>
         spec.rewriteRun(
             //language=typescript

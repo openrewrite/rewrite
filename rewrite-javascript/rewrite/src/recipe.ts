@@ -175,6 +175,11 @@ export interface OptionDescriptor {
     readonly type?: string
 }
 
+/**
+ * @typeParam P The type of the accumulator where scanning data is held until the editing phase. It stays in memory
+ * until the cycle ends, so it should hold values such as coordinates, paths and ids, not trees or other objects of a
+ * type given to registerHeavyweight.
+ */
 export abstract class ScanningRecipe<P> extends Recipe {
     private readonly recipeAccMessage = Symbol("org.openrewrite.recipe.acc");
 

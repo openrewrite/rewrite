@@ -920,4 +920,46 @@ class GradleDependencyTest implements RewriteTest {
         );
     }
 
+
+    /**
+     * The Kotlin DSL `kotlin(module)` helper expands to `org.jetbrains.kotlin:kotlin-$module`, so a recipe
+     * targeting those coordinates has to reach a declaration that never writes them out.
+     */
+    @Test
+    void kotlinDslHelper() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("org.jetbrains.kotlin").artifactId("kotlin-stdlib")
+              .asVisitor(dep -> SearchResult.found(dep.getTree())))),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(kotlin("stdlib"))
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~>*/implementation(kotlin("stdlib"))
+              }
+              """
+          )
+        );
+    }
 }

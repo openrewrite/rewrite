@@ -38,7 +38,7 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public class DotNetBuildContext
 {
-    private const string ContextKey = "org.openrewrite.csharp.DotNetBuildContext";
+    internal const string ContextKey = "org.openrewrite.csharp.DotNetBuildContext";
 
     /// <summary>
     /// File extensions and names that are needed for a correct dotnet restore.

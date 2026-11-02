@@ -31,6 +31,26 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class ChangePropertyKeyTest implements RewriteTest {
 
     @Test
+    void movePropertyWithTrailingInlineCommentIntoNewMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.http.client.factory", "spring.http.clients.imperative.factory", null, null, null)),
+          yaml(
+            """
+              spring:
+                http:
+                  client:
+                    factory: jdk # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+              """,
+            """
+              spring:
+                http: # Use the JdkClientHttpRequestFactory in RestClient.Builder to create the RestClient bean.
+                  clients.imperative.factory: jdk
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveParentAndTrailingCommentsBeforeSeveralRootSiblings() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),

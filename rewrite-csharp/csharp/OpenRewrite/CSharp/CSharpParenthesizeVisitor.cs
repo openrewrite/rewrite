@@ -35,7 +35,7 @@ public static class CSharpParenthesizeVisitor
         // Fast exit: simple expression types never need parenthesization
         if (newTree is not (Binary or Unary or Ternary or Assignment or AssignmentOperation
             or TypeCast or CsBinary or CsUnary or IsPattern or RangeExpression
-            or SwitchExpression or WithExpression or Lambda))
+            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf))
             return newTree;
 
         var originalTree = cursor.Value;
@@ -114,6 +114,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return MaybeWrapBinaryLike(c);
     }
 
+    public override J VisitInstanceOf(InstanceOf instanceOf, P p)
+    {
+        var i = _recursive ? (InstanceOf)base.VisitInstanceOf(instanceOf, p) : instanceOf;
+        return MaybeWrapBinaryLike(i);
+    }
+
     public override J VisitAssignment(Assignment assignment, P p)
     {
         var a = _recursive ? (Assignment)base.VisitAssignment(assignment, p) : assignment;
@@ -172,13 +178,32 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return MaybeWrapBinaryLike(w);
     }
 
+    public override J VisitAwaitExpression(AwaitExpression awaitExpression, P p)
+    {
+        var a = _recursive ? (AwaitExpression)base.VisitAwaitExpression(awaitExpression, p) : awaitExpression;
+        return NeedsParenthesesInSlot(a) ? CSharpPrecedences.Parenthesize(a) : a;
+    }
+
+    public override J VisitQueryExpression(QueryExpression queryExpression, P p)
+    {
+        var q = _recursive ? (QueryExpression)base.VisitQueryExpression(queryExpression, p) : queryExpression;
+        // A query extends as far to the right as a lambda body does
+        return MaybeWrapAssignment(q);
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
+    private const int ShiftPrecedence = 8;
+    private const int SwitchPrecedence = 11;
+    private const int RangePrecedence = 12;
+    private const int UnaryPrecedence = 13;
+    private const int PrimaryPrecedence = 14;
+
     private J MaybeWrapBinaryLike(Expression expr)
     {
-        if (NeedsParenthesesInContext(expr))
+        if (NeedsParenthesesInSlot(expr) || NeedsParenthesesInContext(expr))
             return CSharpPrecedences.Parenthesize(expr);
         return expr;
     }
@@ -188,9 +213,11 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
+        if (WouldFuseSigns(parent, expr) || NeedsParenthesesInSlot(expr))
+            return CSharpPrecedences.Parenthesize(expr);
+
         // All prefix unary operators are at the same precedence level (13),
-        // so a unary inside another unary is always unambiguous — no parens needed.
-        // This covers !!x, -(-x), -(~x), ~(!x), etc.
+        // so a unary inside another unary is unambiguous once its sign can't fuse: !!x, -~x, ~!x, etc.
         if (parent is Unary or CsUnary)
             return expr;
 
@@ -209,7 +236,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         // Ternary (prec -1) needs parens inside most expression contexts.
         // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
         // so a ternary used as the condition of another ternary needs parens.
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary)
+        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary or InstanceOf or ConstantPattern
+            or RelationalPattern || NeedsParenthesesInSlot(expr))
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
@@ -221,10 +249,72 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parent = parentCursor.Value;
 
         // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
-        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern)
+        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern or InstanceOf or ConstantPattern
+            or RelationalPattern || NeedsParenthesesInSlot(expr))
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="expr"/> binds looser than its slot allows: a cast, <c>await</c> and a range take a
+    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access or
+    /// element access a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep their parentheses.
+    /// </summary>
+    private bool NeedsParenthesesInSlot(Expression expr)
+    {
+        var parent = Cursor.ParentTree.Value;
+        int? required = parent switch
+        {
+            TypeCast cast when cast.Expression.Id == expr.Id => UnaryPrecedence,
+            AwaitExpression aw when aw.Expression.Id == expr.Id => UnaryPrecedence,
+            RangeExpression range when range.Start?.Element.Id == expr.Id || range.End?.Id == expr.Id =>
+                UnaryPrecedence,
+            SwitchExpression sw when sw.ExpressionPadded.Element.Id == expr.Id => RangePrecedence,
+            WithExpression we when we.Target.Id == expr.Id => SwitchPrecedence,
+            FieldAccess fa when fa.Target.Id == expr.Id => PrimaryPrecedence,
+            MethodInvocation mi when mi.Select?.Element.Id == expr.Id => PrimaryPrecedence,
+            ArrayAccess aa when aa.Indexed.Id == expr.Id => PrimaryPrecedence,
+            _ => null
+        };
+        if (required == null)
+            return false;
+        // x as T ends in a type, so the parser applies a switch or a with after it to all of x as T
+        if (expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } &&
+            parent is SwitchExpression or WithExpression)
+            return false;
+        var precedence = expr switch
+        {
+            Unary { Operator.Element: Unary.OperatorType.PostIncrement or Unary.OperatorType.PostDecrement } =>
+                PrimaryPrecedence,
+            // x?.y!.z: parentheses around x?.y! would end the conditional access at the !
+            CsUnary { Operator.Element: CsUnary.OperatorKind.SuppressNullableWarning } => PrimaryPrecedence,
+            AwaitExpression => UnaryPrecedence,
+            QueryExpression => int.MinValue,
+            _ => CSharpPrecedences.GetPrecedence(expr)
+        };
+        return precedence < required || parent is TypeCast cast2 && CastReadsAsValue(cast2, expr);
+    }
+
+    /// <summary>
+    /// Whether the parser reads <c>(T)</c> before <paramref name="expr"/> as a parenthesized value and a binary
+    /// operator, as it reads <c>(Foo)-x</c>: a name in parentheses is a cast only when a token that can't continue
+    /// an expression follows it.
+    /// </summary>
+    private static bool CastReadsAsValue(TypeCast cast, Expression expr)
+    {
+        var type = cast.Clazz.Tree.Element;
+        if (type is Primitive or NullableType or ArrayType or PointerType ||
+            type is Identifier { SimpleName: "object" or "string" or "bool" or "byte" or "sbyte" or "char" or
+                "decimal" or "double" or "float" or "int" or "uint" or "long" or "ulong" or "short" or "ushort" })
+            return false;
+        Expression? leftmost = expr;
+        while (LeftOperand(leftmost) is { } next)
+            leftmost = next;
+        return leftmost is Unary { Operator.Element: Unary.OperatorType.Negative or Unary.OperatorType.Positive or
+                   Unary.OperatorType.PreDecrement or Unary.OperatorType.PreIncrement } ||
+               leftmost is CsUnary { Operator.Element: CsUnary.OperatorKind.AddressOf or
+                   CsUnary.OperatorKind.PointerType or CsUnary.OperatorKind.FromEnd };
     }
 
     private bool NeedsParenthesesInContext(Expression expr)
@@ -232,7 +322,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        if (parent is Unary or CsUnary)
+        if (parent is Unary or CsUnary || WouldFuseSigns(parent, expr))
             return true;
 
         if (parent is Binary parentBinary)
@@ -247,6 +337,13 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             return CSharpPrecedences.NeedsParentheses(expr, parentCsBinary, isRight);
         }
 
+        // The parser models a ?? b as a Ternary
+        if (parent is Ternary parentTernary && parentTernary.Markers.FindFirst<NullCoalescing>() != null)
+        {
+            bool isRight = parentTernary.FalsePart.Element.Id == expr.Id;
+            return CSharpPrecedences.NeedsParentheses(expr, parentTernary, isRight);
+        }
+
         if (parent is IsPattern)
         {
             // CsBinary with Or/And inside IsPattern is a pattern combinator, not a
@@ -257,6 +354,72 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation or Lambda;
         }
 
+        // A type test is a left-associative relational operator: a == b is Foo parses as a == (b is Foo)
+        if (parent is InstanceOf instanceOf && instanceOf.Expression.Element.Id == expr.Id)
+            return CSharpPrecedences.GetPrecedence(expr) < CSharpPrecedences.GetPrecedence(instanceOf);
+
+        // A pattern takes a shift expression: x is a == b parses as (x is a) == b
+        if (parent is ConstantPattern or RelationalPattern)
+            return CSharpPrecedences.GetPrecedence(expr) < ShiftPrecedence;
+
         return false;
     }
+
+    /// <summary>
+    /// Whether <paramref name="expr"/> starts with the sign <paramref name="parent"/> prints right before it,
+    /// so that the two would lex as <c>--</c> or <c>++</c>: <c>-(-x)</c> printed bare is <c>--x</c>.
+    /// </summary>
+    private static bool WouldFuseSigns(object? parent, Expression expr)
+    {
+        var preceding = parent switch
+        {
+            Unary { Operator.Element: Unary.OperatorType.Negative } => '-',
+            Unary { Operator.Element: Unary.OperatorType.Positive } => '+',
+            Binary { Operator.Element: Binary.OperatorType.Subtraction } b when b.Right.Id == expr.Id => '-',
+            Binary { Operator.Element: Binary.OperatorType.Addition } b when b.Right.Id == expr.Id => '+',
+            _ => (char?)null
+        };
+        return preceding != null && preceding == LeadingSign(expr);
+    }
+
+    /// <summary>
+    /// The sign <paramref name="expr"/> prints first, found down its left operands, unless whitespace or a comment
+    /// comes before it.
+    /// </summary>
+    private static char? LeadingSign(Expression expr)
+    {
+        for (Expression? e = expr; e != null; e = LeftOperand(e))
+        {
+            if (!e.Prefix.IsEmpty)
+                return null;
+            if (e is Unary u)
+            {
+                switch (u.Operator.Element)
+                {
+                    case Unary.OperatorType.Negative or Unary.OperatorType.PreDecrement:
+                        return '-';
+                    case Unary.OperatorType.Positive or Unary.OperatorType.PreIncrement:
+                        return '+';
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Expression? LeftOperand(Expression expr) => expr switch
+    {
+        Binary b => b.Left,
+        CsBinary b => b.Left,
+        Ternary t => t.Condition,
+        Assignment a => a.Variable,
+        AssignmentOperation a => a.Variable,
+        InstanceOf i => i.Expression.Element,
+        IsPattern ip => ip.Expression,
+        FieldAccess fa => fa.Target,
+        MethodInvocation mi => mi.Select?.Element,
+        ArrayAccess aa => aa.Indexed,
+        Unary { Operator.Element: Unary.OperatorType.PostIncrement or Unary.OperatorType.PostDecrement } u =>
+            u.Expression,
+        _ => null
+    };
 }

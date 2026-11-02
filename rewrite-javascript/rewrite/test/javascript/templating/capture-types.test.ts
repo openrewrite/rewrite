@@ -155,6 +155,54 @@ describe('capture types', () => {
         ], values)).toEqual(['let __PLACEHOLDER_0__: number;', 'let __PLACEHOLDER_1__: boolean;', 'let __PLACEHOLDER_4__: string;']);
     });
 
+    test('a parameter of a generic type is declared with its type arguments', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}))
+            .orElse(rewrite(() => ({before: pattern`lookup(${x})`, after: template`${x}.get("k")`})));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                'const arr: number[] = [1];\nconst map = new Map<string, number>();\nhas(arr);\nlookup(map);',
+                'const arr: number[] = [1];\nconst map = new Map<string, number>();\narr.includes(1);\nmap.get("k");'
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const [includes, get] = [2, 3].map(i => (cu.statements[i].element as J.MethodInvocation).methodType!);
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+                expect(includes.returnType).toBe(Type.Primitive.Boolean);
+                expect((get.declaringType as Type.Class).fullyQualifiedName).toBe('Map');
+                expect(get.returnType).toBe(Type.Primitive.Double);
+            }
+        });
+    });
+
+    test('a parameter of a recursive generic type is declared with any where the type holds itself', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nhas(nested);',
+                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nnested.includes(1);'
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const includes = (cu.statements[2].element as J.MethodInvocation).methodType!;
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+            }
+        });
+    });
+
     test('capture without type still works', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {

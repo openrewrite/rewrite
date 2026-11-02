@@ -76,10 +76,11 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 
 	if len(out.Statements) > 0 && out.Statements[0].Element != nil &&
 		len(getPrefix(out.Statements[0].Element).Comments()) == 0 {
-		first := out.Statements[0]
-		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
-			first.Element = updated
-			out.Statements[0] = first
+		first := out.Statements[0].Element
+		if updated, ok := transformPrefix(first, stripLeadingBlankLinesSpace).(java.Statement); ok && updated != first {
+			statements := append([]java.RightPadded[java.Statement](nil), out.Statements...)
+			statements[0].Element = updated
+			out = out.WithStatements(statements)
 		}
 	}
 	return out

@@ -136,6 +136,7 @@ final class Tree {
          * An optional peer got bound after its dependent was placed ({@link Lockfile#resolve}).
          */
         private boolean lateBoundOptionalPeer;
+        private final PeerProbes peerProbes = new PeerProbes();
 
         Builder(Lockfile lockfile) {
             this.lockfile = lockfile;
@@ -321,11 +322,119 @@ final class Tree {
         return true;
     }
 
+    /** Tree.rs PeerProbes, from 1.4.4. A probe is [peer row, provided, owner's copy]. */
+    private static final class PeerProbes {
+        private static final int NONE = -1;
+        private static final int FIRST_ABOVE = -2;
+        private final List<int[]> probes = new ArrayList<>();
+
+        void begin(Builder builder, Package owner, int packageId, boolean forPeer) {
+            probes.clear();
+            Lockfile lockfile = builder.lockfile;
+            if (packageId == INVALID_PACKAGE_ID) {
+                return;
+            }
+            Package pkg = lockfile.packages.get(packageId);
+            if (pkg.resolution.tag == Resolution.Tag.WORKSPACE || pkg.resolution.tag == Resolution.Tag.SYMLINK) {
+                return;
+            }
+            for (int row = pkg.dependenciesOff; row < pkg.dependenciesEnd(); row++) {
+                Dependency peer = lockfile.dependencies.get(row);
+                if (!peer.behavior.isPeer() || peer.version.tag != DependencyVersion.Tag.NPM) {
+                    continue;
+                }
+                boolean ownRegular = false;
+                for (Dependency own : lockfile.dependenciesOf(pkg)) {
+                    ownRegular |= own.nameHash == peer.nameHash && !own.behavior.isPeer();
+                }
+                if (ownRegular) {
+                    continue;
+                }
+                int ownerCopy = NONE;
+                boolean samePeer = false;
+                for (int own = owner.dependenciesOff; own < owner.dependenciesEnd(); own++) {
+                    Dependency dep = lockfile.dependencies.get(own);
+                    if (dep.nameHash != peer.nameHash) {
+                        continue;
+                    }
+                    samePeer |= !dep.behavior.isOptionalPeer();
+                    int target = lockfile.resolutions.get(own);
+                    if (!dep.behavior.isPeer() && target != INVALID_PACKAGE_ID) {
+                        ownerCopy = target;
+                        break;
+                    }
+                }
+                boolean listed = ownerCopy != NONE ?
+                        satisfies(lockfile, ownerCopy, peer.version) : !peer.behavior.isOptionalPeer();
+                if (listed) {
+                    probes.add(new int[]{row, ownerCopy != NONE ? 1 : 0,
+                            forPeer ? NONE : ownerCopy != NONE ? ownerCopy : samePeer ? FIRST_ABOVE : NONE});
+                }
+            }
+        }
+
+        private boolean satisfies(Lockfile lockfile, int id, DependencyVersion version) {
+            // resolution.rs satisfies_dependency_version: a workspace never satisfies an npm peer here.
+            // begin() only probes npm peers, so the other supported pairings (git and github) cannot occur.
+            Resolution resolved = lockfile.packages.get(id).resolution;
+            return resolved.tag == Resolution.Tag.NPM && version.tag == DependencyVersion.Tag.NPM &&
+                    version.npm().version.satisfies(resolved.version);
+        }
+
+        boolean hiddenBy(Builder builder, int treeId) {
+            Lockfile lockfile = builder.lockfile;
+            for (int i = 0; i < probes.size(); ) {
+                int[] probe = probes.get(i);
+                Dependency peer = lockfile.dependencies.get(probe[0]);
+                int held = INVALID_PACKAGE_ID;
+                for (int row : builder.dependencyLists.get(treeId)) {
+                    if (lockfile.dependencies.get(row).nameHash == peer.nameHash) {
+                        held = lockfile.resolutions.get(row);
+                        break;
+                    }
+                }
+                if (held == INVALID_PACKAGE_ID) {
+                    i++;
+                    continue;
+                }
+                boolean optional = peer.behavior.isOptionalPeer();
+                if (satisfies(lockfile, held, peer.version)) {
+                    if (probe[2] >= 0 && probe[2] != held) {
+                        boolean regularTarget = false;
+                        for (int row = 0; row < lockfile.dependencies.size(); row++) {
+                            regularTarget |= !lockfile.dependencies.get(row).behavior.isPeer() &&
+                                    lockfile.resolutions.get(row) == held;
+                        }
+                        if (!regularTarget) {
+                            return true;
+                        }
+                        probe[2] = NONE;
+                    } else if (probe[2] == FIRST_ABOVE) {
+                        probe[2] = held;
+                    }
+                    if (!optional) {
+                        probe[1] = 1;
+                    }
+                    i++;
+                } else if (probe[1] != 0 && !optional) {
+                    return true;
+                } else {
+                    probes.set(i, probes.get(probes.size() - 1));
+                    probes.remove(probes.size() - 1);
+                }
+            }
+            return false;
+        }
+    }
+
     // 1: dedupe (hoisted), 2: place here or higher, 3: stay at this relative place (dependency loop)
     // inputDepRange: the package whose dependencies are being placed
     private HoistResult hoistDependency(boolean asDefined, int hoistRootId, int packageId, Dependency dependency,
                                         Package inputDepRange, Builder builder) {
         BunRelease release = builder.lockfile.release;
+        if (!asDefined && release.probesPeersBeforeHoisting() && builder.peerProbes.hiddenBy(builder, this.id)) {
+            return HoistResult.DEPENDENCY_LOOP;
+        }
         List<Integer> thisDependencies = builder.dependencyLists.get(this.id);
         for (int depId : thisDependencies) {
             Dependency dep = builder.lockfile.dependencies.get(depId);
@@ -381,6 +490,9 @@ final class Tree {
         }
 
         if (this.parent != INVALID_ID && this.id != hoistRootId) {
+            if (asDefined && release.probesPeersBeforeHoisting()) {
+                builder.peerProbes.begin(builder, inputDepRange, packageId, dependency.behavior.isPeer());
+            }
             HoistResult id = builder.trees.get(this.parent)
                     .hoistDependency(false, hoistRootId, packageId, dependency, inputDepRange, builder);
             if (!asDefined || id.kind != HoistResult.Kind.DEPENDENCY_LOOP) {

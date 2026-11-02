@@ -1,8 +1,12 @@
-from rewrite import random_id
+from pathlib import Path
+
+from rewrite import InMemoryExecutionContext, random_id
 from rewrite.java import Assert, J, P, Unary, JLeftPadded
 from rewrite.java.support_types import Space
 from rewrite.markers import Markers
+from rewrite.parser import ParseError
 from rewrite.python import AutoFormat, PythonVisitor
+from rewrite.python.format import AutoFormatVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
 
@@ -473,3 +477,8 @@ def test_fix_space_in_multi_import():
         spec=RecipeSpec()
         .with_recipe(AutoFormat())
     )
+
+
+def test_a_file_the_parser_failed_on_is_left_as_it_is():
+    error = ParseError(random_id(), Markers.EMPTY, Path("a.py"), None, "utf-8", False, None, "x=1\n", None)
+    assert AutoFormatVisitor().visit(error, InMemoryExecutionContext()) is error

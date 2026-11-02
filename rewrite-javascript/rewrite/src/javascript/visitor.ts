@@ -16,11 +16,13 @@
  * limitations under the License.
  */
 import {mapAsync, updateIfChanged} from "../util";
+import {Markers} from "../markers";
 import {SourceFile} from "../tree";
 import {ValidRecipeReturnType} from "../visitor";
 import {Expression, J, JavaVisitor, NameTree, Statement, Type, TypedTree} from "../java";
 import {create, Draft} from "mutative";
 import {isJavaScript, JS, JSX} from "./tree";
+import {isStatement} from "./parser-utils";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -76,12 +78,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         alias = expression as JS.Alias;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(alias, async () => ({
             prefix: await this.visitSpace(alias.prefix, p),
             markers: await this.visitMarkers(alias.markers, p),
             propertyName: await this.visitRightPadded(alias.propertyName, p),
             alias: await this.visitDefined<Expression>(alias.alias, p)
-        };
+        }));
         return updateIfChanged(alias, updates);
     }
 
@@ -98,7 +100,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         arrowFunction = statement as JS.ArrowFunction;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(arrowFunction, async () => ({
             prefix: await this.visitSpace(arrowFunction.prefix, p),
             markers: await this.visitMarkers(arrowFunction.markers, p),
             leadingAnnotations: await mapAsync(arrowFunction.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p)),
@@ -106,18 +108,24 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             typeParameters: arrowFunction.typeParameters && await this.visitDefined<J.TypeParameters>(arrowFunction.typeParameters, p),
             lambda: await this.visitDefined<J.Lambda>(arrowFunction.lambda, p),
             returnTypeExpression: arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p)
-        };
+        }));
         return updateIfChanged(arrowFunction, updates);
     }
 
     protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(as_, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.As) {
+            return expression;
+        }
+        as_ = expression as JS.As;
+
+        const updates: any = await this.visitChildrenOf(as_, async () => ({
             prefix: await this.visitSpace(as_.prefix, p),
             markers: await this.visitMarkers(as_.markers, p),
             left: await this.visitRightPadded<Expression>(as_.left, p),
             right: await this.visitDefined<Expression>(as_.right, p),
             type: as_.type && await this.visitType(as_.type, p)
-        };
+        }));
         return updateIfChanged(as_, updates);
     }
 
@@ -128,17 +136,23 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         await_ = expression as JS.Await;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(await_, async () => ({
             prefix: await this.visitSpace(await_.prefix, p),
             markers: await this.visitMarkers(await_.markers, p),
             expression: await this.visitDefined<Expression>(await_.expression, p),
             type: await_.type && await this.visitType(await_.type, p)
-        };
+        }));
         return updateIfChanged(await_, updates);
     }
 
     protected async visitJsxTag(element: JSX.Tag, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(element, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.JsxTag) {
+            return expression;
+        }
+        element = expression as JSX.Tag;
+
+        const updates: any = await this.visitChildrenOf(element, async () => ({
             prefix: await this.visitSpace(element.prefix, p),
             markers: await this.visitMarkers(element.markers, p),
             openName: await this.visitLeftPadded(element.openName, p),
@@ -149,7 +163,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             children: element.children && await mapAsync(element.children, child => this.visit(child, p)),
             closingName: element.closingName && await this.visitLeftPadded(element.closingName, p),
             afterClosingName: element.afterClosingName && await this.visitSpace(element.afterClosingName, p)
-        };
+        }));
         return updateIfChanged(element, updates);
     }
 
@@ -174,11 +188,17 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     protected async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(expr, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.JsxEmbeddedExpression) {
+            return expression;
+        }
+        expr = expression as JSX.EmbeddedExpression;
+
+        const updates: any = await this.visitChildrenOf(expr, async () => ({
             prefix: await this.visitSpace(expr.prefix, p),
             markers: await this.visitMarkers(expr.markers, p),
             expression: await this.visitRightPadded(expr.expression, p)
-        };
+        }));
         return updateIfChanged(expr, updates);
     }
 
@@ -209,13 +229,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         conditionalType = expression as JS.ConditionalType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(conditionalType, async () => ({
             prefix: await this.visitSpace(conditionalType.prefix, p),
             markers: await this.visitMarkers(conditionalType.markers, p),
             checkType: await this.visitDefined<Expression>(conditionalType.checkType, p),
             condition: await this.visitLeftPadded(conditionalType.condition, p),
             type: conditionalType.type && await this.visitType(conditionalType.type, p)
-        };
+        }));
         return updateIfChanged(conditionalType, updates);
     }
 
@@ -232,11 +252,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         delete_ = statement as JS.Delete;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(delete_, async () => ({
             prefix: await this.visitSpace(delete_.prefix, p),
             markers: await this.visitMarkers(delete_.markers, p),
             expression: await this.visitDefined<Expression>(delete_.expression, p)
-        };
+        }));
         return updateIfChanged(delete_, updates);
     }
 
@@ -253,11 +273,28 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         expressionStatement = statement as JS.ExpressionStatement;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(expressionStatement, async () => ({
             prefix: await this.visitSpace(expressionStatement.prefix, p),
             markers: await this.visitMarkers(expressionStatement.markers, p),
             expression: await this.visitDefined<Expression>(expressionStatement.expression, p)
-        };
+        }));
+        // Outside a `for` head the parser makes a statement the statement itself, so a visit that makes one does too,
+        // where the cursor shows what holds the expression statement
+        let visited: J | undefined = updates.expression;
+        const parent = this.cursor.parentTree()?.value;
+        if (visited && visited !== expressionStatement.expression && isStatement(visited) &&
+            parent && parent.kind !== J.Kind.ForLoopControl) {
+            // and it holds a statement that is no expression in a JS.StatementExpression only when it is a `yield`
+            const held = visited.kind === JS.Kind.StatementExpression ? (visited as JS.StatementExpression).statement : undefined;
+            if (held && held.kind !== J.Kind.Yield) {
+                visited = {...held, prefix: concatenated(visited.prefix, held.prefix), markers: withOuterMarkers(visited.markers, held.markers)};
+            }
+            return {
+                ...visited,
+                prefix: concatenated(updates.prefix, visited.prefix),
+                markers: withOuterMarkers(updates.markers, visited.markers)
+            };
+        }
         return updateIfChanged(expressionStatement, updates);
     }
 
@@ -268,13 +305,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         expressionWithTypeArguments = expression as JS.ExpressionWithTypeArguments;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(expressionWithTypeArguments, async () => ({
             prefix: await this.visitSpace(expressionWithTypeArguments.prefix, p),
             markers: await this.visitMarkers(expressionWithTypeArguments.markers, p),
             clazz: await this.visitDefined<J>(expressionWithTypeArguments.clazz, p),
             typeArguments: expressionWithTypeArguments.typeArguments && await this.visitContainer(expressionWithTypeArguments.typeArguments, p),
             type: expressionWithTypeArguments.type && await this.visitType(expressionWithTypeArguments.type, p)
-        };
+        }));
         return updateIfChanged(expressionWithTypeArguments, updates);
     }
 
@@ -291,14 +328,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         functionCall = statement as JS.FunctionCall;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(functionCall, async () => ({
             prefix: await this.visitSpace(functionCall.prefix, p),
             markers: await this.visitMarkers(functionCall.markers, p),
             function: await this.visitOptionalRightPadded(functionCall.function, p),
             typeParameters: await this.visitOptionalContainer(functionCall.typeParameters, p),
             arguments: await this.visitContainer(functionCall.arguments, p),
             methodType: await this.visitType(functionCall.methodType, p) as Type.Method | undefined
-        };
+        }));
         return updateIfChanged(functionCall, updates);
     }
 
@@ -309,7 +346,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         functionType = expression as JS.FunctionType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(functionType, async () => ({
             prefix: await this.visitSpace(functionType.prefix, p),
             markers: await this.visitMarkers(functionType.markers, p),
             modifiers: await mapAsync(functionType.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
@@ -317,7 +354,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             typeParameters: functionType.typeParameters && await this.visitDefined<J.TypeParameters>(functionType.typeParameters, p),
             parameters: await this.visitContainer(functionType.parameters, p),
             returnType: await this.visitLeftPadded(functionType.returnType, p)
-        };
+        }));
         return updateIfChanged(functionType, updates);
     }
 
@@ -328,12 +365,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         inferType = expression as JS.InferType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(inferType, async () => ({
             prefix: await this.visitSpace(inferType.prefix, p),
             markers: await this.visitMarkers(inferType.markers, p),
             typeParameter: await this.visitLeftPadded(inferType.typeParameter, p),
             type: inferType.type && await this.visitType(inferType.type, p)
-        };
+        }));
         return updateIfChanged(inferType, updates);
     }
 
@@ -344,7 +381,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         importType = expression as JS.ImportType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(importType, async () => ({
             prefix: await this.visitSpace(importType.prefix, p),
             markers: await this.visitMarkers(importType.markers, p),
             hasTypeof: await this.visitRightPadded(importType.hasTypeof, p),
@@ -352,7 +389,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             qualifier: importType.qualifier && await this.visitLeftPadded(importType.qualifier, p),
             typeArguments: importType.typeArguments && await this.visitContainer(importType.typeArguments, p),
             type: importType.type && await this.visitType(importType.type, p)
-        };
+        }));
         return updateIfChanged(importType, updates);
     }
 
@@ -363,7 +400,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         jsImport = statement as JS.Import;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(jsImport, async () => ({
             prefix: await this.visitSpace(jsImport.prefix, p),
             markers: await this.visitMarkers(jsImport.markers, p),
             modifiers: await mapAsync(jsImport.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
@@ -371,7 +408,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             moduleSpecifier: jsImport.moduleSpecifier && await this.visitLeftPadded(jsImport.moduleSpecifier, p),
             attributes: jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p),
             initializer: jsImport.initializer && await this.visitLeftPadded(jsImport.initializer, p)
-        };
+        }));
         return updateIfChanged(jsImport, updates);
     }
 
@@ -392,12 +429,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         namedImports = expression as JS.NamedImports;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(namedImports, async () => ({
             prefix: await this.visitSpace(namedImports.prefix, p),
             markers: await this.visitMarkers(namedImports.markers, p),
             elements: await this.visitContainer(namedImports.elements, p),
             type: namedImports.type && await this.visitType(namedImports.type, p)
-        };
+        }));
         return updateIfChanged(namedImports, updates);
     }
 
@@ -408,13 +445,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         importSpecifier = expression as JS.ImportSpecifier;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(importSpecifier, async () => ({
             prefix: await this.visitSpace(importSpecifier.prefix, p),
             markers: await this.visitMarkers(importSpecifier.markers, p),
             importType: await this.visitLeftPadded(importSpecifier.importType, p),
             specifier: await this.visitDefined<JS.Alias | J.Identifier>(importSpecifier.specifier, p),
             type: importSpecifier.type && await this.visitType(importSpecifier.type, p)
-        };
+        }));
         return updateIfChanged(importSpecifier, updates);
     }
 
@@ -445,24 +482,30 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         importAttribute = statement as JS.ImportAttribute;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(importAttribute, async () => ({
             prefix: await this.visitSpace(importAttribute.prefix, p),
             markers: await this.visitMarkers(importAttribute.markers, p),
             name: await this.visitDefined<Expression>(importAttribute.name, p),
             value: await this.visitLeftPadded(importAttribute.value, p)
-        };
+        }));
         return updateIfChanged(importAttribute, updates);
     }
 
     protected async visitBinaryExtensions(jsBinary: JS.Binary, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(jsBinary, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.Binary) {
+            return expression;
+        }
+        jsBinary = expression as JS.Binary;
+
+        const updates: any = await this.visitChildrenOf(jsBinary, async () => ({
             prefix: await this.visitSpace(jsBinary.prefix, p),
             markers: await this.visitMarkers(jsBinary.markers, p),
             left: await this.visitDefined<Expression>(jsBinary.left, p),
             operator: await this.visitLeftPadded(jsBinary.operator, p),
             right: await this.visitDefined<Expression>(jsBinary.right, p),
             type: jsBinary.type && await this.visitType(jsBinary.type, p)
-        };
+        }));
         return updateIfChanged(jsBinary, updates);
     }
 
@@ -473,12 +516,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         literalType = expression as JS.LiteralType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(literalType, async () => ({
             prefix: await this.visitSpace(literalType.prefix, p),
             markers: await this.visitMarkers(literalType.markers, p),
             literal: await this.visitDefined<Expression>(literalType.literal, p),
             type: (await this.visitType(literalType.type, p))!
-        };
+        }));
         return updateIfChanged(literalType, updates);
     }
 
@@ -489,7 +532,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         mappedType = expression as JS.MappedType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(mappedType, async () => ({
             prefix: await this.visitSpace(mappedType.prefix, p),
             markers: await this.visitMarkers(mappedType.markers, p),
             prefixToken: mappedType.prefixToken && await this.visitLeftPadded(mappedType.prefixToken, p),
@@ -499,27 +542,39 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             hasQuestionToken: await this.visitLeftPadded(mappedType.hasQuestionToken, p),
             valueType: await this.visitContainer(mappedType.valueType, p),
             type: mappedType.type && await this.visitType(mappedType.type, p)
-        };
+        }));
         return updateIfChanged(mappedType, updates);
     }
 
     protected async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const statement = await this.visitStatement(keysRemapping, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.MappedTypeKeysRemapping) {
+            return statement;
+        }
+        keysRemapping = statement as JS.MappedType.KeysRemapping;
+
+        const updates: any = await this.visitChildrenOf(keysRemapping, async () => ({
             prefix: await this.visitSpace(keysRemapping.prefix, p),
             markers: await this.visitMarkers(keysRemapping.markers, p),
             typeParameter: await this.visitRightPadded(keysRemapping.typeParameter, p),
             nameType: keysRemapping.nameType && await this.visitRightPadded(keysRemapping.nameType, p)
-        };
+        }));
         return updateIfChanged(keysRemapping, updates);
     }
 
     protected async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const statement = await this.visitStatement(mappedTypeParameter, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.MappedTypeParameter) {
+            return statement;
+        }
+        mappedTypeParameter = statement as JS.MappedType.Parameter;
+
+        const updates: any = await this.visitChildrenOf(mappedTypeParameter, async () => ({
             prefix: await this.visitSpace(mappedTypeParameter.prefix, p),
             markers: await this.visitMarkers(mappedTypeParameter.markers, p),
             name: await this.visitDefined<Expression>(mappedTypeParameter.name, p),
             iterateType: await this.visitLeftPadded(mappedTypeParameter.iterateType, p)
-        };
+        }));
         return updateIfChanged(mappedTypeParameter, updates);
     }
 
@@ -530,7 +585,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         objectBindingPattern = expression as JS.ObjectBindingPattern;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(objectBindingPattern, async () => ({
             prefix: await this.visitSpace(objectBindingPattern.prefix, p),
             markers: await this.visitMarkers(objectBindingPattern.markers, p),
             leadingAnnotations: await mapAsync(objectBindingPattern.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p)),
@@ -538,7 +593,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             typeExpression: objectBindingPattern.typeExpression && await this.visitDefined<TypedTree>(objectBindingPattern.typeExpression, p),
             bindings: await this.visitContainer(objectBindingPattern.bindings, p),
             initializer: objectBindingPattern.initializer && await this.visitLeftPadded(objectBindingPattern.initializer, p)
-        };
+        }));
         return updateIfChanged(objectBindingPattern, updates);
     }
 
@@ -549,13 +604,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         propertyAssignment = statement as JS.PropertyAssignment;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(propertyAssignment, async () => ({
             prefix: await this.visitSpace(propertyAssignment.prefix, p),
             markers: await this.visitMarkers(propertyAssignment.markers, p),
             modifiers: await mapAsync(propertyAssignment.modifiers, m => this.visitDefined<J.Modifier>(m, p)),
             name: await this.visitRightPadded(propertyAssignment.name, p),
             initializer: propertyAssignment.initializer && await this.visitDefined<Expression>(propertyAssignment.initializer, p)
-        };
+        }));
         return updateIfChanged(propertyAssignment, updates);
     }
 
@@ -566,13 +621,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         satisfiesExpression = expression as JS.SatisfiesExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(satisfiesExpression, async () => ({
             prefix: await this.visitSpace(satisfiesExpression.prefix, p),
             markers: await this.visitMarkers(satisfiesExpression.markers, p),
             expression: await this.visitDefined<J>(satisfiesExpression.expression, p),
             satisfiesType: await this.visitLeftPadded(satisfiesExpression.satisfiesType, p),
             type: satisfiesExpression.type && await this.visitType(satisfiesExpression.type, p)
-        };
+        }));
         return updateIfChanged(satisfiesExpression, updates);
     }
 
@@ -583,12 +638,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         scopedVariableDeclarations = statement as JS.ScopedVariableDeclarations;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(scopedVariableDeclarations, async () => ({
             prefix: await this.visitSpace(scopedVariableDeclarations.prefix, p),
             markers: await this.visitMarkers(scopedVariableDeclarations.markers, p),
             modifiers: await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             variables: await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p))
-        };
+        }));
         return updateIfChanged(scopedVariableDeclarations, updates);
     }
 
@@ -613,12 +668,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         spread = statement as JS.Spread;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(spread, async () => ({
             prefix: await this.visitSpace(spread.prefix, p),
             markers: await this.visitMarkers(spread.markers, p),
             expression: await this.visitDefined<Expression>(spread.expression, p),
             type: await this.visitType(spread.type, p)
-        };
+        }));
         return updateIfChanged(spread, updates);
     }
 
@@ -635,11 +690,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         statementExpression = statement as JS.StatementExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(statementExpression, async () => ({
             prefix: await this.visitSpace(statementExpression.prefix, p),
             markers: await this.visitMarkers(statementExpression.markers, p),
             statement: await this.visitDefined<Statement>(statementExpression.statement, p)
-        };
+        }));
         return updateIfChanged(statementExpression, updates);
     }
 
@@ -656,14 +711,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         taggedTemplateExpression = statement as JS.TaggedTemplateExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(taggedTemplateExpression, async () => ({
             prefix: await this.visitSpace(taggedTemplateExpression.prefix, p),
             markers: await this.visitMarkers(taggedTemplateExpression.markers, p),
             tag: taggedTemplateExpression.tag && await this.visitRightPadded(taggedTemplateExpression.tag, p),
             typeArguments: taggedTemplateExpression.typeArguments && await this.visitContainer(taggedTemplateExpression.typeArguments, p),
             templateExpression: await this.visitDefined<Expression>(taggedTemplateExpression.templateExpression, p),
             type: taggedTemplateExpression.type && await this.visitType(taggedTemplateExpression.type, p)
-        };
+        }));
         return updateIfChanged(taggedTemplateExpression, updates);
     }
 
@@ -680,13 +735,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         templateExpression = statement as JS.TemplateExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(templateExpression, async () => ({
             prefix: await this.visitSpace(templateExpression.prefix, p),
             markers: await this.visitMarkers(templateExpression.markers, p),
             head: await this.visitDefined<J.Literal>(templateExpression.head, p),
             spans: await mapAsync(templateExpression.spans, item => this.visitRightPadded(item, p)),
             type: templateExpression.type && await this.visitType(templateExpression.type, p)
-        };
+        }));
         return updateIfChanged(templateExpression, updates);
     }
 
@@ -707,12 +762,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         tuple = expression as JS.Tuple;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(tuple, async () => ({
             prefix: await this.visitSpace(tuple.prefix, p),
             markers: await this.visitMarkers(tuple.markers, p),
             elements: await this.visitContainer(tuple.elements, p),
             type: tuple.type && await this.visitType(tuple.type, p)
-        };
+        }));
         return updateIfChanged(tuple, updates);
     }
 
@@ -723,7 +778,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeDeclaration = statement as JS.TypeDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeDeclaration, async () => ({
             prefix: await this.visitSpace(typeDeclaration.prefix, p),
             markers: await this.visitMarkers(typeDeclaration.markers, p),
             modifiers: await mapAsync(typeDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
@@ -731,7 +786,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             typeParameters: typeDeclaration.typeParameters && await this.visitDefined<J.TypeParameters>(typeDeclaration.typeParameters, p),
             initializer: await this.visitLeftPadded(typeDeclaration.initializer, p),
             type: typeDeclaration.type && await this.visitType(typeDeclaration.type, p)
-        };
+        }));
         return updateIfChanged(typeDeclaration, updates);
     }
 
@@ -742,12 +797,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeOf = expression as JS.TypeOf;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeOf, async () => ({
             prefix: await this.visitSpace(typeOf.prefix, p),
             markers: await this.visitMarkers(typeOf.markers, p),
             expression: await this.visitDefined<Expression>(typeOf.expression, p),
             type: typeOf.type && await this.visitType(typeOf.type, p)
-        };
+        }));
         return updateIfChanged(typeOf, updates);
     }
 
@@ -758,23 +813,46 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeTreeExpression = expression as JS.TypeTreeExpression;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeTreeExpression, async () => ({
             prefix: await this.visitSpace(typeTreeExpression.prefix, p),
             markers: await this.visitMarkers(typeTreeExpression.markers, p),
             expression: await this.visitDefined<Expression>(typeTreeExpression.expression, p)
-        };
+        }));
+        // The parser wraps no type tree, so a visit that makes the expression one drops the wrapper
+        const visited: J = updates.expression;
+        if (visited !== typeTreeExpression.expression && (visited.kind === J.Kind.Identifier ||
+            visited.kind === J.Kind.FieldAccess || visited.kind === J.Kind.ArrayType ||
+            visited.kind === J.Kind.ParameterizedType)) {
+            return {
+                ...visited,
+                prefix: concatenated(updates.prefix, visited.prefix),
+                markers: withOuterMarkers(updates.markers, visited.markers)
+            };
+        }
         return updateIfChanged(typeTreeExpression, updates);
     }
 
     protected async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(assignmentOperation, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.AssignmentOperation) {
+            return expression;
+        }
+        assignmentOperation = expression as JS.AssignmentOperation;
+
+        const statement = await this.visitStatement(assignmentOperation, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.AssignmentOperation) {
+            return statement;
+        }
+        assignmentOperation = statement as JS.AssignmentOperation;
+
+        const updates: any = await this.visitChildrenOf(assignmentOperation, async () => ({
             prefix: await this.visitSpace(assignmentOperation.prefix, p),
             markers: await this.visitMarkers(assignmentOperation.markers, p),
             variable: await this.visitDefined<Expression>(assignmentOperation.variable, p),
             operator: await this.visitLeftPadded(assignmentOperation.operator, p),
             assignment: await this.visitDefined<Expression>(assignmentOperation.assignment, p),
             type: assignmentOperation.type && await this.visitType(assignmentOperation.type, p)
-        };
+        }));
         return updateIfChanged(assignmentOperation, updates);
     }
 
@@ -785,23 +863,29 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         indexedAccessType = expression as JS.IndexedAccessType;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(indexedAccessType, async () => ({
             prefix: await this.visitSpace(indexedAccessType.prefix, p),
             markers: await this.visitMarkers(indexedAccessType.markers, p),
             objectType: await this.visitDefined<TypedTree>(indexedAccessType.objectType, p),
             indexType: await this.visitDefined<TypedTree>(indexedAccessType.indexType, p),
             type: indexedAccessType.type && await this.visitType(indexedAccessType.type, p)
-        };
+        }));
         return updateIfChanged(indexedAccessType, updates);
     }
 
     protected async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(indexType, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.IndexedAccessTypeIndexType) {
+            return expression;
+        }
+        indexType = expression as JS.IndexedAccessType.IndexType;
+
+        const updates: any = await this.visitChildrenOf(indexType, async () => ({
             prefix: await this.visitSpace(indexType.prefix, p),
             markers: await this.visitMarkers(indexType.markers, p),
             element: await this.visitRightPadded(indexType.element, p),
             type: indexType.type && await this.visitType(indexType.type, p)
-        };
+        }));
         return updateIfChanged(indexType, updates);
     }
 
@@ -812,13 +896,13 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeQuery = expression as JS.TypeQuery;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeQuery, async () => ({
             prefix: await this.visitSpace(typeQuery.prefix, p),
             markers: await this.visitMarkers(typeQuery.markers, p),
             typeExpression: await this.visitDefined<TypedTree>(typeQuery.typeExpression, p),
             typeArguments: typeQuery.typeArguments && await this.visitContainer(typeQuery.typeArguments, p),
             type: typeQuery.type && await this.visitType(typeQuery.type, p)
-        };
+        }));
         return updateIfChanged(typeQuery, updates);
     }
 
@@ -829,11 +913,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeInfo = expression as JS.TypeInfo;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeInfo, async () => ({
             prefix: await this.visitSpace(typeInfo.prefix, p),
             markers: await this.visitMarkers(typeInfo.markers, p),
             typeIdentifier: await this.visitDefined<TypedTree>(typeInfo.typeIdentifier, p)
-        };
+        }));
         return updateIfChanged(typeInfo, updates);
     }
 
@@ -844,11 +928,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         computedPropertyName = expression as JS.ComputedPropertyName;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(computedPropertyName, async () => ({
             prefix: await this.visitSpace(computedPropertyName.prefix, p),
             markers: await this.visitMarkers(computedPropertyName.markers, p),
             expression: await this.visitRightPadded(computedPropertyName.expression, p)
-        };
+        }));
         return updateIfChanged(computedPropertyName, updates);
     }
 
@@ -859,11 +943,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typeOperator = expression as JS.TypeOperator;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typeOperator, async () => ({
             prefix: await this.visitSpace(typeOperator.prefix, p),
             markers: await this.visitMarkers(typeOperator.markers, p),
             expression: await this.visitLeftPadded(typeOperator.expression, p)
-        };
+        }));
         return updateIfChanged(typeOperator, updates);
     }
 
@@ -874,14 +958,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         typePredicate = expression as JS.TypePredicate;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(typePredicate, async () => ({
             prefix: await this.visitSpace(typePredicate.prefix, p),
             markers: await this.visitMarkers(typePredicate.markers, p),
             asserts: await this.visitLeftPadded(typePredicate.asserts, p),
             parameterName: await this.visitDefined<J.Identifier>(typePredicate.parameterName, p),
             expression: typePredicate.expression && await this.visitLeftPadded(typePredicate.expression, p),
             type: typePredicate.type && await this.visitType(typePredicate.type, p)
-        };
+        }));
         return updateIfChanged(typePredicate, updates);
     }
 
@@ -892,12 +976,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         union = expression as JS.Union;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(union, async () => ({
             prefix: await this.visitSpace(union.prefix, p),
             markers: await this.visitMarkers(union.markers, p),
             types: await mapAsync(union.types, item => this.visitRightPadded(item, p)),
             type: union.type && await this.visitType(union.type, p)
-        };
+        }));
         return updateIfChanged(union, updates);
     }
 
@@ -908,12 +992,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         intersection = expression as JS.Intersection;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(intersection, async () => ({
             prefix: await this.visitSpace(intersection.prefix, p),
             markers: await this.visitMarkers(intersection.markers, p),
             types: await mapAsync(intersection.types, item => this.visitRightPadded(item, p)),
             type: intersection.type && await this.visitType(intersection.type, p)
-        };
+        }));
         return updateIfChanged(intersection, updates);
     }
 
@@ -924,11 +1008,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         void_ = expression as JS.Void;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(void_, async () => ({
             prefix: await this.visitSpace(void_.prefix, p),
             markers: await this.visitMarkers(void_.markers, p),
             expression: await this.visitDefined<Expression>(void_.expression, p)
-        };
+        }));
         return updateIfChanged(void_, updates);
     }
 
@@ -939,12 +1023,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         withStatement = statement as JS.WithStatement;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(withStatement, async () => ({
             prefix: await this.visitSpace(withStatement.prefix, p),
             markers: await this.visitMarkers(withStatement.markers, p),
             expression: await this.visitDefined<J.ControlParentheses<Expression>>(withStatement.expression, p),
             body: await this.visitRightPadded(withStatement.body, p)
-        };
+        }));
         return updateIfChanged(withStatement, updates);
     }
 
@@ -955,14 +1039,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         indexSignatureDeclaration = statement as JS.IndexSignatureDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(indexSignatureDeclaration, async () => ({
             prefix: await this.visitSpace(indexSignatureDeclaration.prefix, p),
             markers: await this.visitMarkers(indexSignatureDeclaration.markers, p),
             modifiers: await mapAsync(indexSignatureDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             parameters: await this.visitContainer(indexSignatureDeclaration.parameters, p),
             typeExpression: await this.visitLeftPadded(indexSignatureDeclaration.typeExpression, p),
             type: indexSignatureDeclaration.type && await this.visitType(indexSignatureDeclaration.type, p)
-        };
+        }));
         return updateIfChanged(indexSignatureDeclaration, updates);
     }
 
@@ -973,7 +1057,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         computedPropMethod = statement as JS.ComputedPropertyMethodDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(computedPropMethod, async () => ({
             prefix: await this.visitSpace(computedPropMethod.prefix, p),
             markers: await this.visitMarkers(computedPropMethod.markers, p),
             leadingAnnotations: await mapAsync(computedPropMethod.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p)),
@@ -984,27 +1068,39 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             parameters: await this.visitContainer(computedPropMethod.parameters, p),
             body: computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p),
             methodType: computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as Type.Method)
-        };
+        }));
         return updateIfChanged(computedPropMethod, updates);
     }
 
     protected async visitForOfLoop(forOfLoop: JS.ForOfLoop, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const statement = await this.visitStatement(forOfLoop, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ForOfLoop) {
+            return statement;
+        }
+        forOfLoop = statement as JS.ForOfLoop;
+
+        const updates: any = await this.visitChildrenOf(forOfLoop, async () => ({
             prefix: await this.visitSpace(forOfLoop.prefix, p),
             markers: await this.visitMarkers(forOfLoop.markers, p),
             await: forOfLoop.await && await this.visitSpace(forOfLoop.await, p),
             loop: await this.visitDefined<J.ForEachLoop>(forOfLoop.loop, p)
-        };
+        }));
         return updateIfChanged(forOfLoop, updates);
     }
 
     protected async visitForInLoop(forInLoop: JS.ForInLoop, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const statement = await this.visitStatement(forInLoop, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.ForInLoop) {
+            return statement;
+        }
+        forInLoop = statement as JS.ForInLoop;
+
+        const updates: any = await this.visitChildrenOf(forInLoop, async () => ({
             prefix: await this.visitSpace(forInLoop.prefix, p),
             markers: await this.visitMarkers(forInLoop.markers, p),
             control: await this.visitDefined<JS.ForInLoop.Control>(forInLoop.control, p),
             body: await this.visitRightPadded(forInLoop.body, p)
-        };
+        }));
         return updateIfChanged(forInLoop, updates);
     }
 
@@ -1015,34 +1111,46 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         namespaceDeclaration = statement as JS.NamespaceDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(namespaceDeclaration, async () => ({
             prefix: await this.visitSpace(namespaceDeclaration.prefix, p),
             markers: await this.visitMarkers(namespaceDeclaration.markers, p),
             modifiers: await mapAsync(namespaceDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             keywordType: await this.visitLeftPadded(namespaceDeclaration.keywordType, p),
             name: await this.visitRightPadded(namespaceDeclaration.name, p),
             body: namespaceDeclaration.body && await this.visitDefined<J.Block>(namespaceDeclaration.body, p)
-        };
+        }));
         return updateIfChanged(namespaceDeclaration, updates);
     }
 
     protected async visitTypeLiteral(typeLiteral: JS.TypeLiteral, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(typeLiteral, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeLiteral) {
+            return expression;
+        }
+        typeLiteral = expression as JS.TypeLiteral;
+
+        const updates: any = await this.visitChildrenOf(typeLiteral, async () => ({
             prefix: await this.visitSpace(typeLiteral.prefix, p),
             markers: await this.visitMarkers(typeLiteral.markers, p),
             members: await this.visitDefined<J.Block>(typeLiteral.members, p),
             type: typeLiteral.type && await this.visitType(typeLiteral.type, p)
-        };
+        }));
         return updateIfChanged(typeLiteral, updates);
     }
 
     protected async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(arrayBindingPattern, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.ArrayBindingPattern) {
+            return expression;
+        }
+        arrayBindingPattern = expression as JS.ArrayBindingPattern;
+
+        const updates: any = await this.visitChildrenOf(arrayBindingPattern, async () => ({
             prefix: await this.visitSpace(arrayBindingPattern.prefix, p),
             markers: await this.visitMarkers(arrayBindingPattern.markers, p),
             elements: await this.visitContainer(arrayBindingPattern.elements, p),
             type: arrayBindingPattern.type && await this.visitType(arrayBindingPattern.type, p)
-        };
+        }));
         return updateIfChanged(arrayBindingPattern, updates);
     }
 
@@ -1053,14 +1161,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         bindingElement = statement as JS.BindingElement;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(bindingElement, async () => ({
             prefix: await this.visitSpace(bindingElement.prefix, p),
             markers: await this.visitMarkers(bindingElement.markers, p),
             propertyName: bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, p),
             name: await this.visitDefined<TypedTree>(bindingElement.name, p),
             initializer: bindingElement.initializer && await this.visitLeftPadded(bindingElement.initializer, p),
             variableType: bindingElement.variableType && (await this.visitType(bindingElement.variableType, p) as Type.Variable)
-        };
+        }));
         return updateIfChanged(bindingElement, updates);
     }
 
@@ -1071,7 +1179,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         exportDeclaration = statement as JS.ExportDeclaration;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(exportDeclaration, async () => ({
             prefix: await this.visitSpace(exportDeclaration.prefix, p),
             markers: await this.visitMarkers(exportDeclaration.markers, p),
             modifiers: await mapAsync(exportDeclaration.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
@@ -1079,7 +1187,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             exportClause: exportDeclaration.exportClause && await this.visitDefined<Expression>(exportDeclaration.exportClause, p),
             moduleSpecifier: exportDeclaration.moduleSpecifier && await this.visitLeftPadded(exportDeclaration.moduleSpecifier, p),
             attributes: exportDeclaration.attributes && await this.visitDefined<JS.ImportAttributes>(exportDeclaration.attributes, p)
-        };
+        }));
         return updateIfChanged(exportDeclaration, updates);
     }
 
@@ -1090,32 +1198,44 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         exportAssignment = statement as JS.ExportAssignment;
 
-        const updates: any = {
+        const updates: any = await this.visitChildrenOf(exportAssignment, async () => ({
             prefix: await this.visitSpace(exportAssignment.prefix, p),
             markers: await this.visitMarkers(exportAssignment.markers, p),
             expression: await this.visitLeftPadded<Expression>(exportAssignment.expression, p)
-        };
+        }));
         return updateIfChanged(exportAssignment, updates);
     }
 
     protected async visitNamedExports(namedExports: JS.NamedExports, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(namedExports, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.NamedExports) {
+            return expression;
+        }
+        namedExports = expression as JS.NamedExports;
+
+        const updates: any = await this.visitChildrenOf(namedExports, async () => ({
             prefix: await this.visitSpace(namedExports.prefix, p),
             markers: await this.visitMarkers(namedExports.markers, p),
             elements: await this.visitContainer(namedExports.elements, p),
             type: namedExports.type && await this.visitType(namedExports.type, p)
-        };
+        }));
         return updateIfChanged(namedExports, updates);
     }
 
     protected async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
-        const updates: any = {
+        const expression = await this.visitExpression(exportSpecifier, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.ExportSpecifier) {
+            return expression;
+        }
+        exportSpecifier = expression as JS.ExportSpecifier;
+
+        const updates: any = await this.visitChildrenOf(exportSpecifier, async () => ({
             prefix: await this.visitSpace(exportSpecifier.prefix, p),
             markers: await this.visitMarkers(exportSpecifier.markers, p),
             typeOnly: await this.visitLeftPadded(exportSpecifier.typeOnly, p),
             specifier: await this.visitDefined<Expression>(exportSpecifier.specifier, p),
             type: exportSpecifier.type && await this.visitType(exportSpecifier.type, p)
-        };
+        }));
         return updateIfChanged(exportSpecifier, updates);
     }
 
@@ -1202,4 +1322,22 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
         return super.accept(j, p);
     }
+}
+
+/** The prefix that prints as `outer` and then `inner`. */
+function concatenated(outer: J.Space, inner: J.Space): J.Space {
+    if (outer.comments.length === 0) {
+        return {...inner, whitespace: outer.whitespace + inner.whitespace};
+    }
+    const last = outer.comments[outer.comments.length - 1];
+    return {
+        ...outer,
+        comments: [...outer.comments.slice(0, -1), {...last, suffix: last.suffix + inner.whitespace}, ...inner.comments]
+    };
+}
+
+/** `inner`, led by each marker of `outer` it does not already hold, so they print as they did around it. */
+function withOuterMarkers(outer: Markers, inner: Markers): Markers {
+    const added = outer.markers.filter(marker => !inner.markers.some(own => own.id === marker.id));
+    return added.length === 0 ? inner : {...inner, markers: [...added, ...inner.markers]};
 }
