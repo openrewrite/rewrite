@@ -288,6 +288,14 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         if (expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } &&
             parent is SwitchExpression or WithExpression)
             return false;
+        // So do x is string and x is int i, but the parser reads x is Foo switch { ... } as a test against a constant
+        if (parent is SwitchExpression && expr is InstanceOf or IsPattern && EndsInTypeOrPattern(expr))
+            return false;
+        // x as string.. too, but the parser reads the Foo.. of x as Foo.. as a qualified name and int?.. as ?.
+        if (parent is RangeExpression { Start: not null } startOf && startOf.Start.Element.Id == expr.Id &&
+            expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } asType &&
+            (asType.Right is ArrayType or PointerType or TupleType || IsKeywordType(asType.Right)))
+            return false;
         var precedence = expr switch
         {
             Unary { Operator.Element: Unary.OperatorType.PostIncrement or Unary.OperatorType.PostDecrement } =>
@@ -332,9 +340,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     private static bool CastReadsAsValue(TypeCast cast, Expression expr)
     {
         var type = cast.Clazz.Tree.Element;
-        if (type is Primitive or NullableType or ArrayType or PointerType ||
-            type is Identifier { SimpleName: "object" or "string" or "bool" or "byte" or "sbyte" or "char" or
-                "decimal" or "double" or "float" or "int" or "uint" or "long" or "ulong" or "short" or "ushort" })
+        if (type is NullableType or ArrayType or PointerType || IsKeywordType(type))
             return false;
         Expression? leftmost = expr;
         while (LeftOperand(leftmost) is { } next)
@@ -344,6 +350,28 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
                leftmost is CsUnary { Operator.Element: CsUnary.OperatorKind.AddressOf or
                    CsUnary.OperatorKind.PointerType or CsUnary.OperatorKind.FromEnd };
     }
+
+    private static bool IsKeywordType(J type) =>
+        type is Primitive || type is Identifier { SimpleName: "object" or "string" or "bool" or "byte" or "sbyte" or
+            "char" or "decimal" or "double" or "float" or "int" or "uint" or "long" or "ulong" or "short" or "ushort" };
+
+    /// <summary>
+    /// Whether the type test or pattern <paramref name="expr"/> ends in a token that can't continue an expression: a
+    /// type other than a name, a designation, or a closing brace, bracket or parenthesis.
+    /// </summary>
+    private static bool EndsInTypeOrPattern(J expr) => expr switch
+    {
+        InstanceOf io => io.Pattern != null || io.Clazz is TypeTree && EndsInTypeOrPattern(io.Clazz),
+        IsPattern ip => EndsInTypeOrPattern(ip.Pattern.Element),
+        CsBinary { Operator.Element: CsBinary.OperatorType.Or or CsBinary.OperatorType.And } combined =>
+            EndsInTypeOrPattern(combined.Right),
+        CsUnary { Operator.Element: CsUnary.OperatorKind.Not } negated => EndsInTypeOrPattern(negated.Expression),
+        StatementExpression or PropertyPattern or ListPattern or DeconstructionPattern or Parentheses<Expression> =>
+            true,
+        Identifier or FieldAccess or PointerFieldAccess => IsKeywordType(expr),
+        TypeTree => true,
+        _ => false
+    };
 
     private bool NeedsParenthesesInContext(Expression expr)
     {

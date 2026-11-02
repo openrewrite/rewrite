@@ -900,6 +900,42 @@ public class TemplateApplyTests : RewriteTest
         AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
     }
 
+    /// <summary>
+    /// A switch after a type test or pattern applies to all of it, and a range after <c>x as T</c> starts with all of
+    /// it, unless the test ends in an expression that the switch or the <c>..</c> would continue.
+    /// </summary>
+    [Theory]
+    [InlineData("", " switch { _ => 0 }", "x is string", "x is string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int?", "x is int? switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is List<int>", "x is List<int> switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int i", "x is int i switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo f", "x is Foo f switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is { Length: 1 }", "x is { Length: 1 } switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is [1, 2]", "x is [1, 2] switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int or string", "x is int or string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is not string", "x is not string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo.Bar", "(x is Foo.Bar) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is null", "(x is null) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is > 1", "(x is > 1) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is string or null", "(x is string or null) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is not Foo", "(x is not Foo) switch { _ => 0 }")]
+    [InlineData("", "..y", "x as string", "x as string..y")]
+    [InlineData("", "..y", "x as int[]", "x as int[]..y")]
+    [InlineData("", "..y", "x as List<int>", "(x as List<int>)..y")]
+    [InlineData("", "..y", "x as int?", "(x as int?)..y")]
+    [InlineData("y..", "", "x as string", "y..(x as string)")]
+    [InlineData("Console.WriteLine(", ")", "x is string switch { true => 0, _ => 1 }",
+        "Console.WriteLine(x is string switch { true => 0, _ => 1 })")]
+    [InlineData("Console.WriteLine(", ")", "x is int i switch { true => i, _ => 1 }",
+        "Console.WriteLine(x is int i switch { true => i, _ => 1 })")]
+    [InlineData("Console.WriteLine(", ")", "x as string..", "Console.WriteLine(x as string..)")]
+    public void CaptureEndingInTypeOrPatternBeforeSwitchOrRangeMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
     [Theory]
     [InlineData("b ?? c", "await (b ?? c)")]
     [InlineData("(Task)b", "await (Task)b")]
