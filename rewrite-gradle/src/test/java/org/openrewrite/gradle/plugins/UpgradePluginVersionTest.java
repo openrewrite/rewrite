@@ -738,6 +738,46 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void pinsVersionNoLongerManagedThroughImportedBom() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "4.0.0", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.5.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testImplementation 'io.rest-assured:rest-assured'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '4.0.0'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testImplementation 'io.rest-assured:rest-assured:5.5.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotPinPropertyManagedVersions() {
         rewriteRun(
           spec -> spec
