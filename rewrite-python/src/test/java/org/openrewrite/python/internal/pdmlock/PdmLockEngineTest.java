@@ -93,19 +93,19 @@ class PdmLockEngineTest {
     }
 
     @Test
-    void unrelatedMissingDependencyDoesNotBlockScopedUpgrade() {
+    void lockOutOfDateBeforeTheEditIsRefused() {
         stubPypiSix();
-        // attrs is declared but absent from the lock (pre-existing drift). Bumping six — which the
-        // recipe actually changed — must succeed and leave attrs alone, not abort on it.
+        // attrs is declared but absent from the lock, whose hash records the manifest without it. pdm relocks that
+        // drift too, and refreshing the hash over it would make the stale lock pass `pdm lock --check`.
         String original = resource("g-upgrade/pyproject.toml.before")
                 .replace("dependencies = [\"six==1.16.0\"]", "dependencies = [\"six==1.16.0\", \"attrs==25.1.0\"]");
         String edited = resource("g-upgrade/pyproject.toml.after")
                 .replace("dependencies = [\"six==1.17.0\"]", "dependencies = [\"six==1.17.0\", \"attrs==25.1.0\"]");
         Result result = PdmLockEngine.regenerate(edited, original, resource("g-upgrade/pdm.lock.before"), ctx);
-        assertThat(result.getErrorMessage()).isNull();
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(result.getLockFileContent()).contains("version = \"1.17.0\"");
-        assertThat(result.getLockFileContent()).doesNotContain("attrs");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("out of date");
+        assertThat(http.requests).isEmpty();
     }
 
     @Test
