@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
+import {ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
@@ -2416,14 +2416,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     /** Any type in the file can name what moved, whether or not it references the binding. */
     protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
         return this.movedTypes.visit(javaType, undefined);
-    }
-
-    /**
-     * A decorator and the other type-name positions reach the tree through this hook, which the
-     * base visitor holds closed; a reference in one of them is a reference like any other.
-     */
-    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
-        return await this.visit(nameTree, p) as N;
     }
 
     /**

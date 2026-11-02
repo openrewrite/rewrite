@@ -75,6 +75,11 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
+    /** Visits a tree in a type-name position, then gives it to `visitTypeName`, as Java's visitor does. */
+    private async visitNameTree<N extends NameTree>(nameTree: N, p: P): Promise<N> {
+        return this.visitTypeName(await this.visitDefined<N>(nameTree, p), p);
+    }
+
     /**
      * Visits the children of `tree` through `visit` under a cursor that holds it, where a visit made it of the tree
      * on the cursor, and puts the given cursor back after with the messages they left.
@@ -119,7 +124,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         const updates = await this.visitChildrenOf(annotation, async () => ({
             prefix: await this.visitSpace(annotation.prefix, p),
             markers: await this.visitMarkers(annotation.markers, p),
-            annotationType: await this.visitTypeName(annotation.annotationType, p),
+            annotationType: await this.visitNameTree(annotation.annotationType, p),
             arguments: await this.visitOptionalContainer(annotation.arguments, p)
         }));
         return updateIfChanged(annotation, updates);
@@ -914,7 +919,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         const updates: any = await this.visitChildrenOf(parameterizedType, async () => ({
             prefix: await this.visitSpace(parameterizedType.prefix, p),
             markers: await this.visitMarkers(parameterizedType.markers, p),
-            class: await this.visitTypeName(parameterizedType.class, p),
+            class: await this.visitNameTree(parameterizedType.class, p),
             typeParameters: await this.visitOptionalContainer(parameterizedType.typeParameters, p),
             type: await this.visitType(parameterizedType.type, p)
         }));
@@ -1268,7 +1273,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 bound: await this.visitOptionalLeftPadded(wildcard.bound, p)
             };
             if (wildcard.boundedType) {
-                updates.boundedType = await this.visitTypeName(wildcard.boundedType, p);
+                updates.boundedType = await this.visitNameTree(wildcard.boundedType, p);
             }
             return updateIfChanged(wildcard, updates);
         });
