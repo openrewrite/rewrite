@@ -73,11 +73,11 @@ import {alpha as a, beta as b} from 'module';
         return spec.rewriteRun(
             typescript(
                 `
-import {"zeta-z" as z, beta, "alpha-a" as a} from 'module';
-`,
+                    import {"zeta-z" as z, beta, "alpha-a" as a} from 'module';
+                `,
                 `
-import {"alpha-a" as a, beta, "zeta-z" as z} from 'module';
-`))
+                    import {"alpha-a" as a, beta, "zeta-z" as z} from 'module';
+                `))
     });
 
     test("side-effect imports come first", () => {

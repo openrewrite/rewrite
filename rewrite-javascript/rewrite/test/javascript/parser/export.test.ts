@@ -207,13 +207,13 @@ describe('export keyword tests', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 export { add as "\\0 add", "test name" as "string name" } from "./counter";
-                 export { "link-a-class" as linkAClass } from "./link-a.module.css";
-                 export { /*1*/ "a-b" /*2*/ } from "./x";
-                 export * as "ns name" from "./y";
-                 const local = 1;
-                 export { local as "local name" };
-             `)
+                export { add as "\\0 add", "test name" as "string name" } from "./counter";
+                export { "link-a-class" as linkAClass } from "./link-a.module.css";
+                export { /*1*/ "a-b" /*2*/ } from "./x";
+                export * as "ns name" from "./y";
+                const local = 1;
+                export { local as "local name" };
+            `)
         ));
 
     // noinspection ES6UnusedImports
