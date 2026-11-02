@@ -806,6 +806,29 @@ class TestGeneratedSources:
                 python(None, None, path=Path("pkg/_helper.py")),
             )
 
+    def test_empty_contents_that_do_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, "", path=Path("pkg/_helper.py")),
+            )
+
+    def test_empty_contents_without_a_path_match_no_generated_file(self):
+        with pytest.raises(AssertionError, match="Expected the recipe to generate a source file"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, ""),
+            )
+
+
+class TestEmptyAfter:
+
+    def test_an_empty_after_that_does_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=_renaming_one_step("a", "b"), type_attribution=False).rewrite_run(
+                python("a = 1\n", ""),
+            )
+
 
 def _renaming_one_step(*names: str) -> Recipe:
     """A recipe that renames each name in ``names`` to the one after it, a single step per run."""
