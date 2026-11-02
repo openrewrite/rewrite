@@ -850,6 +850,9 @@ export async function replacedByObjectLiteral(tree: J, cursor: Cursor): Promise<
     return parentTree !== undefined && !expectsStatement(parentTree, tree.id);
 }
 
+/** The trees templates made, each in place of the tree it replaced, even where it keeps the id of a capture. */
+const templateResults = new WeakSet<J>();
+
 /**
  * The tree that holds `tree`. The cursor points at `tree`, at what it stands in for, or at a tree that
  * holds it, as where a recipe applies a template to a child of the node it visits.
@@ -858,9 +861,11 @@ async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | 
     const owner = cursor?.value;
     let holder: J | undefined;
     if (isTree(owner) && owner.id !== tree.id) {
+        // A chained rule's result stands in for the owner, though it can keep the id of a capture inside it
+        const held = (t: J) => t === tree || (t.id === tree.id && !templateResults.has(tree));
         await new class extends JavaScriptVisitor<undefined> {
             protected override async preVisit(t: J, p: undefined): Promise<J | undefined> {
-                if (holder === undefined && t.id === tree.id) {
+                if (holder === undefined && held(t)) {
                     holder = this.cursor.parentTree()?.value;
                 }
                 if (holder !== undefined) {
@@ -930,7 +935,9 @@ export class TemplateApplier {
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
             {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        return this.format(resultToUse, originalTree);
+        const result = await this.format(resultToUse, originalTree);
+        templateResults.add(result);
+        return result;
     }
 
     /** The node holding the tree being replaced and the id it holds it under. */
