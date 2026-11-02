@@ -18,6 +18,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {detectPackageManager, findNodeResolutionResult, findNodeRuntime, PackageJsonParser, PackageManager} from "../../src/javascript";
 import {Json} from "../../src/json";
+import {selectPackageManager} from "../../src/javascript/package-manager";
 import {MarkersKind} from "../../src/markers";
 
 function write(root: string, name: string, value: object | string): string {
@@ -185,4 +186,46 @@ describe("declared package manager selection", () => {
             });
         }, {unsafeCleanup: true});
     });
+});
+
+test('an explicit nested project does not borrow an outer foreign lock', async () => {
+ await withDir(async d => {
+  fs.writeFileSync(path.join(d.path,'package.json'),JSON.stringify({name:'outer',packageManager:'bun@1.2.2'}));
+  fs.writeFileSync(path.join(d.path,'bun.lock'),'{}');
+  fs.writeFileSync(path.join(d.path,'package-lock.json'),'{}');
+  const nested=path.join(d.path,'standalone');fs.mkdirSync(nested);
+  fs.writeFileSync(path.join(nested,'package.json'),JSON.stringify({name:'nested',packageManager:'npm@11.19.1'}));
+  const selected=selectPackageManager(nested,d.path);
+  expect(selected).toEqual({packageManager:PackageManager.Npm,root:nested});
+ },{unsafeCleanup:true});
+});
+
+test('an unrelated standalone nested npm project keeps its own lock',async()=>{
+ await withDir(async d=>{
+  fs.writeFileSync(path.join(d.path,'package.json'),JSON.stringify({name:'outer',packageManager:'bun@1.2.2',workspaces:['packages/*']}));
+  fs.writeFileSync(path.join(d.path,'bun.lock'),'{}');
+  const nested=path.join(d.path,'standalone');fs.mkdirSync(nested);
+  fs.writeFileSync(path.join(nested,'package.json'),JSON.stringify({name:'nested'}));
+  const lockFile=path.join(nested,'package-lock.json');fs.writeFileSync(lockFile,'{}');
+  const selected=selectPackageManager(nested,d.path);
+  expect(selected).toEqual({packageManager:PackageManager.Npm,root:nested,lockFile});
+ },{unsafeCleanup:true});
+});
+
+test.each(["array", "object", "pnpm"])("%s workspace membership permits a compatible member declaration to share its root lock", async style => {
+    await withDir(async dir => {
+        write(dir.path, "package.json", {...pkg, packageManager: "bun@1.2.2",
+            ...(style === "array" ? {workspaces: ["packages/*", "!packages/excluded"]} :
+                style === "object" ? {workspaces: {packages: ["packages/*", "!packages/excluded"]}} : {})});
+        if (style === "pnpm") write(dir.path, "pnpm-workspace.yaml", "packages:\n  - packages/*\n  - '!packages/excluded'\n");
+        bunLock(dir.path);
+        const member = path.join(dir.path, "packages/a");
+        write(member, "package.json", {...pkg, packageManager: "bun@1.2.2"});
+        expect(selectPackageManager(member, dir.path)).toEqual({packageManager: PackageManager.Bun,
+            root: dir.path, lockFile: path.join(dir.path, "bun.lock")});
+        const excluded = path.join(dir.path, "packages/excluded");
+        write(excluded, "package.json", pkg);
+        npmLock(excluded);
+        expect(selectPackageManager(excluded, dir.path)?.packageManager).toBe(PackageManager.Npm);
+    }, {unsafeCleanup: true});
 });

@@ -37,6 +37,7 @@ import {spawnSync} from "child_process";
 import {isDeepStrictEqual} from "util";
 import * as YAML from "yaml";
 import * as semver from "semver";
+import picomatch from "picomatch";
 
 /**
  * Configuration for each package manager.
@@ -220,6 +221,24 @@ function declaredPackageManager(manifest: unknown): PackageManager | undefined {
     }
 }
 
+function isWorkspaceMember(root: string, member: string, manifest: unknown): boolean {
+    let patterns: unknown = manifest && typeof manifest === "object" ?
+        (manifest as {workspaces?: unknown}).workspaces : undefined;
+    if (patterns && !Array.isArray(patterns) && typeof patterns === "object") {
+        patterns = (patterns as {packages?: unknown}).packages;
+    }
+    if (!Array.isArray(patterns)) {
+        try { patterns = YAML.parse(fs.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8"))?.packages; }
+        catch { return false; }
+    }
+    if (!Array.isArray(patterns) || !patterns.every(p => typeof p === "string")) return false;
+    const relative = path.relative(root, member).split(path.sep).join("/");
+    const include = patterns.filter(p => !p.startsWith("!"));
+    const exclude = patterns.filter(p => p.startsWith("!")).map(p => p.slice(1));
+    return include.length > 0 && picomatch(include)(relative) &&
+        (exclude.length === 0 || !picomatch(exclude)(relative));
+}
+
 /**
  * Select a lock and its manager together. The nearest supported pinned declaration takes precedence over lock
  * filename order, including when a workspace member inherits it. An explicit parser boundary limits the walk.
@@ -232,22 +251,35 @@ export function selectPackageManager(startDir: string, rootDir?: string, manifes
         dirs.push(dir);
         if (dir === stop || path.dirname(dir) === dir) break;
     }
+    const manifests = new Map<string, unknown>();
+    for (const dir of dirs) {
+        if (dir === dirs[0] && manifest !== undefined) manifests.set(dir, manifest);
+        else {
+            try { manifests.set(dir, JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"))); }
+            catch { /* A lock can still identify a project without a readable manifest. */ }
+        }
+    }
     let declared: {manager: PackageManager, root: string} | undefined;
     for (const dir of dirs) {
-        let pkg: unknown = dir === dirs[0] ? manifest : undefined;
-        if (pkg === undefined) {
-            try { pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); }
-            catch { continue; }
-        }
+        const pkg = manifests.get(dir);
         const manager = declaredPackageManager(pkg);
-        if (manager !== undefined) {
+        if (manager !== undefined && (dir === dirs[0] || isWorkspaceMember(dir, dirs[0], pkg))) {
             declared = {manager, root: dir};
             break;
         }
     }
     if (declared) {
+        // A nested declaration defines its own project unless a compatible workspace actually contains it.
+        let boundary = dirs.indexOf(declared.root);
+        for (let i = boundary + 1; i < dirs.length; i++) {
+            const pkg = manifests.get(dirs[i]);
+            const manager = declaredPackageManager(pkg);
+            if (manager !== undefined && manager !== declared.manager) break;
+            if (isWorkspaceMember(dirs[i], declared.root, pkg)) boundary = i;
+        }
+        const projectDirs = dirs.slice(0, boundary + 1);
         const filename = getLockFileName(declared.manager);
-        for (const dir of dirs) {
+        for (const dir of projectDirs) {
             const lockFile = path.join(dir, filename);
             if (!fs.existsSync(lockFile)) continue;
             if (filename === "yarn.lock") {
@@ -260,7 +292,7 @@ export function selectPackageManager(startDir: string, rootDir?: string, manifes
             }
             return {packageManager: declared.manager, root: dir, lockFile};
         }
-        const foreign = dirs.flatMap(dir => LOCK_FILE_DETECTION
+        const foreign = projectDirs.flatMap(dir => LOCK_FILE_DETECTION
             .map(config => path.join(dir, config.filename)).filter(file => fs.existsSync(file)));
         if (foreign.length) {
             throw new PackageManagerSelectionError(
