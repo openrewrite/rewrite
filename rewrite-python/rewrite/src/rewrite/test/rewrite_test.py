@@ -863,7 +863,7 @@ class RecipeSpec:
             if result is None:
                 return actual  # Callable returned None = actual is acceptable
             return result
-        return dedent(after) if after else actual
+        return actual if after is None else dedent(after)
 
 
 class _LaterCycleContext(DelegatingExecutionContext):
