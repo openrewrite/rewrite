@@ -200,6 +200,21 @@ def test_keep_the_indentation_of_a_file_without_a_style():
     )
 
 
+def test_keep_the_alignment_of_continuation_lines_in_a_tab_indented_file():
+    rewrite_run(
+        python(
+            "def foo(a, b):\n"
+            "\tif (a and\n"
+            "\t\tb):\n"
+            "\t\treturn (1 +\n"
+            "\t\t\t\t2)\n"
+            "\treturn 0\n"
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+
 def test_fix_indentation_to_a_configured_style():
     rewrite_run(
         # language=python

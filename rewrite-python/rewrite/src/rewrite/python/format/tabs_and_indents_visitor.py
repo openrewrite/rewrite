@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import sys
 import textwrap
 from enum import Enum, auto
 from typing import TypeVar, Optional, cast, List
@@ -601,6 +600,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                     break
         if line_start is None:
             return -1
+        tab_size = self._style.tab_size
 
         class _ColumnCounter(PrintOutputCapture):
             def __init__(self):
@@ -611,7 +611,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             def append(self, text):
                 if text and not self.found:
                     for ch in text:
-                        self.col = 0 if ch == '\n' else self.col + 1
+                        self.col = 0 if ch == '\n' else self.col + (tab_size if ch == '\t' else 1)
                 return self
 
         class _Printer(PythonPrinter):
@@ -662,6 +662,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             return -1
 
         select = method.select
+        tab_size = self._style.tab_size
 
         class _ColumnCounter(PrintOutputCapture):
             def __init__(self):
@@ -672,7 +673,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
             def append(self, text):
                 if text and not self.found:
                     for ch in text:
-                        self.col = 0 if ch == '\n' else self.col + 1
+                        self.col = 0 if ch == '\n' else self.col + (tab_size if ch == '\t' else 1)
                 return self
 
         class _Printer(PythonPrinter):
@@ -834,22 +835,17 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         return self._shift(whitespace, shift)
 
     def _shift(self, text: str, shift: int) -> str:
-        tab_indent = self._style.tab_size
-        if not self._style.use_tab_character:
-            tab_indent = sys.maxsize
-
+        if shift == 0:
+            return text
+        if self._style.use_tab_character:
+            # By columns, since a line that aligns may hold spaces after its tabs
+            head, newline, indent = text.rpartition('\n')
+            column = max(self._get_length_of_whitespace(indent) + shift, 0)
+            return head + newline + '\t' * (column // self._style.tab_size) + ' ' * (column % self._style.tab_size)
         if shift > 0:
-            text += '\t' * (shift // tab_indent)
-            text += ' ' * (shift % tab_indent)
-        else:
-            if self._style.use_tab_character:
-                len_text = len(text) + (shift // tab_indent)
-            else:
-                len_text = len(text) + shift
-            if len_text >= 0:
-                text = text[:len_text]
-
-        return text
+            return text + ' ' * shift
+        len_text = len(text) + shift
+        return text[:len_text] if len_text >= 0 else text
 
     def find_indent(self, space: Space) -> int:
         return self._get_length_of_whitespace(space.indent)
