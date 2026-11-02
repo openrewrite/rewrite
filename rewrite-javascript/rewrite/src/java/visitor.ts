@@ -75,7 +75,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return nameTree;
     }
 
-    /** Visits a tree in a type-name position, then gives it to `visitTypeName`, as Java's visitor does. */
+    /** Visits a tree in a type-name position, then gives it to `visitTypeName`. */
     private async visitNameTree<N extends NameTree>(nameTree: N, p: P): Promise<N> {
         return this.visitTypeName(await this.visitDefined<N>(nameTree, p), p);
     }
