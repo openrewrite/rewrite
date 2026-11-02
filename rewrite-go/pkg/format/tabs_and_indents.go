@@ -151,7 +151,7 @@ func (v *TabsAndIndentsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit,
 				if before := v.reindentSpace(block.Before); !java.SpaceEqual(before, block.Before) {
 					reindented := *block
 					reindented.Before = before
-					rp.Element = rp.Element.WithMarkers(withImportBlock(rp.Element.Markers, reindented))
+					rp.Element = rp.Element.WithMarkers(withMarker(rp.Element.Markers, reindented))
 				}
 			}
 			if grouped {
@@ -227,17 +227,6 @@ func (v *TabsAndIndentsVisitor) VisitVariableDeclarations(vd *java.VariableDecla
 		vd = vd.WithLeadingAnnotations(v.reindentDirectives(vd.LeadingAnnotations))
 	}
 	return v.GoVisitor.VisitVariableDeclarations(vd, p)
-}
-
-// withImportBlock replaces the ImportBlock marker among m's entries with block.
-func withImportBlock(m java.Markers, block golang.ImportBlock) java.Markers {
-	entries := append([]java.Marker(nil), m.Entries()...)
-	for i, e := range entries {
-		if _, isBlock := e.(golang.ImportBlock); isBlock {
-			entries[i] = block
-		}
-	}
-	return java.MakeMarkers(m.GetID(), entries)
 }
 
 // VisitDeclarationBlock sets a `var (…)` or `const (…)` group's directives at
