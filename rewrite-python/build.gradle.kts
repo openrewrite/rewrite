@@ -36,7 +36,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -174,7 +174,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
@@ -189,7 +189,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-test"))
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("io.moderne:jsonrpc:latest.integration")
             }
