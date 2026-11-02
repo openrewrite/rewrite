@@ -46,7 +46,7 @@ public static class MSBuildProjectHelper
     // therefore stale until the next restore. Mutating visitors add to
     // this set; RegenerateMarkerVisitor consumes from it so files no one touched
     // skip the (expensive) restore.
-    private const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
+    internal const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
 
     /// <summary>
     /// Marks the given .csproj source path as having pending changes whose

@@ -862,8 +862,8 @@ public class SolutionParser
                     cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked, projectTypeCache);
                 }
 
-                // Attach formatting style marker from .editorconfig
-                var formatStyle = editorConfigResolver.Resolve(unit.FilePath);
+                // Attach formatting style marker from .editorconfig, and the file's own indentation where it sets none
+                var formatStyle = editorConfigResolver.Resolve(unit.FilePath, cu);
                 cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
 
                 if (requirePrintEqualsInput)

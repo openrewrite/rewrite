@@ -282,6 +282,13 @@ tasks.named("check") {
 tasks.withType<Test> {
     // Ensure Python venv is set up before running tests
     dependsOn(pythonInstall)
+    // The RPC processes run the Python sources in place, so a change to them runs the tests again
+    inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("pythonSources")
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("pythonProject")
 
     // A fork costs a Python process besides its JVM, so there are at most four
     maxParallelForks = maxParallelForks.coerceAtMost(4)

@@ -19,6 +19,7 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {castDraft} from "mutative";
 import {updateIfChanged} from "../util";
+import {registerHeavyweight} from "../heavyweight";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -258,6 +259,8 @@ export interface NodeResolutionResult extends Marker {
     // npm configuration from various scopes (global, user, project, env)
     readonly npmrcConfigs?: Npmrc[];
 }
+
+registerHeavyweight(NodeResolutionResultKind);
 
 /**
  * Creates a NodeResolutionResult marker from a package.json file.

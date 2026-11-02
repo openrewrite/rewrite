@@ -575,7 +575,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      */
     private <T> ListConcat<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
         if (insertMode == null || insertMode == Last || insertProperty == null || t.isEmpty()) {
-            return new ListConcat<>(ListUtils.concatAll(ls, t), -1, -1);
+            // Keep the original list when nothing is added, but do not expose a potentially
+            // immutable incoming list to the comment-preserving mutations in mergeMapping.
+            return new ListConcat<>(ls.isEmpty() && !t.isEmpty() ? new ArrayList<>(t) : ListUtils.concatAll(ls, t), -1, -1);
         }
 
         List<T> mutatedEntries = new ArrayList<>();

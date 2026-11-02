@@ -17,7 +17,8 @@ import * as ts from "typescript";
 import {Expression, J, Statement} from "../java";
 import {JS} from "./tree";
 
-const is_statements = new Set<string>([
+// Built on first use, since ./tree imports the visitor, which imports this module
+const statementKinds = (): string[] => [
     J.Kind.Assert,
     J.Kind.Assignment,
     J.Kind.AssignmentOperation,
@@ -78,9 +79,9 @@ const is_statements = new Set<string>([
     JS.Kind.WithStatement,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-])
+];
 
-const is_expressions = new Set<string>([
+const expressionKinds = (): string[] => [
     J.Kind.AnnotatedType,
     J.Kind.Annotation,
     J.Kind.ArrayAccess,
@@ -157,14 +158,17 @@ const is_expressions = new Set<string>([
     JS.Kind.Void,
     JS.Kind.ExpressionStatement,
     JS.Kind.StatementExpression
-])
+];
+
+let is_statements: Set<string> | undefined;
+let is_expressions: Set<string> | undefined;
 
 export function isStatement(statement: J):  statement is Statement {
-    return is_statements.has(statement.kind);
+    return (is_statements ??= new Set(statementKinds())).has(statement.kind);
 }
 
 export function isExpression(expression: J):  expression is Expression {
-    return is_expressions.has(expression.kind);
+    return (is_expressions ??= new Set(expressionKinds())).has(expression.kind);
 }
 
 export function getNextSibling(node: ts.Node): ts.Node | undefined {

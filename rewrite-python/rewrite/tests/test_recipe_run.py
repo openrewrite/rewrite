@@ -259,6 +259,8 @@ class TestScanningPhaseTraversal:
         spec = RecipeSpec(
             recipe=Composite([DeletingScanner(), ScanningEditor()]),
             type_attribution=False,
+            # The scanner deletes the file on purpose, to show what the run does where nothing checks it.
+            check_no_edits_in_scanning_phase=False,
         )
         spec.rewrite_run(
             python('s = "hello"', 's = "hello (count: 1)"')

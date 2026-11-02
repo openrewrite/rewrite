@@ -63,6 +63,8 @@ func (v *GoVisitor) Cursor() *Cursor { return v.cursor }
 // IDs before invoking Visit. Recipes typically don't call this directly.
 func (v *GoVisitor) SetCursor(c *Cursor) { v.cursor = c }
 
+func (*GoVisitor) IsHeavyweight() {}
+
 // DoAfterVisit queues a follow-up visitor to run after the main visit
 // completes. Mirrors JavaVisitor.doAfterVisit. Use this from inside any
 // Visit* override to compose side-effects like adding an import:

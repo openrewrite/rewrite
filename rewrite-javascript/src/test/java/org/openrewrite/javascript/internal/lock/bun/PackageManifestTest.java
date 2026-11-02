@@ -51,7 +51,7 @@ class PackageManifestTest {
                 continue;
             }
             if (manifest.get("workspaces") != null || manifest.get("overrides") != null ||
-                manifest.get("resolutions") != null) {
+                manifest.get("resolutions") != null || manifest.get("packageExtensions") != null) {
                 continue;
             }
             Json.Expr deps = manifest.get("dependencies");
@@ -84,12 +84,13 @@ class PackageManifestTest {
     @MethodSource("picks")
     void picksWhatBunPicked(String name, BunScenarios.Scenario scenario, String alias, DependencyVersion version,
                             String realName, String packument, String fresh) {
-        PackageManifest manifest = PackageManifest.parse(new Log(), packument, realName, false);
+        BunRelease release = scenario.recordedRelease() == null ? BunRelease.PORTED : BunRelease.of(scenario.recordedRelease());
+        PackageManifest manifest = PackageManifest.parse(release, new Log(), packument, realName, false);
         assertThat(manifest).isNotNull();
         PackageManifest.FindResult found = version.tag == DependencyVersion.Tag.NPM ?
           manifest.findBestVersion(version.npm().version) : manifest.findByDistTag(version.distTag().tag);
         Lockfile lockfile = TextLockfileReader.load(fresh,
-          BunOptions.load(null, null, null, HostEnvironment.UNKNOWN));
+          BunOptions.load(release, null, null, null, HostEnvironment.UNKNOWN));
         Package locked = topLevel(lockfile, alias);
         if (found == null) {
             assertThat(locked).as("bun installed nothing for " + alias).isNull();

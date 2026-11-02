@@ -77,7 +77,7 @@ func (v *wrapErrorWithContextVisitor) VisitReturn(ret *java.Return, p any) java.
 		Name:   &java.Identifier{ID: uuid.New(), Name: "Errorf"},
 		Arguments: java.Container[java.Expression]{
 			Elements: []java.RightPadded[java.Expression]{
-				{Element: &java.Literal{ID: uuid.New(), Source: `"` + v.funcName + `: %w"`}},
+				{Element: &java.Literal{ID: uuid.New(), Value: v.funcName + ": %w", Source: `"` + v.funcName + `: %w"`}},
 				{Element: &errArg},
 			},
 		},

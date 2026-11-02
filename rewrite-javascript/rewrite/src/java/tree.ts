@@ -752,7 +752,8 @@ export namespace J {
     export interface Yield extends J, Statement {
         readonly kind: typeof Kind.Yield;
         readonly implicit: boolean;
-        readonly value: Expression;
+        /** Absent from a bare `yield`. */
+        readonly value?: Expression;
     }
 
     export interface Unknown extends J, Statement, Expression, TypeTree {

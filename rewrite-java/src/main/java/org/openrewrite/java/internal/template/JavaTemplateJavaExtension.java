@@ -273,8 +273,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             } else {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
-                            if (c.getType() != null) {
-                                c = c.withType(((JavaType.Class) c.getType()).withInterfaces(ListUtils.concatAll(c.getType().getInterfaces(), implementsTypes)));
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            if (classType != null) {
+                                classType = classType.withInterfaces(ListUtils.concatAll(classType.getInterfaces(), implementsTypes));
+                                c = c.withType(parameterized == null ? classType : parameterized.withType(classType));
                             }
 
                             //noinspection ConstantConditions

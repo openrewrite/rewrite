@@ -82,13 +82,7 @@ final class Cache {
      */
     static String checksum(byte[] tgz, Ident ident, Configuration options) {
         Object compressionLevel = options.get("compressionLevel");
-        if (!Integer.valueOf(0).equals(compressionLevel)) {
-            String name = ident instanceof Locator ? StructUtils.stringifyLocator((Locator) ident) :
-                    StructUtils.stringifyIdent(ident);
-            throw new CannotKnow("the checksum of " + name + " under compressionLevel " + Js.string(compressionLevel) +
-                                 " (zlib-ng deflate)");
-        }
-        byte[] zip = TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(ident), 1).toByteArray();
+        byte[] zip = TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(ident), 1).toByteArray(compressionLevel);
         return getCacheKey(options) + "/" + HashUtils.sha512Hex(zip);
     }
 }

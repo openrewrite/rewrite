@@ -112,9 +112,9 @@ public final class NodeDependencyScan {
         // a parse error holds no text where the host could not read the file either
         if (!(sf instanceof Quark) && !(sf instanceof ParseError && ((ParseError) sf).getText().isEmpty())) {
             if (readAwayFromLock(name.toString())) {
-                acc.packageManagerFiles.put(path, sf.printAll());
+                acc.packageManagerFiles.put(path, PackageJsonHelper.printed(sf));
             } else {
-                acc.besideLock.put(path, sf.printAll());
+                acc.besideLock.put(path, PackageJsonHelper.printed(sf));
             }
         }
         return true;
@@ -332,7 +332,7 @@ public final class NodeDependencyScan {
     public static void captureLock(Accumulator acc, SourceFile lock) {
         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(lock.getSourcePath());
         acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
-        acc.locks.put(lock.getSourcePath(), lock.printAll());
+        acc.locks.put(lock.getSourcePath(), PackageJsonHelper.printed(lock));
         acc.lockToPackage.put(lock.getSourcePath(), packagePath);
     }
 

@@ -60,23 +60,29 @@ func (v *DocCommentVisitor) Visit(t java.Tree, p any) java.Tree {
 // file that imports "C" its doc comment is the cgo preamble, whose spacing is
 // significant, and gofmt exempts it too.
 func (v *DocCommentVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
-	out := *cu
 	// The file's own prefix is the one place a doc comment can begin the source
 	// with no line break ahead of it.
-	out.Prefix = canonicalDoc(cu.Prefix, true)
+	out := cu.WithPrefix(canonicalDoc(cu.Prefix, true))
 
 	declarationDoc := func(s java.Space) java.Space { return canonicalDoc(s, false) }
-	statements := make([]java.RightPadded[java.Statement], len(cu.Statements))
+	var statements []java.RightPadded[java.Statement]
 	for i, rp := range cu.Statements {
-		if rp.Element != nil {
-			if fixed, ok := transformPrefix(rp.Element, declarationDoc).(java.Statement); ok {
-				rp.Element = fixed
-			}
+		if rp.Element == nil {
+			continue
 		}
-		statements[i] = rp
+		fixed, ok := transformPrefix(rp.Element, declarationDoc).(java.Statement)
+		if !ok || fixed == rp.Element {
+			continue
+		}
+		if statements == nil {
+			statements = append([]java.RightPadded[java.Statement](nil), cu.Statements...)
+		}
+		statements[i].Element = fixed
 	}
-	out.Statements = statements
-	return v.GoVisitor.VisitCompilationUnit(&out, p)
+	if statements != nil {
+		out = out.WithStatements(statements)
+	}
+	return v.GoVisitor.VisitCompilationUnit(out, p)
 }
 
 // canonicalDoc rewrites the doc comment run of s, if it has one.
@@ -89,8 +95,11 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 	if !ok {
 		return s
 	}
-	s = java.MakeSpace(append(append([]java.Comment(nil), s.Comments()[:start]...), formatted...), s.Whitespace())
-	return s
+	out := java.MakeSpace(append(append([]java.Comment(nil), s.Comments()[:start]...), formatted...), s.Whitespace())
+	if spaceContentEqual(out, s) {
+		return s
+	}
+	return out
 }
 
 // docCommentRun reports the index at which the run documenting whatever

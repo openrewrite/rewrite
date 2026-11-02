@@ -416,6 +416,10 @@ export class WhitespaceReconciler {
         original: J.Identifier | J.Literal,
         formatted: J.Identifier | J.Literal
     ): J.Identifier | J.Literal {
+        // A literal's type follows from how it is written, so an identifier's is not the literal's
+        if (isLiteral(formatted)) {
+            return formatted;
+        }
         const result: Record<string, unknown> = { ...formatted };
 
         // Preserve type attribution - both Identifier and Literal have `type`

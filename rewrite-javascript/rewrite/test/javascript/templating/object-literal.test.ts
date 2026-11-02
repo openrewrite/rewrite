@@ -13,7 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
+import {
+    capture,
+    JavaScriptParser,
+    JavaScriptVisitor,
+    JS,
+    param,
+    pattern,
+    Template,
+    template,
+    typescript
+} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
 import {ExecutionContext} from '../../../src';
@@ -42,6 +52,25 @@ describe('object literals in templates and patterns', () => {
             typescript(
                 `const options = {...base};`,
                 `const options = {responseType: 'text', ...base};`
+            )
+        );
+    });
+
+    test('a template opening with `{` in place of a case label is an object literal', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                // A call is a statement too, so only its slot says what the code opening with `{` is
+                return method.name.simpleName === 'key' ? template`{k: 1}`.apply(method, this.cursor) :
+                    super.visitMethodInvocation(method, p);
+            }
+        });
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'switch (x) {\n    case key():\n        break;\n}',
+                'switch (x) {\n    case {k: 1}:\n        break;\n}'
             )
         );
     });
@@ -112,6 +141,68 @@ describe('object literals in templates and patterns', () => {
                 `http.post(url, {headers: h, withCredentials: true, responseType: 'text'})`
             )
         );
+    });
+
+    test('one member passed as a parameter is a member of the object literal', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J | undefined> {
+                const options = newClass.arguments.elements[0]?.element;
+                const members = options?.kind === J.Kind.NewClass ? (options as J.NewClass).body?.statements : [];
+                if (newClass.class && members?.length === 1) {
+                    return Template.builder().code('new E({\n  a: 1,\n  ').param(members[0].element).code(',\n})')
+                        .build().apply(newClass, this.cursor);
+                }
+                return super.visitNewClass(newClass, p);
+            }
+        });
+        return spec.rewriteRun(
+            typescript('new E({b: 2});', 'new E({\n    a: 1,\n    b: 2,\n});'),
+            typescript('new E({b() {}});', 'new E({\n    a: 1,\n    b() {},\n});'),
+            typescript('new E({...b});', 'new E({\n    a: 1,\n    ...b,\n});')
+        );
+    });
+
+    describe('one member is a member of the object literal', () => {
+        const [m, options] = [capture('m'), capture<J.NewClass>('options')];
+        const templates: Record<string, (options: J.NewClass) => Template> = {
+            padded: options => Template.builder().code('new E({a: 1, ').param(options.body!.statements[0]).code('})').build(),
+            capture: () => template`new E({a: 1, ${m}})`,
+            parameter: () => template`new E({a: 1, ${param('m')}})`,
+            property: () => template`new E({a: 1, ${options.body!.statements[0].element}})`
+        };
+
+        test.for(Object.keys(templates))('passed %s', how => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                    if (method.name.simpleName !== how) {
+                        return super.visitMethodInvocation(method, p);
+                    }
+                    const bound = method.arguments.elements[0].element as J.NewClass;
+                    return templates[how](bound).apply(method, this.cursor, {
+                        values: new Map<string, J>([['options', bound], ['m', bound.body!.statements[0].element]])
+                    });
+                }
+            });
+            // rewriteRun compares the trees with a fresh parse of the text they print
+            return spec.rewriteRun(typescript(`${how}({b: 2});`, 'new E({a: 1, b: 2});'));
+        });
+
+        test('a padded member put ahead of another leaves its trailing comma behind', () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                    const members = (method.arguments.elements[0].element as J.NewClass).body!.statements;
+                    const given = method.name.simpleName === 'one' ? members[0] : members;
+                    return Template.builder().code('new E({').param(given).code(', a: 1})').build().apply(method, this.cursor);
+                }
+            });
+            return spec.rewriteRun(
+                typescript('one({b: 2,});', 'new E({b: 2, a: 1});'),
+                typescript('all({b: 2, c: 3,});', 'new E({b: 2, c: 3, a: 1});')
+            );
+        });
     });
 
     test('a variadic capture in an object literal pattern matches its properties', async () => {
