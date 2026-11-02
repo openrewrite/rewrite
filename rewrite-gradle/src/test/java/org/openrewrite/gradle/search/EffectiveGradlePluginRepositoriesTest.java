@@ -155,8 +155,6 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-
-              include 'module'
               """,
             spec -> spec.path("settings.gradle")
           ),

@@ -39,10 +39,11 @@ final class EffectiveRepositoryAssertions {
 
     /**
      * The Gradle plugin portal's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror
-     * in its place too.
+     * in its place too, which Gradle 9 reports without a trailing slash.
      */
     static String gradlePluginPortal() {
-        return mirrorOr("https://plugins.gradle.org/m2");
+        String url = mirrorOr("https://plugins.gradle.org/m2");
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     private static String mirrorOr(String url) {
