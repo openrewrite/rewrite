@@ -1458,4 +1458,31 @@ class KotlinTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void parenthesizeReplacementOnTheRightOfAnEquallyBindingOperator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!"same".equals(method.getSimpleName())) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return KotlinTemplate.builder("#{any(kotlin.Int)} == #{any(kotlin.Int)}")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0),
+                      method.getArguments().get(1));
+              }
+          })),
+          kotlin(
+            """
+              fun same(a: Int, b: Int) = a == b
+              fun test(flag: Boolean, a: Int, b: Int) = flag == same(a, b)
+              """,
+            """
+              fun same(a: Int, b: Int) = a == b
+              fun test(flag: Boolean, a: Int, b: Int) = flag == (a == b)
+              """
+          ));
+    }
 }
