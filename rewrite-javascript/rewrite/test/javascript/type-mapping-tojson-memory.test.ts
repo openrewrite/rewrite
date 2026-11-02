@@ -121,8 +121,8 @@ test("parsing the same file repeatedly does not accumulate distinct toJSON closu
 }, 300000);
 
 test("per-instance toJSON closures retain heap that a shared function does not", () => {
-    // given
-    const instances = 10_000;
+    // given: enough closures that their cost, about 6 MB, dwarfs how far a fresh process's heap moves between runs
+    const instances = 100_000;
 
     // when: the pre-fix shape mints a fresh closure per instance, and the post-fix shape shares one hoisted function
     const perInstance = retained("function () { return signature(this); }", instances);
