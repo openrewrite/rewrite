@@ -806,6 +806,18 @@ class TestGeneratedSources:
                 python(None, None, path=Path("pkg/_helper.py")),
             )
 
+    def test_empty_contents_matched_on_its_source_path(self):
+        RecipeSpec(recipe=self._recipe(contents="")).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, "", path=Path("pkg/_helper.py")),
+        )
+
+    def test_empty_contents_matched_when_the_spec_gives_no_path(self):
+        RecipeSpec(recipe=self._recipe(contents="")).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, ""),
+        )
+
     def test_empty_contents_that_do_not_match(self):
         with pytest.raises(AssertionError, match="does not match expected"):
             RecipeSpec(recipe=self._recipe()).rewrite_run(
@@ -822,6 +834,7 @@ class TestGeneratedSources:
 
 
 class TestEmptyAfter:
+    """An empty `after` expects the recipe to leave the file empty."""
 
     def test_an_empty_after_that_does_not_match(self):
         with pytest.raises(AssertionError, match="does not match expected"):
