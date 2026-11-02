@@ -18,7 +18,7 @@ import {Recipe} from "../../recipe";
 import {produceAsync, TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
-import {J} from "../../java";
+import {isIdentifier, isLiteral, J} from "../../java";
 import {create as produce, Draft} from "mutative";
 import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
 
@@ -121,8 +121,8 @@ export class OrderImports extends Recipe {
 
                 // Namespace imports: import * as foo from 'module'
                 if (import_.importClause.namedBindings?.kind === JS.Kind.Alias) {
-                    const alias = import_.importClause.namedBindings as JS.Alias;
-                    if (alias.propertyName.element.simpleName === "*") {
+                    const propertyName = (import_.importClause.namedBindings as JS.Alias).propertyName.element;
+                    if (isIdentifier(propertyName) && propertyName.simpleName === "*") {
                         return ImportCategory.Namespace;
                     }
                 }
@@ -232,7 +232,11 @@ export class OrderImports extends Recipe {
             private getSpecifierSortKey(specifier: JS.ImportSpecifier): string {
                 if (specifier.specifier.kind === JS.Kind.Alias) {
                     // import { foo as bar } - sort by 'foo'
-                    return (specifier.specifier as JS.Alias).propertyName.element.simpleName;
+                    const propertyName = (specifier.specifier as JS.Alias).propertyName.element;
+                    if (isIdentifier(propertyName)) {
+                        return propertyName.simpleName;
+                    }
+                    return isLiteral(propertyName) ? String(propertyName.value) : '';
                 } else if (specifier.specifier.kind === J.Kind.Identifier) {
                     // import { foo } - sort by 'foo'
                     return (specifier.specifier as J.Identifier).simpleName;

@@ -130,7 +130,7 @@ export namespace JS {
      */
     export interface Alias extends JS, Expression {
         readonly kind: typeof Kind.Alias;
-        readonly propertyName: J.RightPadded<J.Identifier>;
+        readonly propertyName: J.RightPadded<Expression>;
         readonly alias: Expression;
     }
 

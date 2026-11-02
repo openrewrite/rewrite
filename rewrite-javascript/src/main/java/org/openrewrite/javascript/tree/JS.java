@@ -323,16 +323,16 @@ public interface JS extends J {
         @With
         Markers markers;
 
-        JRightPadded<J.Identifier> propertyName;
+        JRightPadded<Expression> propertyName;
 
         @With
         Expression alias;
 
-        public J.Identifier getPropertyName() {
+        public Expression getPropertyName() {
             return propertyName.getElement();
         }
 
-        public JS.Alias withPropertyName(J.Identifier propertyName) {
+        public JS.Alias withPropertyName(Expression propertyName) {
             return getPadding().withPropertyName(this.propertyName.withElement(propertyName));
         }
 
@@ -377,11 +377,11 @@ public interface JS extends J {
         public static class Padding {
             private final JS.Alias t;
 
-            public JRightPadded<J.Identifier> getPropertyName() {
+            public JRightPadded<Expression> getPropertyName() {
                 return t.propertyName;
             }
 
-            public JS.Alias withPropertyName(JRightPadded<J.Identifier> propertyName) {
+            public JS.Alias withPropertyName(JRightPadded<Expression> propertyName) {
                 return t.propertyName == propertyName ? t : new JS.Alias(t.id, t.prefix, t.markers, propertyName, t.alias);
             }
         }

@@ -174,6 +174,22 @@ describe('import mapping', () => {
             typescript('import type { } from \'../..\'')
         ));
 
+    test('string literal module export names', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                import { "a-b" as ab, "\\0 add" as add } from "./x";
+                import icss, { /*1*/ 'sheet-button' /*2*/ as /*3*/ button } from "./icss.module.css";
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const namedImports = (cu.statements[0].element as JS.Import).importClause!.namedBindings as JS.NamedImports;
+                const alias = namedImports.elements.elements[0].element.specifier as JS.Alias;
+                expect(alias.kind).toEqual(JS.Kind.Alias);
+                expect(alias.propertyName.element.kind).toEqual(J.Kind.Literal);
+                expect((alias.propertyName.element as J.Literal).value).toEqual("a-b");
+            }
+        }));
+
     test('export import', () =>
         spec.rewriteRun(
             //language=typescript
