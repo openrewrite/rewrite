@@ -33,6 +33,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.Semver;
 
 import java.nio.file.Path;
@@ -151,7 +153,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public Scanned getInitialValue(ExecutionContext ctx) {
         Scanned acc = new Scanned();
-        if (version != null) {
+        // Upgrading to the requested version would break alignment with the family
+        if (version != null && familyPattern == null) {
             acc.upgradeState = upgradeDependencyVersion().getInitialValue(ctx);
         }
         return acc;
@@ -278,14 +281,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return s;
                         }
 
+                        String versionToAdd = Optional.ofNullable(familyVersion(gp)).orElse(version);
                         Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
                             if (jvmTestSuite != null) {
-                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, classifier, extension, metadataFailures, null, ctx)
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, versionToAdd, versionPattern, classifier, extension, metadataFailures, null, ctx)
                                         .visitNonNull(s, ctx);
                             } else {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, versionToAdd, versionPattern, resolvedConfiguration,
                                         classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
                             }
                         }
@@ -352,6 +356,26 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             }
         }
         return false;
+    }
+
+    // The newest version already resolved in the family, so the added dependency aligns with it
+    private @Nullable String familyVersion(GradleProject gp) {
+        if (familyPattern == null) {
+            return null;
+        }
+        String familyVersion = null;
+        for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+            if (!c.isCanBeResolved()) {
+                continue;
+            }
+            for (ResolvedDependency d : c.getResolved()) {
+                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern) &&
+                        (familyVersion == null || new Version(d.getVersion()).compareTo(new Version(familyVersion)) > 0)) {
+                    familyVersion = d.getVersion();
+                }
+            }
+        }
+        return familyVersion;
     }
 
     private UpgradeDependencyVersion upgradeDependencyVersion() {
