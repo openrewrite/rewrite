@@ -16,6 +16,9 @@
 package org.openrewrite.gradle.gradle8;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -206,7 +209,8 @@ class MigrateArchiveClassifierTest implements RewriteTest {
           """
             import example.*
             task docs(type: Jar) { classifier = 'custom' }
-            """
+            """,
+          spec -> spec.mapBeforeRecipe(MigrateArchiveClassifierTest::withoutArchiveTypeAttribution)
         ));
     }
 
@@ -390,8 +394,20 @@ class MigrateArchiveClassifierTest implements RewriteTest {
             task docs(type: Jar) {
                 archiveClassifier = 'docs'
             }
-            """
+            """,
+          spec -> spec.mapBeforeRecipe(MigrateArchiveClassifierTest::withoutArchiveTypeAttribution)
         ));
+    }
+
+    private static G.CompilationUnit withoutArchiveTypeAttribution(G.CompilationUnit cu) {
+        // Model older LSTs explicitly: current parsers can resolve Gradle's Jar despite an unrelated wildcard import.
+        return (G.CompilationUnit) new GroovyIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                J.Identifier id = super.visitIdentifier(identifier, p);
+                return "Jar".equals(id.getSimpleName()) ? id.withType(null).withFieldType(null) : id;
+            }
+        }.visitNonNull(cu, 0);
     }
 
 }
