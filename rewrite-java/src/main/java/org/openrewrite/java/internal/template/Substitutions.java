@@ -204,9 +204,10 @@ public class Substitutions {
             }
         }
         String typeName = TypeUtils.toString(type).replace("$", ".");
-        if (containsLocalOrAnonymousClassName(typeName)) {
+        if (containsLocalOrAnonymousClassName(typeName) || typeName.contains(" & ")) {
             // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
-            // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
+            // or an intersection type (e.g., "List<Serializable & Comparable<?>>"), neither of which is
+            // valid Java source code. Fall back to java.lang.Object for the entire type.
             return "java.lang.Object";
         }
         return typeName;

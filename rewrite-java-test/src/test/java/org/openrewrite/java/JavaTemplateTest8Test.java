@@ -702,6 +702,53 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceContextSensitiveMethodInvocationWithIntersectionTypedParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("singletonList") &&
+                      method.getMethodType() != null &&
+                      method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.util.Collections")) {
+                      return JavaTemplate.builder("List.of(#{any()})")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().toArray());
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      System.out.println(Collections.singletonList(List.of(Map.of("a", "x", "b", true))));
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      System.out.println(List.of(List.of(Map.of("a", "x", "b", true))));
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/8327")
     @Test
     void unreachableCoordinatesFailLoudly() {
