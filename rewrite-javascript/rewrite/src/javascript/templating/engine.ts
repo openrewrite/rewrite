@@ -207,6 +207,19 @@ function isTypeReference(name: string): boolean {
     return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
 }
 
+/** A type as TypeScript writes it, and how tightly it binds, which is where it needs parentheses. */
+interface WrittenType {
+    readonly text: string;
+    readonly binding: 'union' | 'intersection' | 'primary';
+}
+
+/** The TypeScript type of each primitive keyword: the parser types a bigint as a long, and undefined with none. */
+const primitiveTypes = new Map([
+    ['String', 'string'], ['boolean', 'boolean'], ['void', 'void'], ['null', 'null'], ['', 'undefined'],
+    ['long', 'bigint'], ['double', 'number'], ['float', 'number'], ['int', 'number'], ['short', 'number'],
+    ['byte', 'number']
+]);
+
 /**
  * The compiler's diagnostic for code that did not parse, as one line: the marker states it ahead
  * of a stack, and its positions index the whole parsed text, context statements included.
@@ -481,64 +494,97 @@ export class TemplateEngine {
      * Converts a Type instance to a TypeScript type string.
      *
      * @param type The Type instance
-     * @param enclosing The types that `type` is a type argument or element type of
+     * @param enclosing The types that `type` is a type argument, element type, member or bound of
      * @returns A TypeScript type string
      */
     private static typeToString(type: Type, enclosing: Type[] = []): string {
+        return this.writeType(type, enclosing).text;
+    }
+
+    /** {@link typeToString}, with how tightly the type it writes binds, to parenthesize it by. */
+    private static writeType(type: Type, enclosing: Type[]): WrittenType {
         // A recursive type, such as `type A = Array<A>`, is any where it holds itself
         if (enclosing.includes(type)) {
-            return 'any';
+            return {text: 'any', binding: 'primary'};
         }
+        const nested = [...enclosing, type];
+        const primary = (text: string): WrittenType => ({text, binding: 'primary'});
+        const typeArguments = (args: Type[]) => args.map(t => this.typeToString(t, nested)).join(', ');
 
-        // Handle Type.Class and Type.ShallowClass - return their fully qualified names
-        if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
-            const classType = type as Type.Class;
-            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
-            // is no type reference cannot be declared for. Naming a module's type takes a `context`
-            // statement of the caller's own, which `type` then names.
-            return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
-        }
-
-        // Handle Type.Primitive - map to TypeScript primitive types
-        if (type.kind === Type.Kind.Primitive) {
-            const primitiveType = type as Type.Primitive;
-            switch (primitiveType.keyword) {
-                case 'String':
-                    return 'string';
-                case 'boolean':
-                    return 'boolean';
-                case 'double':
-                case 'float':
-                case 'int':
-                case 'long':
-                case 'short':
-                case 'byte':
-                    return 'number';
-                case 'void':
-                    return 'void';
-                default:
-                    return 'any';
+        switch (type.kind) {
+            case Type.Kind.Class:
+            case Type.Kind.ShallowClass: {
+                const classType = type as Type.Class;
+                const name = this.className(classType);
+                // A generic type the parser leaves without its arguments, as it does `Array<T>` where `T`
+                // is a type variable, takes what each of its own type variables stands for
+                return primary(!name ? 'any' :
+                    classType.typeParameters?.length ? `${name}<${typeArguments(classType.typeParameters)}>` : name);
             }
+            case Type.Kind.Parameterized: {
+                // An array, a map or any other generic type, with its type arguments
+                const {type: base, typeParameters} = type as Type.Parameterized;
+                if (typeParameters.length === 0) {
+                    return this.writeType(base, nested);
+                }
+                const name = this.className(base);
+                return primary(name ? `${name}<${typeArguments(typeParameters)}>` : 'any');
+            }
+            case Type.Kind.Primitive:
+                return primary(primitiveTypes.get((type as Type.Primitive).keyword) ?? 'any');
+            case Type.Kind.Array: {
+                const elemType = this.writeType((type as Type.Array).elemType, nested);
+                return primary(`${elemType.binding === 'primary' ? elemType.text : `(${elemType.text})`}[]`);
+            }
+            case Type.Kind.Union: {
+                // A member that could be anything makes the union so too
+                const members = this.writeMembers((type as Type.Union).bounds, nested);
+                const top = members.find(m => m.text === 'any') ?? members.find(m => m.text === 'unknown');
+                return top ?? (members.length === 1 ? members[0] :
+                    {text: members.map(m => m.text).join(' | '), binding: 'union'});
+            }
+            case Type.Kind.Intersection: {
+                // A value of an intersection is a value of each member, so the members that can be written
+                // still type it, where the rest would make it any
+                const all = this.writeMembers((type as Type.Intersection).bounds, nested);
+                const members = all.filter(m => m.text !== 'any' && m.text !== 'unknown');
+                return members.length === 0 ? primary(all.some(m => m.text === 'any') ? 'any' : 'unknown') :
+                    members.length === 1 ? members[0] : {
+                        text: members.map(m => m.binding === 'union' ? `(${m.text})` : m.text).join(' & '),
+                        binding: 'intersection'
+                    };
+            }
+            case Type.Kind.GenericTypeVariable: {
+                // No declaration can name a type variable of the code being edited, so it is what bounds
+                // it, or unknown, as TypeScript reads an unconstrained one
+                const bounds = (type as Type.GenericTypeVariable).bounds;
+                return bounds.length === 0 ? primary('unknown') : this.writeType(bounds.length === 1 ? bounds[0] :
+                    {kind: Type.Kind.Intersection, bounds} as Type.Intersection, nested);
+            }
+            default:
+                // A method, a variable, an annotation or an unknown type
+                return primary('any');
         }
+    }
 
-        // Handle Type.Array - render component type plus []
-        if (type.kind === Type.Kind.Array) {
-            const arrayType = type as Type.Array;
-            const componentTypeString = this.typeToString(arrayType.elemType, [...enclosing, type]);
-            return `${componentTypeString}[]`;
+    /** The distinct members of a union or an intersection as TypeScript writes them. */
+    private static writeMembers(bounds: Type[], enclosing: Type[]): WrittenType[] {
+        const members = new Map<string, WrittenType>();
+        for (const bound of bounds) {
+            const member = this.writeType(bound, enclosing);
+            members.set(member.text, member);
         }
+        return [...members.values()];
+    }
 
-        // An array, a map or any other generic type, with its type arguments
-        if (type.kind === Type.Kind.Parameterized) {
-            const parameterized = type as Type.Parameterized;
-            const base = this.typeToString(parameterized.type);
-            return base === 'any' || parameterized.typeParameters.length === 0 ? base :
-                `${base}<${parameterized.typeParameters.map(t => this.typeToString(t, [...enclosing, type])).join(', ')}>`;
-        }
-
-        // For other types, return 'any' as a fallback
-        // TODO: Implement proper Type to string conversion for other Type.Kind values
-        return 'any';
+    /**
+     * The name of a class, where it is a type reference. A module qualifies its types by where they come from
+     * — `src/a.Foo` — and naming one takes a `context` statement of the caller's own, which `type` then names.
+     */
+    private static className(type: Type): string | undefined {
+        const name = (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) ?
+            (type as Type.Class).fullyQualifiedName : undefined;
+        return name !== undefined && isTypeReference(name) ? name : undefined;
     }
 
     /**
