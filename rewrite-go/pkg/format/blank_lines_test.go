@@ -39,3 +39,15 @@ func TestBlankLinesVisitorLeavesTheVisitedTreeUntouched(t *testing.T) {
 	assert.Equal(t, src, printer.Print(cu))
 	assert.Equal(t, "package p\n\ntype T struct {\n\tA int\n}\n", printer.Print(out))
 }
+
+func TestBlankLinesVisitorDropsTheBlankLinesAFileOpensWith(t *testing.T) {
+	// given a file that opens with blank lines
+	cu, err := parser.NewGoParser().Parse("t.go", "\n\n\n// Package p is a package.\npackage p\n")
+	require.NoError(t, err)
+
+	// when
+	out := NewBlankLinesVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, "// Package p is a package.\npackage p\n", printer.Print(out))
+}

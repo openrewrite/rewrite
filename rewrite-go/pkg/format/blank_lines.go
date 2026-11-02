@@ -57,6 +57,14 @@ func (v *BlankLinesVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
+// VisitCompilationUnit drops the blank lines a file opens with, as gofmt does.
+func (v *BlankLinesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = cu.WithPrefix(adjustSpace(cu.Prefix, func(ws string) string {
+		return ws[strings.LastIndex(ws, "\n")+1:]
+	}))
+	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
 func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
 	if !strings.Contains(s.Whitespace(), "\n\n\n") {
 		return s
