@@ -203,6 +203,84 @@ describe('capture types', () => {
         });
     });
 
+    test('a union, an intersection, a type variable or a generic type left without its arguments is declared as a parse reads it', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`use(${x})`, after: template`${x}.valueOf()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        const name = (t: Type): string => Type.isClass(t) ? t.fullyQualifiedName : Type.isPrimitive(t) ? t.keyword :
+            t.kind === Type.Kind.Union ? (t as Type.Union).bounds.map(name).join(' | ') : 'unknown';
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `
+                    function f<T, D extends Date>(
+                        xs: Array<T>, t: T, d: D, u: string | number, i: Date & {n: 1}, b: bigint
+                    ) {
+                        use(xs);
+                        use(t);
+                        use(d);
+                        use(u);
+                        use(i);
+                        use(b);
+                    }
+                `,
+                `
+                    function f<T, D extends Date>(
+                        xs: Array<T>, t: T, d: D, u: string | number, i: Date & {n: 1}, b: bigint
+                    ) {
+                        xs.valueOf();
+                        t.valueOf();
+                        d.valueOf();
+                        u.valueOf();
+                        i.valueOf();
+                        b.valueOf();
+                    }
+                `
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const calls = (cu.statements[0].element as J.MethodDeclaration).body!.statements
+                    .map(s => (s.element as J.MethodInvocation).methodType!);
+                // What a parse of the same code gives each call
+                expect(calls.map(m => `${name(m.declaringType)} ${name(m.returnType)}`)).toEqual([
+                    'Object Object', 'Object Object', 'Date double',
+                    'unknown String | double', 'Date double', 'BigInt long'
+                ]);
+            }
+        });
+    });
+
+    test('a type is declared as TypeScript writes it, in parentheses where it binds less tightly than where it stands', () => {
+        const variable = (name: string, ...bounds: Type[]) => ({
+            kind: Type.Kind.GenericTypeVariable, name, variance: Type.GenericTypeVariable.Variance.Invariant, bounds
+        } as Type.GenericTypeVariable);
+        const cls = (fullyQualifiedName: string, ...typeParameters: Type[]) =>
+            ({kind: Type.Kind.Class, fullyQualifiedName, typeParameters} as unknown as Type.Class);
+        const union = (...bounds: Type[]) => ({kind: Type.Kind.Union, bounds} as Type.Union);
+        const intersection = (...bounds: Type[]) => ({kind: Type.Kind.Intersection, bounds} as Type.Intersection);
+        const array = (elemType: Type) => ({kind: Type.Kind.Array, elemType, annotations: []} as Type.Array);
+        const {String: str, Double: num, Null: nul, None: undef} = Type.Primitive;
+        expect(TemplateEngine.parameterPreamble([
+            cls('Box', variable('T', str)),
+            intersection(union(str, num), cls('Date'), cls('{}')),
+            array(union(str, undef)),
+            union(str, str, nul),
+            // A module-qualified class can't be named, and an unconstrained type variable could be anything
+            union(str, cls('src/a.Foo')),
+            union(str, variable('T'))
+        ].map(type => ({value: typed(type)})))).toEqual([
+            'let __PLACEHOLDER_0__: Box<string>;',
+            'let __PLACEHOLDER_1__: (string | number) & Date;',
+            'let __PLACEHOLDER_2__: (string | undefined)[];',
+            'let __PLACEHOLDER_3__: string | null;',
+            'let __PLACEHOLDER_5__: unknown;'
+        ]);
+    });
+
     test('capture without type still works', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {

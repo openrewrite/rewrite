@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, javascript, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
+import {capture, javascript, JavaScriptParser, JavaScriptVisitor, JS, pattern, rewrite, template, typescript, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {foundSearchResult} from '../../../src/markers';
@@ -369,5 +369,40 @@ describe('Statement Expression Wrapping', () => {
         });
 
         return spec.rewriteRun(typescript('go()', 'if (ready) {\n    go()\n}'));
+    });
+
+    it('should leave an expression that replaces an argument of the call statement a visitor is on bare', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                const [first] = m.arguments.elements;
+                if (m.name.simpleName !== 'outer' || first.element.kind !== J.Kind.MethodInvocation) {
+                    return m;
+                }
+                // The cursor is on the call, a statement whose own parent takes statements, as the argument is
+                const sum = await template`${first.element} + 1`.apply(first.element, this.cursor);
+                return {...m, arguments: {...m.arguments, elements: [{...first, element: sum!}]}} as J.MethodInvocation;
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(typescript('outer(inner());', 'outer(inner() + 1);'));
+    });
+
+    it('should wrap an expression that a chained rule makes of the argument the first rule unwrapped', () => {
+        const x = capture();
+        const rule = rewrite(() => ({before: pattern`outer(${x})`, after: template`${x}`}))
+            .andThen(rewrite(() => ({before: pattern`inner()`, after: template`inner() + 1`})));
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                // The first result keeps the argument's id, but it stands where the call statement was
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+
+        return spec.rewriteRun(typescript('outer(inner());', 'inner() + 1;'));
     });
 });

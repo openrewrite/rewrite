@@ -46,4 +46,25 @@ describe('rewriting calls that carry type arguments', () => {
             )
         );
     });
+
+    test('a capture fills and matches the class of a `new` with type arguments', async () => {
+        const c = capture('c'), d = capture('d');
+        const rule = rewrite(() => ({before: pattern`make(${c})`, after: template`new ${c}<number>()`}))
+            .orElse(rewrite(() => ({before: pattern`wrap(new ${d}<number>())`, after: template`unwrap(${d})`})));
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                method = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `const a = make(Box);\nconst b = wrap(new Box<number>());`,
+                `const a = new Box<number>();\nconst b = unwrap(Box);`
+            )
+        );
+    });
 });

@@ -32,7 +32,7 @@ import {
     sourceFileCache,
     walk
 } from "../../src/javascript";
-import {J, NameTree} from "../../src/java";
+import {J} from "../../src/java";
 import {Cursor} from "../../src/tree";
 import {randomId} from "../../src/uuid";
 
@@ -643,9 +643,6 @@ async function answersAt<T>(
                 answers.push(ask(this.cursor, identifier));
             }
             return identifier;
-        }
-        protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
-            return await this.visit(nameTree, p) as N;
         }
     }().visit(await parse(source, sourcePath), undefined);
     expect(answers.length).toBeGreaterThan(0);
