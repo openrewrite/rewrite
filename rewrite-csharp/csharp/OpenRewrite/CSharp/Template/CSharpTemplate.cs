@@ -212,7 +212,7 @@ public sealed class CSharpTemplate
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
         }
 
-        tree = TemplateEngine.RetainIds(tree, cursorJ);
+        tree = TemplateEngine.RetainIds(tree, Replaced(cursorJ, coordinates));
 
         // Phase 2: coordinate application (prefix preservation)
         if (coordinates != null)
@@ -227,6 +227,13 @@ public sealed class CSharpTemplate
 
         return tree;
     }
+
+    /// <summary>
+    /// The subtree the result takes the place of: the one the coordinates replace, or the one at the cursor when no
+    /// coordinates are given. Inserting before or after a tree replaces nothing.
+    /// </summary>
+    private static J? Replaced(J? cursorJ, CSharpCoordinates? coordinates) =>
+        coordinates == null ? cursorJ : coordinates.Mode == CoordinateMode.Replace ? coordinates.Tree : null;
 
     /// <summary>
     /// Extract the J element from a cursor value, unwrapping JRightPadded/JLeftPadded

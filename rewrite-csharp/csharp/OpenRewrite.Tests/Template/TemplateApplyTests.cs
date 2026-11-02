@@ -337,6 +337,30 @@ public class TemplateApplyTests : RewriteTest
         Assert.Equal(IdsOf(result).Count, IdsOf(result).Distinct().Count());
     }
 
+    /// <summary>
+    /// Only the code the coordinates replace leaves the tree, so a capture from code that stays gets an id of its own.
+    /// </summary>
+    [Fact]
+    public void CaptureKeepsItsIdOnlyWhereTheCoordinatesReplaceItsCode()
+    {
+        var a = Capture.Expression("a");
+        var cu = Parse("class C { void M(int x) { Console.Write(x); Console.Write(1); } }");
+        var writes = FindFirst<MethodDeclaration>(cu)!.Body!.Statements
+            .Select(J (s) => s.Element is ExpressionStatement es ? es.Expression : s.Element)
+            .Cast<MethodInvocation>().ToList();
+        var x = writes[0].Arguments.Elements[0].Element;
+        var cursor = new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu), writes[0]);
+        var match = CSharpPattern.Expression($"Console.Write({a})").Match(writes[0], cursor.Parent!)!;
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({a})");
+
+        MethodInvocation ApplyAt(CSharpCoordinates coordinates) =>
+            (MethodInvocation)tmpl.Apply(cursor, values: match, coordinates: coordinates)!;
+
+        Assert.Equal(x.Id, ApplyAt(CSharpCoordinates.Replace(writes[0])).Arguments.Elements[0].Element.Id);
+        Assert.NotEqual(x.Id, ApplyAt(CSharpCoordinates.Replace(writes[1])).Arguments.Elements[0].Element.Id);
+        Assert.NotEqual(x.Id, ApplyAt(CSharpCoordinates.Before(writes[0])).Arguments.Elements[0].Element.Id);
+    }
+
     private static List<Guid> IdsOf(J tree)
     {
         var ids = new List<Guid>();
