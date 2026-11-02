@@ -35,7 +35,8 @@ public static class CSharpParenthesizeVisitor
         // Fast exit: simple expression types never need parenthesization
         if (newTree is not (Binary or Unary or Ternary or Assignment or AssignmentOperation
             or TypeCast or CsBinary or CsUnary or IsPattern or RangeExpression
-            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf))
+            or SwitchExpression or WithExpression or Lambda or AwaitExpression or QueryExpression or InstanceOf
+            or NullSafeExpression))
             return newTree;
 
         var originalTree = cursor.Value;
@@ -103,7 +104,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     public override J VisitTernary(Ternary ternary, P p)
     {
         var t = _recursive ? (Ternary)base.VisitTernary(ternary, p) : ternary;
-        return MaybeWrapTernary(t);
+        return MaybeWrapBinaryLike(t);
     }
 
     public override J VisitTypeCast(TypeCast cast, P p)
@@ -191,6 +192,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return MaybeWrapAssignment(q);
     }
 
+    public override J VisitNullSafeExpression(NullSafeExpression nullSafeExpression, P p)
+    {
+        var n = _recursive ? base.VisitNullSafeExpression(nullSafeExpression, p) : nullSafeExpression;
+        return n is NullSafeExpression nse && NeedsParenthesesInSlot(nse) ? CSharpPrecedences.Parenthesize(nse) : n;
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
@@ -228,25 +235,15 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return expr;
     }
 
-    private J MaybeWrapTernary(Expression expr)
-    {
-        var parentCursor = Cursor.ParentTree;
-        var parent = parentCursor.Value;
-
-        // Ternary (prec -1) needs parens inside most expression contexts.
-        // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
-        // so a ternary used as the condition of another ternary needs parens.
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary or InstanceOf or ConstantPattern
-            or RelationalPattern || NeedsParenthesesInSlot(expr))
-            return CSharpPrecedences.Parenthesize(expr);
-
-        return expr;
-    }
-
     private J MaybeWrapAssignment(Expression expr)
     {
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
+
+        // A conditional's branches take any expression, so c ? a : b = 1 assigns in its branch
+        if (parent is Ternary conditional && conditional.Markers.FindFirst<NullCoalescing>() == null &&
+            conditional.Condition.Id != expr.Id)
+            return expr;
 
         // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
         if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern or InstanceOf or ConstantPattern
@@ -258,8 +255,9 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
     /// <summary>
     /// Whether <paramref name="expr"/> binds looser than its slot allows: a cast, <c>await</c> and a range take a
-    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access or
-    /// element access a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep their parentheses.
+    /// unary expression, a switch expression a range, a with expression a switch expression, and a member access,
+    /// element access or postfix <c>!</c> a primary one, so <c>(object)(b + c)</c> and <c>(b + c).ToString()</c> keep
+    /// their parentheses.
     /// </summary>
     private bool NeedsParenthesesInSlot(Expression expr)
     {
@@ -275,13 +273,28 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             FieldAccess fa when fa.Target.Id == expr.Id => PrimaryPrecedence,
             MethodInvocation mi when mi.Select?.Element.Id == expr.Id => PrimaryPrecedence,
             ArrayAccess aa when aa.Indexed.Id == expr.Id => PrimaryPrecedence,
+            NullSafeExpression nse when nse.Expression.Id == expr.Id => PrimaryPrecedence,
+            CsUnary { Operator.Element: CsUnary.OperatorKind.SuppressNullableWarning } cu
+                when cu.Expression.Id == expr.Id => PrimaryPrecedence,
             _ => null
         };
         if (required == null)
             return false;
+        // Bare, a member access after x?.y! would join the conditional access, as x?.y!.z does
+        if (parent is FieldAccess or MethodInvocation or ArrayAccess && expr is NullSafeExpression receiver &&
+            IsConditionalAccess(receiver.Expression))
+            return true;
         // x as T ends in a type, so the parser applies a switch or a with after it to all of x as T
         if (expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } &&
             parent is SwitchExpression or WithExpression)
+            return false;
+        // So do x is string and x is int i, but the parser reads x is Foo switch { ... } as a test against a constant
+        if (parent is SwitchExpression && expr is InstanceOf or IsPattern && EndsInTypeOrPattern(expr))
+            return false;
+        // x as string.. too, but the parser reads the Foo.. of x as Foo.. as a qualified name and int?.. as ?.
+        if (parent is RangeExpression { Start: not null } startOf && startOf.Start.Element.Id == expr.Id &&
+            expr is CsBinary { Operator.Element: CsBinary.OperatorType.As } asType &&
+            (asType.Right is ArrayType or PointerType or TupleType || IsKeywordType(asType.Right)))
             return false;
         var precedence = expr switch
         {
@@ -297,6 +310,29 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     }
 
     /// <summary>
+    /// Whether <paramref name="expr"/> is a conditional access such as <c>x?.y</c> or <c>x?[0].y!</c>, which a member
+    /// access printed after it would extend.
+    /// </summary>
+    private static bool IsConditionalAccess(Expression? expr)
+    {
+        while (expr != null)
+        {
+            if (expr is FieldAccess or MethodInvocation or ArrayAccess && expr.Markers.FindFirst<NullSafe>() != null)
+                return true;
+            expr = expr switch
+            {
+                FieldAccess fa => fa.Target,
+                MethodInvocation mi => mi.Select?.Element,
+                ArrayAccess aa => aa.Indexed,
+                NullSafeExpression nse => nse.Expression,
+                CsUnary { Operator.Element: CsUnary.OperatorKind.SuppressNullableWarning } cu => cu.Expression,
+                _ => null
+            };
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Whether the parser reads <c>(T)</c> before <paramref name="expr"/> as a parenthesized value and a binary
     /// operator, as it reads <c>(Foo)-x</c>: a name in parentheses is a cast only when a token that can't continue
     /// an expression follows it.
@@ -304,9 +340,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     private static bool CastReadsAsValue(TypeCast cast, Expression expr)
     {
         var type = cast.Clazz.Tree.Element;
-        if (type is Primitive or NullableType or ArrayType or PointerType ||
-            type is Identifier { SimpleName: "object" or "string" or "bool" or "byte" or "sbyte" or "char" or
-                "decimal" or "double" or "float" or "int" or "uint" or "long" or "ulong" or "short" or "ushort" })
+        if (type is NullableType or ArrayType or PointerType || IsKeywordType(type))
             return false;
         Expression? leftmost = expr;
         while (LeftOperand(leftmost) is { } next)
@@ -316,6 +350,28 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
                leftmost is CsUnary { Operator.Element: CsUnary.OperatorKind.AddressOf or
                    CsUnary.OperatorKind.PointerType or CsUnary.OperatorKind.FromEnd };
     }
+
+    private static bool IsKeywordType(J type) =>
+        type is Primitive || type is Identifier { SimpleName: "object" or "string" or "bool" or "byte" or "sbyte" or
+            "char" or "decimal" or "double" or "float" or "int" or "uint" or "long" or "ulong" or "short" or "ushort" };
+
+    /// <summary>
+    /// Whether the type test or pattern <paramref name="expr"/> ends in a token that can't continue an expression: a
+    /// type other than a name, a designation, or a closing brace, bracket or parenthesis.
+    /// </summary>
+    private static bool EndsInTypeOrPattern(J expr) => expr switch
+    {
+        InstanceOf io => io.Pattern != null || io.Clazz is TypeTree && EndsInTypeOrPattern(io.Clazz),
+        IsPattern ip => EndsInTypeOrPattern(ip.Pattern.Element),
+        CsBinary { Operator.Element: CsBinary.OperatorType.Or or CsBinary.OperatorType.And } combined =>
+            EndsInTypeOrPattern(combined.Right),
+        CsUnary { Operator.Element: CsUnary.OperatorKind.Not } negated => EndsInTypeOrPattern(negated.Expression),
+        StatementExpression or PropertyPattern or ListPattern or DeconstructionPattern or Parentheses<Expression> =>
+            true,
+        Identifier or FieldAccess or PointerFieldAccess => IsKeywordType(expr),
+        TypeTree => true,
+        _ => false
+    };
 
     private bool NeedsParenthesesInContext(Expression expr)
     {
@@ -343,6 +399,14 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             bool isRight = parentTernary.FalsePart.Element.Id == expr.Id;
             return CSharpPrecedences.NeedsParentheses(expr, parentTernary, isRight);
         }
+
+        // A conditional's branches take any expression, and its condition one that binds at least as tightly as ??
+        if (parent is Ternary conditional)
+            return conditional.Condition.Id == expr.Id && CSharpPrecedences.GetPrecedence(expr) < 0;
+
+        // An interpolation's format starts at its first : that no parentheses enclose, so $"{c ? a : b}" doesn't parse
+        if (parent is Interpolation)
+            return expr is Ternary hole && hole.Markers.FindFirst<NullCoalescing>() == null;
 
         if (parent is IsPattern)
         {
