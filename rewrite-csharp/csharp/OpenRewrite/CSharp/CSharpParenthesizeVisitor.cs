@@ -103,7 +103,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     public override J VisitTernary(Ternary ternary, P p)
     {
         var t = _recursive ? (Ternary)base.VisitTernary(ternary, p) : ternary;
-        return MaybeWrapTernary(t);
+        return MaybeWrapBinaryLike(t);
     }
 
     public override J VisitTypeCast(TypeCast cast, P p)
@@ -228,21 +228,6 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return expr;
     }
 
-    private J MaybeWrapTernary(Expression expr)
-    {
-        var parentCursor = Cursor.ParentTree;
-        var parent = parentCursor.Value;
-
-        // Ternary (prec -1) needs parens inside most expression contexts.
-        // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
-        // so a ternary used as the condition of another ternary needs parens.
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary or InstanceOf or ConstantPattern
-            or RelationalPattern || NeedsParenthesesInSlot(expr))
-            return CSharpPrecedences.Parenthesize(expr);
-
-        return expr;
-    }
-
     private J MaybeWrapAssignment(Expression expr)
     {
         var parentCursor = Cursor.ParentTree;
@@ -343,6 +328,10 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
             bool isRight = parentTernary.FalsePart.Element.Id == expr.Id;
             return CSharpPrecedences.NeedsParentheses(expr, parentTernary, isRight);
         }
+
+        // A conditional's branches take any expression, and its condition one that binds at least as tightly as ??
+        if (parent is Ternary conditional)
+            return conditional.Condition.Id == expr.Id && CSharpPrecedences.GetPrecedence(expr) < 0;
 
         if (parent is IsPattern)
         {

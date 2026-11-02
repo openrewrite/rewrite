@@ -740,6 +740,29 @@ public class TemplateApplyTests : RewriteTest
     }
 
     /// <summary>
+    /// <c>??</c> groups to the right and a conditional's branches take any expression, so another conditional or
+    /// <c>??</c> needs parentheses only on the left of <c>??</c> or as the condition of a conditional.
+    /// </summary>
+    [Theory]
+    [InlineData("c ?? ", "", "a ?? b", "c ?? a ?? b")]
+    [InlineData("", " ?? c", "a ?? b", "(a ?? b) ?? c")]
+    [InlineData("c ?? ", "", "x ? y : z", "c ?? (x ? y : z)")]
+    [InlineData("x ? y : ", "", "a ?? b", "x ? y : a ?? b")]
+    [InlineData("x ? ", " : z", "a ?? b", "x ? a ?? b : z")]
+    [InlineData("", " ? y : z", "a ?? b", "a ?? b ? y : z")]
+    [InlineData("x ? y : ", "", "c ? d : e", "x ? y : c ? d : e")]
+    [InlineData("x ? ", " : z", "c ? d : e", "x ? c ? d : e : z")]
+    [InlineData("", " ? y : z", "c ? d : e", "(c ? d : e) ? y : z")]
+    [InlineData("Console.WriteLine(", ")", "a ?? b ?? c", "Console.WriteLine(a ?? b ?? c)")]
+    [InlineData("Console.WriteLine(", ")", "c ? a : b ? d : e", "Console.WriteLine(c ? a : b ? d : e)")]
+    public void CaptureUnderConditionalOrNullCoalescingMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
     /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
     /// </summary>
     [Theory]
