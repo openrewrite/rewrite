@@ -35,11 +35,15 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
         CONTINUATION_INDENT = auto()
 
     def __init__(self, style: TabsAndIndentsStyle, other: OtherStyle = IntelliJ.other(),
-                 stop_after: Optional[Tree] = None):
+                 stop_after: Optional[Tree] = None, keep_indent: bool = False):
+        """With ``keep_indent``, a tree visited with a parent cursor keeps the indentation of the line it starts
+        and indents its other lines from there, as a tree that took the place of another should."""
         self._stop_after = stop_after
         self._style = style
         self._other = other
         self._stop = False
+        self._keep_indent = keep_indent
+        self._keeps_next_indent = False
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[J]:
         if self._stop:
@@ -70,6 +74,7 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
                 if isinstance(next_parent, J):
                     self.pre_visit(next_parent, p)
                     break
+            self._keeps_next_indent = self._keep_indent
 
         return super().visit(tree, p)
 
@@ -105,6 +110,13 @@ class TabsAndIndentsVisitor(PythonVisitor[P]):
     def visit_space(self, space: Optional[Space], p: P) -> Space:
         if space is None:
             return space  # ty: ignore[invalid-return-type]
+
+        if self._keeps_next_indent:
+            # Every visit method visits its node's prefix first, so this is the prefix of the tree visited.
+            self._keeps_next_indent = False
+            if '\n' in space.last_whitespace:
+                self.cursor.put_message("last_indent", self.find_indent(space))
+                return space
 
         space_context = self.cursor.get_nearest_message("space_context")
         parent = self.cursor.parent
