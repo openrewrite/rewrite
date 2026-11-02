@@ -143,6 +143,8 @@ public final class UvLockEngine {
         UvLock lock;
         try {
             lock = UvLockReader.parse(oldLockContent);
+        } catch (UvLockUnsupportedException e) {
+            return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null, null, e.getMessage()));
         } catch (UvLockFormatException e) {
             return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, null,
                     "Existing uv.lock could not be parsed: " + e.getMessage()));
@@ -157,7 +159,12 @@ public final class UvLockEngine {
             return Result.failure(new Failure(Reason.MALFORMED_MANIFEST, null, null, detail));
         }
         try {
-            return new Run(pyproject, lock, ctx).regenerate();
+            Result result = new Run(pyproject, lock, ctx).regenerate();
+            // uv leaves a lock that satisfies the manifest untouched, whatever spellings it reads it in
+            if (result.isSuccess() && UvLockWriter.write(lock).equals(result.getLockFileContent())) {
+                return Result.success(oldLockContent, result.getDetail());
+            }
+            return result;
         } catch (PythonIndexException e) {
             return Result.failure(indexFailure(null, e));
         } catch (UvLockFormatException e) {
