@@ -54,10 +54,13 @@ def formatting_listener(listener: FormattingListener) -> Iterator[None]:
 
 
 class AutoFormatVisitor(PythonVisitor[P]):
-    def __init__(self, stop_after: Optional[Tree] = None, keep_indent: bool = False):
-        """``keep_indent`` is passed on to `TabsAndIndentsVisitor`."""
+    def __init__(self, stop_after: Optional[Tree] = None, keep_indent: bool = False,
+                 replaced: Optional[Tree] = None):
+        """``keep_indent`` is passed on to `TabsAndIndentsVisitor`, and ``replaced``, the tree the one formatted
+        takes the place of, to `BlankLinesVisitor`."""
         self._stop_after = stop_after
         self._keep_indent = keep_indent
+        self._replaced = replaced
 
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
         if isinstance(tree, SourceFile) and not self.is_acceptable(tree, p):
@@ -73,7 +76,8 @@ class AutoFormatVisitor(PythonVisitor[P]):
 
         tree = MinimumViableSpacingVisitor(self._stop_after).visit(tree, p, self._cursor.fork())
 
-        tree = BlankLinesVisitor(cu.get_style(BlankLinesStyle) or IntelliJ.blank_lines(), self._stop_after).visit(tree, p, self._cursor.fork())
+        tree = BlankLinesVisitor(cu.get_style(BlankLinesStyle) or IntelliJ.blank_lines(), self._stop_after,
+                                 self._replaced).visit(tree, p, self._cursor.fork())
 
         tree = SpacesVisitor(cu.get_style(SpacesStyle) or IntelliJ.spaces(), self._stop_after).visit(tree, p, self._cursor.fork())
 
