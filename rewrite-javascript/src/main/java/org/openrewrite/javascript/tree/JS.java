@@ -343,13 +343,15 @@ public interface JS extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return propertyName.getElement().getType();
+            return propertyName.getElement() instanceof J.Literal ? alias.getType() : propertyName.getElement().getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public Alias withType(@Nullable JavaType type) {
-            return withPropertyName(propertyName.getElement().withType(type));
+            return propertyName.getElement() instanceof J.Literal ?
+                    withAlias(alias.withType(type)) :
+                    withPropertyName(propertyName.getElement().withType(type));
         }
 
         @Transient
