@@ -39,7 +39,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     // For `:rewrite-javascript:generateTestClasspath` — bundles org.openrewrite.maven.rpc.JavaRewriteRpc,
     // the main class spawned by JavaRpcTestServer in test/rpc/.
     testRuntimeOnly(project(":rewrite-maven"))
@@ -308,7 +308,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
