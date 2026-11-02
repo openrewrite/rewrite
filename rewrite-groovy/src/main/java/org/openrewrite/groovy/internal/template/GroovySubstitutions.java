@@ -15,12 +15,61 @@
  */
 package org.openrewrite.groovy.internal.template;
 
+import org.openrewrite.Cursor;
+import org.openrewrite.groovy.marker.AsStyleTypeCast;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptySet;
+import static org.openrewrite.Tree.randomId;
 
 public class GroovySubstitutions extends Substitutions {
     public GroovySubstitutions(String code, Object[] parameters) {
         super(code, emptySet(), parameters);
+    }
+
+    /**
+     * Groovy casts a prefix expression however the cast is written, and `x as T` binds below the shifts but above
+     * `<`, `in` and `==`, so a cast operand needs parentheses only where it binds more loosely than that.
+     */
+    @Override
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        Object parent = cursor.getParentTreeCursor().getValue();
+        if (parent instanceof J.TypeCast) {
+            boolean asCast = ((J.TypeCast) parent).getMarkers().findFirst(AsStyleTypeCast.class).isPresent();
+            if (newTree instanceof J.Unary || asCast && bindsAsTightlyAsAs(newTree)) {
+                return newTree;
+            } else if (newTree instanceof G.Binary && ((G.Binary) newTree).getOperator() != G.Binary.Type.Access) {
+                return new J.Parentheses<>(randomId(), newTree.getPrefix(), Markers.EMPTY,
+                        JRightPadded.build(newTree.withPrefix(Space.EMPTY)));
+            }
+        }
+        return super.maybeParenthesize(newTree, cursor);
+    }
+
+    private static boolean bindsAsTightlyAsAs(Expression e) {
+        if (e instanceof J.Binary) {
+            switch (((J.Binary) e).getOperator()) {
+                case Multiplication:
+                case Division:
+                case Modulo:
+                case Addition:
+                case Subtraction:
+                case LeftShift:
+                case RightShift:
+                case UnsignedRightShift:
+                    return true;
+                default:
+                    return false;
+            }
+        } else if (e instanceof G.Binary) {
+            G.Binary.Type operator = ((G.Binary) e).getOperator();
+            return operator == G.Binary.Type.Power || operator == G.Binary.Type.Access ||
+                   operator == G.Binary.Type.NotInstanceOf;
+        }
+        // `x instanceof T as boolean` is `(x instanceof T) as boolean`
+        return e instanceof J.InstanceOf || e instanceof J.TypeCast;
     }
 }

@@ -563,6 +563,50 @@ class GroovyTemplateTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizeCastOperandWithGroovyPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "asInt" -> "#{any()} as int";
+                      case "asBoolean" -> "#{any()} as boolean";
+                      case "toInteger" -> "(Integer) #{any()}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return GroovyTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+              }
+          })),
+          groovy(
+            """
+              def a = 1
+              def b = 2
+              def l = [1]
+              def sum = asInt(a + b)
+              def shifted = asInt(a << b)
+              def negated = toInteger(-a)
+              def member = asBoolean(a in l)
+              def less = asBoolean(a < b)
+              """,
+            """
+              def a = 1
+              def b = 2
+              def l = [1]
+              def sum = a + b as int
+              def shifted = a << b as int
+              def negated = (Integer) -a
+              def member = (a in l) as boolean
+              def less = (a < b) as boolean
+              """
+          ));
+    }
+
+    @Test
     void replaceArgumentsOfExplicitConstructorInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new GroovyVisitor<>() {
