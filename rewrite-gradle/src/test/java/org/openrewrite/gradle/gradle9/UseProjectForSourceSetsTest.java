@@ -52,7 +52,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
             subprojects {
                 dependencies {
                     compileOnly project(':core')
-                    compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath
+                    compileOnly project(path: ':core', configuration: 'runtimeElements')
+                    compileOnly rootProject.project(':core').sourceSets.main.output
                 }
             }
             subprojects.each { project ->
@@ -72,7 +73,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
             """,
             """
             dependencies {
-                compileOnly(rootProject.project( /* keep */ ':core').sourceSets.main.runtimeClasspath)
+                compileOnly(project(path: ':core', configuration: 'runtimeElements'))
+                compileOnly(rootProject.project( /* keep */ ':core').sourceSets.main.output)
                 implementation rootProject.project(':core').sourceSets.test.output
             }
             """));
@@ -196,7 +198,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
                 project(':other')
             }
             allprojects {
-                dependencies { compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath }
+                dependencies { compileOnly project(path: ':core', configuration: 'runtimeElements')
+                    compileOnly rootProject.project(':core').sourceSets.main.output }
             }
             """));
     }
@@ -277,7 +280,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
             configure(subprojects.findAll { it.name != 'core' }) {
                 dependencies {
                     compileOnly project(':core')
-                    compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath
+                    compileOnly project(path: ':core', configuration: 'runtimeElements')
+                    compileOnly rootProject.project(':core').sourceSets.main.output
                 }
             }
             subprojects.each { project -> println project.name }
@@ -326,8 +330,9 @@ class UseProjectForSourceSetsTest implements RewriteTest {
         try (var input = getClass().getResourceAsStream("/org/openrewrite/gradle/gradle9/project-source-sets/build.gradle")) {
             assert input != null;
             String before = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-            rewriteRun(buildGradle(before, before.replace("compileOnly project(':core').sourceSets",
-                    "compileOnly rootProject.project(':core').sourceSets")));
+            rewriteRun(buildGradle(before, before.replace("compileOnly project(':core').sourceSets.main.runtimeClasspath",
+                    "compileOnly project(path: ':core', configuration: 'runtimeElements')\n" +
+                    "        compileOnly rootProject.project(':core').sourceSets.main.output")));
         }
     }
 
@@ -340,7 +345,8 @@ class UseProjectForSourceSetsTest implements RewriteTest {
                 dependencies { compileOnly project(':core').sourceSets.main.runtimeClasspath }
                 """,
                 """
-                dependencies { compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath }
+                dependencies { compileOnly project(path: ':core', configuration: 'runtimeElements')
+                    compileOnly rootProject.project(':core').sourceSets.main.output }
                 """,
                 spec -> spec.beforeRecipe(cu -> new GroovyIsoVisitor<Void>() {
                     @Override
@@ -349,6 +355,104 @@ class UseProjectForSourceSetsTest implements RewriteTest {
                         return super.visitMethodInvocation(method, unused).withMethodType(null);
                     }
                 }.visitNonNull(cu, null))));
+    }
+
+    @Test
+    void onlyDirectCompileOnlyMainRuntimeClasspathUsesVariant() {
+        rewriteRun(buildGradle(
+            """
+            dependencies {
+                compileOnly project(':core').sourceSets.main.runtimeClasspath
+                compileOnly project(':core').sourceSets.test.runtimeClasspath
+                compileOnly project(':core').sourceSets.main.compileClasspath
+                println project(':core').sourceSets.main.runtimeClasspath
+                implementation project(':core').sourceSets.main.runtimeClasspath
+            }
+            """,
+            """
+            dependencies {
+                compileOnly project(path: ':core', configuration: 'runtimeElements')
+                compileOnly rootProject.project(':core').sourceSets.main.output
+                compileOnly project(':core').sourceSets.test.runtimeClasspath
+                compileOnly project(':core').sourceSets.main.compileClasspath
+                println project(':core').sourceSets.main.runtimeClasspath
+                implementation project(':core').sourceSets.main.runtimeClasspath
+            }
+            """));
+    }
+
+    @Test
+    void doesNotTreatCompositeFileCollectionAsProjectDependency() {
+        rewriteRun(buildGradle(
+            """
+            dependencies {
+                compileOnly files(project(':core').sourceSets.main.runtimeClasspath)
+                compileOnly project(':core').sourceSets.main.runtimeClasspath.files
+            }
+            """));
+    }
+
+    @Test
+    void explicitAndDeclarativeViewsUnchanged() {
+        rewriteRun(buildGradle("""
+            dependencies {
+                compileOnly rootProject.project(':core').sourceSets.main.runtimeClasspath
+                compileOnly project(path: ':core', configuration: 'runtimeElements')
+                compileOnly other.project(':core').sourceSets.main.runtimeClasspath
+            }
+            """));
+    }
+
+    @Test
+    void compileOnlyShadowNotReinterpretedAsDependency() {
+        rewriteRun(buildGradle(
+            """
+            def compileOnly(Object value) { println value }
+            dependencies { compileOnly project(':core').sourceSets.main.runtimeClasspath }
+            """));
+    }
+
+    @Test
+    void splitKeepsCommentsOnceAndTreeIdsUnique() {
+        rewriteRun(buildGradle(
+            """
+            dependencies {
+                // keep declaration
+                compileOnly /* notation */ project( /* path */ ":core") /* project */ .sourceSets /* sets */ .main /* main */ .runtimeClasspath // trailing
+            }
+            """,
+            """
+            dependencies {
+                // keep declaration
+                compileOnly project(path: ":core", configuration: 'runtimeElements')
+                compileOnly /* notation */ rootProject.project( /* path */ ":core") /* project */ .sourceSets /* sets */ .main /* main */ .output // trailing
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<java.util.Set<java.util.UUID>>() {
+                @Override
+                public J preVisit(J tree, java.util.Set<java.util.UUID> ids) {
+                    org.junit.jupiter.api.Assertions.assertTrue(ids.add(tree.getId()), "duplicate tree id: " + tree.getId());
+                    return tree;
+                }
+            }.visit(cu, new java.util.HashSet<>()))));
+    }
+
+    @Test
+    void unsupportedResolvingViewsRemainUnchanged() {
+        rewriteRun(buildGradle("""
+            dependencies {
+                compileOnly((project(':core').sourceSets.main).runtimeClasspath)
+                compileOnly project(':core').sourceSets.main.getRuntimeClasspath()
+            }
+            """));
+    }
+
+    @Test
+    void variantDoesNotOverrideExtraCompileOnlyShadow() {
+        rewriteRun(buildGradle("""
+            ext.compileOnly = { value -> println value }
+            dependencies { compileOnly project(':core').sourceSets.main.runtimeClasspath }
+            """));
     }
 
 }

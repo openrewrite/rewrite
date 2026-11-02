@@ -14,4 +14,6 @@
  * limitations under the License.
  */
 package example;
-public class Plugin { public String message() { return Core.message(); } }
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
+public class Plugin { public String message() { return StringUtils.trim(Core.message()) + ":" + DigestUtils.md5Hex(""); } }
