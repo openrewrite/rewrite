@@ -233,6 +233,11 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
+        // A conditional's branches take any expression, so c ? a : b = 1 assigns in its branch
+        if (parent is Ternary conditional && conditional.Markers.FindFirst<NullCoalescing>() == null &&
+            conditional.Condition.Id != expr.Id)
+            return expr;
+
         // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
         if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern or InstanceOf or ConstantPattern
             or RelationalPattern || NeedsParenthesesInSlot(expr))

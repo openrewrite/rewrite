@@ -763,6 +763,27 @@ public class TemplateApplyTests : RewriteTest
     }
 
     /// <summary>
+    /// An assignment, a lambda or a query runs as far right as it can, which in a conditional's branch is the end of
+    /// the branch, so only the condition and the operands of <c>??</c> need parentheses around one.
+    /// </summary>
+    [Theory]
+    [InlineData("x ? y : ", "", "b = 1", "x ? y : b = 1")]
+    [InlineData("x ? ", " : z", "b += 1", "x ? b += 1 : z")]
+    [InlineData("x ? null : ", "", "() => b", "x ? null : () => b")]
+    [InlineData("x ? ", " : null", "b => b", "x ? b => b : null")]
+    [InlineData("x ? ", " : null", "b => c ? d : e", "x ? b => c ? d : e : null")]
+    [InlineData("x ? ", " : ys", "from q in xs select q", "x ? from q in xs select q : ys")]
+    [InlineData("", " ? y : z", "b = c", "(b = c) ? y : z")]
+    [InlineData("c ?? ", "", "b = 1", "c ?? (b = 1)")]
+    [InlineData("", " ?? c", "b = 1", "(b = 1) ?? c")]
+    public void CaptureInBranchOfConditionalMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
     /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
     /// </summary>
     [Theory]
