@@ -669,15 +669,7 @@ internal static class TemplateEngine
     {
         var visitor = new SubstitutionVisitor(values);
         visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        tree = visitor.VisitNonNull(tree, 0);
-
-        // Auto-parenthesize substituted expressions that may need parens in their
-        // new context within the template (e.g., a || b substituted into && position)
-        var parenthesizer = new CSharpParenthesizeVisitor<int>();
-        parenthesizer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        tree = parenthesizer.VisitNonNull(tree, 0);
-
-        return tree;
+        return visitor.VisitNonNull(tree, 0);
     }
 
     /// <summary>

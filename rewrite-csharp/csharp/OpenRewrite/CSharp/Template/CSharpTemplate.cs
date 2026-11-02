@@ -204,15 +204,20 @@ public sealed class CSharpTemplate
             tree = TemplateEngine.ApplySubstitutions(tree, values);
         }
 
-        // Phase 1.5: check if the result needs wrapping when grafted into the cursor position.
-        // Inner precedence is already handled by ApplySubstitutions (which runs a recursive
-        // CSharpParenthesizeVisitor after substitution); this only checks the root vs. cursor parent.
+        // Before the parentheses: the parenthesizer finds a node's slot by its id, and a capture spliced into two
+        // slots would otherwise have one id in both
+        tree = TemplateEngine.RetainIds(tree, Replaced(cursorJ, coordinates));
+
+        // Phase 1.5: parenthesize the captures for their slots in the template, then the result's root for the
+        // cursor's position
+        if (values != null)
+        {
+            tree = CSharpParenthesizeVisitor.ParenthesizeDeep(tree);
+        }
         if (tree is Expression expr && cursorJ != null)
         {
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
         }
-
-        tree = TemplateEngine.RetainIds(tree, Replaced(cursorJ, coordinates));
 
         // Phase 2: coordinate application (prefix preservation)
         if (coordinates != null)

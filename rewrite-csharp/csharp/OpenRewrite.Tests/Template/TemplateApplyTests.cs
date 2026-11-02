@@ -361,6 +361,38 @@ public class TemplateApplyTests : RewriteTest
         Assert.NotEqual(x.Id, ApplyAt(CSharpCoordinates.Before(writes[0])).Arguments.Elements[0].Element.Id);
     }
 
+    /// <summary>
+    /// The parenthesizer finds a capture's slot by its id, so each copy of a capture spliced into two slots is
+    /// parenthesized for its own.
+    /// </summary>
+    [Theory]
+    [InlineData("", " ?? ", "", "b ?? c", "(b ?? c) ?? b ?? c")]
+    [InlineData("", " - ", "", "x - y", "x - y - (x - y)")]
+    [InlineData("", " + ", "", "x - y", "x - y + (x - y)")]
+    [InlineData("", " ? ", " : z", "c ? d : e", "(c ? d : e) ? c ? d : e : z")]
+    public void CaptureInTwoSlotsMatchesFreshParse(string before, string middle, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{middle}{a}{after}"), captured, expected);
+    }
+
+    [Fact]
+    public void RecipeBuiltNullCoalescingInTwoSlotsKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        var coalescing = new CsBinary(Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "b", null, null),
+            new JLeftPadded<CsBinary.OperatorType>(Space.SingleSpace, CsBinary.OperatorType.NullCoalescing),
+            new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], "c", null, null), null);
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = coalescing }, null);
+
+        var result = CSharpTemplate.Expression($"{a} ?? {a}")
+            .Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        Assert.Equal("(b ?? c) ?? b ?? c", new CSharpPrinter<int>().Print(result));
+    }
+
     private static List<Guid> IdsOf(J tree)
     {
         var ids = new List<Guid>();
