@@ -75,8 +75,9 @@ public static class RoslynFormatter
             source = printer.Print(mvsCu);
         }
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var formatting = targetSubtree == null ? null : new HashSet<Guid> { targetSubtree.Id };
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, formatting);
 
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
@@ -249,8 +250,8 @@ public static class RoslynFormatter
         if (spans.Count == 0)
             return originalCu;
 
-        // 3. Get style from marker (attached during parsing) or fall back to defaults
-        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
+        // 3. Get style from marker (attached during parsing) or fall back to defaults, indented as the file is
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? IndentationDetector.DefaultFor(cu, nodeIds);
 
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
