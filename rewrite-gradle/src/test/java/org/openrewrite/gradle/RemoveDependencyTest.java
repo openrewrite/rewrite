@@ -565,7 +565,7 @@ class RemoveDependencyTest implements RewriteTest {
           settingsGradle(
             """
               rootProject.name = 'OpenRewrite-example'
-              include 'example'
+              include 'subproject'
               """
           ),
           mavenProject(
