@@ -1,0 +1,24 @@
+plugins { id 'java' }
+
+allprojects {
+    jar {
+        manifest {
+            attributes('Existing': 'retained')
+            attributes += ['Main-Class':'pt.lsts.neptus.loader.NeptusMain']
+        }
+    }
+}
+
+tasks.register('verifyManifest') {
+    dependsOn jar
+    doLast {
+        def artifact = new java.util.jar.JarFile(tasks.jar.archiveFile.get().asFile)
+        try {
+            assert artifact.manifest.mainAttributes.getValue('Existing') == 'retained'
+            assert artifact.manifest.mainAttributes.getValue('Main-Class') == 'pt.lsts.neptus.loader.NeptusMain'
+        } finally {
+            artifact.close()
+        }
+    }
+}
+check.dependsOn verifyManifest
