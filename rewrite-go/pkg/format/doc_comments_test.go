@@ -29,9 +29,13 @@ func TestDocCommentRun(t *testing.T) {
 			src:  "package p\n\n//a\n\t\t//b\nfunc A() {}\n",
 			want: "package p\n\n// a\n// b\nfunc A() {}\n",
 		},
-		"indented token documents nothing": {
+		"indented token is documented, as it is once at the margin": {
 			src:  "package p\n\n//a\n\t\tfunc A() {}\n",
-			want: "package p\n\n//a\n\t\tfunc A() {}\n",
+			want: "package p\n\n// a\n\t\tfunc A() {}\n",
+		},
+		"indented run is a doc comment": {
+			src:  "package p\n\n  //a\n  func A() {}\n",
+			want: "package p\n\n  // a\n  func A() {}\n",
 		},
 		"blank line ends the run": {
 			src:  "package p\n\n//a\n\n//b\nfunc A() {}\n",
@@ -58,6 +62,30 @@ func TestDocCommentRun(t *testing.T) {
 				t.Errorf("got  %q\nwant %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestAutoFormatFormatsTheDocCommentOfAnIndentedDeclarationInOneRun(t *testing.T) {
+	// given a doc comment and the declaration it documents, both indented
+	p := parser.NewGoParser()
+	p.ParseOnly = true
+	cu, err := p.Parse("t.go", "  //Package p is a package.\n  package p\n\n  //A does nothing.\n  func A() {}\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	// when
+	once := runAutoFormat(cu)
+	again, err := p.Parse("t.go", once)
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	twice := runAutoFormat(again)
+
+	// then
+	want := "// Package p is a package.\npackage p\n\n// A does nothing.\nfunc A() {}\n"
+	if once != want || twice != want {
+		t.Errorf("once  %q\ntwice %q\nwant  %q", once, twice, want)
 	}
 }
 

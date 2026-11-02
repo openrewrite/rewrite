@@ -26,6 +26,19 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 )
 
+func TestTabsAndIndentsVisitorSetsTheFilesDeclarationsAtTheMargin(t *testing.T) {
+	// given a package clause, an import and declarations written indented, some
+	// under directives
+	cu, err := parser.NewGoParser().Parse("t.go", "  // Package p is a package.\n  package p\n\n\timport \"fmt\"\n\n  var V = fmt.Sprint()\n\n    // F does nothing.\n    func F() {\n  }\n\n  //go:noinline\n  func G() {}\n\n\t//go:generate stringer -type K\n\ttype K int\n")
+	require.NoError(t, err)
+
+	// when
+	out := NewTabsAndIndentsVisitor(nil).Visit(cu, nil)
+
+	// then
+	assert.Equal(t, "// Package p is a package.\npackage p\n\nimport \"fmt\"\n\nvar V = fmt.Sprint()\n\n// F does nothing.\nfunc F() {\n}\n\n//go:noinline\nfunc G() {}\n\n//go:generate stringer -type K\ntype K int\n", printer.Print(out))
+}
+
 func TestTabsAndIndentsVisitorIndentsALaterImportDeclaration(t *testing.T) {
 	// given a second import declaration written indented
 	cu, err := parser.NewGoParser().Parse("t.go", "package p\n\nimport \"fmt\"\n\n  import \"os\"\n\nvar _ = fmt.Sprint\nvar _ = os.Args\n")

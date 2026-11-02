@@ -110,22 +110,17 @@ func canonicalDoc(s java.Space, atFileStart bool) java.Space {
 func docCommentRun(s java.Space, atFileStart bool) (int, bool) {
 	comments := s.Comments()
 	last := len(comments) - 1
-	// Only the line break itself may stand between the run and the token it
-	// documents: go/printer leaves an indented token undocumented.
-	if last < 0 || comments[last].Suffix != "\n" {
+	// Only a line break may stand between the run and the token it documents.
+	// An indent there doesn't count, since TabsAndIndentsVisitor moves the token
+	// to the margin, where go/printer reads the run as its doc comment.
+	if last < 0 || strings.TrimRight(comments[last].Suffix, " \t") != "\n" {
 		return 0, false
 	}
 	for start := last; ; start-- {
 		// A run reaching the start of s, or preceded by anything other than a
 		// single line break, is as far back as this doc comment goes.
 		if start == 0 {
-			if s.Whitespace() == "" && !atFileStart {
-				return 0, false
-			}
-			if s.Whitespace() != "" && !strings.HasSuffix(s.Whitespace(), "\n") {
-				return 0, false
-			}
-			return 0, true
+			return 0, atFileStart || strings.Contains(s.Whitespace(), "\n")
 		}
 		if !joinsLines(comments[start-1].Suffix) {
 			return start, strings.Contains(comments[start-1].Suffix, "\n")
