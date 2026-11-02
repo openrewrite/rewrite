@@ -156,9 +156,7 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 		return nil, false
 	}
 
-	var parser comment.Parser
-	var printer comment.Printer
-	text := string(printer.Comment(parser.Parse(prose.String())))
+	text := settledDocText(prose.String())
 
 	out := make([]java.Comment, 0, len(run)+len(directives)+1)
 	for text != "" {
@@ -192,6 +190,26 @@ func canonicalDocComment(run []java.Comment) ([]java.Comment, bool) {
 	out[len(out)-1].Suffix = run[len(run)-1].Suffix
 	return out, true
 }
+
+// settledDocText formats doc comment text with go/doc/comment until the text
+// stops changing. One pass can print a code block straight above a list, which
+// the next pass reads back as a single code block, as gofmt's next run does.
+func settledDocText(text string) string {
+	var parser comment.Parser
+	var printer comment.Printer
+	for range maxDocCommentPasses {
+		formatted := string(printer.Comment(parser.Parse(text)))
+		if formatted == text {
+			break
+		}
+		text = formatted
+	}
+	return text
+}
+
+// maxDocCommentPasses bounds settledDocText. A third pass changes nothing in
+// any doc comment of the standard library, as written or re-whitespaced.
+const maxDocCommentPasses = 4
 
 // docLine builds one comment line, taking everything but the text from an
 // existing line of the same run.

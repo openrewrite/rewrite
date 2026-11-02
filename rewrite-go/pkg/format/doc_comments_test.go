@@ -89,6 +89,31 @@ func TestAutoFormatFormatsTheDocCommentOfAnIndentedDeclarationInOneRun(t *testin
 	}
 }
 
+func TestDocCommentVisitorSettlesTextItsFirstPassLeavesUnsettled(t *testing.T) {
+	// given a code line above a list, which go/doc/comment prints with no blank
+	// line between them and reads back as a single code block
+	p := parser.NewGoParser()
+	p.ParseOnly = true
+	cu, err := p.Parse("t.go", "package p\n\n//     code\n//   - item\n//     more\nfunc F() {}\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	// when
+	once := printer.Print(NewDocCommentVisitor(nil).Visit(cu, nil))
+	again, err := p.Parse("t.go", once)
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	twice := printer.Print(NewDocCommentVisitor(nil).Visit(again, nil))
+
+	// then
+	want := "package p\n\n//\t\tcode\n//\t  - item\n//\t    more\nfunc F() {}\n"
+	if once != want || twice != want {
+		t.Errorf("once  %q\ntwice %q\nwant  %q", once, twice, want)
+	}
+}
+
 func TestDocCommentFormattingIsIdempotent(t *testing.T) {
 	// go/doc/comment rewrites this text again on a second pass when it is read
 	// alone; grouped with the line above it, as go/ast groups it, the first
