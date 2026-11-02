@@ -82,6 +82,16 @@ func wrapped(n int) string {
 	select {
 	case v := <-ch:
 		joined += fmt.Sprint(v)
+	case <-func() chan int {
+		return ch
+	}():
+	}
+	switch {
+	case strings.HasPrefix(
+		joined,
+		"a",
+	), n > 1:
+		joined += "b"
 	}
 	return fmt.Sprintf(
 		"%s-%d",
