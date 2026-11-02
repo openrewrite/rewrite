@@ -36,6 +36,7 @@ import * as os from "os";
 import {spawnSync} from "child_process";
 import {isDeepStrictEqual} from "util";
 import * as YAML from "yaml";
+import * as semver from "semver";
 
 /**
  * Configuration for each package manager.
@@ -193,28 +194,101 @@ interface InstallOptions {
     env?: Record<string, string>;
 }
 
+/** A conflicting declaration must not produce a resolution graph from another manager's lock. */
+export class PackageManagerSelectionError extends Error {
+}
+
+export interface PackageManagerSelection {
+    readonly packageManager: PackageManager;
+    readonly root: string;
+    readonly lockFile?: string;
+}
+
+function declaredPackageManager(manifest: unknown): PackageManager | undefined {
+    if (!manifest || typeof manifest !== "object") return undefined;
+    const value = (manifest as {packageManager?: unknown}).packageManager;
+    if (typeof value !== "string") return undefined;
+    const match = /^(npm|pnpm|bun|yarn)@(.+)$/.exec(value);
+    const version = match && semver.valid(match[2].split("+", 1)[0]);
+    if (!match || !version) return undefined;
+    switch (match[1]) {
+        case "npm": return PackageManager.Npm;
+        case "pnpm": return PackageManager.Pnpm;
+        case "bun": return PackageManager.Bun;
+        case "yarn": return semver.major(version) === 1 ? PackageManager.YarnClassic : PackageManager.YarnBerry;
+        default: return undefined;
+    }
+}
+
 /**
- * Detects the package manager used in a directory by checking for lock files.
- *
- * @param dir The directory to check
- * @returns The detected package manager, or undefined if none found
+ * Select a lock and its manager together. The nearest supported pinned declaration takes precedence over lock
+ * filename order, including when a workspace member inherits it. An explicit parser boundary limits the walk.
+ * The supplied manifest is the parser input at startDir, which may differ from the file on disk.
  */
-export function detectPackageManager(dir: string): PackageManager | undefined {
-    for (const config of LOCK_FILE_DETECTION) {
-        const lockPath = path.join(dir, config.filename);
-        if (fs.existsSync(lockPath)) {
-            if (typeof config.packageManager === 'function') {
-                try {
-                    const content = fs.readFileSync(lockPath, 'utf-8');
-                    return config.packageManager(content);
-                } catch {
-                    continue;
+export function selectPackageManager(startDir: string, rootDir?: string, manifest?: unknown): PackageManagerSelection | undefined {
+    const dirs: string[] = [];
+    const stop = rootDir === undefined ? undefined : path.resolve(rootDir);
+    for (let dir = path.resolve(startDir); ; dir = path.dirname(dir)) {
+        dirs.push(dir);
+        if (dir === stop || path.dirname(dir) === dir) break;
+    }
+    let declared: {manager: PackageManager, root: string} | undefined;
+    for (const dir of dirs) {
+        let pkg: unknown = dir === dirs[0] ? manifest : undefined;
+        if (pkg === undefined) {
+            try { pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); }
+            catch { continue; }
+        }
+        const manager = declaredPackageManager(pkg);
+        if (manager !== undefined) {
+            declared = {manager, root: dir};
+            break;
+        }
+    }
+    if (declared) {
+        const filename = getLockFileName(declared.manager);
+        for (const dir of dirs) {
+            const lockFile = path.join(dir, filename);
+            if (!fs.existsSync(lockFile)) continue;
+            if (filename === "yarn.lock") {
+                const actual = isYarnBerryLockFile(fs.readFileSync(lockFile, "utf8")) ?
+                    PackageManager.YarnBerry : PackageManager.YarnClassic;
+                if (actual !== declared.manager) {
+                    throw new PackageManagerSelectionError(
+                        `packageManager selects ${declared.manager}, but ${lockFile} contains ${actual}`);
                 }
             }
-            return config.packageManager;
+            return {packageManager: declared.manager, root: dir, lockFile};
+        }
+        const foreign = dirs.flatMap(dir => LOCK_FILE_DETECTION
+            .map(config => path.join(dir, config.filename)).filter(file => fs.existsSync(file)));
+        if (foreign.length) {
+            throw new PackageManagerSelectionError(
+                `packageManager selects ${declared.manager}, but ${filename} is missing; other lock files: ${foreign.join(", ")}`);
+        }
+        return {packageManager: declared.manager, root: declared.root};
+    }
+    // Without a recognized declaration, retain the existing nearest-lock/filename precedence.
+    for (const dir of dirs) {
+        for (const config of LOCK_FILE_DETECTION) {
+            const lockFile = path.join(dir, config.filename);
+            if (!fs.existsSync(lockFile)) continue;
+            if (typeof config.packageManager !== "function") {
+                return {packageManager: config.packageManager, root: dir, lockFile};
+            }
+            try {
+                return {packageManager: config.packageManager(fs.readFileSync(lockFile, "utf8")), root: dir, lockFile};
+            } catch {
+                return {packageManager: PackageManager.YarnClassic, root: dir, lockFile};
+            }
         }
     }
     return undefined;
+}
+
+/** Detect the manager selected by the declaration and locks in this directory. */
+export function detectPackageManager(dir: string): PackageManager | undefined {
+    return selectPackageManager(dir, dir)?.packageManager;
 }
 
 /**
