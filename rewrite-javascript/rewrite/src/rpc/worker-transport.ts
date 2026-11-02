@@ -234,6 +234,7 @@ const SMALL_MESSAGE = 4096;
 
 interface Serving {
     objectId: string;
+    params: { id: string, sourceFileType?: string };
     // JSON of the ids of GetObject requests not yet answered
     waiting: string[];
     pageReady: boolean;
@@ -362,7 +363,7 @@ export class StdioRelay {
     }
 
     private startServe(id: string, params: { id: string, sourceFileType?: string }): void {
-        this.serving = {objectId: params.id, waiting: [id], pageReady: false};
+        this.serving = {objectId: params.id, params, waiting: [id], pageReady: false};
         this.port.postMessage({t: "serve", params} satisfies ToWorker);
     }
 
@@ -410,7 +411,16 @@ export class StdioRelay {
                 break;
             }
             case "served": {
+                const finished = this.serving;
                 this.serving = undefined;
+                // A request for this object that arrived after its last page but before this message is
+                // a new transfer of the object, with no page of this one left to answer it.
+                if (finished && finished.waiting.length > 0) {
+                    const [first, ...rest] = finished.waiting;
+                    this.startServe(first, finished.params);
+                    this.serving!.waiting.push(...rest);
+                    break;
+                }
                 const next = this.queuedServes.shift();
                 if (next) {
                     this.startServe(next.id, next.params);
