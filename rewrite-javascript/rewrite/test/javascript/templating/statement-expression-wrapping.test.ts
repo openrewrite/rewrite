@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
+import {capture, javascript, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {foundSearchResult} from '../../../src/markers';
@@ -239,6 +239,42 @@ describe('Statement Expression Wrapping', () => {
         });
     });
 
+    it('should wrap an expression that replaces the statement of a with statement', () => {
+        const spec = new RecipeSpec();
+        const operand = capture('operand');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitUnary(unary: J.Unary, p: any): Promise<J | undefined> {
+                const match = await pattern`!${operand}`.match(unary, this.cursor);
+                return match ? template`${operand}`.apply(unary, this.cursor, {values: match}) :
+                    super.visitUnary(unary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(javascript('with (o) !x;', 'with (o) x;'));
+    });
+
+    it('should wrap an expression that replaces a statement of a for head, but not its condition', () => {
+        const spec = new RecipeSpec();
+        const [name, bound] = [capture('name'), capture('bound')];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitVariableDeclarations(declarations: J.VariableDeclarations, p: any): Promise<J | undefined> {
+                const match = await pattern`let ${name} = 0`.match(declarations, this.cursor);
+                return match ? template`${name} = 0`.apply(declarations, this.cursor, {values: match}) :
+                    super.visitVariableDeclarations(declarations, p);
+            }
+
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const match = await pattern`i < ${bound}`.match(binary, this.cursor);
+                return match ? template`i <= ${bound}`.apply(binary, this.cursor, {values: match}) :
+                    super.visitBinary(binary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(typescript('for (let i = 0; i < n;) {\n}', 'for (i = 0; i <= n;) {\n}'));
+    });
+
     it('should make a statement that replaces the expression of an expression statement the statement itself', () => {
         const spec = new RecipeSpec();
         const [a, b, object] = [capture('a'), capture('b'), capture('object')];
@@ -261,6 +297,52 @@ describe('Statement Expression Wrapping', () => {
             {...typescript(`foo['bar'];`, 'foo.bar;'), afterRecipe: expectParserShaped},
             // a `for` head holds every expression in an expression statement
             {...typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}'), afterRecipe: expectParserShaped}
+        );
+    });
+
+    it('should make a statement that no expression holds, made of the expression of an expression statement, the statement itself', () => {
+        const spec = new RecipeSpec();
+        const [cond, call, value] = [capture('cond'), capture('call'), capture('value')];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const match = await pattern`${cond} && ${call}`.match(binary, this.cursor);
+                if (match) {
+                    return template`if (${cond}) ${call}`.apply(binary, this.cursor, {values: match});
+                }
+                const sum = await pattern`${value} + 1`.match(binary, this.cursor);
+                return sum ? template`yield ${value}`.apply(binary, this.cursor, {values: sum}) :
+                    super.visitBinary(binary, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            typescript('cond && doIt();', 'if (cond) doIt();'),
+            // the parser holds a `yield` in a JS.StatementExpression wherever it stands
+            typescript('function* g() {\n    x + 1;\n}', 'function* g() {\n    yield x;\n}')
+        );
+    });
+
+    it('should make a type tree that replaces the expression of a type tree expression the type tree itself', () => {
+        const spec = new RecipeSpec();
+        const object = capture('object');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTypeTreeExpression(typeTree: JS.TypeTreeExpression, p: any): Promise<J | undefined> {
+                return super.visitTypeTreeExpression(foundSearchResult(typeTree, 'found'), p);
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+                const match = await pattern`${object}['bar']`.match(arrayAccess, this.cursor);
+                return match ? template`${object}.bar`.apply(arrayAccess, this.cursor, {values: match}) :
+                    super.visitArrayAccess(arrayAccess, p);
+            }
+        });
+
+        // rewriteRun compares the trees with a fresh parse of the text they print
+        return spec.rewriteRun(
+            typescript(`new foo['bar']();`, 'new /*~~(found)~~>*/foo.bar();'),
+            typescript(`new  foo['bar'];`, 'new  /*~~(found)~~>*/foo.bar;'),
+            typescript(`class A extends foo['bar'] {\n}`, 'class A extends /*~~(found)~~>*/foo.bar {\n}')
         );
     });
 
