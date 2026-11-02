@@ -1140,6 +1140,47 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// A file that leaves the members of its namespace flush gets template results indented as it indents, rather than
+    /// a level deeper for the namespace.
+    /// </summary>
+    [Fact]
+    public void AutoFormatsTemplateResultIndentationInNamespaceWithFlushMembers()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceWithIfBlockRecipe()),
+            CSharp(
+                """
+                namespace N
+                {
+                class C
+                {
+                    void M()
+                    {
+                        Console.Write(42);
+                    }
+                }
+                }
+                """,
+                """
+                namespace N
+                {
+                class C
+                {
+                    void M()
+                    {
+                        if (true)
+                        {
+                            Console.WriteLine(42);
+                        }
+                    }
+                }
+                }
+                """
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================

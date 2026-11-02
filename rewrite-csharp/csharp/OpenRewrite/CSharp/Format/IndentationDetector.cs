@@ -68,6 +68,17 @@ internal static class IndentationDetector
             _ => CSharpFormatStyle.Default.WithIndentation(useTabs, size, tabSize));
     }
 
+    /// <summary>
+    /// The whitespace before a node that starts a line, from the start of that line, or null when the node doesn't
+    /// start one.
+    /// </summary>
+    private static string? LineIndentation(Space prefix)
+    {
+        var whitespace = prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace;
+        var lineStart = whitespace.LastIndexOf('\n');
+        return lineStart < 0 ? null : whitespace[(lineStart + 1)..];
+    }
+
     private sealed class Statistics
     {
         public int Depth;
@@ -77,11 +88,8 @@ internal static class IndentationDetector
 
         public void Record(Space prefix)
         {
-            var whitespace = prefix.Comments.Count > 0 ? prefix.Comments[^1].Suffix : prefix.Whitespace;
-            var lineStart = whitespace.LastIndexOf('\n');
-            if (lineStart < 0 || Depth == 0)
+            if (LineIndentation(prefix) is not { } indentation || Depth == 0)
                 return;
-            var indentation = whitespace[(lineStart + 1)..];
             var tabs = indentation.Count(c => c == '\t');
             var spaces = indentation.Count(c => c == ' ');
             if (tabs + spaces == 0)
@@ -135,7 +143,8 @@ internal static class IndentationDetector
 
         public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, Statistics statistics)
         {
-            if (ns.Name.Markers.FindFirst<Semicolon>() != null)
+            // A file-scoped namespace is no level of nesting, nor is one whose members the file leaves flush
+            if (ns.Name.Markers.FindFirst<Semicolon>() != null || LeavesMembersFlush(ns))
                 return base.VisitNamespaceDeclaration(ns, statistics);
             statistics.Depth++;
             foreach (var member in ns.Members)
@@ -143,6 +152,23 @@ internal static class IndentationDetector
             var result = base.VisitNamespaceDeclaration(ns, statistics);
             statistics.Depth--;
             return result;
+        }
+
+        /// <summary>
+        /// Whether the first member of <paramref name="ns"/> that starts a line, of those not about to be reindented,
+        /// starts in the column of the namespace itself.
+        /// </summary>
+        private bool LeavesMembersFlush(NamespaceDeclaration ns)
+        {
+            var own = LineIndentation(ns.Prefix) ?? ns.Prefix.Whitespace;
+            foreach (var member in ns.Members)
+            {
+                var (id, prefix) = RoslynFormatter.PrintableIdAndPrefix(member.Element);
+                if (!formatting.Contains(id) && !formatting.Contains(member.Element.Id) &&
+                    LineIndentation(prefix) is { } indentation)
+                    return indentation == own;
+            }
+            return false;
         }
 
         private void Record(Statement statement, Statistics statistics)

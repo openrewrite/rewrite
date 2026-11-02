@@ -48,6 +48,34 @@ public class AutoFormatTests : RewriteTest
         Assert.Contains("    {", result);
     }
 
+    /// <summary>
+    /// Roslyn always indents the members of a namespace with braces, but this file leaves them flush.
+    /// </summary>
+    [Fact]
+    public void FormatKeepsTheMembersOfANamespaceFlushWhereTheFileDoes()
+    {
+        var cu = _parser.Parse(
+            "namespace N\n{\nclass C\n{\n    int x;\n    void M()\n    {\n    Foo();\n    }\n}\n}\n");
+
+        var formatted = _printer.Print(RoslynFormatter.Format(cu));
+
+        Assert.Equal("namespace N\n{\nclass C\n{\n    int x;\n    void M()\n    {\n        Foo();\n    }\n}\n}\n",
+            formatted);
+    }
+
+    /// <summary>
+    /// The first member of such a namespace moves to its column too, on the line the file gives it.
+    /// </summary>
+    [Fact]
+    public void FormatMovesTheFirstMemberOfANamespaceFlushWhereTheFileDoes()
+    {
+        var cu = _parser.Parse("namespace N\n{\n    class B\n    {\n    int y;\n    }\nclass A\n{\n    int x;\n}\n}\n");
+
+        var formatted = _printer.Print(RoslynFormatter.Format(cu, FindFirst<ClassDeclaration>(cu), stopAfter: null));
+
+        Assert.Equal("namespace N\n{\nclass B\n{\n    int y;\n}\nclass A\n{\n    int x;\n}\n}\n", formatted);
+    }
+
     [Fact]
     public void FormatsUsingStatements()
     {
