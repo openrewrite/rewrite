@@ -86,6 +86,18 @@ public class CSharpUnwrapParenthesesTests
     }
 
     [Fact]
+    public void IsUnwrappable_SameOpOnRight_False()
+    {
+        // a + (b + c) => cannot unwrap, a + b + c parses as (a + b) + c
+        var parens = MakeParens(MakeBinary(Binary.OperatorType.Addition, MakeId("b"), MakeId("c")));
+        var parent = MakeBinary(Binary.OperatorType.Addition, MakeId("a"), parens);
+        var root = new Cursor(null, "root");
+        var parentCursor = new Cursor(root, parent);
+        var parensCursor = new Cursor(parentCursor, parens);
+        Assert.False(CSharpUnwrapParentheses<int>.IsUnwrappable(parensCursor));
+    }
+
+    [Fact]
     public void IsUnwrappable_InsideTypeCast_False()
     {
         // (int)(x) => cannot unwrap parens that are the expression of a type cast

@@ -13,10 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
+import {
+    capture,
+    JavaScriptParser,
+    JavaScriptVisitor,
+    JS,
+    pattern,
+    Template,
+    template,
+    typescript
+} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
 import {ExecutionContext} from '../../../src';
+import {expectParserShaped} from '../../test-util';
 
 describe('object literals in templates and patterns', () => {
     async function parseExpression(code: string): Promise<J> {
@@ -112,6 +122,26 @@ describe('object literals in templates and patterns', () => {
                 `http.post(url, {headers: h, withCredentials: true, responseType: 'text'})`
             )
         );
+    });
+
+    test('one member passed as a parameter is a member of the object literal', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J | undefined> {
+                const options = newClass.arguments.elements[0]?.element;
+                const members = options?.kind === J.Kind.NewClass ? (options as J.NewClass).body?.statements : [];
+                if (newClass.class && members?.length === 1) {
+                    return Template.builder().code('new E({\n  a: 1,\n  ').param(members[0].element).code(',\n})')
+                        .build().apply(newClass, this.cursor);
+                }
+                return super.visitNewClass(newClass, p);
+            }
+        });
+        return spec.rewriteRun(...[
+            typescript('new E({b: 2});', 'new E({\n    a: 1,\n    b: 2,\n});'),
+            typescript('new E({b() {}});', 'new E({\n    a: 1,\n    b() {},\n});'),
+            typescript('new E({...b});', 'new E({\n    a: 1,\n    ...b,\n});')
+        ].map(source => ({...source, afterRecipe: expectParserShaped})));
     });
 
     test('a variadic capture in an object literal pattern matches its properties', async () => {

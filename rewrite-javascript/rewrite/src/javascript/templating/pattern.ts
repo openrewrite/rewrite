@@ -756,6 +756,16 @@ class Matcher {
                 opensWithBrace(this.pattern.templateParts) && this.ast.kind !== J.Kind.Block);
         }
 
+        // A visit reaches what parentheses hold right after them, so seeing through them here would match it twice
+        if ((this.ast.kind === J.Kind.Parentheses || this.ast.kind === J.Kind.ControlParentheses) &&
+            this.patternAst.kind !== this.ast.kind) {
+            if (this.debugOptions.enabled) {
+                this.setExplanation('kind-mismatch', 'An expression without parentheses',
+                    `Parentheses (${this.ast.kind.split('.').pop()})`,
+                    'The expression the parentheses hold is matched on its own');
+            }
+            return false;
+        }
         return this.matchNode(this.patternAst, this.ast);
     }
 

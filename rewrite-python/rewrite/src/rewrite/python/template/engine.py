@@ -72,8 +72,7 @@ def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor'
     target = coordinates.tree
     if not isinstance(target, Statement):
         return False
-    ambiguous = isinstance(target, Expression) and \
-        not isinstance(target, (py.ExpressionStatement, py.StatementExpression))
+    ambiguous = isinstance(target, Expression) and not isinstance(target, py.ExpressionStatement)
     if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
             or cursor is None or getattr(cursor.value, 'id', None) != target.id:
         return True

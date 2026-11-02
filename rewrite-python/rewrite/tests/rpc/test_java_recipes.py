@@ -24,9 +24,21 @@ Note: These tests require the Java RPC server infrastructure:
 Or set the REWRITE_PYTHON_CLASSPATH environment variable.
 """
 
+from pathlib import Path
+
 import pytest
 
+from rewrite import InMemoryExecutionContext, random_id
+from rewrite.markers import Markers
+from rewrite.parser import ParseError
+from rewrite.rpc.rpc_recipe import JavaRecipeVisitor, PreparedJavaRecipe
 from rewrite.test import RecipeSpec, python
+
+
+def test_a_file_the_parser_failed_on_is_not_sent_to_java():
+    error = ParseError(random_id(), Markers.EMPTY, Path("a.py"), None, "utf-8", False, None, "x = 1\n", None)
+    prepared = PreparedJavaRecipe("unused", "org.openrewrite.java.ChangeMethodName", "edit:unused", None, {})
+    assert JavaRecipeVisitor(prepared).visit(error, InMemoryExecutionContext()) is error
 
 
 @pytest.mark.requires_java_rpc

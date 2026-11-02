@@ -114,14 +114,6 @@ _PY_BINARY_PRECEDENCE = {
     py.Binary.Type.StringConcatenation: Precedence.PRIMARY,
 }
 
-_ASSOCIATIVE = frozenset({j.Binary.Type.And, j.Binary.Type.Or})
-"""Operators whose right operand may stay unparenthesized at its own precedence.
-
-`and`/`or` are grammar, not the object protocol: both groupings call `__bool__`
-on the same operands in order and yield the same one. An overloadable operator
-is absent — `+` regroups differently on floats, `|`/`&`/`^` on `__ror__` dispatch.
-"""
-
 _UNARY_PRECEDENCE = {
     j.Unary.Type.Not: Precedence.NOT,
     j.Unary.Type.Negative: Precedence.UNARY,
@@ -278,8 +270,14 @@ def maybe_parenthesize(parent: Optional[J], child_id: UUID, expression: J) -> J:
     return expression
 
 
-def parenthesize(expression: Expression) -> j.Parentheses:
-    """Wraps in `J.Parentheses`, moving the prefix out so the surrounding whitespace survives."""
+def parenthesize(expression: Expression) -> Expression:
+    """Parenthesizes as the parser reads the parenthesized text: a bare tuple or generator gets back its own
+    parentheses, and anything else is wrapped in `J.Parentheses` with the prefix moved out."""
+    if isinstance(expression, py.CollectionLiteral) and _omits_parentheses(expression.padding.elements):
+        elements = expression.padding.elements
+        return expression.padding.replace(_elements=elements.replace(markers=_with_parentheses(elements.markers)))
+    if isinstance(expression, py.ComprehensionExpression) and _omits_parentheses(expression):
+        return expression.replace(markers=_with_parentheses(expression.markers))
     return j.Parentheses(
         _id=random_id(),
         _prefix=expression.prefix,
@@ -311,19 +309,25 @@ def _binary_slot(parent, child_id: UUID) -> Optional[SlotConstraints]:
     if not is_left and _id_of(parent.right) != child_id:
         return None
 
+    if parent.operator == py.Binary.Type.StringConcatenation:
+        # Adjacent strings make one atom, and `'a' ('b')` is a call rather than `'a' 'b'`
+        return None
     if precedence == Precedence.COMPARISON:
         # Comparisons chain rather than associate, so `(a < b) < c` and `a < b < c` differ
         return SlotConstraints(precedence + 1)
     if precedence == Precedence.POWER:
         # `**` is right-associative, and `-a ** b` means `-(a ** b)`, so its left operand takes no unary
         return SlotConstraints(Precedence.AWAIT if is_left else Precedence.UNARY)
-    if parent.operator in _ASSOCIATIVE:
-        return SlotConstraints(precedence)
+    # Left-associative: the right operand of an equally binding operator needs parentheses
     return SlotConstraints(precedence if is_left else precedence + 1)
 
 
 def _omits_parentheses(node) -> bool:
     return node is not None and any(isinstance(m, OmitParentheses) for m in node.markers.markers)
+
+
+def _with_parentheses(markers: Markers) -> Markers:
+    return markers.replace(markers=[m for m in markers.markers if not isinstance(m, OmitParentheses)])
 
 
 def _is_dot_adjacent_number(expression: J) -> bool:

@@ -132,6 +132,14 @@ func (v *tallier) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J
 	return cu
 }
 
+// countingSpec runs r, which counts on the ExecutionContext that the tests of
+// its sharing look at.
+func countingSpec(r recipe.Recipe) *RecipeSpec {
+	spec := NewRecipeSpec().WithRecipe(r)
+	spec.CheckExecutionContextUnchanged = false
+	return spec
+}
+
 type deleteFile struct {
 	recipe.Base
 	path string
@@ -175,8 +183,7 @@ func TestScannerSeesTheSourcesBeforeAnyRecipeEditsThem(t *testing.T) {
 }
 
 func TestExecutionContextIsSharedAcrossSourceFiles(t *testing.T) {
-	NewRecipeSpec().
-		WithRecipe(&tally{count: true, report: true}).
+	countingSpec(&tally{count: true, report: true}).
 		RewriteRun(t,
 			Golang(`
 				package main
@@ -192,11 +199,10 @@ func TestExecutionContextIsSharedAcrossSourceFiles(t *testing.T) {
 }
 
 func TestExecutionContextIsSharedAcrossRecipes(t *testing.T) {
-	NewRecipeSpec().
-		WithRecipe(&recipeList{recipes: []recipe.Recipe{
-			&tally{count: true},
-			&tally{report: true},
-		}}).
+	countingSpec(&recipeList{recipes: []recipe.Recipe{
+		&tally{count: true},
+		&tally{report: true},
+	}}).
 		RewriteRun(t, Golang(`
 			package main
 		`, `
@@ -218,11 +224,10 @@ func TestRecipeDeletingASourceFile(t *testing.T) {
 }
 
 func TestLaterRecipesDoNotEditADeletedSourceFile(t *testing.T) {
-	NewRecipeSpec().
-		WithRecipe(&recipeList{recipes: []recipe.Recipe{
-			&deleteFile{path: "a.go"},
-			&tally{count: true, report: true},
-		}}).
+	countingSpec(&recipeList{recipes: []recipe.Recipe{
+		&deleteFile{path: "a.go"},
+		&tally{count: true, report: true},
+	}}).
 		RewriteRun(t,
 			Golang(`
 				package main

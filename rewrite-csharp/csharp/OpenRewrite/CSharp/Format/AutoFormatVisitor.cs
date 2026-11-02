@@ -33,6 +33,7 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
 
     public override J VisitCompilationUnit(CompilationUnit cu, P p)
     {
+        FormattingListener.BeforeFormat(cu, _stopAfter, Cursor);
         return RoslynFormatter.Format(cu, targetSubtree: null, stopAfter: _stopAfter);
     }
 
@@ -42,6 +43,7 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
     /// </summary>
     public J Format(J tree, Cursor cursor)
     {
+        FormattingListener.BeforeFormat(tree, _stopAfter, cursor);
         if (tree is CompilationUnit treeCu)
             return RoslynFormatter.Format(treeCu, targetSubtree: null, stopAfter: _stopAfter);
 

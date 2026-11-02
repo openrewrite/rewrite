@@ -863,6 +863,30 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         return base.VisitIdentifier(identifier, p);
     }
 
+    public override J VisitInstanceOf(InstanceOf instanceOf, int p)
+    {
+        var clazzIsPlaceholder = instanceOf.Clazz is Identifier clazzId &&
+                                 Placeholder.FromPlaceholder(clazzId.SimpleName) != null;
+        var result = base.VisitInstanceOf(instanceOf, p);
+
+        // The parser reads `x is <name>` as a type test and `x is "abc"` or `x is int.MaxValue` as a constant pattern
+        if (clazzIsPlaceholder && result is InstanceOf { Pattern: null, Clazz: Expression value } io &&
+            (value is not TypeTree || value is FieldAccess { Target: var target } && IsKeywordQualified(target)))
+        {
+            return new IsPattern(io.Id, io.Prefix, io.Markers, io.Expression.Element,
+                new JLeftPadded<Expression>(io.Expression.After,
+                    new ConstantPattern(Tree.RandomId(), value.Prefix, Markers.Empty,
+                        J.SetPrefix(value, Space.Empty))));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Whether a member access on <paramref name="target"/> starts with a keyword type, as <c>int.MaxValue</c> does.
+    /// </summary>
+    private static bool IsKeywordQualified(Expression target) =>
+        target is Primitive || target is FieldAccess fa && IsKeywordQualified(fa.Target);
+
     public override J VisitAnnotation(Annotation annotation, int p)
     {
         annotation = (Annotation)base.VisitAnnotation(annotation, p);

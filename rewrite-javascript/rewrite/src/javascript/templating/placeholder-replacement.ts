@@ -41,6 +41,18 @@ export class SubstitutedValue implements Marker {
 /** Chooses a substituted value's prefix, and says whether it is the source's own. */
 type MergePrefix = (sourcePrefix: J.Space, templatePrefix: J.Space) => [J.Space, boolean];
 
+/** Whether `value` is a property, method or spread of an object literal. */
+function isObjectMember(value: unknown): value is J {
+    switch (isTree(value) && value.kind) {
+        case JS.Kind.PropertyAssignment:
+        case JS.Kind.Spread:
+        case J.Kind.MethodDeclaration:
+        case JS.Kind.ComputedPropertyMethodDeclaration:
+            return true;
+    }
+    return false;
+}
+
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
  */
@@ -330,6 +342,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                         // Check if it's a direct Tree[] array
                         else if (Array.isArray(param.value)) {
                             arrayToExpand = param.value as J[];
+                        }
+                        // One member of an object literal fills the slot of a member, not the name of a property
+                        else if (element.kind === JS.Kind.PropertyAssignment && isObjectMember(param.value)) {
+                            arrayToExpand = [param.value];
                         }
                         // Check if it's a CaptureValue
                         else if (param.value instanceof CaptureValue) {

@@ -186,16 +186,23 @@ public abstract class RewriteTest
 
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
-            var runCtx = new ExecutionContext();
+            var checks = new RunChecks(validations);
+            var runCtx = checks.Ctx;
+            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
             try
             {
-                var run = RunCycles(recipeSpec.Recipe, sources, runCtx, cycles, expectedCycles);
+                CycleRun run;
+                using (formatting?.Install())
+                {
+                    run = RunCycles(recipeSpec.Recipe, sources, checks, cycles, expectedCycles);
+                }
                 var results = run.Changes;
 
                 if (inputMarkers != null)
                 {
                     AddedMarkersCheck.Verify(inputMarkers, results);
                 }
+                checks.AssertLightweightAccumulators();
 
                 foreach (var afterRecipe in recipeSpec.AfterRecipe)
                 {
@@ -229,10 +236,20 @@ public abstract class RewriteTest
                     ExpectNoFurtherChanges(changes,
                         $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
                 }
-                if (cycles > expectedCycles && results.Count > 0)
+                var fresh = results.Count > 0 && (cycles > expectedCycles || validations.ParserShapedTrees)
+                    ? ParseAgain(run.Finals, metadataReferences)
+                    : null;
+                if (cycles > expectedCycles && fresh != null)
                 {
-                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, metadataReferences, runCtx);
+                    ExpectStableOnFreshParse(recipeSpec.Recipe, run.Finals, fresh, checks);
                 }
+                formatting?.AssertFormattedOnlyWhatChanged(results);
+                if (validations.ParserShapedTrees && fresh != null)
+                {
+                    TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
+                }
+                EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
+                UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
             }
             finally
             {
@@ -257,7 +274,7 @@ public abstract class RewriteTest
     }
 
     /// <summary>Runs the recipe cycle after cycle, each on what the cycle before produced.</summary>
-    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx,
+    private static CycleRun RunCycles(Recipe recipe, List<SourceFile> sources, RunChecks checks,
         int cycles, int expectedCycles)
     {
         var lineages = sources.Select(s => new Lineage(s, s)).ToList();
@@ -272,8 +289,8 @@ public abstract class RewriteTest
         {
             var live = lineages.Where(l => l.Latest != null).Select(l => l.Latest!).ToList();
             var changes = cycle == 1
-                ? RecipeScheduler.Run(recipe, live, ctx)
-                : RunWithoutWritingDataTables(recipe, live, ctx);
+                ? checks.Run(recipe, live)
+                : RunWithoutWritingDataTables(recipe, live, checks);
             if (changes.Count == 0)
             {
                 break;
@@ -311,14 +328,15 @@ public abstract class RewriteTest
     }
 
     /// <summary>Data tables are written by the first cycle only, as in Java.</summary>
-    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, ExecutionContext ctx)
+    private static List<Result> RunWithoutWritingDataTables(Recipe recipe, List<SourceFile> sources, RunChecks checks)
     {
+        var ctx = checks.Ctx;
         var dataTables = ctx.ComputeMessageIfAbsent<IDataTableStore>(DataTable<object>.DataTableStoreKey,
             _ => new InMemoryDataTableStore());
         ctx.PutMessage(DataTable<object>.DataTableStoreKey, new InMemoryDataTableStore());
         try
         {
-            return RecipeScheduler.Run(recipe, sources, ctx);
+            return checks.Run(recipe, sources);
         }
         finally
         {
@@ -367,12 +385,13 @@ public abstract class RewriteTest
         }
     }
 
-    /// <summary>
-    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
-    /// recipe that recognizes its own output only by the shape of that LST changes it again.
-    /// </summary>
-    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
-        ImmutableArray<MetadataReference>? metadataReferences, ExecutionContext ctx)
+    /// <param name="SyntaxTree">Roslyn's parse of the printed text.</param>
+    /// <param name="Unit">The LST of the printed text, or null when the parser doesn't print it back.</param>
+    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
+
+    /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
+    private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals,
+        ImmutableArray<MetadataReference>? metadataReferences)
     {
         var units = finals.OfType<CompilationUnit>()
             .Select(unit =>
@@ -386,31 +405,47 @@ public abstract class RewriteTest
             : null;
 
         var parser = new CSharpParser();
-        var reparsedByFinal = new Dictionary<SourceFile, SourceFile>(ReferenceEqualityComparer.Instance);
+        var fresh = new Dictionary<SourceFile, FreshParse>(ReferenceEqualityComparer.Instance);
         foreach (var (unit, text, tree) in units)
         {
+            CompilationUnit? reparsed = null;
             try
             {
-                var reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
+                reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
                     semanticModel: compilation?.GetSemanticModel(tree));
-                if (PrintTree(reparsed, MarkerPrinter.Sanitized) == text)
+                if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
                 {
-                    // What the source file carries, like its styles, comes from outside its text
-                    reparsedByFinal[unit] = reparsed.WithMarkers(unit.Markers);
+                    reparsed = null;
                 }
             }
             catch (Exception)
             {
                 // A file that does not parse again keeps the LST the recipe produced
             }
+            fresh[unit] = new FreshParse(tree, reparsed);
         }
-        if (reparsedByFinal.Count == 0)
+        return fresh;
+    }
+
+    /// <summary>
+    /// Code that the next run reads is parsed from the printed output, not the LST this run produced, and a
+    /// recipe that recognizes its own output only by the shape of that LST changes it again.
+    /// </summary>
+    private static void ExpectStableOnFreshParse(Recipe recipe, List<SourceFile> finals,
+        Dictionary<SourceFile, FreshParse> fresh, RunChecks checks)
+    {
+        if (!fresh.Values.Any(parse => parse.Unit != null))
         {
             return;
         }
 
-        var sources = finals.Select(f => reparsedByFinal.GetValueOrDefault(f, f)).ToList();
-        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, ctx),
+        var sources = finals
+            .Select(f => fresh.TryGetValue(f, out var parse) && parse.Unit != null
+                // What the source file carries, like its styles, comes from outside its text
+                ? parse.Unit.WithMarkers(f.Markers)
+                : f)
+            .ToList();
+        ExpectNoFurtherChanges(RunWithoutWritingDataTables(recipe, sources, checks),
             "Running the recipe on a fresh parse of its output changed", sanitized: true);
     }
 

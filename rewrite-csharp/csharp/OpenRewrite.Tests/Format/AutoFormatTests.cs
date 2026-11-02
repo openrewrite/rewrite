@@ -926,6 +926,186 @@ public class AutoFormatTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// AutoFormat on the constructor alone formats its prefix too, as Java's autoFormat does,
+    /// so the first line lands at the class's member indentation.
+    /// </summary>
+    [Fact]
+    public void AutoFormatIndentsSynthesizedMember()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            CSharp(
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+    /// <summary>
+    /// Statements moved out of a nested block keep their old prefix until AutoFormat reindents them.
+    /// </summary>
+    [Fact]
+    public void AutoFormatReindentsMovedStatements()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new InlineNestedBlockRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        {
+                            Foo();
+                            Bar();
+                        }
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Foo();
+                        Bar();
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// A template replacement keeps the prefix of the code it replaces, where Roslyn's default style would reindent it.
+    /// </summary>
+    [Theory]
+    [InlineData("class C\n{\n\tvoid M()\n\t{\n\t\tConsole.Write(1);\n\t}\n}\n")]
+    [InlineData("class C\n{\n  void M()\n  {\n    Console.Write(1);\n  }\n}\n")]
+    [InlineData("class C\n{\n    void M() { Console.Write(1); }\n}\n")]
+    [InlineData("class C\n{\n    void M()\n    {\n        Foo(); Console.Write(1);\n    }\n}\n")]
+    public void TemplateReplacementKeepsItsPrefix(string before)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new WriteToWriteLineRecipe()),
+            CSharp(before, before.Replace("Console.Write(", "Console.WriteLine("))
+        );
+    }
+
+    /// <summary>
+    /// A synthesized member is indented even when its prefix is also the class's, since that prefix ends a line.
+    /// </summary>
+    [Fact]
+    public void AutoFormatIndentsSynthesizedMemberOfClassAfterBlankLine()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            CSharp(
+                "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+}
+
+/// <summary>
+/// Replaces <c>Console.Write(x)</c> with <c>Console.WriteLine(x)</c> through a template.
+/// </summary>
+file class WriteToWriteLineRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Write to WriteLine";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor()
+    {
+        var x = Capture.Expression("x");
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Expression($"Console.Write({x})"),
+            CSharpTemplate.Expression($"Console.WriteLine({x})"));
+    }
+}
+
+/// <summary>
+/// Adds a constructor whose prefix carries no indentation and calls AutoFormat on that constructor alone.
+/// </summary>
+file class AddConstructorWithAutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Add constructor with AutoFormat";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
+            if (classDecl.Body == null) return classDecl;
+
+            foreach (var stmt in classDecl.Body.Statements)
+                if (stmt.Element is MethodDeclaration md && md.Parameters.Elements.Count == 0 &&
+                    md.Name.SimpleName == classDecl.Name.SimpleName)
+                    return classDecl;
+
+            var body = new Block(
+                Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [], Space.Empty);
+            var method = new MethodDeclaration(
+                Guid.NewGuid(), Space.Format("\n\n"), Markers.Empty, [],
+                [new Modifier(Guid.NewGuid(), Space.Empty, Markers.Empty, Modifier.ModifierType.Public, [])],
+                null, null,
+                new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], classDecl.Name.SimpleName, null, null),
+                new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+                [],
+                null, body,
+                new JLeftPadded<Expression>(Space.SingleSpace,
+                    new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
+                        new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "base", null, null),
+                        null, new JContainer<Expression>(Space.Empty, [], Markers.Empty), null)),
+                null);
+
+            var newStatements = new List<JRightPadded<Statement>>(classDecl.Body.Statements)
+            {
+                new(AutoFormat(method, ctx, Cursor), Space.Empty, Markers.Empty)
+            };
+            return classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+        }
+    }
+}
+
+/// <summary>
+/// Moves the statements of a nested block into the block around it and calls AutoFormat on each moved statement.
+/// </summary>
+file class InlineNestedBlockRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Inline nested block";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBlock(Block block, ExecutionContext ctx)
+        {
+            block = (Block)base.VisitBlock(block, ctx);
+            if (!block.Statements.Any(s => s.Element is Block))
+                return block;
+
+            var statements = new List<JRightPadded<Statement>>();
+            foreach (var padded in block.Statements)
+            {
+                if (padded.Element is Block nested)
+                    statements.AddRange(nested.Statements.Select(s =>
+                        s.WithElement(AutoFormat(s.Element, ctx, Cursor))));
+                else
+                    statements.Add(padded);
+            }
+            return block.WithStatements(statements);
+        }
+    }
 }
 
 /// <summary>
