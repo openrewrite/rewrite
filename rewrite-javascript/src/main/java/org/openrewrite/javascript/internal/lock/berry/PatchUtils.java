@@ -115,7 +115,7 @@ final class PatchUtils {
     }
 
     /**
-     * Whether a patch path is a builtin patch the release ships, whose text the engine does not hold.
+     * Whether a patch path is a builtin patch the release ships.
      */
     static boolean isShippedBuiltin(String patchPath, YarnRelease release) {
         String name = builtinName(patchPath);
@@ -127,8 +127,8 @@ final class PatchUtils {
     }
 
     /**
-     * {@code loadPatchFiles} where no path is a builtin the release ships: each file's text with LF line endings, null
-     * for any other builtin (no hook answers); throws CannotKnow for a file outside the project or a non-workspace's.
+     * {@code loadPatchFiles}: release-specific builtin or local patch text with LF line endings; null for a builtin
+     * no hook answers. Throws CannotKnow for a file outside the project or a non-workspace's.
      */
     static List<@Nullable String> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
                                                  Project project) {
@@ -150,7 +150,8 @@ final class PatchUtils {
                 if (name.startsWith(COMPAT_TAG)) {
                     StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
                 }
-                source = null;
+                source = name.startsWith(COMPAT_TAG) ? CompatPatches.source(project.configuration.getRelease(),
+                        name.substring(COMPAT_TAG.length())) : null;
             } else if (path.startsWith("~/")) {
                 source = project.readFile(projectPath(".", path.substring(2), patchPath));
             } else if (path.startsWith("/")) {

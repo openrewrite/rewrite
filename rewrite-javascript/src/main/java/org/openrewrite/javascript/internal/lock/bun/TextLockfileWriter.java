@@ -115,8 +115,11 @@ final class TextLockfileWriter {
                         foundPatchedDependencies.put(nameAndVersionHash, new String[]{nameAndVersion, patch});
                     }
                 }
-                if (lockfile.trustedDependencies != null && lockfile.trustedDependencies.contains((int) dep.nameHash)) {
-                    foundTrustedDependencies.put(dep.nameHash, dep.name);
+                boolean trustPublishedName = release.trustsNpmPackagesByTheirPublishedName() &&
+                        pkg.resolution.tag == Resolution.Tag.NPM;
+                long trustedHash = trustPublishedName ? pkg.nameHash : dep.nameHash;
+                if (lockfile.trustedDependencies != null && lockfile.trustedDependencies.contains((int) trustedHash)) {
+                    foundTrustedDependencies.put(trustedHash, trustPublishedName ? pkg.name : dep.name);
                 }
                 if (!writesEveryOverride && !lockfile.overrides.map.isEmpty()) {
                     Dependency override = lockfile.overrides.map.get(dep.nameHash);
@@ -141,6 +144,10 @@ final class TextLockfileWriter {
             }
             decIndent(writer, indent);
             writer.append("],\n");
+        } else if (release.writesAnEmptyTrustedList() && lockfile.trustedDependencies != null &&
+                   lockfile.trustedDependencies.isEmpty()) {
+            writeIndent(writer, indent);
+            writer.append("\"trustedDependencies\": [],\n");
         }
 
         if (foundPatchedDependencies.count() > 0) {
@@ -228,6 +235,21 @@ final class TextLockfileWriter {
             writer.append("},\n");
         }
 
+        if (release.readsPackageExtensions()) {
+            List<String> extensions = lockfile.packageExtensions.lines(lockfile);
+            if (!extensions.isEmpty()) {
+                writeIndent(writer, indent);
+                writer.append("\"packageExtensions\": {\n");
+                indent[0]++;
+                for (String line : extensions) {
+                    writeIndent(writer, indent);
+                    writer.append(line);
+                }
+                decIndent(writer, indent);
+                writer.append("},\n");
+            }
+        }
+
         writeIndent(writer, indent);
         writer.append("\"packages\": {");
         boolean first = true;
@@ -298,7 +320,7 @@ final class TextLockfileWriter {
                         writer.append("@file:");
                         Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release, lockfile);
                         writer.append(']');
                         break;
                     case LOCAL_TARBALL:
@@ -308,7 +330,7 @@ final class TextLockfileWriter {
                         writer.append('@');
                         Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release, lockfile);
                         if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
                             writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         } else {
@@ -321,7 +343,7 @@ final class TextLockfileWriter {
                         writer.append("@link:");
                         Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release, lockfile);
                         writer.append(']');
                         break;
                     case NPM:
@@ -338,7 +360,7 @@ final class TextLockfileWriter {
                             writer.append(underDefault ? "" : res.url);
                         }
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release, lockfile);
                         writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         break;
                     case WORKSPACE:
@@ -360,7 +382,7 @@ final class TextLockfileWriter {
                             writer.append(formatted);
                         }
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release, lockfile);
                         writer.append(", ");
                         Strings.appendJsonString(writer, repo.resolved, true, release);
                         if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
@@ -384,7 +406,7 @@ final class TextLockfileWriter {
     }
 
     private static void writePackageInfoObject(StringBuilder writer, Behavior depBehavior, List<Dependency> depsBuf,
-                                               List<Integer> pkgDepIds, Package pkg, BunRelease release) {
+                                               List<Integer> pkgDepIds, Package pkg, BunRelease release, Lockfile lockfile) {
         List<String> optionalPeersBuf = new ArrayList<>();
         writer.append('{');
         boolean any = false;
@@ -435,6 +457,18 @@ final class TextLockfileWriter {
             writer.append(']');
         }
 
+        List<String> unresolved = unresolvedNames(lockfile, pkgDepIds);
+        if (!unresolved.isEmpty()) {
+            writer.append(", \"unresolved\": [");
+            for (int i = 0; i < unresolved.size(); i++) {
+                if (i > 0) {
+                    writer.append(", ");
+                }
+                Strings.appendJsonString(writer, unresolved.get(i), true, release);
+            }
+            writer.append(']');
+        }
+
         if (depBehavior.isBundled()) {
             if (any) {
                 writer.append(',');
@@ -464,6 +498,26 @@ final class TextLockfileWriter {
             Negatable.toJson(Negatable.ARCHITECTURE, pkg.meta.arch, writer);
         }
 
+        if (release.carriesPackageInstallMetadata()) {
+            for (Map.Entry<String, Integer> libc : Negatable.LIBC.nameMap.entrySet()) {
+                if (pkg.meta.libc == libc.getValue()) {
+                    if (any) {
+                        writer.append(',');
+                    }
+                    any = true;
+                    writer.append(" \"libc\": \"").append(libc.getKey()).append('"');
+                    break;
+                }
+            }
+            if (pkg.meta.hasInstallScript) {
+                if (any) {
+                    writer.append(',');
+                }
+                any = true;
+                writer.append(" \"hasInstallScript\": true");
+            }
+        }
+
         if (pkg.bin.tag != Bin.Tag.NONE) {
             if (any) {
                 writer.append(',');
@@ -475,6 +529,26 @@ final class TextLockfileWriter {
         }
 
         writer.append(any ? " }" : "}");
+    }
+
+    private static List<String> unresolvedNames(Lockfile lockfile, List<Integer> rows) {
+        List<String> names = new ArrayList<>();
+        if (!lockfile.release.carriesUnresolvedOptionalNames()) {
+            return names;
+        }
+        for (int row : rows) {
+            Dependency dep = lockfile.dependencies.get(row);
+            if (lockfile.resolutions.get(row) != INVALID_PACKAGE_ID || !dep.behavior.isOptional()) {
+                continue;
+            }
+            for (int placed : lockfile.hoistedDependencies) {
+                if (lockfile.dependencies.get(placed).nameHash == dep.nameHash) {
+                    names.add(dep.name);
+                    break;
+                }
+            }
+        }
+        return names;
     }
 
     private static void writeWorkspaceDeps(StringBuilder writer, int[] indent, Lockfile lockfile, int pkgId,
@@ -569,6 +643,25 @@ final class TextLockfileWriter {
             for (String optionalPeer : optionalPeersBuf) {
                 writeIndent(writer, indent);
                 Strings.appendJsonString(writer, optionalPeer, true, release);
+                writer.append(",\n");
+            }
+            decIndent(writer, indent);
+            writer.append(']');
+        }
+        List<Integer> rows = new ArrayList<>();
+        for (int row = pkg.dependenciesOff; row < pkg.dependenciesEnd(); row++) {
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Strings.order(lockfile.dependencies.get(a).name, lockfile.dependencies.get(b).name));
+        List<String> unresolved = unresolvedNames(lockfile, rows);
+        if (!unresolved.isEmpty()) {
+            writer.append(",\n");
+            writeIndent(writer, indent);
+            writer.append("\"unresolved\": [\n");
+            indent[0]++;
+            for (String name : unresolved) {
+                writeIndent(writer, indent);
+                Strings.appendJsonString(writer, name, true, release);
                 writer.append(",\n");
             }
             decIndent(writer, indent);

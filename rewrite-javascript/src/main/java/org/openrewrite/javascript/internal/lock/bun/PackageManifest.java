@@ -39,6 +39,7 @@ final class PackageManifest {
      */
     static final class PackageVersion {
         Integrity integrity = Integrity.UNKNOWN;
+        boolean deprecated;
 
         /**
          * Names and specs alternating, in the packument's order; the optional peers moved to the front of the peers.
@@ -162,8 +163,13 @@ final class PackageManifest {
     @Nullable
     FindResult findBestVersion(SemverQuery.Group group) {
         SemverRange.Comparator left = group.head.head.range.left;
-        if (left.op == SemverRange.Op.EQL) {
+        if (left.op == SemverRange.Op.EQL && (!release.prefersNonDeprecatedRangeMatches() ||
+                group.head.next == null && group.head.head.next == null &&
+                group.head.head.range.right.op == SemverRange.Op.UNSET)) {
             return findByVersion(left.version);
+        }
+        if (release.prefersNonDeprecatedRangeMatches()) {
+            return findNonDeprecatedVersion(group);
         }
         FindResult latest = findByDistTag("latest");
         if (latest != null && group.satisfies(latest.version)) {
@@ -190,6 +196,35 @@ final class PackageManifest {
             }
         }
         return null;
+    }
+
+    // npm.rs find_best_version: explicit tags still use findByDistTag, even when deprecated.
+    private @Nullable FindResult findNonDeprecatedVersion(SemverQuery.Group group) {
+        FindResult latest = findByDistTag("latest");
+        if (latest != null && !latest.packageVersion.deprecated &&
+                (group.isStar() || group.satisfies(latest.version)) &&
+                ((group.flags & SemverQuery.Group.FLAG_PRE) == 0 ||
+                 group.head.head.range.left.version.order(latest.version, release) == 0)) {
+            return latest;
+        }
+        FindResult deprecated = null;
+        for (int list = 0; list < ((group.flags & SemverQuery.Group.FLAG_PRE) != 0 ? 2 : 1); list++) {
+            List<SemverVersion> versions = list == 0 ? releaseVersions : prereleaseVersions;
+            List<PackageVersion> packages = list == 0 ? releasePackages : prereleasePackages;
+            for (int i = versions.size() - 1; i >= 0; i--) {
+                if (!group.satisfies(versions.get(i))) {
+                    continue;
+                }
+                FindResult found = new FindResult(versions.get(i), packages.get(i));
+                if (!found.packageVersion.deprecated) {
+                    return found;
+                }
+                if (deprecated == null) {
+                    deprecated = found;
+                }
+            }
+        }
+        return deprecated;
     }
 
     /**
@@ -434,6 +469,9 @@ final class PackageManifest {
                 }
 
                 PackageVersion packageVersion = new PackageVersion();
+                Json.Expr deprecated = value.get("deprecated");
+                packageVersion.deprecated = deprecated != null &&
+                        (Boolean.TRUE.equals(deprecated.asBool()) || deprecated.isString() && !deprecated.asString().isEmpty());
                 Json.Expr cpu = value.get("cpu");
                 if (cpu != null) {
                     packageVersion.cpu = Negatable.fromJson(Negatable.ARCHITECTURE, cpu);

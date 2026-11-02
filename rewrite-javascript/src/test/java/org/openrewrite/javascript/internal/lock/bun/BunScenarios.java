@@ -235,6 +235,7 @@ final class BunScenarios {
         BunLockRegenerator.Inputs.InputsBuilder inputs(Phase phase, @Nullable String lock) {
             return BunLockRegenerator.Inputs.builder()
                     .lock(lock)
+                    .release(recordedRelease() == null ? BunRelease.PORTED : BunRelease.of(recordedRelease()))
                     .manifests(manifests(phase, lock == null ? "" : lock))
                     .npmrc(config(phase, "npmrc", ".npmrc"))
                     .bunfig(config(phase, "bunfig", "bunfig.toml"))
