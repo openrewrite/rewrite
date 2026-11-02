@@ -27,7 +27,6 @@ import {
 import {J} from '../../../src/java';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
 import {ExecutionContext} from '../../../src';
-import {expectParserShaped} from '../../test-util';
 
 describe('object literals in templates and patterns', () => {
     async function parseExpression(code: string): Promise<J> {
@@ -157,11 +156,11 @@ describe('object literals in templates and patterns', () => {
                 return super.visitNewClass(newClass, p);
             }
         });
-        return spec.rewriteRun(...[
+        return spec.rewriteRun(
             typescript('new E({b: 2});', 'new E({\n    a: 1,\n    b: 2,\n});'),
             typescript('new E({b() {}});', 'new E({\n    a: 1,\n    b() {},\n});'),
             typescript('new E({...b});', 'new E({\n    a: 1,\n    ...b,\n});')
-        ].map(source => ({...source, afterRecipe: expectParserShaped})));
+        );
     });
 
     describe('one member is a member of the object literal', () => {
