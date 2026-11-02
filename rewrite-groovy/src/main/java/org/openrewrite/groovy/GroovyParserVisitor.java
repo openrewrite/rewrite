@@ -2609,6 +2609,18 @@ public class GroovyParserVisitor {
         public void visitMapEntryExpression(MapEntryExpression expression) {
             Space prefix = whitespace();
             Expression key;
+            if (expression.getKeyExpression() instanceof SpreadMapExpression) {
+                // Groovy also exposes the spread operand as this entry's value. Visiting the
+                // synthetic key would consume that operand twice and lose the '*'.
+                skip("*");
+                key = new G.Unary(randomId(), EMPTY, Markers.EMPTY,
+                        JLeftPadded.build(G.Unary.Type.Spread),
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY), null);
+                queue.add(new G.MapEntry(randomId(), prefix, Markers.EMPTY,
+                        JRightPadded.build(key).withAfter(sourceBefore(":")),
+                        doVisit(expression.getValueExpression()), null));
+                return;
+            }
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
             Integer keyParenLevel = getInsideParenthesesLevel(expression.getKeyExpression());
