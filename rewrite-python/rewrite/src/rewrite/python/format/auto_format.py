@@ -3,6 +3,7 @@ from contextvars import ContextVar
 from typing import Callable, Iterator, Optional, cast
 
 from .blank_lines import BlankLinesVisitor
+from .indentation import tabs_and_indents_style
 from .line_breaks import general_format_style
 from .minimum_viable_spacing import MinimumViableSpacingVisitor
 from .normalize_format import NormalizeFormatVisitor
@@ -11,7 +12,7 @@ from .normalize_tabs_or_spaces import NormalizeTabsOrSpacesVisitor
 from .remove_trailing_whitespace_visitor import RemoveTrailingWhitespaceVisitor
 from .spaces_visitor import SpacesVisitor
 from .tabs_and_indents_visitor import TabsAndIndentsVisitor
-from .. import TabsAndIndentsStyle, SpacesStyle, OtherStyle
+from .. import SpacesStyle, OtherStyle
 from ..style import BlankLinesStyle, IntelliJ
 from ..visitor import PythonVisitor
 from ... import Recipe, SourceFile, Tree, Cursor
@@ -77,10 +78,8 @@ class AutoFormatVisitor(PythonVisitor[P]):
 
         tree = SpacesVisitor(cu.get_style(SpacesStyle) or IntelliJ.spaces(), self._stop_after).visit(tree, p, self._cursor.fork())
 
-        tree = NormalizeTabsOrSpacesVisitor(
-            cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
-            self._stop_after
-        ).visit(tree, p, self._cursor.fork())
+        tree = NormalizeTabsOrSpacesVisitor(tabs_and_indents_style(cu), self._stop_after).visit(
+            tree, p, self._cursor.fork())
 
         tree = _tabs_and_indents(cu, self._stop_after, self._keep_indent).visit(tree, p, self._cursor.fork())
 
@@ -107,7 +106,7 @@ def minimally_format(tree: T, p: P, cursor: Optional[Cursor] = None, keep_indent
 def _tabs_and_indents(cu: JavaSourceFile, stop_after: Optional[Tree] = None,
                       keep_indent: bool = False) -> TabsAndIndentsVisitor:
     return TabsAndIndentsVisitor(
-        cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
+        tabs_and_indents_style(cu),
         cu.get_style(OtherStyle) or IntelliJ.other(),
         stop_after,
         keep_indent

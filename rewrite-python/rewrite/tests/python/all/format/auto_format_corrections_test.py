@@ -5,7 +5,7 @@ from rewrite.java import Assert, J, P, Unary, JLeftPadded
 from rewrite.java.support_types import Space
 from rewrite.markers import Markers
 from rewrite.parser import ParseError
-from rewrite.python import AutoFormat, PythonVisitor
+from rewrite.python import AutoFormat, IntelliJ, PythonVisitor
 from rewrite.python.format import AutoFormatVisitor
 from rewrite.test import rewrite_run, python, RecipeSpec, from_visitor
 
@@ -165,6 +165,62 @@ def test_fix_wrong_indentation():
         python(
             """\
             def foo():
+                x = 1
+                if x > 0:
+                  return x
+                return 0
+            """,
+            """\
+            def foo():
+                x = 1
+                if x > 0:
+                    return x
+                return 0
+            """
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+
+def test_keep_the_indentation_of_a_file_without_a_style():
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            def foo():
+              x = 1
+              if x > 0:
+                return x
+              return 0
+            """
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+
+def test_keep_the_alignment_of_continuation_lines_in_a_tab_indented_file():
+    rewrite_run(
+        python(
+            "def foo(a, b):\n"
+            "\tif (a and\n"
+            "\t\tb):\n"
+            "\t\treturn (1 +\n"
+            "\t\t\t\t2)\n"
+            "\treturn 0\n"
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+
+def test_fix_indentation_to_a_configured_style():
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            def foo():
               x = 1
               if x > 0:
                 return x
@@ -176,7 +232,8 @@ def test_fix_wrong_indentation():
                 if x > 0:
                     return x
                 return 0
-            """
+            """,
+            before_recipe=lambda cu: cu.replace(markers=cu.markers.add(IntelliJ())),
         ),
         spec=RecipeSpec()
         .with_recipe(AutoFormat())

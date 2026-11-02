@@ -242,7 +242,7 @@ def test_a_replaced_operand_keeps_the_indentation_of_its_continuation_line():
 
 
 def test_a_replaced_statement_keeps_the_indentation_of_its_block():
-    """The lines inside the result indent from there by the style's four spaces."""
+    """The lines inside the result indent from there as the file indents."""
     spec = RecipeSpec(recipe=_ReplaceTryWithWith())
     spec.rewrite_run(
         python(
@@ -255,8 +255,27 @@ def test_a_replaced_statement_keeps_the_indentation_of_its_block():
             #
             "def f():\n"
             "  with suppress(KeyError):\n"
-            "      do_stuff()\n"
+            "    do_stuff()\n"
             "  done()\n",
+        )
+    )
+
+
+def test_a_replacement_in_a_tab_indented_file_indents_with_tabs():
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "def f():\n"
+            "\ttry:\n"
+            "\t\tdo_stuff()\n"
+            "\texcept KeyError:\n"
+            "\t\tpass\n"
+            "\tdone()\n",
+            #
+            "def f():\n"
+            "\twith suppress(KeyError):\n"
+            "\t\tdo_stuff()\n"
+            "\tdone()\n",
         )
     )
 
