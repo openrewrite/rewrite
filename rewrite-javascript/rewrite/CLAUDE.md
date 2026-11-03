@@ -203,14 +203,25 @@ describe('OrderImports', () => {
 
     test('sorts imports', () =>
         spec.rewriteRun(
+            //language=typescript
             typescript(
-                `import {z} from 'zebra';\nimport {a} from 'alpha';`,
-                `import {a} from 'alpha';\nimport {z} from 'zebra';`
+                `
+                import {z} from 'zebra';
+                import {a} from 'alpha';
+                `,
+                `
+                import {a} from 'alpha';
+                import {z} from 'zebra';
+                `
             )
         )
     );
 });
 ```
+
+`rewriteRun` dedents each source, so write it over real lines rather than with `\n`. A
+`//language=typescript` comment (`javascript`, `tsx`, `jsx`, `json`) above the call lets IntelliJ
+highlight both strings.
 
 ### Sharing a `RecipeSpec` across tests
 
