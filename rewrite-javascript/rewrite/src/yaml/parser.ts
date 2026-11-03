@@ -749,8 +749,6 @@ class YamlCstReader {
     }
 
     private convertFlowScalarWithTrailing(cst: CstFlowScalar): {node: Yaml.Scalar, trailing: string} {
-        // Keep the scalar's source text, as the Java YamlParser does. The resolved value folds
-        // line breaks and unescapes quoted scalars, so it would not print back to the input.
         let style: Yaml.ScalarStyle;
         let value: string;
         switch (cst.type) {
