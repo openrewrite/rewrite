@@ -16,7 +16,7 @@
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
-import {createRequire} from "module";
+import {createRequire, registerHooks} from "module";
 import {RecipeMarketplace} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
@@ -223,6 +223,23 @@ describe("InstallRecipes", () => {
                 fs.cpSync(hostMutativeRoot, linkedMutative, {recursive: true});
                 fs.mkdirSync(path.join(packageDir, "node_modules"));
                 fs.symlinkSync(linkedMutative, path.join(packageDir, "node_modules", "mutative"), "dir");
+
+                const hostMutative = hostRequire("mutative");
+                await captureHandler(path.join(base, "install"), new RecipeMarketplace())({recipes: packageDir} as any);
+
+                expect(hostRequire(packageDir).mutative).toBe(hostMutative);
+            }, {unsafeCleanup: true});
+        });
+
+        // Below Node 22.15 the copy is shared by mapping file paths, which needs the host's layout.
+        test.runIf(typeof registerHooks === "function")("shares the host's copy with a package whose copy has another file layout", async () => {
+            await withDir(async (dir) => {
+                const base = fs.realpathSync(dir.path);
+                const packageDir = path.join(base, "recipes");
+                writeRecipePackage(packageDir);
+                const ownMutative = path.join(packageDir, "node_modules", "mutative");
+                fs.cpSync(path.join(hostMutativeRoot, "dist"), path.join(ownMutative, "lib"), {recursive: true});
+                fs.writeFileSync(path.join(ownMutative, "package.json"), JSON.stringify({name: "mutative", main: "lib/index.js"}));
 
                 const hostMutative = hostRequire("mutative");
                 await captureHandler(path.join(base, "install"), new RecipeMarketplace())({recipes: packageDir} as any);
