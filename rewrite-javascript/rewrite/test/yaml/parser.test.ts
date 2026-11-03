@@ -582,3 +582,28 @@ describe('Multi-line flow scalars', () => {
         expect(double).toBe(String.raw`a\tb`);
     });
 });
+
+describe('Anchor and tag on a scalar', () => {
+    const spec = new RecipeSpec();
+
+    test('either order, on every scalar style and position', () =>
+        spec.rewriteRun(
+            yaml(`
+                plain: &a !!str one
+                single: &b !!str 'two'
+                double: &c !!str "three"
+                literal: &d !!str |
+                  four
+                folded: &e !!str >-
+                  five
+                tagFirst: !!str &f six
+                seq:
+                  - &g !!str seven
+                  - !!str &h eight
+                flowSeq: [&i !!str nine, !!str &j ten]
+                flowMap: {k: &k !!str eleven}
+                &l !!str key: twelve
+                aliases: [*a, *d, *g]
+            `)
+        ));
+});
