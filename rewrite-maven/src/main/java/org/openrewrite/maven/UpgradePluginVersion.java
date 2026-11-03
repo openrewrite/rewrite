@@ -76,10 +76,10 @@ public class UpgradePluginVersion extends Recipe {
     @Nullable
     String versionPattern;
 
-    // needs implementation, left here as syntactic placeholder // todo
     @Option(displayName = "Trust parent POM",
-            description = "Even if the parent suggests a version that is older than what we are trying to upgrade to, trust it anyway. " +
-                          "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
+            description = "Whether to preserve an inherited managed version when the plugin declaration has no version. " +
+                          "Set to false with `addVersionIfMissing` to override an older inherited version. " +
+                          "When unset, inherited plugin management is preserved.",
             required = false)
     @Nullable
     Boolean trustParent;
@@ -127,18 +127,25 @@ public class UpgradePluginVersion extends Recipe {
                             assert tagGroupId != null;
                             assert tagArtifactId != null;
 
+                            boolean overrideInheritedVersion = Boolean.FALSE.equals(trustParent) &&
+                                    !hasLocallyManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId);
                             final String versionLookup;
                             if (maybeVersionValue.isPresent()) {
                                 versionLookup = resolvedPom.getValue(maybeVersionValue.get().trim());
                             } else {
-                                if (hasManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId)) {
+                                String managedVersion = getManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId);
+                                if (managedVersion != null && !overrideInheritedVersion) {
                                     return tag;
                                 }
-                                versionLookup = "0.0.0";
+                                versionLookup = managedVersion == null ? "0.0.0" : resolvedPom.getValue(managedVersion);
+                                if (versionLookup == null) {
+                                    return tag;
+                                }
                             }
 
                             findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
-                                    doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
+                                    doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer,
+                                            Boolean.TRUE.equals(addVersionIfMissing), overrideInheritedVersion))
                             );
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
@@ -164,15 +171,28 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     private static boolean hasManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+        return getManagedPluginVersion(resolvedPom, groupId, artifactId) != null;
+    }
+
+    private static boolean hasLocallyManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+        for (Plugin p : resolvedPom.getRequested().getPluginManagement()) {
+            if (p.getGroupId().equals(groupId) && p.getArtifactId().equals(artifactId) && p.getVersion() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static @Nullable String getManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
         for (Plugin p : ListUtils.concatAll(resolvedPom.getPluginManagement(),
                 resolvedPom.getRequested().getPluginManagement())) {
             if (p.getGroupId().equals(groupId) &&
                     p.getArtifactId().equals(artifactId) &&
                     p.getVersion() != null) {
-                return true;
+                return p.getVersion();
             }
         }
-        return false;
+        return null;
     }
 
     @Value
@@ -182,6 +202,7 @@ public class UpgradePluginVersion extends Recipe {
         String artifactId;
         String newVersion;
         boolean addVersionIfMissing;
+        boolean overrideInheritedVersion;
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -199,7 +220,8 @@ public class UpgradePluginVersion extends Recipe {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
                     }
-                } else if (addVersionIfMissing && !hasManagedPluginVersion(getResolutionResult().getPom(), groupId, artifactId)) {
+                } else if (addVersionIfMissing && (overrideInheritedVersion ||
+                        !hasManagedPluginVersion(getResolutionResult().getPom(), groupId, artifactId))) {
                     Xml.Tag newTag = Xml.Tag.build("<version>" + newVersion + "</version>");
                     doAfterVisit(new AddToTagVisitor<>(tag, newTag, new MavenTagInsertionComparator(tag.getChildren())));
                 }
