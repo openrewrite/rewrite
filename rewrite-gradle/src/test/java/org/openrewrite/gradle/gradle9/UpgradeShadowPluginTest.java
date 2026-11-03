@@ -58,6 +58,31 @@ class UpgradeShadowPluginTest implements RewriteTest {
     }
 
     @Test
+    void preserveExplicitUnresolvedReceiver() {
+        rewriteRun(buildGradleKts(
+          "plugins { custom.id(\"com.github.johnrengelman.shadow\").version(\"6.1.0\") }"));
+    }
+
+    @Test
+    void preserveExplicitTypedReceiver() {
+        rewriteRun(buildGradleKts(
+          """
+          class CustomPluginDsl {
+              fun id(value: String): CustomPluginDsl = this
+              fun version(value: String): CustomPluginDsl = this
+          }
+          val custom = CustomPluginDsl()
+          plugins { custom.id("com.github.johnrengelman.shadow").version("6.1.0") }
+          """));
+    }
+
+    @Test
+    void preserveExplicitGroovyReceiver() {
+        rewriteRun(buildGradle(
+          "plugins { custom.id('com.github.johnrengelman.shadow').version('6.1.0') }"));
+    }
+
+    @Test
     void legacyKotlin() {
         rewriteRun(buildGradleKts(
           "plugins { id(\"com.github.johnrengelman.shadow\") version \"6.1.0\" }",

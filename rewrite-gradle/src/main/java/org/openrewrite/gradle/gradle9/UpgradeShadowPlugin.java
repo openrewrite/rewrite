@@ -68,7 +68,8 @@ public class UpgradeShadowPlugin extends Recipe {
                             return m;
                         }
                         J.MethodInvocation id = (J.MethodInvocation) m.getSelect();
-                        if (!"id".equals(id.getSimpleName()) || id.getArguments().size() != 1 ||
+                        // An explicit receiver can be a user-defined DSL, even inside plugins {}.
+                        if (!"id".equals(id.getSimpleName()) || id.getSelect() != null || id.getArguments().size() != 1 ||
                             !(id.getArguments().get(0) instanceof J.Literal)) {
                             return m;
                         }
