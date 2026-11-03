@@ -339,7 +339,7 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
 
 /**
  * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
- * changing nothing, where the move cannot be expressed safely. One call moves one binding.
+ * moving no binding, where nothing binds `from` or the move cannot be expressed safely. One call moves one binding.
  * A named member's spellings through its module rather than a binding of it — `NS.Old`,
  * `import("m").Old`, `export {Old} from "m"` — move with it, and also where nothing binds `from`,
  * which still answers `undefined`; see {@link RenameMemberSpellings}.
