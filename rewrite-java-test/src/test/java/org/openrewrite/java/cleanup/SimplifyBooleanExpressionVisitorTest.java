@@ -52,10 +52,18 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
-      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value",
-      "true ? value : false", "false ? false : value"})
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value"})
     void preserveBooleanBoundUnboxing(String expression) {
         rewriteRun(java("class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"true ? value : false", "false ? false : value"})
+    void simplifyBooleanBoundReferenceConditional(String expression) {
+        rewriteRun(java(
+          "class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }",
+          "class A { <T extends Boolean> Object f(T value) { return value; } }"
+        ));
     }
 
     @Test
