@@ -2573,6 +2573,12 @@ public class GroovyParserVisitor {
         }
 
         private J visitGStringValue(org.codehaus.groovy.ast.expr.Expression value) {
+            if (value instanceof ClosureExpression && !sourceStartsWith("{")) {
+                J.Lambda closure = doVisit(value);
+                // The interpolation owns the closure's braces in `${ -> value }`.
+                cursor--;
+                return closure.withMarkers(closure.getMarkers().add(new OmitBraces(randomId())));
+            }
             // Groovy compiles `${ statement; statement }` into an implicit `{ statement; statement }.call()`
             if (value instanceof MethodCallExpression) {
                 MethodCallExpression call = (MethodCallExpression) value;
