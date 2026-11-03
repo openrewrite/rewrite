@@ -298,7 +298,8 @@ member only where the default is the module object, as `export =` typings make i
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
-signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+signature but not a class's members. So does a move that only renames a member's spellings through
+its module, since nothing binds `from`, once it renames one. An AMD dependency swap rewrites no attribution. Names follow
 the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
 function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
 declared beside a moved member keeps the old name.

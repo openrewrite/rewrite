@@ -2330,30 +2330,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         this.cu = cu;
-        const imports = cu.statements
-            .filter(s => s.element?.kind === JS.Kind.Import)
-            .map(s => s.element as JS.Import);
-        const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
-        const ofModule = imports.filter(imp => {
-            const module = importedModule(imp);
-            return module !== undefined && sameModule(module, this.from.module);
-        });
-        const requiresOfModule = requires.filter(d => sameModule(requiredModuleOfDeclaration(d)!, this.from.module));
-        const fromPackage = packageOf(this.from.module);
-        const member = declaredMember(this.from);
-        this.movedTypes = new MovedTypes(this.from, this.to, {
-            module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
-                requiresOfModule.some(d => !isOnlyRequired(d)),
-            // Same-named classes from two subpaths of one package share a name.
-            className: member !== undefined && imports.filter(imp => {
-                const module = importedModule(imp);
-                return module !== undefined && packageOf(module) === fromPackage &&
-                    importBinds(imp, module, member) !== undefined;
-            }).length + requires.filter(d => {
-                const module = requiredModuleOfDeclaration(d)!;
-                return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
-            }).length > 1
-        });
+        this.movedTypes = movedTypesIn(cu, this.from, this.to, true);
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
@@ -2737,6 +2714,58 @@ function joinedRequire(
 }
 
 /** Rewrites a file's attribution onto the module and member a binding moved to. */
+/**
+ * The rewrite of the types in `cu` naming `from` to name `to`. A module object or a package-qualified
+ * class name another binding in the file shares keeps its name, since it stands for that binding too.
+ * `bindingMoves` says whether one of the file's bindings of `from` is the one that moves; where none
+ * is, every binding of a same-named class from the package shares its name.
+ */
+function movedTypesIn(
+    cu: JS.CompilationUnit,
+    from: {module: string; member?: string},
+    to: {module: string; member?: string},
+    bindingMoves: boolean
+): MovedTypes {
+    const imports = cu.statements
+        .filter(s => s.element?.kind === JS.Kind.Import)
+        .map(s => s.element as JS.Import);
+    const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
+    const ofModule = imports.filter(imp => {
+        const module = importedModule(imp);
+        return module !== undefined && sameModule(module, from.module);
+    });
+    const requiresOfModule = requires.filter(d => sameModule(requiredModuleOfDeclaration(d)!, from.module));
+    const fromPackage = packageOf(from.module);
+    const member = declaredMember(from);
+    return new MovedTypes(from, to, {
+        module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
+            requiresOfModule.some(d => !isOnlyRequired(d)),
+        // Same-named classes from two subpaths of one package share a name.
+        className: member !== undefined && imports.filter(imp => {
+            const module = importedModule(imp);
+            return module !== undefined && packageOf(module) === fromPackage &&
+                importBinds(imp, module, member) !== undefined;
+        }).length + requires.filter(d => {
+            const module = requiredModuleOfDeclaration(d)!;
+            return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
+        }).length > (bindingMoves ? 1 : 0)
+    });
+}
+
+/** `cu` with every type naming `from` renamed to name `to`, for a move that no binding in `cu` made. */
+export async function withMovedTypes(
+    cu: JS.CompilationUnit,
+    from: {module: string; member?: string},
+    to: {module: string; member?: string}
+): Promise<JS.CompilationUnit> {
+    const movedTypes = movedTypesIn(cu, from, to, false);
+    return await new class extends JavaScriptVisitor<undefined> {
+        protected override async visitType(javaType: Type | undefined): Promise<Type | undefined> {
+            return movedTypes.visit(javaType, undefined);
+        }
+    }().visit(cu, undefined) as JS.CompilationUnit;
+}
+
 class MovedTypes extends TypeVisitor<undefined> {
     private readonly onPath = new Set<Type>();
     private readonly answered = new Map<Type, Type | undefined>();

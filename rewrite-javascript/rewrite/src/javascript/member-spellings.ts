@@ -18,7 +18,7 @@ import {isIdentifier, J} from "../java";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
-import {aliasing, moduleNameOf, newIdentifier, respecify} from "./add-import";
+import {aliasing, moduleNameOf, newIdentifier, respecify, withMovedTypes} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -36,9 +36,19 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         readonly from: {module: string; member: string},
         readonly to: {module: string; member: string},
         /** The names the file binds `from`'s module object under at module scope. */
-        readonly moduleObjects: ReadonlySet<string>
+        readonly moduleObjects: ReadonlySet<string>,
+        /** Whether a renamed spelling renames the file's types too, which a rebind of a binding does itself. */
+        readonly retypes: boolean
     ) {
         super();
+    }
+
+    override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const visited = await super.visitJsCompilationUnit(cu, p);
+        // Only a spelling renamed here moves the types, so a file left as it was keeps them as they were
+        return visited === cu || !this.retypes || visited?.kind !== JS.Kind.CompilationUnit
+            ? visited
+            : withMovedTypes(visited as JS.CompilationUnit, this.from, this.to);
     }
 
     private get withinModule(): boolean {
