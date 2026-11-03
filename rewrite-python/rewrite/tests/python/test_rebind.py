@@ -219,6 +219,25 @@ def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result
     )
 
 
+@requires_ty
+def test_a_function_local_move_renames_the_class_its_import_names():
+    # A parse names `HttpClient` after the private module the package re-exports it from.
+    _assert_attributed_as_parsed(
+        [ChangeImport(old_module='acme_common.http', old_name='HttpClient', new_module='legacy_http',
+                      new_name='Http')],
+        '''
+        def send(c) -> None:
+            from acme_common.http import HttpClient
+            x: HttpClient = c
+        ''',
+        '''
+        def send(c) -> None:
+            from legacy_http import Http
+            x: Http = c
+        ''',
+    )
+
+
 # The package imports its submodule, as `os` does `os.path`.
 _DOTTED = {**_PACKAGES, 'legacy/__init__.py': 'from legacy import http',
            'legacy/http.py': _PACKAGES['legacy_http/__init__.py'], 'legacy/auth.py': 'def login() -> None: ...',
