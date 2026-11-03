@@ -52,6 +52,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     .map(property -> "/project/properties/" + property)
                     .map(XPathMatcher::new).collect(toList());
 
+    private static final XPathMatcher PROFILE_PROPERTY = new XPathMatcher("/project/profiles/profile/properties/*");
+
     private static final List<String> COMPILER_LEVEL_CONFIGURATION = Arrays.asList("source", "target", "release");
 
     private static final Pattern PROPERTY_REFERENCE = Pattern.compile("\\$\\{([^${}]+)}");
@@ -74,7 +76,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                " * `release.version`\n\n" +
                "Properties of any other name are updated too when the `maven-compiler-plugin` `source`, `target` or `release` " +
                "configuration of this pom, or of a pom it inherits from, resolves to them.\n\n" +
-               "If none of these properties are in use and the maven compiler plugin is not otherwise configured, adds the `maven.compiler.release` property.";
+               "If none of these properties are in use and the maven compiler plugin is not otherwise configured, adds the `maven.compiler.release` property.\n\n" +
+               "Numeric property aliases are resolved before choosing local overrides. Active profile properties are updated when they override the project compiler level.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -98,14 +101,10 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     for (String property : javaVersionProperties) {
                         String propertyValue = resolvedProperties.get(property);
                         if (requestedProperties.containsKey(property) && propertyValue != null) {
-                            try {
-                                if (Float.parseFloat(propertyValue) < version) {
-                                    d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
-                                            .visitNonNull(d, ctx);
-                                    maybeUpdateModel();
-                                }
-                            } catch (NumberFormatException ex) {
-                                // either an expression or something else, don't touch
+                            if (shouldUpgradeValue(propertyValue)) {
+                                d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
+                                        .visitNonNull(d, ctx);
+                                maybeUpdateModel();
                             }
                         }
                     }
@@ -119,15 +118,11 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     String propertyValue = currentProperties.get(property);
                     if (propertyValue != null) {
                         foundProperty = true;
-                        try {
-                            if (Float.parseFloat(propertyValue) < version) {
-                                d = (Xml.Document) new AddProperty(property, String.valueOf(version), null, false)
-                                        .getVisitor()
-                                        .visitNonNull(d, ctx);
-                                maybeUpdateModel();
-                            }
-                        } catch (NumberFormatException ex) {
-                            // either an expression or something else, don't touch
+                        if (shouldUpgradeValue(propertyValue)) {
+                            d = (Xml.Document) new AddProperty(property, String.valueOf(version), null, false)
+                                    .getVisitor()
+                                    .visitNonNull(d, ctx);
+                            maybeUpdateModel();
                         }
                     }
                 }
@@ -148,6 +143,16 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
+                if (PROFILE_PROPERTY.matches(getCursor()) && javaVersionProperties().contains(t.getName())) {
+                    Xml.Tag profile = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
+                    String id = profile.getChildValue("id").orElse(null);
+                    boolean active = id != null && getResolutionResult().getPom().getRequested().getProfiles().stream()
+                            .anyMatch(p -> id.equals(p.getId()) && p.isActive(getResolutionResult().getActiveProfiles()));
+                    if (active && t.getValue().filter(this::shouldUpgradeValue).isPresent()) {
+                        t = t.withValue(version.toString());
+                        maybeUpdateModel();
+                    }
+                }
                 if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
                     t.getChild("configuration").ifPresent(compilerPluginConfig -> {
                         for (String configuration : COMPILER_LEVEL_CONFIGURATION) {
@@ -160,6 +165,21 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     });
                 }
                 return t;
+            }
+
+            private boolean shouldUpgradeValue(String value) {
+                Matcher reference = PROPERTY_REFERENCE.matcher(value.trim());
+                if (reference.matches() && javaVersionProperties().contains(reference.group(1))) {
+                    // That property is upgraded separately, so preserve references to it.
+                    return false;
+                }
+                try {
+                    String resolved = getResolutionResult().getPom().getValue(value);
+                    return resolved != null && Float.parseFloat(resolved) < version;
+                } catch (IllegalArgumentException ex) {
+                    // Preserve unresolved or cyclic aliases and nonnumeric settings.
+                    return false;
+                }
             }
 
             // Whatever the compiler plugin routes its level through is a Java version property, regardless of its name

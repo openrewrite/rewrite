@@ -25,6 +25,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +57,25 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         //noinspection ConstantValue
         if (resolutionResult.getUserProperties() != null) {
             requested.getProperties().putAll(resolutionResult.getUserProperties());
+        }
+
+        Optional<Xml.Tag> profiles = document.getRoot().getChild("profiles");
+        if (profiles.isPresent()) {
+            List<Xml.Tag> profileTags = profiles.get().getChildren("profile");
+            requested = requested.withProfiles(ListUtils.map(requested.getProfiles(), profile -> {
+                for (Xml.Tag profileTag : profileTags) {
+                    if (profile.getId() != null && profile.getId().equals(profileTag.getChildValue("id").orElse(null))) {
+                        Map<String, String> profileProperties = new LinkedHashMap<>();
+                        profileTag.getChild("properties").ifPresent(profilePropertiesTag -> {
+                            for (Xml.Tag propertyTag : profilePropertiesTag.getChildren()) {
+                                profileProperties.put(propertyTag.getName(), propertyTag.getValue().orElse(""));
+                            }
+                        });
+                        return profile.getProperties().equals(profileProperties) ? profile : profile.withProperties(profileProperties);
+                    }
+                }
+                return profile;
+            }));
         }
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
