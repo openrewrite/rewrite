@@ -512,7 +512,7 @@ public static class TypeUtils
     /// Map a <see cref="JavaType.Primitive.PrimitiveKind"/> to its .NET fully-qualified type name.
     /// Returns null for non-value primitives (Null, None, Void).
     /// </summary>
-    private static string? PrimitiveToFqn(JavaType.Primitive.PrimitiveKind kind) => kind switch
+    internal static string? PrimitiveToFqn(JavaType.Primitive.PrimitiveKind kind) => kind switch
     {
         JavaType.Primitive.PrimitiveKind.Boolean => "System.Boolean",
         JavaType.Primitive.PrimitiveKind.Byte => "System.Byte",

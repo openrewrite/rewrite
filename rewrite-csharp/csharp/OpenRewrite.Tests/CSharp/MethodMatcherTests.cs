@@ -20,6 +20,43 @@ namespace OpenRewrite.Tests.CSharp;
 
 public class MethodMatcherTests
 {
+    [Theory]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Boolean, "bool", "System.Boolean")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Byte, "byte", "System.Byte")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Char, "char", "System.Char")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Double, "double", "System.Double")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Float, "float", "System.Single")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Int, "int", "System.Int32")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Long, "long", "System.Int64")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.Short, "short", "System.Int16")]
+    [InlineData(JavaType.Primitive.PrimitiveKind.String, "string", "System.String")]
+    public void MatchesPrimitiveParametersByCSharpKeywordAndDotNetName(
+        JavaType.Primitive.PrimitiveKind kind, string keyword, string fullyQualifiedName)
+    {
+        var method = MakeMethod("Example", "Accept", parameterTypes: [JavaType.Primitive.Of(kind)]);
+        Assert.True(new MethodMatcher($"Example Accept({keyword})").Matches(method));
+        Assert.True(new MethodMatcher($"Example Accept({fullyQualifiedName})").Matches(method));
+        Assert.True(new MethodMatcher($"Example Accept({fullyQualifiedName[(fullyQualifiedName.LastIndexOf('.') + 1)..]})").Matches(method));
+    }
+
+    [Fact]
+    public void DoesNotConflateSignedAndUnsignedParameters()
+    {
+        var signed = MakeMethod("Example", "Accept", parameterTypes: [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        var unsigned = MakeMethod("Example", "Accept", parameterTypes: [MakeClass("System.UInt32")]);
+        Assert.False(new MethodMatcher("Example Accept(uint)").Matches(signed));
+        Assert.False(new MethodMatcher("Example Accept(System.UInt32)").Matches(signed));
+        Assert.False(new MethodMatcher("Example Accept(int)").Matches(unsigned));
+        Assert.False(new MethodMatcher("Example Accept(System.Int32)").Matches(unsigned));
+    }
+
+    [Fact]
+    public void KeepsJavaPrimitiveKeywordCompatibility()
+    {
+        var method = MakeMethod("Example", "Accept", parameterTypes: [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Boolean)]);
+        Assert.True(new MethodMatcher("Example Accept(boolean)").Matches(method));
+    }
+
     private static JavaType.Class MakeClass(string fqn, JavaType.FullyQualified? supertype = null) =>
         new() { FullyQualifiedName = fqn, Supertype = supertype };
 
