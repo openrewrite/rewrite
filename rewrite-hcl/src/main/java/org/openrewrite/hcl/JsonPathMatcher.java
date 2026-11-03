@@ -20,6 +20,7 @@ import lombok.Value;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.hcl.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
@@ -592,10 +593,7 @@ public class JsonPathMatcher {
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
+            return s == null ? null : unquoteStringLiteral(s);
         }
 
         @Override
@@ -983,7 +981,7 @@ public class JsonPathMatcher {
 
         private static String unquoteStringLiteral(String literal) {
             if (literal != null && (literal.startsWith("'") || literal.startsWith("\""))) {
-                return literal.substring(1, literal.length() - 1);
+                return HclString.decodeQuoted(literal.substring(1, literal.length() - 1));
             }
             return "null".equals(literal) ? null : literal;
         }
