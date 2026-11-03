@@ -3167,11 +3167,17 @@ describe("maybeRebind and the member's other spellings", () => {
                 let a: import("m").Old;
                 let b: import("m").Old<{}>;
                 let c: typeof import("m").Old;
+                let d: import("m").Old.Inner;
+                let e: typeof import("m").Old.factory;
+                let other: import("m").Other.Old;
             `,
             `
                 let a: import("m").New;
                 let b: import("m").New<{}>;
                 let c: typeof import("m").New;
+                let d: import("m").New.Inner;
+                let e: typeof import("m").New.factory;
+                let other: import("m").Other.Old;
             `
         ));
 
@@ -3180,9 +3186,11 @@ describe("maybeRebind and the member's other spellings", () => {
         await toOther.rewriteRun(typescript(
             `
                 let a: import('m').Old;
+                let b: import('m').Old.Inner;
             `,
             `
                 let a: import('m2').New;
+                let b: import('m2').New.Inner;
             `
         ));
     });

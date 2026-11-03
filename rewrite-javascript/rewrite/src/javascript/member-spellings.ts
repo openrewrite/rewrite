@@ -17,7 +17,7 @@ import {create as produce, Draft} from "mutative";
 import {isIdentifier, J} from "../java";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {resolve} from "./scope";
+import {resolve, rootName} from "./scope";
 import {aliasing, moduleNameOf, newIdentifier, requiredModuleOf, respecify} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
@@ -83,14 +83,14 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         }
         const argument = importType.argumentAndAttributes.elements[0]?.element;
         const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
-        const qualifier = importType.qualifier?.element;
+        const qualifier = rootName(importType.qualifier?.element);
         if (literal?.kind !== J.Kind.Literal || typeof (literal as J.Literal).value !== "string" ||
             !sameModule(moduleNameOf(literal as J.Literal), this.from.module) ||
             qualifier === undefined || !isIdentifier(qualifier) || qualifier.simpleName !== this.from.member) {
             return visited;
         }
         return produce(visited as JS.ImportType, draft => {
-            (draft.qualifier!.element as Draft<J.Identifier>).simpleName = this.to.member;
+            (rootName(draft.qualifier!.element) as Draft<J.Identifier>).simpleName = this.to.member;
             if (!this.withinModule) {
                 const spelled = (draft.argumentAndAttributes.elements[0].element as Draft<JS.LiteralType>).literal as Draft<J.Literal>;
                 respecify(spelled, spelledLike(this.to.module, String(spelled.value)));
