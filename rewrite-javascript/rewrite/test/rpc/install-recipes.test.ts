@@ -17,8 +17,9 @@ import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
 import {createRequire, registerHooks} from "module";
+import {ResponseError} from "vscode-jsonrpc/node";
 import {RecipeMarketplace} from "../../src";
-import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
+import {checkHostVersion, InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
 
 describe("InstallRecipes", () => {
@@ -26,7 +27,7 @@ describe("InstallRecipes", () => {
     type RequestHandler = (request: InstallRecipes) => Promise<InstallRecipesResponse>;
 
     function captureHandler(installDir: string, marketplace: RecipeMarketplace,
-                            recipeOrigin: Map<string, string> = new Map()): RequestHandler {
+                            recipeOrigin: Map<string, string> = new Map(), logger?: any): RequestHandler {
         let capturedHandler: RequestHandler | undefined;
 
         const dummyConnection = {
@@ -35,7 +36,7 @@ describe("InstallRecipes", () => {
             }
         } as any;
 
-        InstallRecipes.handle(dummyConnection, installDir, marketplace, recipeOrigin);
+        InstallRecipes.handle(dummyConnection, installDir, marketplace, recipeOrigin, logger);
 
         if (!capturedHandler) {
             throw new Error("Handler was not registered");
@@ -246,6 +247,55 @@ describe("InstallRecipes", () => {
 
                 expect(hostRequire(packageDir).mutative).toBe(hostMutative);
             }, {unsafeCleanup: true});
+        });
+    });
+
+    describe("host version", () => {
+        const peerRange = (range: string) =>
+            ({name: "recipes", version: "1.0.0", peerDependencies: {"@openrewrite/rewrite": range}});
+
+        test("warns when a development build of the host is outside the package's peer range", async () => {
+            await withDir(async (dir) => {
+                const packageDir = path.join(dir.path, "recipes");
+                fs.mkdirSync(packageDir);
+                fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({...peerRange("^8.97.0"), main: "index.js"}));
+                fs.writeFileSync(path.join(packageDir, "index.js"), "module.exports = { activate() {} };");
+                const warnings: string[] = [];
+                const logger = {info() {}, log() {}, error() {}, warn: (m: string) => warnings.push(m)};
+
+                await captureHandler(path.join(dir.path, "install"), new RecipeMarketplace(), new Map(), logger)({recipes: packageDir} as any);
+
+                expect(warnings).toContain("recipes@1.0.0 requires @openrewrite/rewrite ^8.97.0, but this host runs 0.0.0");
+            }, {unsafeCleanup: true});
+        });
+
+        test("refuses a released host outside the package's peer range", () => {
+            let refusal: any;
+            try {
+                checkHostVersion(peerRange("^8.98.0"), "8.97.0");
+            } catch (e) {
+                refusal = e;
+            }
+
+            // The wire contract with IncompatibleRecipeBundleException in rewrite-core
+            expect(refusal).toBeInstanceOf(ResponseError);
+            expect(refusal.code).toBe(1001);
+            expect(refusal.message).toBe("recipes@1.0.0 requires @openrewrite/rewrite ^8.98.0, but this host runs 8.97.0");
+            expect(JSON.parse(refusal.data)).toEqual(
+                {packageName: "recipes", packageVersion: "1.0.0", requiredRange: "^8.98.0", hostVersion: "8.97.0"});
+        });
+
+        test("accepts a snapshot of the host inside the package's peer range", () => {
+            const warnings: string[] = [];
+            checkHostVersion(peerRange("^8.97.0"), "8.98.0-20261103-120000", {warn: (m: string) => warnings.push(m)} as any);
+            expect(warnings).toEqual([]);
+        });
+
+        test("checks only a semver peer range", () => {
+            const plainDependency = {name: "recipes", version: "1.0.0", dependencies: {"@openrewrite/rewrite": "^9.0.0"}};
+            expect(() => checkHostVersion(plainDependency, "8.97.0")).not.toThrow();
+
+            expect(() => checkHostVersion(peerRange("workspace:*"), "8.97.0")).not.toThrow();
         });
     });
 
