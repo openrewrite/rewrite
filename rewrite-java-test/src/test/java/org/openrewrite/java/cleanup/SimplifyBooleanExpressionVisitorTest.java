@@ -50,6 +50,27 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         rewriteRun(java("class A { Object f(Boolean value) { return " + expression + "; } }"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value",
+      "true ? value : false", "false ? false : value"})
+    void preserveBooleanBoundUnboxing(String expression) {
+        rewriteRun(java("class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }"));
+    }
+
+    @Test
+    void preserveBooleanBoundOverloadSelection() {
+        rewriteRun(java(
+          """
+            class A {
+                <T extends Boolean> String f(T value) { return select(value == true); }
+                String select(boolean value) { return "primitive"; }
+                String select(Boolean value) { return "boxed"; }
+            }
+            """
+        ));
+    }
+
     @Test
     void preservePrimitiveOverloadSelection() {
         rewriteRun(java(

@@ -203,7 +203,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     private static boolean isBoxedBoolean(Expression expression) {
-        return TypeUtils.isOfClassType(expression.getType(), "java.lang.Boolean");
+        return TypeUtils.isAssignableTo("java.lang.Boolean", expression.getType());
     }
 
     private Expression unpackExpression(Expression expr, Expression j) {
