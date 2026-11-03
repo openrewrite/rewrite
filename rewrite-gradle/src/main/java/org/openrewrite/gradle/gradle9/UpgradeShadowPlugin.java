@@ -53,7 +53,16 @@ public class UpgradeShadowPlugin extends Recipe {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                         if (!"version".equals(m.getSimpleName()) ||
                             !(m.getSelect() instanceof J.MethodInvocation) ||
-                            m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Literal)) {
+                            m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Literal) ||
+                            !(((J.Literal) m.getArguments().get(0)).getValue() instanceof String)) {
+                            return m;
+                        }
+                        J.MethodInvocation id = (J.MethodInvocation) m.getSelect();
+                        // An explicit receiver can be a user-defined DSL, even inside plugins {}.
+                        // Exclude it before the trait interprets its arguments as plugin strings.
+                        if (!"id".equals(id.getSimpleName()) || id.getSelect() != null || id.getArguments().size() != 1 ||
+                            !(id.getArguments().get(0) instanceof J.Literal) ||
+                            !(((J.Literal) id.getArguments().get(0)).getValue() instanceof String)) {
                             return m;
                         }
                         GradlePlugin plugin = new GradlePlugin.Matcher().get(getCursor()).orElse(null);
@@ -65,12 +74,6 @@ public class UpgradeShadowPlugin extends Recipe {
                         // Versionless or computed declarations can be managed elsewhere. Only rewrite
                         // the literal declaration that owns both the plugin id and its version.
                         if (!plugin.getVersion().matches("\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?")) {
-                            return m;
-                        }
-                        J.MethodInvocation id = (J.MethodInvocation) m.getSelect();
-                        // An explicit receiver can be a user-defined DSL, even inside plugins {}.
-                        if (!"id".equals(id.getSimpleName()) || id.getSelect() != null || id.getArguments().size() != 1 ||
-                            !(id.getArguments().get(0) instanceof J.Literal)) {
                             return m;
                         }
                         J.Literal pluginId = (J.Literal) id.getArguments().get(0);

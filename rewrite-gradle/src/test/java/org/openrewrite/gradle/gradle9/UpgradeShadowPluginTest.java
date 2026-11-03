@@ -64,6 +64,19 @@ class UpgradeShadowPluginTest implements RewriteTest {
     }
 
     @Test
+    void preserveExplicitNonStringDsl() {
+        rewriteRun(buildGradleKts(
+          """
+          class CustomPluginDsl {
+              fun id(value: Int): CustomPluginDsl = this
+              fun version(value: Int): CustomPluginDsl = this
+          }
+          val custom = CustomPluginDsl()
+          plugins { custom.id(123).version(456) }
+          """));
+    }
+
+    @Test
     void preserveExplicitTypedReceiver() {
         rewriteRun(buildGradleKts(
           """
