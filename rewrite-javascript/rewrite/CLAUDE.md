@@ -284,9 +284,9 @@ pass rather than run it alongside.
 
 A named member is spelled through its module as well as through a binding of it, and those spellings
 move with it: `NS.Old` where `NS` is a module object the file binds at module scope (`import * as NS`,
-`import NS = require`, `const NS = require`), as a type, a call or a `new`; `import("m").Old`, with
-`typeof` too; and `export {Old} from "m"`, which keeps the name it publishes as `export {New as Old}`,
-while `export {Old as X}` only reads the new member. They move when the binding does, and also where
+`import NS = require`, `const NS = require`, `const NS = await import`), wherever it is read, as a type,
+a value, a call, a `new` or a JSX tag; `import("m").Old`, with `typeof` too; and `export {Old} from "m"`,
+which keeps the name it publishes as `export {New as Old}`, while `export {Old as X}` becomes `export {New as X}`. They move when the binding does, and also where
 nothing binds `from`, which still answers `undefined` since no binding moved. A move refused for the
 binding renames none of them, so the file is never left half-moved.
 
