@@ -17,6 +17,7 @@ import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
 import {createRequire, registerHooks} from "module";
+import {ResponseError} from "vscode-jsonrpc/node";
 import {RecipeMarketplace} from "../../src";
 import {checkHostVersion, InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
@@ -269,8 +270,19 @@ describe("InstallRecipes", () => {
         });
 
         test("refuses a released host outside the package's peer range", () => {
-            expect(() => checkHostVersion(peerRange("^8.98.0"), "8.97.0"))
-                .toThrow("recipes@1.0.0 requires @openrewrite/rewrite ^8.98.0, but this host runs 8.97.0");
+            let refusal: any;
+            try {
+                checkHostVersion(peerRange("^8.98.0"), "8.97.0");
+            } catch (e) {
+                refusal = e;
+            }
+
+            // The wire contract with IncompatibleRecipeBundleException in rewrite-core
+            expect(refusal).toBeInstanceOf(ResponseError);
+            expect(refusal.code).toBe(1001);
+            expect(refusal.message).toBe("recipes@1.0.0 requires @openrewrite/rewrite ^8.98.0, but this host runs 8.97.0");
+            expect(JSON.parse(refusal.data)).toEqual(
+                {packageName: "recipes", packageVersion: "1.0.0", requiredRange: "^8.98.0", hostVersion: "8.97.0"});
         });
 
         test("accepts a snapshot of the host inside the package's peer range", () => {

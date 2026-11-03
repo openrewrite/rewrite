@@ -179,6 +179,8 @@ export class InstallRecipes {
     }
 }
 
+const INCOMPATIBLE_RECIPE_BUNDLE = 1001;
+
 /**
  * Throws when this host's version is outside the package's peer range for @openrewrite/rewrite.
  * A development build of the host (0.0.0, or a prerelease snapshot) only warns.
@@ -194,7 +196,10 @@ export function checkHostVersion(manifest: { name?: string, version?: string, pe
     if (hostVersion === '0.0.0' || semver.prerelease(hostVersion)) {
         logger?.warn(message);
     } else {
-        throw new Error(message);
+        // RewriteRpc on the Java side turns this code and data into an IncompatibleRecipeBundleException.
+        // data is a string because that side's JSON-RPC library cannot decode an object there.
+        throw new rpc.ResponseError(INCOMPATIBLE_RECIPE_BUNDLE, message, JSON.stringify(
+            {packageName: manifest.name, packageVersion: manifest.version, requiredRange: range, hostVersion}));
     }
 }
 
