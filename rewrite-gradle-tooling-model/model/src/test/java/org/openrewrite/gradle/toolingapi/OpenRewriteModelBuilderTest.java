@@ -28,16 +28,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenRewriteModelBuilderTest {
 
     @Test
-    void forkGradleUserHomeSharesTheDefaultHomesDownloads(@TempDir Path tmp) throws IOException {
+    void forkGradleUserHomeLinksOnlyTheDefaultHomesDependencyCache(@TempDir Path tmp) throws IOException {
+        // A default home with no dependency cache yet, which the link must still reach
         Path defaultHome = tmp.resolve("default");
-        Files.createDirectories(defaultHome.resolve("caches/modules-2"));
 
         Path home = ForkGradleUserHome.create(tmp.resolve("homes"), "1", defaultHome);
 
         assertThat(home.resolve("caches/modules-2")).isSymbolicLink();
         assertThat(Files.isSameFile(home.resolve("caches/modules-2"), defaultHome.resolve("caches/modules-2"))).isTrue();
-        // The default home has downloaded no distribution yet, and the fork's first download must still land there
-        assertThat(Files.isSameFile(home.resolve("wrapper/dists"), defaultHome.resolve("wrapper/dists"))).isTrue();
+        // Distributions stay out of reach of the cache cleanup that the fork home's daemons run
+        assertThat(home.resolve("wrapper")).doesNotExist();
     }
 
     @Test
@@ -52,5 +52,22 @@ class OpenRewriteModelBuilderTest {
 
         assertThat(home).doesNotExist();
         assertThat(artifact).exists();
+    }
+
+    @Test
+    void deletingAForkGradleUserHomeGoesOnPastWhatItCannotDelete(@TempDir Path tmp) throws IOException {
+        Path home = ForkGradleUserHome.create(tmp.resolve("homes"), "1", tmp.resolve("default"));
+        Path registry = Files.createDirectories(home.resolve("daemon/9.8.2"));
+        Files.write(registry.resolve("registry.bin"), new byte[]{1});
+        Path scripts = Files.createDirectories(home.resolve("caches/9.8.2/groovy-dsl"));
+        assertThat(registry.toFile().setWritable(false)).isTrue();
+        try {
+            ForkGradleUserHome.delete(home);
+
+            assertThat(scripts).doesNotExist();
+            assertThat(home.resolve("caches/modules-2")).doesNotExist();
+        } finally {
+            assertThat(registry.toFile().setWritable(true)).isTrue();
+        }
     }
 }

@@ -107,7 +107,7 @@ tasks.withType<Test>().configureEach {
     val manifest = testManifestFile.get().asFile
     val forkGradleUserHomes = temporaryDir.resolve("gradle-user-homes")
     val fileSystem = objects.newInstance<InjectedFileSystem>().fs
-    // What ForkGradleUserHome leaves behind. Gradle's delete removes a home's links, not the caches they point to.
+    // What daemons write to a home after its JVM is gone. Gradle's delete removes the link, not the cache behind it.
     doFirst { fileSystem.delete { delete(forkGradleUserHomes) } }
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
