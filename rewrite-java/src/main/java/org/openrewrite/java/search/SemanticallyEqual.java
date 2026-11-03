@@ -1092,6 +1092,12 @@ public class SemanticallyEqual {
                         return method;
                     }
                 }
+                // Kotlin extension methods are static, but their synthetic receiver parameter is
+                // represented by the select rather than an argument in the source tree.
+                if (static_ && (method.getMethodType().getParameterNames().contains("$this$") ||
+                                compareTo.getMethodType().getParameterNames().contains("$this$"))) {
+                    visit(method.getSelect(), compareTo.getSelect());
+                }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
                     for (int i = 0; i < arguments.size(); i++) {
