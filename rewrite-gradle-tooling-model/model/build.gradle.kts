@@ -1,3 +1,5 @@
+import javax.inject.Inject
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.java8-text-blocks")
@@ -103,6 +105,10 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     dependsOn(testManifestTask)
     val manifest = testManifestFile.get().asFile
+    val forkGradleUserHomes = temporaryDir.resolve("gradle-user-homes")
+    val fileSystem = objects.newInstance<InjectedFileSystem>().fs
+    // What ForkGradleUserHome leaves behind. Gradle's delete removes a home's links, not the caches they point to.
+    doFirst { fileSystem.delete { delete(forkGradleUserHomes) } }
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         @get:Classpath
@@ -113,12 +119,22 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifestFile: File = manifest
 
+        // Where each test JVM keeps a Gradle user home of its own (OpenRewriteModelBuilder.ForkGradleUserHome)
+        @get:Internal
+        val gradleUserHomes: File = forkGradleUserHomes
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${gradleUserHomes.absolutePath}"
         )
     })
 }
 
 tasks.named("check").configure {
     dependsOn(testGradle4)
+}
+
+interface InjectedFileSystem {
+    @get:Inject
+    val fs: FileSystemOperations
 }
