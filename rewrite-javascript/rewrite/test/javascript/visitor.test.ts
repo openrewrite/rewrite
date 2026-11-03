@@ -165,6 +165,42 @@ describe('JavaScript visitor formatting', () => {
             )
         );
     });
+
+    test('visits the class of a parameterized type and the type of a decorator', async () => {
+        class MarkVisitor extends JavaScriptVisitor<ExecutionContext> {
+            override async visitIdentifier(identifier: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
+                const visited = await super.visitIdentifier(identifier, ctx) as J.Identifier;
+                return visited.simpleName === 'Box' ? foundSearchResult(visited) : visited;
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, ctx: ExecutionContext): Promise<J | undefined> {
+                return foundSearchResult(await super.visitArrayAccess(arrayAccess, ctx) as J.ArrayAccess);
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new MarkVisitor());
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    @Box class A {}
+                    @(foo['bar']) class B {}
+                    const c = new Box<number>();
+                    const d = new foo['bar']<number>();
+                    let e: Box<string>;
+                `,
+                `
+                    @/*~~>*/Box class A {}
+                    @(/*~~>*/foo['bar']) class B {}
+                    const c = new /*~~>*/Box<number>();
+                    const d = new /*~~>*/foo['bar']<number>();
+                    let e: /*~~>*/Box<string>;
+                `
+            )
+        );
+    });
 });
 
 describe('JavaScript visitor dispatch', () => {

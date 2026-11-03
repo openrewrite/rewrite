@@ -33,6 +33,8 @@ recipeList:
   - org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
   # Manifest.attributes is read-only in Gradle 9; use the merging method instead of +=
   - org.openrewrite.gradle.gradle9.UseManifestAttributes
+  # ProjectDependency no longer delegates Project properties in Gradle 9
+  - org.openrewrite.gradle.gradle9.UseProjectForSourceSets
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.gradle9.UseVersionClosure
   # Depending on the current project by its own module coordinates is deprecated in 9.3

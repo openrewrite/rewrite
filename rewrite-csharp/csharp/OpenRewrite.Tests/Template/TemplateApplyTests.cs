@@ -337,6 +337,62 @@ public class TemplateApplyTests : RewriteTest
         Assert.Equal(IdsOf(result).Count, IdsOf(result).Distinct().Count());
     }
 
+    /// <summary>
+    /// Only the code the coordinates replace leaves the tree, so a capture from code that stays gets an id of its own.
+    /// </summary>
+    [Fact]
+    public void CaptureKeepsItsIdOnlyWhereTheCoordinatesReplaceItsCode()
+    {
+        var a = Capture.Expression("a");
+        var cu = Parse("class C { void M(int x) { Console.Write(x); Console.Write(1); } }");
+        var writes = FindFirst<MethodDeclaration>(cu)!.Body!.Statements
+            .Select(J (s) => s.Element is ExpressionStatement es ? es.Expression : s.Element)
+            .Cast<MethodInvocation>().ToList();
+        var x = writes[0].Arguments.Elements[0].Element;
+        var cursor = new Cursor(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu), writes[0]);
+        var match = CSharpPattern.Expression($"Console.Write({a})").Match(writes[0], cursor.Parent!)!;
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({a})");
+
+        MethodInvocation ApplyAt(CSharpCoordinates coordinates) =>
+            (MethodInvocation)tmpl.Apply(cursor, values: match, coordinates: coordinates)!;
+
+        Assert.Equal(x.Id, ApplyAt(CSharpCoordinates.Replace(writes[0])).Arguments.Elements[0].Element.Id);
+        Assert.NotEqual(x.Id, ApplyAt(CSharpCoordinates.Replace(writes[1])).Arguments.Elements[0].Element.Id);
+        Assert.NotEqual(x.Id, ApplyAt(CSharpCoordinates.Before(writes[0])).Arguments.Elements[0].Element.Id);
+    }
+
+    /// <summary>
+    /// The parenthesizer finds a capture's slot by its id, so each copy of a capture spliced into two slots is
+    /// parenthesized for its own.
+    /// </summary>
+    [Theory]
+    [InlineData("", " ?? ", "", "b ?? c", "(b ?? c) ?? b ?? c")]
+    [InlineData("", " - ", "", "x - y", "x - y - (x - y)")]
+    [InlineData("", " + ", "", "x - y", "x - y + (x - y)")]
+    [InlineData("", " ? ", " : z", "c ? d : e", "(c ? d : e) ? c ? d : e : z")]
+    public void CaptureInTwoSlotsMatchesFreshParse(string before, string middle, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{middle}{a}{after}"), captured, expected);
+    }
+
+    [Fact]
+    public void RecipeBuiltNullCoalescingInTwoSlotsKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        var coalescing = new CsBinary(Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "b", null, null),
+            new JLeftPadded<CsBinary.OperatorType>(Space.SingleSpace, CsBinary.OperatorType.NullCoalescing),
+            new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], "c", null, null), null);
+        var values = new MatchResult(new Dictionary<string, object> { ["a"] = coalescing }, null);
+
+        var result = CSharpTemplate.Expression($"{a} ?? {a}")
+            .Apply(new Cursor(null, Cursor.ROOT_VALUE), values: values)!;
+
+        Assert.Equal("(b ?? c) ?? b ?? c", new CSharpPrinter<int>().Print(result));
+    }
+
     private static List<Guid> IdsOf(J tree)
     {
         var ids = new List<Guid>();
@@ -740,6 +796,64 @@ public class TemplateApplyTests : RewriteTest
     }
 
     /// <summary>
+    /// <c>??</c> groups to the right and a conditional's branches take any expression, so another conditional or
+    /// <c>??</c> needs parentheses only on the left of <c>??</c> or as the condition of a conditional.
+    /// </summary>
+    [Theory]
+    [InlineData("c ?? ", "", "a ?? b", "c ?? a ?? b")]
+    [InlineData("", " ?? c", "a ?? b", "(a ?? b) ?? c")]
+    [InlineData("c ?? ", "", "x ? y : z", "c ?? (x ? y : z)")]
+    [InlineData("x ? y : ", "", "a ?? b", "x ? y : a ?? b")]
+    [InlineData("x ? ", " : z", "a ?? b", "x ? a ?? b : z")]
+    [InlineData("", " ? y : z", "a ?? b", "a ?? b ? y : z")]
+    [InlineData("x ? y : ", "", "c ? d : e", "x ? y : c ? d : e")]
+    [InlineData("x ? ", " : z", "c ? d : e", "x ? c ? d : e : z")]
+    [InlineData("", " ? y : z", "c ? d : e", "(c ? d : e) ? y : z")]
+    [InlineData("Console.WriteLine(", ")", "a ?? b ?? c", "Console.WriteLine(a ?? b ?? c)")]
+    [InlineData("Console.WriteLine(", ")", "c ? a : b ? d : e", "Console.WriteLine(c ? a : b ? d : e)")]
+    public void CaptureUnderConditionalOrNullCoalescingMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
+    /// An assignment, a lambda or a query runs as far right as it can, which in a conditional's branch is the end of
+    /// the branch, so only the condition and the operands of <c>??</c> need parentheses around one.
+    /// </summary>
+    [Theory]
+    [InlineData("x ? y : ", "", "b = 1", "x ? y : b = 1")]
+    [InlineData("x ? ", " : z", "b += 1", "x ? b += 1 : z")]
+    [InlineData("x ? null : ", "", "() => b", "x ? null : () => b")]
+    [InlineData("x ? ", " : null", "b => b", "x ? b => b : null")]
+    [InlineData("x ? ", " : null", "b => c ? d : e", "x ? b => c ? d : e : null")]
+    [InlineData("x ? ", " : ys", "from q in xs select q", "x ? from q in xs select q : ys")]
+    [InlineData("", " ? y : z", "b = c", "(b = c) ? y : z")]
+    [InlineData("c ?? ", "", "b = 1", "c ?? (b = 1)")]
+    [InlineData("", " ?? c", "b = 1", "(b = 1) ?? c")]
+    public void CaptureInBranchOfConditionalMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
+    /// The format of an interpolation starts at its first <c>:</c> that no parentheses enclose.
+    /// </summary>
+    [Theory]
+    [InlineData("$\"{", "}\"", "c ? d : e", "$\"{(c ? d : e)}\"")]
+    [InlineData("$\"{", ":F2}\"", "c ? d : e", "$\"{(c ? d : e):F2}\"")]
+    [InlineData("$\"{x,", "}\"", "c ? 1 : 2", "$\"{x,(c ? 1 : 2)}\"")]
+    [InlineData("$\"{", "}\"", "a ?? b", "$\"{a ?? b}\"")]
+    public void CaptureInInterpolationMatchesFreshParse(string before, string after, string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
+    /// <summary>
     /// A sign printed right before the same sign lexes as <c>--</c> or <c>++</c>, a decrement or increment.
     /// </summary>
     [Theory]
@@ -773,6 +887,33 @@ public class TemplateApplyTests : RewriteTest
         var a = Capture.Expression("a");
         AssertAppliesAsParsed(CSharpTemplate.Expression($"Console.WriteLine({a})"), captured,
             $"Console.WriteLine({captured})");
+    }
+
+    /// <summary>
+    /// A postfix <c>!</c> takes a primary operand, and a member access after a conditional access that ends in one
+    /// would join the conditional access.
+    /// </summary>
+    [Theory]
+    [InlineData("", "!", "b ?? c", "(b ?? c)!")]
+    [InlineData("", "!.ToString()", "b ?? c", "(b ?? c)!.ToString()")]
+    [InlineData("", "!", "-b", "(-b)!")]
+    [InlineData("", "!", "(int)b", "((int)b)!")]
+    [InlineData("", "!", "b as string", "(b as string)!")]
+    [InlineData("", "!", "b++", "b++!")]
+    [InlineData("", "!", "x?.y", "x?.y!")]
+    [InlineData("", "!", "x?.y!", "x?.y!!")]
+    [InlineData("", ".ToString()", "x?.ToString()!", "(x?.ToString()!).ToString()")]
+    [InlineData("", "[0]", "x?.y!", "(x?.y!)[0]")]
+    [InlineData("", ".Length", "x?.y!!", "(x?.y!!).Length")]
+    [InlineData("", ".Length", "x?[0].y!", "(x?[0].y!).Length")]
+    [InlineData("", ".Length", "x!", "x!.Length")]
+    [InlineData("", ".Length", "x?.y!.z", "x?.y!.z.Length")]
+    [InlineData("(object)", "", "x?.y!", "(object)x?.y!")]
+    public void CaptureAsOperandOfNullForgivingMatchesFreshParse(string before, string after, string captured,
+        string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
     }
 
     /// <summary>
@@ -829,6 +970,42 @@ public class TemplateApplyTests : RewriteTest
         AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
     }
 
+    /// <summary>
+    /// A switch after a type test or pattern applies to all of it, and a range after <c>x as T</c> starts with all of
+    /// it, unless the test ends in an expression that the switch or the <c>..</c> would continue.
+    /// </summary>
+    [Theory]
+    [InlineData("", " switch { _ => 0 }", "x is string", "x is string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int?", "x is int? switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is List<int>", "x is List<int> switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int i", "x is int i switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo f", "x is Foo f switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is { Length: 1 }", "x is { Length: 1 } switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is [1, 2]", "x is [1, 2] switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is int or string", "x is int or string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is not string", "x is not string switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is Foo.Bar", "(x is Foo.Bar) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is null", "(x is null) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is > 1", "(x is > 1) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is string or null", "(x is string or null) switch { _ => 0 }")]
+    [InlineData("", " switch { _ => 0 }", "x is not Foo", "(x is not Foo) switch { _ => 0 }")]
+    [InlineData("", "..y", "x as string", "x as string..y")]
+    [InlineData("", "..y", "x as int[]", "x as int[]..y")]
+    [InlineData("", "..y", "x as List<int>", "(x as List<int>)..y")]
+    [InlineData("", "..y", "x as int?", "(x as int?)..y")]
+    [InlineData("y..", "", "x as string", "y..(x as string)")]
+    [InlineData("Console.WriteLine(", ")", "x is string switch { true => 0, _ => 1 }",
+        "Console.WriteLine(x is string switch { true => 0, _ => 1 })")]
+    [InlineData("Console.WriteLine(", ")", "x is int i switch { true => i, _ => 1 }",
+        "Console.WriteLine(x is int i switch { true => i, _ => 1 })")]
+    [InlineData("Console.WriteLine(", ")", "x as string..", "Console.WriteLine(x as string..)")]
+    public void CaptureEndingInTypeOrPatternBeforeSwitchOrRangeMatchesFreshParse(string before, string after,
+        string captured, string expected)
+    {
+        var a = Capture.Expression("a");
+        AssertAppliesAsParsed(CSharpTemplate.Expression($"{before}{a}{after}"), captured, expected);
+    }
+
     [Theory]
     [InlineData("b ?? c", "await (b ?? c)")]
     [InlineData("(Task)b", "await (Task)b")]
@@ -859,6 +1036,36 @@ public class TemplateApplyTests : RewriteTest
             CSharp(
                 "class C { int Twice(int i) => i + i; string M(int b) { return Twice(b).ToString(); } }",
                 "class C { int Twice(int i) => i + i; string M(int b) { return (b + b).ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ReplacementEndingConditionalAccessAsReceiverKeepsItsParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"NotNull({a})"),
+                CSharpTemplate.Expression($"{a}!")))),
+            CSharp(
+                "class C { T NotNull<T>(T t) => t; int M(string? s) { return NotNull(s?.Trim()).Length; } }",
+                "class C { T NotNull<T>(T t) => t; int M(string? s) { return (s?.Trim()!).Length; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConditionalReplacingTheExpressionOfAnInterpolationTakesParentheses()
+    {
+        var a = Capture.Expression("a");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"YesNo({a})"),
+                CSharpTemplate.Expression($"{a} ? \"yes\" : \"no\"")))),
+            CSharp(
+                "class C { string YesNo(bool b) => \"\"; string M(bool b) => $\"{YesNo(b)}\"; }",
+                "class C { string YesNo(bool b) => \"\"; string M(bool b) => $\"{(b ? \"yes\" : \"no\")}\"; }"
             )
         );
     }
@@ -927,6 +1134,47 @@ public class TemplateApplyTests : RewriteTest
                             Console.WriteLine(42);
                         }
                     }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// A file that leaves the members of its namespace flush gets template results indented as it indents, rather than
+    /// a level deeper for the namespace.
+    /// </summary>
+    [Fact]
+    public void AutoFormatsTemplateResultIndentationInNamespaceWithFlushMembers()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceWithIfBlockRecipe()),
+            CSharp(
+                """
+                namespace N
+                {
+                class C
+                {
+                    void M()
+                    {
+                        Console.Write(42);
+                    }
+                }
+                }
+                """,
+                """
+                namespace N
+                {
+                class C
+                {
+                    void M()
+                    {
+                        if (true)
+                        {
+                            Console.WriteLine(42);
+                        }
+                    }
+                }
                 }
                 """
             )

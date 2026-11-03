@@ -75,6 +75,29 @@ describe('object literals in templates and patterns', () => {
         );
     });
 
+    test('a template opening with `{` in place of an argument of the call a visitor is on is an object literal', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                const [first] = m.arguments.elements;
+                if (first.element.kind !== J.Kind.NewClass || (first.element as J.NewClass).body!.statements.length > 1) {
+                    return m;
+                }
+                // The cursor is on the call, a statement whose own parent takes statements
+                const options = await template`{retries: 3, timeout: 1}`.apply(first.element, this.cursor);
+                return {...m, arguments: {...m.arguments, elements: [{...first, element: options!}]}} as J.MethodInvocation;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'configure({timeout: 1});',
+                'configure({retries: 3, timeout: 1});'
+            )
+        );
+    });
+
     test('a template opening with `{` in place of a function body is a block', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {

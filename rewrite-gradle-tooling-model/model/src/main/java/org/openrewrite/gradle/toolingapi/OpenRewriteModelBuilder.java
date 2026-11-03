@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +33,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
@@ -80,33 +82,37 @@ public class OpenRewriteModelBuilder {
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+        Path wrapperProperties = projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties");
         String gradleVersion;
-        if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
-            gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
+        if (Files.exists(wrapperProperties)) {
+            gradleVersion = wrapperGradleVersion(wrapperProperties);
             connector.useBuildDistribution();
         } else {
-            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.5");
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "9.8.2");
             connector.useGradleVersion(gradleVersion);
         }
-        connector
-                // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
-                // Leaving commented out because the exact consequences of this internal API are unclear
-                // .embedded(true)
-                .forProjectDirectory(projectDir);
         List<String> arguments = new ArrayList<>();
         arguments.add("--init-script");
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
+        File buildRoot = projectDir;
         Path settings = null;
         boolean settingsWritten = false;
         if (buildFile != null && buildFile.exists()) {
             if (isGradle9OrLater(gradleVersion)) {
-                // Gradle 9 dropped -b; for non-conventional build files write a temporary settings.gradle with rootProject.buildFileName.
+                // Gradle 9 dropped -b, which built from the build file's own directory; do the same, writing a
+                // temporary settings.gradle with rootProject.buildFileName for build files elsewhere or named otherwise
                 File abs = buildFile.getAbsoluteFile();
                 boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
                         abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
                 if (!atConventionalLocation) {
-                    Path projectPath = projectDir.toPath();
+                    buildRoot = abs.getParentFile();
+                    URI wrapperDistribution = wrapperDistributionUrl(wrapperProperties);
+                    if (wrapperDistribution != null) {
+                        // The build distribution is looked up from the build root, which no longer holds the wrapper
+                        connector.useDistribution(wrapperDistribution);
+                    }
+                    Path projectPath = buildRoot.toPath();
                     if (!Files.exists(projectPath.resolve("settings.gradle")) &&
                             !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
                         settings = projectPath.resolve("settings.gradle");
@@ -119,6 +125,11 @@ public class OpenRewriteModelBuilder {
                 arguments.add(buildFile.getAbsolutePath());
             }
         }
+        connector
+                // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
+                // Leaving commented out because the exact consequences of this internal API are unclear
+                // .embedded(true)
+                .forProjectDirectory(buildRoot);
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             String resolvedInitScript;
@@ -233,6 +244,24 @@ public class OpenRewriteModelBuilder {
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+
+    private static @Nullable URI wrapperDistributionUrl(Path wrapperProperties) {
+        if (!Files.exists(wrapperProperties)) {
+            return null;
+        }
+        Properties properties = new Properties();
+        try (InputStream in = Files.newInputStream(wrapperProperties)) {
+            properties.load(in);
+        } catch (IOException e) {
+            return null;
+        }
+        String distributionUrl = properties.getProperty("distributionUrl");
+        if (distributionUrl == null) {
+            return null;
+        }
+        URI uri = URI.create(distributionUrl);
+        return uri.isAbsolute() ? uri : wrapperProperties.getParent().toUri().resolve(uri);
     }
 
     private static @Nullable String wrapperGradleVersion(Path wrapperProperties) {

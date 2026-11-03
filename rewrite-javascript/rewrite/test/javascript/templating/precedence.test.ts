@@ -594,6 +594,39 @@ describe('template precedence', () => {
                 `const a = (n + 1).toString();`));
         });
 
+        test('when the result comes from a chained rule whose first result is a capture', () => {
+            const x = capture();
+            // The first result keeps the id of `c`, which the call the cursor is on holds as an argument
+            spec.recipe = onCall(
+                rewrite(() => ({before: pattern`id(${x})`, after: template`${x}`}))
+                    .andThen(rewrite(() => ({before: pattern`c`, after: template`a + b`}))));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const v = id(c) * 2;`,
+                `const v = (a + b) * 2;`));
+        });
+
+        test('when the result replaces a descendant of the node the visitor is on', () => {
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    const [first] = visited.arguments.elements;
+                    const product = first.element as J.Binary;
+                    if (product.kind !== J.Kind.Binary || product.left.kind !== J.Kind.Identifier) {
+                        return visited;
+                    }
+                    // The cursor is on the call, and what holds the operand is its argument
+                    const sum = await template`x + y`.apply(product.left, this.cursor) as Expression;
+                    const elements = [{...first, element: {...product, left: sum}}];
+                    return {...visited, arguments: {...visited.arguments, elements}} as J.MethodInvocation;
+                }
+            });
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `log(b * c);`,
+                `log((x + y) * c);`));
+        });
+
         test('when the result replaces the binary visitExpression returned', () => {
             const x = capture(), y = capture();
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {

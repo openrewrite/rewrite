@@ -1,3 +1,7 @@
+import shutil
+
+import pytest
+
 from rewrite import ExecutionContext
 from rewrite.java import J
 from rewrite.python import CompilationUnit, PythonVisitor, SpacesVisitor
@@ -56,6 +60,19 @@ def test_trailing_comma_takes_the_space_inside_its_brackets():
         python("d = [0,]", "d = [ 0, ]"),
         spec=RecipeSpec().with_recipe(from_visitor(SpacesVisitor(
             spaces.with_within(spaces.within.with_brackets(True)))))
+    )
+
+
+@pytest.mark.skipif(shutil.which("ty-types") is None, reason="ty-types not installed")
+def test_a_default_value_gets_spaces_only_after_an_annotation():
+    rewrite_run(
+        # language=python
+        python(
+            "def f(a, b = 1, c: int=2, *, d = None):\n    return a\n",
+            "def f(a, b=1, c: int = 2, *, d=None):\n    return a\n",
+        ),
+        # With types, every parameter has one, annotated or not
+        spec=RecipeSpec(type_attribution=True).with_recipe(from_visitor(SpacesVisitor(IntelliJ.spaces())))
     )
 
 

@@ -140,7 +140,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         return result != scope.getValue() && result instanceof Expression ?
-                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                (J2) substitutions.maybeParenthesize((Expression) result, scope) :
                 result;
     }
 

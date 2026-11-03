@@ -2573,6 +2573,12 @@ public class GroovyParserVisitor {
         }
 
         private J visitGStringValue(org.codehaus.groovy.ast.expr.Expression value) {
+            if (value instanceof ClosureExpression && !sourceStartsWith("{")) {
+                J.Lambda closure = doVisit(value);
+                // The interpolation owns the closure's braces in `${ -> value }`.
+                cursor--;
+                return closure.withMarkers(closure.getMarkers().add(new OmitBraces(randomId())));
+            }
             // Groovy compiles `${ statement; statement }` into an implicit `{ statement; statement }.call()`
             if (value instanceof MethodCallExpression) {
                 MethodCallExpression call = (MethodCallExpression) value;
@@ -2609,6 +2615,18 @@ public class GroovyParserVisitor {
         public void visitMapEntryExpression(MapEntryExpression expression) {
             Space prefix = whitespace();
             Expression key;
+            if (expression.getKeyExpression() instanceof SpreadMapExpression) {
+                // Groovy also exposes the spread operand as this entry's value. Visiting the
+                // synthetic key would consume that operand twice and lose the '*'.
+                skip("*");
+                key = new G.Unary(randomId(), EMPTY, Markers.EMPTY,
+                        JLeftPadded.build(G.Unary.Type.Spread),
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY), null);
+                queue.add(new G.MapEntry(randomId(), prefix, Markers.EMPTY,
+                        JRightPadded.build(key).withAfter(sourceBefore(":")),
+                        doVisit(expression.getValueExpression()), null));
+                return;
+            }
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
             Integer keyParenLevel = getInsideParenthesesLevel(expression.getKeyExpression());
@@ -4728,7 +4746,7 @@ public class GroovyParserVisitor {
         }
         matcher.appendTail(sb);
         String multiLineRemoved = sb.toString();
-        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
+        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open, -1)[0])
                 .collect(joining("\n"));
     }
 

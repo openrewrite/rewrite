@@ -76,7 +76,11 @@ def assert_no_added_markers(
                 explained.update(placements(source_file))
         unexplained = {p: holder for p, holder in placements(after).items() if p not in explained}
         if unexplained:
-            for p in _fresh_placements(after, reparse):
+            fresh = _fresh_placements(after, reparse)
+            if fresh is None:
+                # Output that doesn't parse is for the checks that follow to report.
+                continue
+            for p in fresh:
                 unexplained.pop(p, None)
         if unexplained:
             lines.append(f"  {after.source_path}{_how_changed(result._before, after)}")
@@ -138,12 +142,14 @@ def _marker_type(marker: Any) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
-def _fresh_placements(source_file: SourceFile, reparse: Callable[[SourceFile], Optional[SourceFile]]) -> Set[Placement]:
-    """The placements of a fresh parse of `source_file`, which explain the syntax markers of code a recipe wrote."""
+def _fresh_placements(source_file: SourceFile,
+                      reparse: Callable[[SourceFile], Optional[SourceFile]]) -> Optional[Set[Placement]]:
+    """The placements of a fresh parse of `source_file`, which explain the syntax markers of code a recipe wrote,
+    or None when what it prints doesn't parse."""
     try:
         fresh = reparse(source_file)
     except Exception:
-        return set()
+        return None
     return set() if fresh is None else set(placements(fresh))
 
 

@@ -108,6 +108,195 @@ def test_template_replace_try_at_top_level():
     )
 
 
+def test_a_replaced_statement_keeps_the_blank_lines_before_it():
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "import x\n"
+            "\n"
+            "\n"
+            "try:\n"
+            "    do_stuff()\n"
+            "except KeyError:\n"
+            "    pass\n"
+            "\n"
+            "\n"
+            "def f():\n"
+            "    a()\n"
+            "\n"
+            "\n"
+            "    try:\n"
+            "        do_stuff()\n"
+            "    except KeyError:\n"
+            "        pass\n",
+            #
+            "import x\n"
+            "\n"
+            "\n"
+            "with suppress(KeyError):\n"
+            "    do_stuff()\n"
+            "\n"
+            "\n"
+            "def f():\n"
+            "    a()\n"
+            "\n"
+            "\n"
+            "    with suppress(KeyError):\n"
+            "        do_stuff()\n",
+        )
+    )
+
+
+def test_a_statement_replaced_after_an_import_gains_no_blank_line_after_imports():
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "import x\n"
+            "try:\n"
+            "    do_stuff()\n"
+            "except KeyError:\n"
+            "    pass\n",
+            #
+            "import x\n"
+            "with suppress(KeyError):\n"
+            "    do_stuff()\n",
+        )
+    )
+
+
+_function = template('def x():\n    return 1')
+
+
+class _AssignmentToFunction(Recipe):
+    @property
+    def name(self) -> str:
+        return "test.AssignmentToFunction"
+
+    @property
+    def display_name(self) -> str:
+        return "Test replace an assignment to x with a function"
+
+    @property
+    def description(self) -> str:
+        return "Replaces each statement assigning to `x` with a function returning 1."
+
+    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_assignment(self, assignment: j.Assignment, p: ExecutionContext) -> Optional[J]:
+                if not isinstance(self.cursor.parent_tree_cursor().value, (py_tree.CompilationUnit, j.Block)) or \
+                        not isinstance(assignment.variable, j.Identifier) or assignment.variable.simple_name != 'x':
+                    return assignment
+                return _function.apply(self.cursor)
+
+        return Visitor()
+
+
+def test_a_replaced_first_statement_keeps_the_first_line():
+    spec = RecipeSpec(recipe=_AssignmentToFunction())
+    spec.rewrite_run(
+        python(
+            "x = 1\n",
+            #
+            "def x():\n"
+            "    return 1\n",
+        ),
+        python(
+            "# x is 1\n"
+            "x = 1\n",
+            #
+            "# x is 1\n"
+            "def x():\n"
+            "    return 1\n",
+        ),
+    )
+
+
+def test_a_replaced_first_statement_of_a_class_gets_no_blank_line_before_it():
+    spec = RecipeSpec(recipe=_AssignmentToFunction())
+    spec.rewrite_run(
+        python(
+            "class A:\n"
+            "    x = 1\n"
+            "    y = 2\n",
+            #
+            "class A:\n"
+            "    def x():\n"
+            "        return 1\n"
+            "    y = 2\n",
+        )
+    )
+
+
+def test_a_statement_replaced_by_a_function_gets_the_blank_lines_around_one():
+    spec = RecipeSpec(recipe=_AssignmentToFunction())
+    spec.rewrite_run(
+        python(
+            "import os\n"
+            "x = 1\n",
+            #
+            "import os\n"
+            "\n"
+            "\n"
+            "def x():\n"
+            "    return 1\n",
+        )
+    )
+
+
+def test_a_statement_replaced_by_a_method_gets_the_blank_line_around_one():
+    spec = RecipeSpec(recipe=_AssignmentToFunction())
+    spec.rewrite_run(
+        python(
+            "class A:\n"
+            "    y = 1\n"
+            "    x = 2\n",
+            #
+            "class A:\n"
+            "    y = 1\n"
+            "\n"
+            "    def x():\n"
+            "        return 1\n",
+        )
+    )
+
+
+def test_a_replacement_keeps_more_blank_lines_than_the_style_asks_for():
+    spec = RecipeSpec(recipe=_AssignmentToFunction())
+    spec.rewrite_run(
+        python(
+            "import os\n"
+            "\n"
+            "\n"
+            "\n"
+            "x = 1\n"
+            "\n"
+            "\n"
+            "def f():\n"
+            "    a()\n"
+            "\n"
+            "\n"
+            "\n"
+            "    x = 2\n",
+            #
+            "import os\n"
+            "\n"
+            "\n"
+            "\n"
+            "def x():\n"
+            "    return 1\n"
+            "\n"
+            "\n"
+            "def f():\n"
+            "    a()\n"
+            "\n"
+            "\n"
+            "\n"
+            "    def x():\n"
+            "        return 1\n",
+        )
+    )
+
+
 def test_template_replace_try_inside_function():
     """Template replacement inside a function must preserve indentation.
 
@@ -242,7 +431,7 @@ def test_a_replaced_operand_keeps_the_indentation_of_its_continuation_line():
 
 
 def test_a_replaced_statement_keeps_the_indentation_of_its_block():
-    """The lines inside the result indent from there by the style's four spaces."""
+    """The lines inside the result indent from there as the file indents."""
     spec = RecipeSpec(recipe=_ReplaceTryWithWith())
     spec.rewrite_run(
         python(
@@ -255,8 +444,27 @@ def test_a_replaced_statement_keeps_the_indentation_of_its_block():
             #
             "def f():\n"
             "  with suppress(KeyError):\n"
-            "      do_stuff()\n"
+            "    do_stuff()\n"
             "  done()\n",
+        )
+    )
+
+
+def test_a_replacement_in_a_tab_indented_file_indents_with_tabs():
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "def f():\n"
+            "\ttry:\n"
+            "\t\tdo_stuff()\n"
+            "\texcept KeyError:\n"
+            "\t\tpass\n"
+            "\tdone()\n",
+            #
+            "def f():\n"
+            "\twith suppress(KeyError):\n"
+            "\t\tdo_stuff()\n"
+            "\tdone()\n",
         )
     )
 

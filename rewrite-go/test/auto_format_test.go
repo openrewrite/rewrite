@@ -58,6 +58,13 @@ func TestRemoveTrailingWhitespace_StripsTrailingTabsFromLines(t *testing.T) {
 	assert.Equal(t, want, out)
 }
 
+func TestRemoveTrailingWhitespace_StripsTheLinesAfterAComment(t *testing.T) {
+	src := "package main\n\nfunc main() {\n\t// a comment\n\t\n\t/* another */  \n\tx := 1\n\t_ = x\n}\n"
+	out := applyVisitor(t, src, format.NewRemoveTrailingWhitespaceVisitor(nil))
+	want := "package main\n\nfunc main() {\n\t// a comment\n\n\t/* another */\n\tx := 1\n\t_ = x\n}\n"
+	assert.Equal(t, want, out)
+}
+
 // Regression: the leading blank line above the first statement of a
 // block lives on the *leftmost descendant* of that statement (e.g.
 // Variable.Prefix), not on Asg.Prefix. The visitor walks the leftmost

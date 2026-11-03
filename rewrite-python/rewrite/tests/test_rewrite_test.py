@@ -33,8 +33,9 @@ from rewrite.test import probes
 from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
 from rewrite.python.markers import PythonResolutionResult, Quoted
+from rewrite.python.template import capture, template
 from rewrite.python.visitor import PythonVisitor
-from rewrite.java.tree import Assignment, ClassDeclaration, Identifier, Literal, MethodInvocation, Yield
+from rewrite.java.tree import Assignment, ClassDeclaration, Identifier, Literal, MethodInvocation, Try, Yield
 from rewrite.python.format import AutoFormat, auto_format, maybe_auto_format
 from rewrite.python.tree import Await, CompilationUnit
 from rewrite.java import J, JavaType, Space
@@ -655,6 +656,28 @@ class TestAddedMarkers:
         spec = RecipeSpec(recipe=from_visitor(QuoteAnnotation()), type_attribution=False)
         spec.rewrite_run(python("x: int = 1\n", 'x: "Model" = 1\n'))
 
+    def test_output_that_does_not_parse_is_left_to_the_check_that_names_it(self):
+        with_lock = template('with lock:\n    {stmt}', stmt=capture('stmt'))
+
+        class LockOneColumnOut(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                if mi.name.simple_name != "a" or self.cursor.first_enclosing(Try) is not None:
+                    return mi
+                # The markers the template's parse gave the `with` are explained only by a fresh parse.
+                locked = with_lock.apply(self.cursor, values={'stmt': mi})
+                return locked.replace(prefix=Space([], "\n   "))
+
+        spec = RecipeSpec(recipe=from_visitor(LockOneColumnOut()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python(
+                "def f():\n    a()\n    b()\n",
+                "def f():\n   with lock:\n        a()\n    b()\n",
+            ))
+
+        assert "The recipe added markers" not in str(failure.value)
+        assert "    the text it prints doesn't parse: unindent does not match any outer indentation level on " \
+               "line 4, `b()`\n" in str(failure.value)
+
     def test_generated_source(self):
         @lst_dataclass
         class Visited(Marker):
@@ -781,6 +804,42 @@ class TestGeneratedSources:
             RecipeSpec(recipe=self._recipe()).rewrite_run(
                 python("import os", path=Path("pkg/client.py")),
                 python(None, None, path=Path("pkg/_helper.py")),
+            )
+
+    def test_empty_contents_matched_on_its_source_path(self):
+        RecipeSpec(recipe=self._recipe(contents="")).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, "", path=Path("pkg/_helper.py")),
+        )
+
+    def test_empty_contents_matched_when_the_spec_gives_no_path(self):
+        RecipeSpec(recipe=self._recipe(contents="")).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, ""),
+        )
+
+    def test_empty_contents_that_do_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, "", path=Path("pkg/_helper.py")),
+            )
+
+    def test_empty_contents_without_a_path_match_no_generated_file(self):
+        with pytest.raises(AssertionError, match="Expected the recipe to generate a source file"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, ""),
+            )
+
+
+class TestEmptyAfter:
+    """An empty `after` expects the recipe to leave the file empty."""
+
+    def test_an_empty_after_that_does_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=_renaming_one_step("a", "b"), type_attribution=False).rewrite_run(
+                python("a = 1\n", ""),
             )
 
 

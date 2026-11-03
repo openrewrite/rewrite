@@ -22,6 +22,7 @@ import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.OrderImports;
+import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
@@ -230,6 +231,194 @@ class RecipeCompatibilityTest implements RewriteTest {
             """
               class MyClass {
                 val num: Long = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeWithMemberImports() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          scala(
+            """
+              import scala.language.implicitConversions
+              import scala.math.Pi
+              import java.util.Collections.emptyList
+              import java.util.ArrayList
+
+              class MyClass {
+                val list = new ArrayList[String](emptyList[String]())
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.language.implicitConversions
+              import scala.math.Pi
+              import java.util.Collections.emptyList
+              import  java.util.LinkedList
+
+              class MyClass {
+                val list = new LinkedList[String](emptyList[String]())
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    // ---- RemoveImport ----
+
+    @Test
+    void removeImportWithValueImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.ArrayList"))),
+          scala(
+            """
+              import scala.language.implicitConversions
+              import scala.math.Pi
+              import java.util.ArrayList
+
+              class MyClass {
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.language.implicitConversions
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportWithMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.ArrayList"))),
+          scala(
+            """
+              import java.util.Collections.emptyList
+              import java.util.ArrayList
+
+              class MyClass {
+                val list = emptyList[String]()
+              }
+              """,
+            """
+              import java.util.Collections.emptyList
+
+              class MyClass {
+                val list = emptyList[String]()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportKeepsUsedMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.Collections.emptyList"))),
+          scala(
+            """
+              import java.util.Collections.emptyList
+
+              class MyClass {
+                val list = emptyList[String]()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportKeepsUsedValueImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("scala.math.Pi"))),
+          scala(
+            """
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportRemovesUnusedMethodImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.Collections.emptyList"))),
+          scala(
+            """
+              import java.util.Collections.emptyList
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportOfOwnerRemovesUnusedMemberImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.Collections"))),
+          scala(
+            """
+              import java.util.Collections.emptyList
+              import java.util.Collections.EMPTY_SET
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """,
+            """
+              import scala.math.Pi
+
+              class MyClass {
+                val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportOfOwnerKeepsUsedMemberImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.Collections"))),
+          scala(
+            """
+              import java.util.Collections.emptyList
+              import java.util.Collections.EMPTY_SET
+
+              class MyClass {
+                val list = emptyList[String]()
+              }
+              """,
+            """
+              import java.util.Collections.emptyList
+
+              class MyClass {
+                val list = emptyList[String]()
               }
               """
           )

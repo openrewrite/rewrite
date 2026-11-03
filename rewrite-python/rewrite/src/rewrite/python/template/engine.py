@@ -470,8 +470,8 @@ class TemplateEngine:
         unformatted = _SubstitutedValues()
         unformatted.visit(result, None)
 
-        # A replacement keeps the indentation of the line the code it replaces starts, which may align
-        # to a bracket that formatting the result alone can't see.
+        # A replacement keeps the blank lines before the code it replaces and the indentation of the line
+        # that code starts, which may align to a bracket that formatting the result alone can't see.
         keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
 
         # Auto-format the result
