@@ -3151,6 +3151,57 @@ describe("maybeRebind and the member's other spellings", () => {
         await spec.rewriteRun(javascript(`${declaration}\nNS = {Old: () => 1};\nNS.Old();`));
     });
 
+    test("the types naming a member moved only through a module object name it as a fresh parse of the result would", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                for (const [from, to] of [["Http", "HttpClient"], ["request", "send"]]) {
+                    maybeRebind(this, {from: {module: "http-api", member: from}, to: {module: "http-api", member: to}});
+                }
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        const after = `
+            import * as api from 'http-api';
+
+            const client: api.HttpClient = new api.HttpClient();
+            client.get('u');
+            api.send('x');
+        `;
+        let rebound: string[] = [];
+        let parsed: string[] = [];
+        await withDir(async (repo) => {
+            installPackage(repo.path, "http-api", {
+                "package.json": `{"name":"http-api","version":"1.0.0","types":"index.d.ts"}`,
+                "index.d.ts": `
+                    export declare class Http { get(url: string): string; }
+                    export declare class HttpClient { get(url: string): string; }
+                    export declare function request(url: string): string;
+                    export declare function send(url: string): string;
+                `
+            });
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(`
+                    import * as api from 'http-api';
+
+                    const client: api.Http = new api.Http();
+                    client.get('u');
+                    api.request('x');
+                `, after),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    rebound = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+            await new RecipeSpec().rewriteRun(npm(repo.path, {
+                ...typescript(after),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    parsed = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
     test("a module object stays constant in a declaration list", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});

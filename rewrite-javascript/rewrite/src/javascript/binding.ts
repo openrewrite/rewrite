@@ -395,7 +395,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         const bound = moduleScopeBindings(cu).some(b => b.module !== undefined &&
             sameModule(b.module, options.from.module) && b.member === memberName(options.from.member));
         if (!bound) {
-            renameMemberSpellings(visitor, cu, options);
+            renameMemberSpellings(visitor, cu, options, true);
         }
         return undefined;
     }
@@ -417,12 +417,20 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         v.localName === existing.localName)) {
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
     }
-    renameMemberSpellings(visitor, cu, options);
+    renameMemberSpellings(visitor, cu, options, false);
     return boundName;
 }
 
-/** Queues the rename of a named member's spellings through its module, once for each move. */
-function renameMemberSpellings(visitor: JavaScriptVisitor<any>, cu: JS.CompilationUnit, options: MaybeRebindOptions): void {
+/**
+ * Queues the rename of a named member's spellings through its module, once for each move.
+ * `retypes` where no `RebindImport` renames the file's types for the move.
+ */
+function renameMemberSpellings(
+    visitor: JavaScriptVisitor<any>,
+    cu: JS.CompilationUnit,
+    options: MaybeRebindOptions,
+    retypes: boolean
+): void {
     const from = memberName(options.from.member);
     const to = memberName(options.to.member);
     if (from === undefined || to === undefined || bindingShape(from) !== "named" || bindingShape(to) !== "named" ||
@@ -435,7 +443,7 @@ function renameMemberSpellings(visitor: JavaScriptVisitor<any>, cu: JS.Compilati
         .filter(b => b.shape !== "default" && !b.reassignable && sameModule(b.module, options.from.module))
         .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
-        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
+        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects, retypes));
 }
 
 /**
