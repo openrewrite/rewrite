@@ -17,7 +17,9 @@ import * as rpc from "vscode-jsonrpc/node";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import * as nodeModule from "module";
 import {createRequire} from "module";
+import {pathToFileURL} from "url";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
@@ -130,11 +132,12 @@ export class InstallRecipes {
 
                     let recipeModule;
                     try {
-                        // Pre-load core modules that are used by recipes but loaded lazily
-                        // This ensures they're in require.cache before setupSharedDependencies runs
-                        preloadCoreModules(logger);
-
-                        setupSharedDependencies(resolvedPath, logger);
+                        if (!resolveSharedDependenciesFromHost()) {
+                            // Pre-load core modules that are used by recipes but loaded lazily
+                            // This ensures they're in require.cache before setupSharedDependencies runs
+                            preloadCoreModules(logger);
+                            setupSharedDependencies(resolvedPath, logger);
+                        }
                         recipeModule = require(resolvedPath);
                     } catch (e: any) {
                         throw new Error(`Failed to load recipe module from ${resolvedPath}: ${e.stack}`);
@@ -168,6 +171,38 @@ export class InstallRecipes {
             )
         );
     }
+}
+
+const SHARED_DEPENDENCIES = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
+let sharedDependencyHook: boolean | undefined;
+
+/**
+ * Resolves the shared dependencies, and their subpaths, from this file for every require and import
+ * in the process. A recipe package then gets the host's instances whatever copies it has on disk.
+ * Returns false on a Node without module.registerHooks.
+ */
+function resolveSharedDependenciesFromHost(): boolean {
+    if (sharedDependencyHook !== undefined) {
+        return sharedDependencyHook;
+    }
+    if (typeof nodeModule.registerHooks !== 'function') {
+        return sharedDependencyHook = false;
+    }
+    let resolvingFromHost = false; // require.resolve re-enters the hook on some Node versions
+    nodeModule.registerHooks({
+        resolve(specifier, context, nextResolve) {
+            if (resolvingFromHost || !SHARED_DEPENDENCIES.some(d => specifier === d || specifier.startsWith(d + '/'))) {
+                return nextResolve(specifier, context);
+            }
+            resolvingFromHost = true;
+            try {
+                return {url: pathToFileURL(require.resolve(specifier)).href, shortCircuit: true};
+            } finally {
+                resolvingFromHost = false;
+            }
+        }
+    });
+    return sharedDependencyHook = true;
 }
 
 /**
