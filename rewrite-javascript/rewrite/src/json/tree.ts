@@ -299,17 +299,15 @@ export function isMember(json: Json): json is Json.Member {
 export function getMemberKeyName(member: Json.Member): string | undefined {
     const key = member.key.element;
     if (isLiteral(key)) {
-        const source = key.source;
-        if (source.startsWith('"') && source.endsWith('"')) {
-            // Decoded from source, since the Java JSON parser keeps a string's escapes in `value`.
+        if (key.source.startsWith('"')) {
+            // Decoded from source, since LSTs serialized by older Java JSON parsers keep a string's escapes in `value`.
             try {
-                return JSON.parse(source);
+                return JSON.parse(key.source);
             } catch {
                 // a JSON5 escape such as `\x41`, which JSON.parse rejects
-                return source.slice(1, -1);
             }
         }
-        return source;
+        return String(key.value);
     } else if (isIdentifier(key)) {
         return key.name;
     }

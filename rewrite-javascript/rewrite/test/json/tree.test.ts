@@ -25,12 +25,19 @@ async function firstMember(text: string): Promise<Json.Member> {
 }
 
 describe("getMemberKeyName", () => {
-    test("decodes the escapes in a quoted key, whichever parser built the tree", async () => {
+    test("decodes a quoted key from its source, even where its value keeps the escapes", async () => {
         const member = await firstMember(String.raw`{"\\.(css|less)$": "identity-obj-proxy"}`);
         expect(getMemberKeyName(member)).toBe(String.raw`\.(css|less)$`);
 
         const key = member.key.element as Json.Literal;
-        const javaParsed = {...member, key: {...member.key, element: {...key, value: String.raw`\\.(css|less)$`}}};
-        expect(getMemberKeyName(javaParsed)).toBe(String.raw`\.(css|less)$`);
+        const serializedWithEscapes = {...member, key: {...member.key, element: {...key, value: String.raw`\\.(css|less)$`}}};
+        expect(getMemberKeyName(serializedWithEscapes)).toBe(String.raw`\.(css|less)$`);
+    });
+
+    test("takes the value of a JSON5 key that JSON.parse rejects", async () => {
+        const member = await firstMember(`{"a": 1}`);
+        const key = member.key.element as Json.Literal;
+        const json5 = {...member, key: {...member.key, element: {...key, source: String.raw`'\x41'`, value: "A"}}};
+        expect(getMemberKeyName(json5)).toBe("A");
     });
 });

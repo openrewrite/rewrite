@@ -24,6 +24,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -43,7 +44,7 @@ public class AddKeyValue extends Recipe {
     String keyPath;
 
     @Option(displayName = "Key",
-            description = "The key to create.",
+            description = "The key to create, as the text it stands for. It is written with the escapes JSON needs, so `\\.` is written `\\\\.`.",
             example = "myKey")
     String key;
 
@@ -109,7 +110,7 @@ public class AddKeyValue extends Recipe {
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
                 return new JsonRightPadded<>(
-                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "\"" + key + "\"", key),
+                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, JsonString.quote(key), key),
                         Space.EMPTY, Markers.EMPTY
                 );
             }

@@ -24,7 +24,6 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeRuntime;
-import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -205,10 +204,6 @@ public final class NodeDependencyScan {
 
         private final boolean resolves;
 
-        // the values its parser read string literals as, by how they are written, where that is not the text between
-        // their quotes: the TypeScript parser reads escapes, the Java one, which parses the text again, does not
-        private final Map<String, Object> escaped = new HashMap<>();
-
         private @Nullable List<Path> linkTargets;
 
         private Manifest(SourceFile packageJson, @Nullable String resolved) {
@@ -222,19 +217,6 @@ public final class NodeDependencyScan {
             this.npmrcConfigs = marker == null ? null : marker.getNpmrcConfigs();
             this.runtime = packageJson.getMarkers().findFirst(NodeRuntime.class).orElse(null);
             this.resolves = resolved == null || resolves(marker, resolved);
-            if (json) {
-                new JsonIsoVisitor<Map<String, Object>>() {
-                    @Override
-                    public Json.Literal visitLiteral(Json.Literal literal, Map<String, Object> values) {
-                        String source = literal.getSource();
-                        if (literal.getValue() instanceof String && source.length() > 1 &&
-                            !source.substring(1, source.length() - 1).equals(literal.getValue())) {
-                            values.put(source, literal.getValue());
-                        }
-                        return literal;
-                    }
-                }.visit(packageJson, escaped);
-            }
         }
 
         public static Manifest of(SourceFile packageJson) {
@@ -302,21 +284,10 @@ public final class NodeDependencyScan {
         }
 
         /**
-         * {@code text}, another revision of it, parsed with its string literals read as its own parser read them, and
-         * no markers; null when either is no JSON.
+         * {@code text}, another revision of it, parsed without markers. Null when either is no JSON.
          */
         public Json.@Nullable Document parse(String text) {
-            Json.Document document = json ? PackageJsonHelper.parseJson(path, text) : null;
-            if (document == null || escaped.isEmpty()) {
-                return document;
-            }
-            return (Json.Document) new JsonIsoVisitor<Integer>() {
-                @Override
-                public Json.Literal visitLiteral(Json.Literal literal, Integer p) {
-                    Object value = escaped.get(literal.getSource());
-                    return value == null ? literal : literal.withValue(value);
-                }
-            }.visitNonNull(document, 0);
+            return json ? PackageJsonHelper.parseJson(path, text) : null;
         }
 
         // the package.json of each directory in the repository that a dependency of the manifest names, once

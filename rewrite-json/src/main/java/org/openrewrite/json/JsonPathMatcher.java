@@ -25,6 +25,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.internal.grammar.JsonPathLexer;
 import org.openrewrite.json.internal.grammar.JsonPathParser;
 import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
@@ -435,10 +436,7 @@ public class JsonPathMatcher {
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
+            return s == null ? null : unquoteStringLiteral(s);
         }
 
         @Override
@@ -851,7 +849,7 @@ public class JsonPathMatcher {
 
         private static String unquoteStringLiteral(String literal) {
             if (literal != null && (literal.startsWith("'") || literal.startsWith("\""))) {
-                return literal.substring(1, literal.length() - 1);
+                return JsonString.decode(literal);
             }
             return "null".equals(literal) ? null : literal;
         }

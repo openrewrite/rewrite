@@ -110,4 +110,30 @@ class ChangeKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newKeyWithEscapes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey(
+            "$.moduleNameMapper.css",
+            "\"\\\\.(css|less)$\""
+          )),
+          json(
+            """
+              {
+                "moduleNameMapper": {
+                  "css": "identity-obj-proxy"
+                }
+              }
+              """,
+            """
+              {
+                "moduleNameMapper": {
+                  "\\\\.(css|less)$": "identity-obj-proxy"
+                }
+              }
+              """
+          )
+        );
+    }
 }
