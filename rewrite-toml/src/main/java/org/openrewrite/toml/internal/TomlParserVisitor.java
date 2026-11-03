@@ -157,11 +157,10 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             return source;
         }
         char first = source.charAt(0);
-        String quoted = source.substring(1, source.length() - 1);
         if (first == '"' && source.endsWith("\"")) {
-            return TomlString.decodeBasic(quoted, false);
+            return TomlString.decodeBasic(source.substring(1, source.length() - 1), false);
         } else if (first == '\'' && source.endsWith("'")) {
-            return quoted;
+            return source.substring(1, source.length() - 1);
         }
         return source;
     }

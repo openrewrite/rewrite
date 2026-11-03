@@ -201,7 +201,7 @@ public class TomlPathMatcher {
             this.isSingleWildcard = isSingleWildcard;
             this.isDoubleWildcard = isDoubleWildcard;
 
-            if (literal != null && !isSingleWildcard && !isDoubleWildcard) {
+            if (literal != null && (literal.indexOf('*') >= 0 || literal.indexOf('?') >= 0)) {
                 StringBuilder regex = new StringBuilder();
                 int start = 0;
                 for (int i = 0; i < literal.length(); i++) {
@@ -212,7 +212,7 @@ public class TomlPathMatcher {
                     }
                 }
                 regex.append(Pattern.quote(literal.substring(start)));
-                this.pattern = Pattern.compile(regex.toString());
+                this.pattern = Pattern.compile(regex.toString(), Pattern.DOTALL);
             } else {
                 this.pattern = null;
             }

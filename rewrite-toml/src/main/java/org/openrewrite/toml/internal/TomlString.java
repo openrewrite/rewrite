@@ -54,13 +54,13 @@ public final class TomlString {
                 case 'u':
                 case 'U': {
                     int digits = e == 'u' ? 4 : 8;
-                    if (i + 2 + digits <= raw.length()) {
+                    if (i + 2 + digits <= raw.length() && isHex(raw, i + 2, i + 2 + digits)) {
                         try {
                             out.appendCodePoint(Integer.parseInt(raw.substring(i + 2, i + 2 + digits), 16));
                             i += 2 + digits;
                             break;
                         } catch (IllegalArgumentException ignored) {
-                            // not hex or beyond U+10FFFF, so the text is kept as written
+                            // beyond U+10FFFF, so the text is kept as written
                         }
                     }
                     out.append(c);
@@ -86,6 +86,15 @@ public final class TomlString {
             }
         }
         return out.toString();
+    }
+
+    private static boolean isHex(String s, int from, int to) {
+        for (int i = from; i < to; i++) {
+            if (Character.digit(s.charAt(i), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

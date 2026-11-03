@@ -26,4 +26,9 @@ class TomlStringTest {
         assertThat(TomlString.quoteBasic("\"\\\b\f\n\r\t" + (char) 1 + "é"))
           .isEqualTo("\\\"\\\\\\b\\f\\n\\r\\t\\u0001é");
     }
+
+    @Test
+    void decodeBasicKeepsAnEscapeWithASignedNumberAsWritten() {
+        assertThat(TomlString.decodeBasic("\\u+041", false)).isEqualTo("\\u+041");
+    }
 }
