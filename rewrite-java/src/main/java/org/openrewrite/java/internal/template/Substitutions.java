@@ -189,7 +189,7 @@ public class Substitutions {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
             } else {
-                return toSourceTypeName(genericType.getBounds().get(0));
+                return toDenotableTypeName(genericType.getBounds().get(0));
             }
         }
         if (type instanceof JavaType.FullyQualified) {
@@ -203,7 +203,7 @@ public class Substitutions {
                 }
             }
         }
-        String typeName = toSourceTypeName(type).replace("$", ".");
+        String typeName = toDenotableTypeName(type).replace("$", ".");
         if (containsLocalOrAnonymousClassName(typeName)) {
             // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
             // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
@@ -213,27 +213,27 @@ public class Substitutions {
     }
 
     /**
-     * Like {@link TypeUtils#toString(JavaType)}, but writes each intersection type as its first bound
-     * (its erasure), since an inferred intersection such as {@code Number & Comparable<...>} is not
-     * valid Java source as a type argument or wildcard bound.
+     * Like {@link TypeUtils#toString(JavaType)}, but writes each intersection type as its first bound,
+     * since an inferred intersection such as {@code Number & Comparable<...>} is not denotable as a
+     * type argument or wildcard bound.
      */
-    private static String toSourceTypeName(JavaType type) {
-        return toSourceTypeName(type, new IdentityHashMap<>());
+    private static String toDenotableTypeName(JavaType type) {
+        return toDenotableTypeName(type, new IdentityHashMap<>());
     }
 
-    private static String toSourceTypeName(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
+    private static String toDenotableTypeName(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
         if (type instanceof JavaType.Intersection) {
             List<JavaType> bounds = ((JavaType.Intersection) type).getBounds();
-            return bounds.isEmpty() ? "java.lang.Object" : toSourceTypeName(bounds.get(0), recursiveTypes);
+            return bounds.isEmpty() ? "java.lang.Object" : toDenotableTypeName(bounds.get(0), recursiveTypes);
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             StringJoiner joiner = new StringJoiner(", ", "<", ">");
             for (JavaType parameter : parameterized.getTypeParameters()) {
-                joiner.add(toSourceTypeName(parameter, recursiveTypes));
+                joiner.add(toDenotableTypeName(parameter, recursiveTypes));
             }
-            return toSourceTypeName(parameterized.getType(), recursiveTypes) + joiner;
+            return toDenotableTypeName(parameterized.getType(), recursiveTypes) + joiner;
         } else if (type instanceof JavaType.Array) {
-            return toSourceTypeName(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
+            return toDenotableTypeName(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (!"?".equals(genericType.getName()) ||
@@ -246,7 +246,7 @@ public class Substitutions {
             }
             recursiveTypes.put(genericType, false);
             String variance = genericType.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT ? "? extends " : "? super ";
-            String bound = toSourceTypeName(genericType.getBounds().get(0), recursiveTypes);
+            String bound = toDenotableTypeName(genericType.getBounds().get(0), recursiveTypes);
             boolean recursive = recursiveTypes.remove(genericType);
             return recursive ? "?" : variance + bound;
         }
