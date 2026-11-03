@@ -21,6 +21,7 @@ import io.moderne.jsonrpc.JsonRpcError;
 import io.moderne.jsonrpc.JsonRpcException;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ObjectMappers;
 
 import java.io.IOException;
 
@@ -35,6 +36,8 @@ public class IncompatibleRecipeBundleException extends RuntimeException {
      * Its data is a JSON string holding this exception's four fields.
      */
     private static final int CODE = 1001;
+
+    private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
 
     private final String packageName;
     private final String packageVersion;
@@ -60,8 +63,7 @@ public class IncompatibleRecipeBundleException extends RuntimeException {
                     return null;
                 }
                 try {
-                    return new IncompatibleRecipeBundleException(detail.getMessage(),
-                            new ObjectMapper().readTree(detail.getData()));
+                    return new IncompatibleRecipeBundleException(detail.getMessage(), mapper.readTree(detail.getData()));
                 } catch (IOException e) {
                     return null;
                 }
