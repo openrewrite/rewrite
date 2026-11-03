@@ -143,6 +143,14 @@ public class RecipeQualityValidation {
     private boolean noStaticVisitors = true;
 
     /**
+     * Controls whether the recipe is validated to keep no {@link org.openrewrite.Heavyweight} objects such as source
+     * files in its fields or in the static fields of the classes nested in it, which would stay in memory all run.
+     * Recipes a composite lists from dependency jars are left to the builds of the projects that own them.
+     */
+    @Builder.Default
+    private boolean lightweightRecipeFields = true;
+
+    /**
      * How much of a type {@link #parserTypedTrees} compares with the type the parser gives, from least to most.
      */
     @Incubating(since = "8.108.0")
@@ -211,6 +219,7 @@ public class RecipeQualityValidation {
                 .compilableOutput(quality.compilableOutput())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .noStaticVisitors(quality.noStaticVisitors())
+                .lightweightRecipeFields(quality.lightweightRecipeFields())
                 .build();
     }
 }
