@@ -22,9 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Version;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -156,6 +154,9 @@ public class RemoveRedundantProperties extends Recipe {
                 if (parentPropertyValue == null) {
                     return equalsSuperPomDefault(tag, mrr);
                 }
+                if (isOrdering() && isLocalOverrideInUse(mrr, rootProject, tag.getName(), ctx)) {
+                    return false;
+                }
                 return comparator == Comparator.ANY || tag.getValue()
                         .map(value -> matchesComparator(parentPropertyValue, value))
                         .orElse(false);
@@ -204,6 +205,44 @@ public class RemoveRedundantProperties extends Recipe {
                         return null;
                     }
                 });
+            }
+
+            private boolean isOrdering() {
+                return comparator != Comparator.ANY && comparator != Comparator.EQ;
+            }
+
+            /// A property that only POMs of this repository define, and that this module uses
+            /// for a version of its own, is a deliberate override: the parent may well use the
+            /// same name for another artifact, so its value is no baseline to compare against.
+            private boolean isLocalOverrideInUse(MavenResolutionResult mrr, MavenResolutionResult rootProject,
+                                                 String name, ExecutionContext ctx) {
+                Map<String, String> external = externalParentProperties(rootProject, ctx);
+                if (external != null && external.containsKey(name)) {
+                    return false;
+                }
+                String reference = "${" + name + "}";
+                Pom requested = mrr.getPom().getRequested();
+                for (Dependency dependency : requested.getDependencies()) {
+                    if (reference.equals(dependency.getVersion())) {
+                        return true;
+                    }
+                }
+                for (ManagedDependency managed : requested.getDependencyManagement()) {
+                    if (reference.equals(managed.getVersion())) {
+                        return true;
+                    }
+                }
+                for (Plugin plugin : requested.getPlugins()) {
+                    if (reference.equals(plugin.getVersion())) {
+                        return true;
+                    }
+                }
+                for (Plugin plugin : requested.getPluginManagement()) {
+                    if (reference.equals(plugin.getVersion())) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             private boolean matchesComparator(String parentValue, String value) {
