@@ -946,15 +946,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return cu;
         }
 
-        /**
-         * Finds a declarable configuration to add the dependency to.
-         */
-        /**
-         * Whether a compile or runtime classpath of a source set extends from the configuration, so that what is
-         * declared in it is a dependency of the project. Configurations that no classpath extends from, such as the
-         * Kotlin plugin's {@code swiftExportClasspath} or {@code kotlinCompilerPluginClasspath}, hold the plugin's
-         * own tooling, which follows the plugin's version and is upgraded by upgrading the plugin.
-         */
+        /// Configurations off every source set classpath, like `kotlinCompilerPluginClasspath`, hold plugin tooling
+        /// that is upgraded along with the plugin itself.
         private boolean isOnSourceSetClasspath(GradleDependencyConfiguration declarable) {
             if (gradleProject == null) {
                 return false;
@@ -970,6 +963,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return false;
         }
 
+        /**
+         * Finds a declarable configuration to add the dependency to.
+         */
         private @Nullable GradleDependencyConfiguration findDependencyConfiguration(GradleDependencyConfiguration config) {
             for (GradleDependencyConfiguration parent : config.allExtendsFrom()) {
                 if (parent.isCanBeDeclared()) {
