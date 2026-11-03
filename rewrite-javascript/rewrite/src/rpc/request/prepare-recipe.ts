@@ -174,22 +174,29 @@ export class PrepareRecipe {
             const wireEntry = this.conditionWireEntry(visitor.check, phase);
             if (wireEntry) {
                 preconditions.push(wireEntry);
-                recipe = Object.assign(
-                    Object.create(Object.getPrototypeOf(recipe)),
-                    recipe,
-                    phase === "edit" ?
+                if (phase === "edit") {
+                    recipe = Object.assign(
+                        Object.create(Object.getPrototypeOf(recipe)),
+                        recipe,
                         {
                             async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
                                 return visitor.v;
                             }
-                        } :
+                        }
+                    )
+                } else {
+                    const original = recipe as ScanningRecipe<any>;
+                    recipe = Object.assign(
+                        Object.create(Object.getPrototypeOf(original)),
+                        original,
                         {
                             async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
-                                const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
+                                const checkVisitor = await original.scanner(acc);
                                 return (checkVisitor as Check<any>).v;
                             }
                         }
-                )
+                    )
+                }
             }
             await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
