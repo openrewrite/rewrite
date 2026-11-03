@@ -23,10 +23,10 @@ import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
     isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
-    requiredModuleOfDeclaration, requireJoinTarget
+    requiredModuleOf, requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
-import {importEqualsNames, RenameMemberSpellings} from "./member-spellings";
+import {RenameMemberSpellings} from "./member-spellings";
 import {sameModule} from "./package-name";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
@@ -217,16 +217,23 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
             continue;
         }
         const jsImport = statement as JS.Import;
-        const specifier = jsImport.moduleSpecifier?.element;
-        if (specifier?.kind !== J.Kind.Literal) {
+        const clause = jsImport.importClause;
+        const typeOnly = clause?.typeOnly ?? false;
+        // `import X = require("m")` binds what `const X = require("m")` binds
+        const initializer = jsImport.initializer?.element;
+        const required = initializer?.kind === J.Kind.MethodInvocation
+            ? requiredModuleOf(initializer as J.MethodInvocation)
+            : undefined;
+        if (required !== undefined && clause?.name?.element?.kind === J.Kind.Identifier) {
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module: required, shape: "require", typeOnly,
+                reassignable: false});
             continue;
         }
-        if (typeof (specifier as J.Literal).value !== "string") {
+        const specifier = jsImport.moduleSpecifier?.element;
+        if (specifier?.kind !== J.Kind.Literal || typeof (specifier as J.Literal).value !== "string") {
             continue;
         }
         const module = moduleNameOf(specifier as J.Literal);
-        const clause = jsImport.importClause;
-        const typeOnly = clause?.typeOnly ?? false;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
             bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly,
                 reassignable: false});
@@ -424,11 +431,9 @@ function renameMemberSpellings(visitor: JavaScriptVisitor<any>, cu: JS.Compilati
         return;
     }
     // A default import is the module object only where its default is, as `export =` typings make it
-    const moduleObjects = new Set([
-        ...moduleObjectBindings(cu).filter(b => b.shape !== "default" && !b.reassignable &&
-            sameModule(b.module, options.from.module)).map(b => b.name),
-        ...importEqualsNames(cu, options.from.module)
-    ]);
+    const moduleObjects = new Set(moduleObjectBindings(cu)
+        .filter(b => b.shape !== "default" && !b.reassignable && sameModule(b.module, options.from.module))
+        .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
         {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
 }

@@ -18,7 +18,7 @@ import {isIdentifier, J} from "../java";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
-import {aliasing, moduleNameOf, newIdentifier, requiredModuleOf, respecify} from "./add-import";
+import {aliasing, moduleNameOf, newIdentifier, respecify} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -150,15 +150,4 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return (read.kind === J.Kind.Identifier || read.kind === J.Kind.Literal) &&
             moduleExportName(read as J.Identifier | J.Literal) === this.from.member;
     }
-}
-
-/** The names `import X = require("m")` declarations bind `module`'s module object under. */
-export function importEqualsNames(cu: JS.CompilationUnit, module: string): string[] {
-    return cu.statements.flatMap(s => {
-        const jsImport = s.element?.kind === JS.Kind.Import ? s.element as JS.Import : undefined;
-        const call = jsImport?.initializer?.element;
-        const required = call?.kind === J.Kind.MethodInvocation ? requiredModuleOf(call as J.MethodInvocation) : undefined;
-        const name = jsImport?.importClause?.name?.element;
-        return required !== undefined && sameModule(required, module) && name !== undefined && isIdentifier(name) ? [name.simpleName] : [];
-    });
 }

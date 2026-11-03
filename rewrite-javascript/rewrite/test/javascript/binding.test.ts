@@ -816,6 +816,28 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Elem");
     });
 
+    test("an import X = require binding answers a plain module request and a namespace request, as a require does", async () => {
+        const spec = new RecipeSpec();
+        let bound: (string | undefined)[] | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound ??= [
+                    maybeBind(this, {module: "sap/ui/core/Element", onlyIfReferenced: false}),
+                    maybeBind(this, {module: "sap/ui/core/Element", member: "*", onlyIfReferenced: false})
+                ];
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `
+                import Elem = require("sap/ui/core/Element");
+
+                target();
+            `
+        ));
+        expect(bound).toEqual(["Elem", "Elem"]);
+    });
+
     test("a whole-module await import answers a namespace request but not a plain module request", async () => {
         const namespaceRequest = new RecipeSpec();
         const namespaceName: {value?: string} = {};
