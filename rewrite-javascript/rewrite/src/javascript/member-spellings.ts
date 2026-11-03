@@ -45,16 +45,16 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return sameModule(this.from.module, this.to.module);
     }
 
-    /** Whether `qualifier`, held by the node at the cursor, reads one of the module objects. */
-    private readsModuleObject(qualifier: J | undefined): boolean {
-        return this.withinModule && qualifier !== undefined && isIdentifier(qualifier) && this.moduleObjects.has(qualifier.simpleName) &&
+    /** Whether `qualifier.name`, at the cursor, reads the moved member through one of the module objects. */
+    private readsMovedMember(qualifier: J | undefined, name: J.Identifier): boolean {
+        return this.withinModule && name.simpleName === this.from.member &&
+            qualifier !== undefined && isIdentifier(qualifier) && this.moduleObjects.has(qualifier.simpleName) &&
             resolve(this.cursor, qualifier)?.kind === JS.Kind.CompilationUnit;
     }
 
     override async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
         const visited = await super.visitFieldAccess(fieldAccess, p);
-        if (visited?.kind !== J.Kind.FieldAccess || fieldAccess.name.element.simpleName !== this.from.member ||
-            !this.readsModuleObject(fieldAccess.target)) {
+        if (visited?.kind !== J.Kind.FieldAccess || !this.readsMovedMember(fieldAccess.target, fieldAccess.name.element)) {
             return visited;
         }
         return produce(visited as J.FieldAccess, draft => {
@@ -64,8 +64,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 
     override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
         const visited = await super.visitMethodInvocation(method, p);
-        if (visited?.kind !== J.Kind.MethodInvocation || method.name.simpleName !== this.from.member ||
-            !this.readsModuleObject(method.select?.element)) {
+        if (visited?.kind !== J.Kind.MethodInvocation || !this.readsMovedMember(method.select?.element, method.name)) {
             return visited;
         }
         return produce(visited as J.MethodInvocation, draft => {
