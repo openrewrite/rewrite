@@ -15,7 +15,7 @@
  */
 import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
 import {findMarker, printer} from "../../src";
-import {RecipeSpec} from "../../src/test";
+import {dedent, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -566,12 +566,19 @@ describe('Multi-line flow scalars', () => {
         ));
 
     test('scalar value is the source text between any quotes', async () => {
-        const docs = await parseYaml(String.raw`plain: one
-  two
-single: 'it''s'
-double: "a\tb"`);
-        const mapping = docs.documents[0].block as Yaml.Mapping;
-        expect(mapping.entries.map(e => (e.value as Yaml.Scalar).value))
-            .toEqual(["one\n  two", "it''s", String.raw`a\tb`]);
+        const docs = await parseYaml(dedent(String.raw`
+            plain: one
+              two
+            single: 'it''s'
+            double: "a\tb"
+        `));
+        const [plain, single, double] = (docs.documents[0].block as Yaml.Mapping).entries
+            .map(e => (e.value as Yaml.Scalar).value);
+
+        expect(plain).toBe(dedent(`
+            one
+              two`));
+        expect(single).toBe("it''s");
+        expect(double).toBe(String.raw`a\tb`);
     });
 });
