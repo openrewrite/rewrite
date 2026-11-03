@@ -41,6 +41,35 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
     }
 
+    @ParameterizedTest
+    @CsvSource({"double,<", "double,>", "double,<=", "double,>=", "float,<", "Float,>=", "Double,>"})
+    void preserveNegatedFloatingComparisons(String type, String operator) {
+        rewriteRun(java("class A { boolean f(%s x, %s y) { return !(x %s y); } }"
+          .formatted(type, type, operator)));
+    }
+
+    @Test
+    void preserveMixedFloatingComparison() {
+        rewriteRun(java("class A { boolean f(int x, double y) { return !(x < y); } }"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"int,<,>=", "Integer,>,<=", "long,<=,>", "Long,>=,<", "char,<,>=", "Byte,>,<="})
+    void stillComplementsIntegralComparisons(String type, String operator, String complement) {
+        rewriteRun(java(
+          "class A { boolean f(%s x, %s y) { return !(x %s y); } }".formatted(type, type, operator),
+          "class A { boolean f(%s x, %s y) { return x %s y; } }".formatted(type, type, complement)
+        ));
+    }
+
+    @Test
+    void preserveFloatingComparisonsInNegatedTernary() {
+        rewriteRun(java(
+          "class A { boolean f(boolean b, double x, double y) { return !(b ? x < y : x >= y); } }",
+          "class A { boolean f(boolean b, double x, double y) { return b ? !(x < y) : !(x >= y); } }"
+        ));
+    }
+
     @DocumentExample
     @Test
     void simplifyEqualsLiteralTrueIf() {

@@ -208,7 +208,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 if (isComparison(binary.getLeft()) || isComparison(binary.getRight())) {
                     return j;
                 }
-                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                J.Binary.Type negated = maybeNegate(binary);
                 if (negated != binary.getOperator()) {
                     j = binary.withOperator(negated).withPrefix(j.getPrefix());
                 }
@@ -235,7 +235,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (expr instanceof J.Binary) {
             J.Binary binary = (J.Binary) expr;
             if (!isComparison(binary.getLeft()) && !isComparison(binary.getRight())) {
-                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                J.Binary.Type negated = maybeNegate(binary);
                 if (negated != binary.getOperator()) {
                     return binary.withOperator(negated).withPrefix(expr.getPrefix());
                 }
@@ -258,8 +258,30 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return not(expr).withPrefix(expr.getPrefix());
     }
 
-    private J.Binary.Type maybeNegate(J.Binary.Type operator) {
-        switch (operator) {
+    private static boolean isKnownIntegral(@Nullable JavaType type) {
+        return type == JavaType.Primitive.Byte || type == JavaType.Primitive.Short ||
+               type == JavaType.Primitive.Int || type == JavaType.Primitive.Long ||
+               type == JavaType.Primitive.Char ||
+               TypeUtils.isOfClassType(type, "java.lang.Byte") ||
+               TypeUtils.isOfClassType(type, "java.lang.Short") ||
+               TypeUtils.isOfClassType(type, "java.lang.Integer") ||
+               TypeUtils.isOfClassType(type, "java.lang.Long") ||
+               TypeUtils.isOfClassType(type, "java.lang.Character");
+    }
+
+    private J.Binary.Type maybeNegate(J.Binary binary) {
+        switch (binary.getOperator()) {
+            case LessThan:
+            case GreaterThan:
+            case LessThanOrEqual:
+            case GreaterThanOrEqual:
+                // Ordered floating-point comparisons are not complementary when either operand is NaN.
+                if (!isKnownIntegral(binary.getLeft().getType()) || !isKnownIntegral(binary.getRight().getType())) {
+                    return binary.getOperator();
+                }
+                break;
+        }
+        switch (binary.getOperator()) {
             case LessThan:
                 return J.Binary.Type.GreaterThanOrEqual;
             case GreaterThan:
@@ -273,7 +295,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             case NotEqual:
                 return J.Binary.Type.Equal;
             default:
-                return operator;
+                return binary.getOperator();
         }
     }
 
