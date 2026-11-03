@@ -21,6 +21,7 @@ import * as nodeModule from "module";
 import {createRequire} from "module";
 import {pathToFileURL} from "url";
 import {spawn} from "child_process";
+import * as semver from "semver";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
 import {getPlatformCommand} from "../../shell-utils";
@@ -130,6 +131,11 @@ export class InstallRecipes {
                         resolvedPath = request.recipes;
                     }
 
+                    const manifest = packageManifest(resolvedPath);
+                    if (manifest) {
+                        checkHostVersion(manifest, hostVersion(), logger);
+                    }
+
                     let recipeModule;
                     try {
                         if (!resolveSharedDependenciesFromHost()) {
@@ -171,6 +177,49 @@ export class InstallRecipes {
             )
         );
     }
+}
+
+/**
+ * Throws when this host's version is outside the package's peer range for @openrewrite/rewrite.
+ * A development build of the host (0.0.0, or a prerelease snapshot) only warns.
+ * A plain dependency's range only records the version the package was built against, so it is not checked.
+ */
+export function checkHostVersion(manifest: { name?: string, version?: string, peerDependencies?: Record<string, string> },
+                                 hostVersion: string, logger?: rpc.Logger): void {
+    const range = manifest.peerDependencies?.['@openrewrite/rewrite'];
+    if (!range || !semver.validRange(range) || semver.satisfies(hostVersion, range, {includePrerelease: true})) {
+        return;
+    }
+    const message = `${manifest.name}@${manifest.version} requires @openrewrite/rewrite ${range}, but this host runs ${hostVersion}`;
+    if (hostVersion === '0.0.0' || semver.prerelease(hostVersion)) {
+        logger?.warn(message);
+    } else {
+        throw new Error(message);
+    }
+}
+
+function hostVersion(): string {
+    const root = findPackageRoot(__filename, '@openrewrite/rewrite');
+    return root ? JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version : '0.0.0';
+}
+
+/**
+ * The package.json of the package a module belongs to, the nearest one above its entry file.
+ */
+function packageManifest(modulePath: string): any {
+    let dir: string;
+    try {
+        dir = path.dirname(require.resolve(modulePath));
+    } catch {
+        return undefined; // Loading the module reports why it does not resolve
+    }
+    for (; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+        const file = path.join(dir, 'package.json');
+        if (fs.existsSync(file)) {
+            return JSON.parse(fs.readFileSync(file, 'utf8'));
+        }
+    }
+    return undefined;
 }
 
 const SHARED_DEPENDENCIES = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
