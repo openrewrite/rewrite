@@ -2170,13 +2170,14 @@ describe("maybeRebind", () => {
             await spec.rewriteRun(npm(repo.path,
                 {...typescript(`export function helper() { return 1; }\n`), path: "util.ts"} as any,
                 {...typescript(`export function helper2() { return 1; }\n`), path: "util2.ts"} as any,
-                //language=typescript
                 {...typescript(
+                    //language=typescript
                     `
                     import { helper } from './util';
 
                     const x = helper;
                     `,
+                    //language=typescript
                     `
                     import { helper2 } from './util2';
 
@@ -2606,13 +2607,14 @@ describe("maybeRebind", () => {
         expect(bound.name).toBeUndefined();
 
         // The dropped import was the file's only ES module syntax, which leaves it reading as CommonJS.
-        //language=javascript
         await spec.rewriteRun({...javascript(
+            //language=javascript
             `
             import {act} from "old";
             const fs = require("fs");
 
             act();`,
+            //language=javascript
             `
             import act from "new";
 
@@ -3396,12 +3398,13 @@ describe("maybeBind on a CommonJS file", () => {
     };
 
     test("a member gets a require of its own after the file's requires", async () => {
-        //language=javascript
         expect(await bindWith({module: "node:fs/promises", member: "rm"},
+            //language=javascript
             `
             const { mkdirp } = require('fs-extra');
 
             target();`,
+            //language=javascript
             `
             const { mkdirp } = require('fs-extra');
             const { rm } = require('node:fs/promises');
@@ -3411,25 +3414,27 @@ describe("maybeBind on a CommonJS file", () => {
     });
 
     test("a member joins a const destructuring require of its module that has no rest element", async () => {
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "rm"},
+            //language=javascript
             `
             const {readFile} = require('node:fs/promises');
 
             target();`,
+            //language=javascript
             `
             const {readFile, rm} = require('node:fs/promises');
 
             rm.target();`
         )).toBe("rm");
 
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "rm"},
+            //language=javascript
             `
             const {a, ...rest} = require('fs/promises');
             let {b} = require('fs/promises');
 
             target();`,
+            //language=javascript
             `
             const {a, ...rest} = require('fs/promises');
             let {b} = require('fs/promises');
@@ -3440,23 +3445,25 @@ describe("maybeBind on a CommonJS file", () => {
     });
 
     test("a whole module binds a name, first or after a shebang or 'use strict' in a file without top-level requires", async () => {
-        //language=javascript
         expect(await bindWith({module: "path"},
+            //language=javascript
             `
             #!/usr/bin/env node
             module.exports = target();`,
+            //language=javascript
             `
             #!/usr/bin/env node
             const path = require('path');
 
             module.exports = path.target();`
         )).toBe("path");
-        //language=javascript
         expect(await bindWith({module: "path"},
+            //language=javascript
             `
             'use strict';
 
             module.exports = target();`,
+            //language=javascript
             `
             'use strict';
 
@@ -3464,9 +3471,10 @@ describe("maybeBind on a CommonJS file", () => {
 
             module.exports = path.target();`
         )).toBe("path");
-        //language=javascript
         expect(await bindWith({module: "path", member: "*", preferredName: "p"},
+            //language=javascript
             `exports.f = target();`,
+            //language=javascript
             `
             const p = require('path');
 
@@ -3475,12 +3483,13 @@ describe("maybeBind on a CommonJS file", () => {
     });
 
     test("a require joins and follows only the file's leading requires, which every top-level use comes after", async () => {
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "rm"},
+            //language=javascript
             `
             const {x} = require('x');
             target();
             const {readFile} = require('fs/promises');`,
+            //language=javascript
             `
             const {x} = require('x');
             const {rm} = require('fs/promises');
@@ -3490,13 +3499,14 @@ describe("maybeBind on a CommonJS file", () => {
     });
 
     test("a taken name is deconflicted and an alias is bound verbatim", async () => {
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "rm"},
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
             const rm = 1;
 
             target();`,
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
             const {rm: rm_1} = require('fs/promises');
@@ -3504,12 +3514,13 @@ describe("maybeBind on a CommonJS file", () => {
 
             rm_1.target();`
         )).toBe("rm_1");
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "rm", alias: "remove"},
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
 
             target();`,
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
             const {rm: remove} = require('fs/promises');
@@ -3519,20 +3530,21 @@ describe("maybeBind on a CommonJS file", () => {
     });
 
     test("a type-only request refuses, since a require binds values only, unless it asks for an import", async () => {
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true},
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
 
             target();`
         )).toBeUndefined();
 
-        //language=javascript
         expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true, style: ImportStyle.ES6Named},
+            //language=javascript
             `
             const {mkdirp} = require('fs-extra');
 
             target();`,
+            //language=javascript
             `
             import type {FileHandle} from 'fs/promises';
 
