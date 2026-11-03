@@ -78,8 +78,9 @@ function frame(body: Uint8Array): Buffer {
     return Buffer.concat([header, body]);
 }
 
-// No page follows one ending in END_OF_OBJECT, so neither side asks for one
-function endsTransfer(page: readonly RpcObjectData[]): boolean {
+// No page follows one ending in END_OF_OBJECT. The remote drops its transfer state when it sends
+// that page, so asking again would start the transfer over.
+export function endsTransfer(page: readonly RpcObjectData[]): boolean {
     return page.length === 0 || page[page.length - 1].state === RpcObjectState.END_OF_OBJECT;
 }
 
