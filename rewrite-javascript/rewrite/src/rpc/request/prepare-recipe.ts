@@ -174,28 +174,31 @@ export class PrepareRecipe {
             const wireEntry = this.conditionWireEntry(visitor.check, phase);
             if (wireEntry) {
                 preconditions.push(wireEntry);
-                recipe = Object.assign(
-                    Object.create(Object.getPrototypeOf(recipe)),
-                    recipe,
-                    phase === "edit" ?
-                        {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                                return visitor.v;
-                            }
-                        } :
-                        {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
-                                const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
-                                return (checkVisitor as Check<any>).v;
-                            }
+                if (phase === "edit") {
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                            return visitor.v;
                         }
-                )
+                    });
+                } else {
+                    const scanner = (recipe as ScanningRecipe<any>).scanner;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async scanner(this: ScanningRecipe<any>, acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const scanVisitor = await scanner.call(this, acc);
+                            return scanVisitor instanceof Check ? scanVisitor.v : scanVisitor;
+                        }
+                    });
+                }
             }
             await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
             await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
+    }
+
+    private static withOverrides(recipe: Recipe, overrides: object): Recipe {
+        return Object.assign(Object.create(Object.getPrototypeOf(recipe)), recipe, overrides);
     }
 
     /**
