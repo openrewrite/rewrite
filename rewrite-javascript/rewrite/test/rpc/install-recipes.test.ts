@@ -16,6 +16,7 @@
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
+import {createRequire} from "module";
 import {RecipeMarketplace} from "../../src";
 import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 import {GetMarketplace, GetMarketplaceResponseRow} from "../../src/rpc/request/get-marketplace";
@@ -169,6 +170,64 @@ describe("InstallRecipes", () => {
                 // then
                 expect(response.recipesInstalled).toBe(3);
                 expect(marketplace.allRecipes().length).toBe(3);
+            }, {unsafeCleanup: true});
+        });
+    });
+
+    describe("shared dependencies", () => {
+        // `mutative` stands in for `@openrewrite/rewrite`, which vitest loads from source outside Node's
+        // require.cache. The same mapping shares both.
+        const hostRequire = createRequire(path.resolve(__dirname, "../../src/rpc/request/install-recipes.ts"));
+        const hostMutativeRoot = path.dirname(hostRequire.resolve("mutative/package.json"));
+
+        function writeRecipePackage(packageDir: string) {
+            fs.mkdirSync(packageDir, {recursive: true});
+            fs.writeFileSync(path.join(packageDir, "package.json"), JSON.stringify({name: "linked-recipes", main: "index.js"}));
+            fs.writeFileSync(path.join(packageDir, "index.js"), `
+                module.exports = { activate() {}, mutative: require("mutative") };
+            `);
+        }
+
+        test("shares the host's copy with a package reached through a symlink", async () => {
+            await withDir(async (dir) => {
+                const base = fs.realpathSync(dir.path);
+                const hostMutative = hostRequire("mutative");
+                const install = (recipes: string) =>
+                    captureHandler(path.join(base, "install"), new RecipeMarketplace())({recipes} as any);
+                // In both cases `mutative` is reachable only from the real path of the package's entry file.
+
+                const linkedPackage = path.join(base, "linked-package");
+                writeRecipePackage(path.join(base, "a", "packages", "recipes"));
+                fs.cpSync(hostMutativeRoot, path.join(base, "a", "node_modules", "mutative"), {recursive: true});
+                fs.symlinkSync(path.join(base, "a", "packages", "recipes"), linkedPackage, "dir");
+                await install(linkedPackage);
+                expect(hostRequire(linkedPackage).mutative).toBe(hostMutative);
+
+                const linkedEntry = path.join(base, "linked-entry");
+                writeRecipePackage(path.join(base, "b", "packages", "recipes"));
+                fs.cpSync(hostMutativeRoot, path.join(base, "b", "node_modules", "mutative"), {recursive: true});
+                fs.mkdirSync(linkedEntry);
+                fs.writeFileSync(path.join(linkedEntry, "package.json"), JSON.stringify({name: "linked-entry", main: "lib/index.js"}));
+                fs.symlinkSync(path.join(base, "b", "packages", "recipes"), path.join(linkedEntry, "lib"), "dir");
+                await install(linkedEntry);
+                expect(hostRequire(linkedEntry).mutative).toBe(hostMutative);
+            }, {unsafeCleanup: true});
+        });
+
+        test("shares the host's copy with a package whose dependency is a symlink", async () => {
+            await withDir(async (dir) => {
+                const base = fs.realpathSync(dir.path);
+                const packageDir = path.join(base, "recipes");
+                writeRecipePackage(packageDir);
+                const linkedMutative = path.join(base, "mutative-build");
+                fs.cpSync(hostMutativeRoot, linkedMutative, {recursive: true});
+                fs.mkdirSync(path.join(packageDir, "node_modules"));
+                fs.symlinkSync(linkedMutative, path.join(packageDir, "node_modules", "mutative"), "dir");
+
+                const hostMutative = hostRequire("mutative");
+                await captureHandler(path.join(base, "install"), new RecipeMarketplace())({recipes: packageDir} as any);
+
+                expect(hostRequire(packageDir).mutative).toBe(hostMutative);
             }, {unsafeCleanup: true});
         });
     });
