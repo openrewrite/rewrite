@@ -8,10 +8,7 @@ import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {
-    bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, readMeaning, resolve, scopeOf,
-    valuesDeclaredAtTopLevel, walk
-} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -2528,13 +2525,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     private readsModuleBinding(identifier: J.Identifier): boolean {
-        if (resolve(this.cursor, identifier)?.kind !== JS.Kind.CompilationUnit) {
-            return false;
-        }
-        // A type-only import binds no value, so a value read of its name reads the value the module
-        // scope declares beside it: `import type {X}; const X = 1; f(X)`
-        return !(this.typeOnly && readMeaning(this.cursor, identifier) === 'value' &&
-            valuesDeclaredAtTopLevel(this.cu!).has(identifier.simpleName));
+        return resolve(this.cursor, identifier)?.kind === JS.Kind.CompilationUnit;
     }
 
     /**

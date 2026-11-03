@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf, valuesDeclaredAtTopLevel} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
@@ -403,10 +403,20 @@ function rebindingName(
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
     }
     const member = memberName(options.to.member);
-    if (existing.aliased || member === undefined || member === '*' || member === existing.localName) {
+    if (existing.aliased || member === undefined || member === '*' || member === existing.localName ||
+        sharesNameWithValue(cu, existing)) {
         return existing.localName;
     }
     return taken(member) ? existing.localName : member;
+}
+
+/**
+ * Whether a value the module scope declares shares the import's name, as one binding no value may:
+ * `import type {X}; const X = 1`. A rename would have to split the name's readers, and `export {X}`
+ * publishes both, so the binding keeps its name.
+ */
+function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBinding): boolean {
+    return !existing.viaRequire && valuesDeclaredAtTopLevel(cu).has(existing.localName);
 }
 
 const noNames: ReadonlySet<string> = new Set();

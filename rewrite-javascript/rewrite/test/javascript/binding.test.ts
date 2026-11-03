@@ -1841,9 +1841,11 @@ describe("maybeRebind", () => {
         ));
     });
 
-    test("a value read of a name a type-only import shares reads the value declared beside it", async () => {
+    test("a binding whose name a module-scope value shares keeps it, as an alias", async () => {
+        // A rename would have to split the name's readers, and `export {Old}` publishes both
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rebindOldToNew());
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
         await spec.rewriteRun(typescript(
             `
                 import type { Old } from "m";
@@ -1851,34 +1853,38 @@ describe("maybeRebind", () => {
                 const Old = 1;
                 export const x = Old;
                 export type C = Old;
+                export { Old };
             `,
             `
-                import type { New } from "m2";
+                import type { New as Old } from "m2";
 
                 const Old = 1;
                 export const x = Old;
-                export type C = New;
+                export type C = Old;
+                export { Old };
             `
         ));
+        expect(bound.name).toBe("Old");
     });
 
-    test("a value read of a name a type-only import shares reads a destructured value declared beside it", async () => {
+    test("a value import of a type keeps its name beside a destructured value of that name", async () => {
+        // Without `isolatedModules`, TypeScript lets an import that binds only a type share its name with a value
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
         await spec.rewriteRun(typescript(
             `
-                import type { Old } from "m";
+                import { Old } from "m";
 
                 const { Old } = { Old: 1 };
                 export const x = Old;
                 export type C = Old<{}>;
             `,
             `
-                import type { New } from "m2";
+                import { New as Old } from "m2";
 
                 const { Old } = { Old: 1 };
                 export const x = Old;
-                export type C = New<{}>;
+                export type C = Old<{}>;
             `
         ));
     });

@@ -254,6 +254,9 @@ unaliased named specifier follows its member to the new name, since that is what
 have written had it imported the member all along — but only where the file spells that name nowhere
 else, since a rename onto a name already in use would capture its references or be captured by them.
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
+So it does where a value the module scope declares shares the binding's name, as an import of a type
+may (`import type {X}; const X = 1`): a rename would have to split the name's readers, and `export {X}`
+publishes both.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
 moved binding is a value too. Outside the imports and `export {…}` clauses the file may spell it only
