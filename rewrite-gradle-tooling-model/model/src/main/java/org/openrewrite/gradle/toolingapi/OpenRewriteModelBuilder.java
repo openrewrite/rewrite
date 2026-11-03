@@ -44,8 +44,9 @@ public class OpenRewriteModelBuilder {
      * The included init script downloads the model plugin at this jar's own version, with its rewrite dependencies, from
      * Maven Central, or from the mirror at {@code MAVEN_CENTRAL_MIRROR_URL} when it, {@code MAVEN_CENTRAL_MIRROR_USERNAME}
      * and {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set. Snapshots come from https://artifacts.codegenomeproject.org/maven,
-     * given {@code codegenomeUsername} and {@code codegenomePassword} in the Gradle user home's gradle.properties, or
-     * {@code CODEGENOME_USERNAME} and {@code CODEGENOME_TOKEN} in the environment.
+     * given {@code codegenomeUsername} and {@code codegenomePassword} in the Gradle user home's gradle.properties or as
+     * {@code ORG_GRADLE_PROJECT_} environment variables, or {@code CODEGENOME_USERNAME} and {@code CODEGENOME_TOKEN} in
+     * the environment.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
@@ -191,8 +192,9 @@ public class OpenRewriteModelBuilder {
             if (t.getMessage() != null && t.getMessage().contains(PLUGIN + pluginVersion)) {
                 return new GradleConnectionException("Could not load " + PLUGIN + pluginVersion + ", the version of " +
                         "this model. Its snapshots are published to https://artifacts.codegenomeproject.org/maven, which " +
-                        "the init script uses when the Gradle user home's gradle.properties sets codegenomeUsername and " +
-                        "codegenomePassword, or the environment sets CODEGENOME_USERNAME and CODEGENOME_TOKEN.", failure);
+                        "the init script uses when the Gradle user home's gradle.properties or ORG_GRADLE_PROJECT_ " +
+                        "environment variables set codegenomeUsername and codegenomePassword, or the environment sets " +
+                        "CODEGENOME_USERNAME and CODEGENOME_TOKEN.", failure);
             }
         }
         return failure;

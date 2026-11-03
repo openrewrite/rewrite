@@ -41,6 +41,7 @@ class OpenRewriteModelBuilderTest {
           new RuntimeException("Could not find org.openrewrite.gradle.tooling:plugin:8.98.0-SNAPSHOT."));
         assertThat(OpenRewriteModelBuilder.explainMissingPlugin(missingPlugin, "8.98.0-SNAPSHOT"))
           .hasMessageContaining("codegenomeUsername")
+          .hasMessageContaining("ORG_GRADLE_PROJECT_")
           .hasMessageContaining("CODEGENOME_USERNAME")
           .hasCause(missingPlugin);
 
