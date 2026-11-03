@@ -22,6 +22,10 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -447,16 +451,17 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
 
     @Test
     void anyWithInferredIntersectionType() {
+        MethodMatcher println = new MethodMatcher("java.io.PrintStream println(..)");
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                  if (println.matches(method) || !(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
                       return method;
                   }
                   return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
               }
-          }).withMaxCycles(1)),
+          })),
           java(
             """
               import java.util.List;
@@ -477,7 +482,22 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                       System.out.println(Objects.requireNonNull(flag ? "a" : 1));
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new JavaIsoVisitor<List<String>>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> types) {
+                    if (println.matches(method)) {
+                        types.add(String.valueOf(method.getMethodType()));
+                        types.add(String.valueOf(method.getArguments().getFirst().getType()));
+                    }
+                    return super.visitMethodInvocation(method, types);
+                }
+            }.reduce(cu, new ArrayList<>())).containsExactly(
+              "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
+              "java.util.List<java.lang.Number & java.lang.Comparable<Generic{? extends java.lang.Number & java.lang.Comparable<Generic{?}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc>",
+              "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
+              "java.io.Serializable & java.lang.Comparable<Generic{? extends java.io.Serializable & java.lang.Comparable<Generic{?}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc"
+            ))
           )
         );
     }
