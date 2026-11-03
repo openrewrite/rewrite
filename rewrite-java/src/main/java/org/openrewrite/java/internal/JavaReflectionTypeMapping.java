@@ -400,7 +400,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         List<String> declaredFormalTypeNames = null;
         for (TypeVariable<?> typeVariable : method.getTypeParameters()) {
-            if (typeVariable.getGenericDeclaration() == method) {
+            if (method.equals(typeVariable.getGenericDeclaration())) {
                 if (declaredFormalTypeNames == null) {
                     declaredFormalTypeNames = new ArrayList<>();
                 }
