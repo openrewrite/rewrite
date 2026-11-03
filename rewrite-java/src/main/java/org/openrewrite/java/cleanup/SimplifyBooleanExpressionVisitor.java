@@ -33,6 +33,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
         J.Binary asBinary = (J.Binary) j;
+        // Replacing a primitive result with a boxed operand can remove unboxing or change overloads.
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit &&
+            (isBoxedBoolean(asBinary.getLeft()) || isBoxedBoolean(asBinary.getRight()))) {
+            return asBinary;
+        }
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
@@ -189,7 +194,16 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             }
         }
+        if (j instanceof Expression && ternary.getType() == JavaType.Primitive.Boolean &&
+            isBoxedBoolean((Expression) j) &&
+            getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return ternary;
+        }
         return j;
+    }
+
+    private static boolean isBoxedBoolean(Expression expression) {
+        return TypeUtils.isOfClassType(expression.getType(), "java.lang.Boolean");
     }
 
     private Expression unpackExpression(Expression expr, Expression j) {
@@ -478,23 +492,20 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     /**
-     * In Java, {@code !} only applies to boolean expressions, so {@code !!x} is always
-     * equivalent to {@code x}. In other languages like JavaScript/TypeScript and Groovy,
+     * A boxed Java {@code Boolean} must still be unboxed, so {@code !!x} can only become
+     * {@code x} when the operand is primitive boolean. In JavaScript/TypeScript and Groovy,
      * {@code !!x} is an idiomatic boolean coercion that converts any truthy/falsy value
      * to a strict boolean. In those cases, simplifying {@code !!x} to {@code x} changes
      * semantics when {@code x} is not boolean-typed.
      */
     private boolean canSimplifyDoubleNegation(Expression innerExpression) {
-        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
-            return true;
-        }
         return isBooleanValued(innerExpression);
     }
 
     /**
      * Determines whether an equals comparison with a boolean literal can be simplified.
      * <p>
-     * In Java, {@code x == true} can always be simplified to {@code x}.
+     * For primitive Java booleans, {@code x == true} can be simplified to {@code x}.
      * In Kotlin and other languages, nullable types like {@code Boolean?} compared
      * with {@code == true} have different semantics than using the value directly,
      * e.g. {@code nullableBoolean == true} evaluates to {@code false} when null,
