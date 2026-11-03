@@ -1083,6 +1083,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
+         * The manifest's dependency maps, by scope then name, as the scan read them before the cycle's edits.
+         */
+        public Map<String, Map<String, String>> scannedDeclarations() {
+            return requireNonNull(acc.captured(path)).getDeclared();
+        }
+
+        /**
          * The catalogs the manifest's package manager reads for it, as the recipes before this one left them, with
          * the edits decided so far; throws Rejected, with corepack's message, for a spec corepack rejects.
          */

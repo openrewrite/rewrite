@@ -24,8 +24,13 @@ import {JavaScriptVisitor} from "../visitor";
 import {MethodMatcher} from "../method-matcher";
 import {usesMethod} from "../preconditions";
 import {maybeBind, maybeUnbind} from "../binding";
-import {moduleScopeBindings} from "../add-import";
+import {ImportStyle, moduleScopeBindings} from "../add-import";
 import {compilationUnitOf, scopeOf} from "../scope";
+
+// A declarative recipe spells the style by name, since `ImportStyle`'s values are numbers. `style` chooses
+// only between an import and a `require`, and the member chooses the shape, so the other `ImportStyle`
+// names would add the same import as `ES6Named`.
+const IMPORT_STYLES = ["ES6Named", "CommonJS"] as const;
 
 /**
  * Moves calls matching a method pattern onto a member imported from a module, such as `jest.fn()`
@@ -38,7 +43,7 @@ export class ChangeMethodTargetToImport extends Recipe {
     readonly name = "org.openrewrite.javascript.change-method-target-to-import";
     readonly displayName = "Change method target to an import";
     readonly description = "Changes the target of calls matching a method pattern to a member imported from a module, " +
-        "adding the import. A CommonJS file changes only where it already requires the target, and an AMD module not at all.";
+        "adding the import. An AMD module does not change.";
 
     @Option({
         displayName: "Method pattern",
@@ -77,20 +82,35 @@ export class ChangeMethodTargetToImport extends Recipe {
     })
     matchOverrides?: boolean;
 
+    @Option({
+        displayName: "Import style",
+        description: "`ES6Named` adds an ES import and `CommonJS` a `require`. " +
+            "Unset, a CommonJS file gets a `require`, and an ES module or plain script an ES import.",
+        example: "ES6Named",
+        valid: [...IMPORT_STYLES],
+        required: false
+    })
+    importStyle?: typeof IMPORT_STYLES[number];
+
     constructor(options?: {
         methodPattern?: string;
         targetModule?: string;
         targetMember?: string;
         targetType?: string;
         matchOverrides?: boolean;
+        importStyle?: typeof IMPORT_STYLES[number];
     }) {
         super(options);
+        if (this.importStyle != null && !IMPORT_STYLES.includes(this.importStyle)) {
+            throw new Error(`Unknown import style \`${this.importStyle}\`, expected one of ${IMPORT_STYLES.join(", ")}.`);
+        }
     }
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const matcher = new MethodMatcher(this.methodPattern, this.matchOverrides);
         const module = this.targetModule;
         const member = this.targetMember;
+        const style = this.importStyle == null ? undefined : ImportStyle[this.importStyle];
         // Named after the specifier, as the parser names a module object.
         const moduleObject = classNamed(module);
         const memberType = this.targetType ? classNamed(this.targetType) : Type.unknownType as Type.FullyQualified;
@@ -119,7 +139,7 @@ export class ChangeMethodTargetToImport extends Recipe {
                     return m;
                 }
 
-                const name = maybeBind(this, {module, member, onlyIfReferenced: false});
+                const name = maybeBind(this, {module, member, onlyIfReferenced: false, style});
                 if (name === undefined) {
                     return m;
                 }
