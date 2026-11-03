@@ -128,7 +128,7 @@ class PoetryLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
         assertThat(result.getFailure().getDetail())
-          .contains("Unsupported poetry.lock lock-version: " + lockVersion + ", written by a Poetry release before 2.0");
+          .contains("Unsupported poetry.lock lock-version: " + lockVersion + "; the native engine reads only lock-version 2.1");
     }
 
     @Test

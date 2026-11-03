@@ -23,8 +23,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Parses poetry.lock text into the {@link PoetryLock} model. poetry.lock is machine-emitted TOML
@@ -45,8 +43,6 @@ public final class PoetryLockReader {
         }
     }
 
-    private static final Pattern LOCK_VERSION = Pattern.compile("^lock-version\\s*=\\s*\"([^\"]*)\"\\s*$");
-
     private static PoetryLock doParse(String content) {
         String[] lines = content.split("\n", -1);
         int[] pos = {0};
@@ -54,15 +50,12 @@ public final class PoetryLockReader {
         // Poetry before 2.0 writes lock-version 2.0 (1.1 before 1.3, without the header comment), whose packages
         // carry no groups; say so before any of those differences reads as a malformed lock
         for (int i = lines.length - 1; i >= 0; i--) {
-            Matcher m = LOCK_VERSION.matcher(lines[i]);
-            if (m.matches()) {
-                if (!"2.1".equals(m.group(1))) {
-                    throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + m.group(1) +
-                            ", written by a Poetry release before 2.0; the native engine reads lock-version 2.1");
-                }
-                break;
-            }
             if ("[metadata]".equals(lines[i].trim())) {
+                Object lockVersion = MachineTomlReader.readKeyValues(lines, new int[]{i + 1}).get("lock-version");
+                if (lockVersion != null && !"2.1".equals(lockVersion)) {
+                    throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + lockVersion +
+                            "; the native engine reads only lock-version 2.1, which Poetry writes from release 2.0 on");
+                }
                 break;
             }
         }
@@ -110,9 +103,6 @@ public final class PoetryLockReader {
         }
 
         String lockVersion = requireString(metadata, "lock-version", "[metadata]");
-        if (!"2.1".equals(lockVersion)) {
-            throw new PoetryLockFormatException("Unsupported poetry.lock lock-version: " + lockVersion);
-        }
         String pythonVersions = optString(metadata, "python-versions");
         String contentHash = requireString(metadata, "content-hash", "[metadata]");
         for (String key : metadata.keySet()) {
