@@ -2565,7 +2565,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 function respecify(literal: Draft<J.Literal>, name: string): void {
     const quoteChar = (literal.valueSource ?? '"').startsWith("'") ? "'" : '"';
     literal.value = name;
-    literal.valueSource = `${quoteChar}${name}${quoteChar}`;
+    literal.valueSource = `${quoteChar}${name.replace(/\\/g, '\\\\').split(quoteChar).join(`\\${quoteChar}`)}${quoteChar}`;
     literal.unicodeEscapes = undefined;
 }
 

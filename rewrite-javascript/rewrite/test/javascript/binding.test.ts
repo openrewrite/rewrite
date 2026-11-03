@@ -1165,6 +1165,20 @@ describe("maybeRebind", () => {
         expect(bound.name).toBe("AngularHttp");
     });
 
+    test("a string-literal name escapes the quote it is spelled with", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "a-b"}, to: {module: "m", member: "it's"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {'a-b' as x} from 'm';\n\nx();`,
+            `import {'it\\'s' as x} from 'm';\n\nx();`
+        ));
+    });
+
     test("a string-literal name the new member makes redundant becomes a bare specifier", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
