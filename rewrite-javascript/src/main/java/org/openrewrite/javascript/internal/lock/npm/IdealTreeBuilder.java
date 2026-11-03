@@ -191,6 +191,7 @@ public final class IdealTreeBuilder {
     private final Pacote pacote;
     private final Host host;
     private final Instant now;
+    private final boolean allowNoLock;
 
     private final boolean preferDedupe;
     private final boolean strictPeerDeps;
@@ -243,6 +244,13 @@ public final class IdealTreeBuilder {
      */
     public IdealTreeBuilder(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options,
                             PackumentSource registry, Host host, Instant now) {
+        this(path, files, options, registry, host, now, false);
+    }
+
+    /** A fresh resolve is used only to validate an opted-in coordinated update's final peer graph. */
+    IdealTreeBuilder(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options,
+                     PackumentSource registry, Host host, Instant now, boolean allowNoLock) {
+        this.allowNoLock = allowNoLock;
         this.path = PosixPath.resolve(path);
         this.files = files;
         this.options = options;
@@ -385,10 +393,10 @@ public final class IdealTreeBuilder {
         if (meta.getLoadingError() != null) {
             throw new MalformedLock("the lock does not parse: " + meta.getLoadingError().getMessage());
         }
-        if (!meta.isLoadedFromDisk()) {
+        if (!meta.isLoadedFromDisk() && !allowNoLock) {
             throw new MalformedLock("no lock");
         }
-        if (!meta.isLoadedFromObject()) {
+        if (meta.isLoadedFromDisk() && !meta.isLoadedFromObject()) {
             throw new MalformedLock("the lock's JSON root is not an object");
         }
         flagsSuspect = loader.isFlagsSuspect();

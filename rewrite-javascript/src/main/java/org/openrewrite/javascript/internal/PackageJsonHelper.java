@@ -1005,6 +1005,16 @@ public class PackageJsonHelper {
             NodeDependencyScan.ProjectFiles projectFiles,
             Map<Path, String> editedFiles,
             ExecutionContext ctx) {
+        return regenerateLockContent(packageJson, capturedLockContent, projectFiles, editedFiles, ctx, false);
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile packageJson,
+            @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
+            Map<Path, String> editedFiles,
+            ExecutionContext ctx,
+            boolean reconcileNpmPeerDependencies) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null) {
@@ -1026,6 +1036,6 @@ public class PackageJsonHelper {
                 .packageManagerFiles(projectFiles.getPackageManagerFiles())
                 .editedFiles(editedFiles)
                 .projectPaths(projectFiles.getPaths())
-                .build(), ctx);
+                .build(), ctx, reconcileNpmPeerDependencies);
     }
 }

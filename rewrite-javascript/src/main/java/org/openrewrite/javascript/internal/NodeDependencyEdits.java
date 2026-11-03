@@ -79,6 +79,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     public final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
     private final Rows rows;
     private final @Nullable String resolved;
+    private final boolean reconcileNpmPeerDependencies;
     private final Set<Object> inserted = new HashSet<>();
     private final Set<Path> failed = new HashSet<>();
     private final Map<Path, String> yamlFiles = new HashMap<>();
@@ -103,7 +104,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private boolean linked;
 
     public NodeDependencyEdits(Rows rows) {
-        this(rows, null);
+        this(rows, null, false);
+    }
+
+    public NodeDependencyEdits(Rows rows, boolean reconcileNpmPeerDependencies) {
+        this(rows, null, reconcileNpmPeerDependencies);
     }
 
     /**
@@ -111,8 +116,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      * {@link Decision#resolves()}.
      */
     public NodeDependencyEdits(Rows rows, @Nullable String resolved) {
+        this(rows, resolved, false);
+    }
+
+    private NodeDependencyEdits(Rows rows, @Nullable String resolved, boolean reconcileNpmPeerDependencies) {
         this.rows = rows;
         this.resolved = resolved;
+        this.reconcileNpmPeerDependencies = reconcileNpmPeerDependencies;
     }
 
     /**
@@ -621,7 +631,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         LockFileRegeneration.Result result = after == null || after == before && changed.isEmpty() ||
                                              ps.capturedLockContent == null ? null :
                 PackageJsonHelper.regenerateLockContent(PackageJsonHelper.refreshMarker(after),
-                        ps.capturedLockContent, files, changed, ctx);
+                        ps.capturedLockContent, files, changed, ctx, reconcileNpmPeerDependencies);
         Set<Path> readFiles = new HashSet<>(files.getManifests().keySet());
         readFiles.addAll(files.getPackageManagerFiles().keySet());
         readFiles.addAll(edited.keySet());
