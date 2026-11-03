@@ -90,10 +90,9 @@ public class CSharpParser
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
-            bool isPrimary = i == 0;
 
             CompilationUnit cu;
-            if (isPrimary && semanticModel != null)
+            if (semanticModel != null)
             {
                 // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
                 var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
@@ -182,10 +181,9 @@ public class CSharpParser
         for (int i = 0; i < permutations.Count; i++)
         {
             var (cleanSource, definedSymbols) = permutations[i];
-            bool isPrimary = i == 0;
 
             CompilationUnit cu;
-            if (isPrimary && semanticModel != null)
+            if (semanticModel != null)
             {
                 // Preserve parse options from the original tree to avoid "Inconsistent syntax tree features"
                 var parseOptions = semanticModel.SyntaxTree.Options as CSharpParseOptions;
