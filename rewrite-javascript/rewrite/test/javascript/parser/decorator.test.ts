@@ -159,7 +159,9 @@ describe('class decorator mapping', () => {
     test('decorators stay where they are written among the modifiers', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript('@a /*1*/ export /*2*/ @b /*3*/ abstract /*4*/ class A {}\nexport @c class B {}'),
+            ...typescript(`
+                @a /*1*/ export /*2*/ @b /*3*/ abstract /*4*/ class A {}
+                export @c class B {}`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const names = (annotations: J.Annotation[]) => annotations.map(a => (a.annotationType as J.Identifier).simpleName);
                 const a = cu.statements[0].element as J.ClassDeclaration;
@@ -322,7 +324,10 @@ describe('decorators and modifiers before a declaration', () => {
     test('function declaration', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript('@a export @b function f() {}\nexport default @c function g() {}\nexport @d async function h() {}'),
+            ...typescript(`
+                @a export @b function f() {}
+                export default @c function g() {}
+                export @d async function h() {}`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [f, g, h] = cu.statements.map(s => s.element as J.MethodDeclaration);
                 expect(names(f.leadingAnnotations)).toEqual(["a"]);
@@ -340,7 +345,11 @@ describe('decorators and modifiers before a declaration', () => {
     test('a decorator is an annotation of the modifier written after it', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript("@a export @b declare type T = string;\n@c declare module 'm' { }\nconst o = { export @d public x: 1 };\nclass A { @e static [key: string]: any }"),
+            ...typescript(`
+                @a export @b declare type T = string;
+                @c declare module 'm' { }
+                const o = { export @d public x: 1 };
+                class A { @e static [key: string]: any }`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [type, module, declarations, clazz] = cu.statements.map(s => s.element);
                 expect(keywords((type as JS.TypeDeclaration).modifiers)).toEqual(["export", "declare"]);
@@ -361,7 +370,9 @@ describe('decorators and modifiers before a declaration', () => {
     test('export as namespace', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript('@a export as namespace N;\n@b declare export as namespace M;'),
+            ...typescript(`
+                @a export as namespace N;
+                @b declare export as namespace M;`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [n, m] = cu.statements.map(s => s.element as JS.NamespaceDeclaration);
                 expect(keywords(n.modifiers)).toEqual(["export", "as"]);
@@ -375,7 +386,11 @@ describe('decorators and modifiers before a declaration', () => {
     test('import and export declaration', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript("const first = 1;\n@a  declare   import b from 'b';\nexport import c from 'c';\n@d declare  export * from 'x';"),
+            ...typescript(`
+                const first = 1;
+                @a  declare   import b from 'b';
+                export import c from 'c';
+                @d declare  export * from 'x';`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [, b, c, star] = cu.statements.map(s => s.element as JS.Import | JS.ExportDeclaration);
                 expect(keywords(b.modifiers)).toEqual(["declare"]);
@@ -471,7 +486,10 @@ describe('decorators and modifiers before a declaration', () => {
     test('class expression', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript('const A = @a export @b abstract class {};\nconst B = @c export @d class {};\nconst C = @e abstract class {};'),
+            ...typescript(`
+                const A = @a export @b abstract class {};
+                const B = @c export @d class {};
+                const C = @e abstract class {};`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [a, b, c] = cu.statements.map(s => {
                     const declarations = s.element as J.VariableDeclarations;

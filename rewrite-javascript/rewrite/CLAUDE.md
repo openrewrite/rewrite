@@ -203,14 +203,23 @@ describe('OrderImports', () => {
 
     test('sorts imports', () =>
         spec.rewriteRun(
+            //language=typescript
             typescript(
-                `import {z} from 'zebra';\nimport {a} from 'alpha';`,
-                `import {a} from 'alpha';\nimport {z} from 'zebra';`
+                `
+                import {z} from 'zebra';
+                import {a} from 'alpha';
+                `,
+                `
+                import {a} from 'alpha';
+                import {z} from 'zebra';
+                `
             )
         )
     );
 });
 ```
+
+Prefer writing test sources over real lines rather than with `\n`.
 
 ### Sharing a `RecipeSpec` across tests
 

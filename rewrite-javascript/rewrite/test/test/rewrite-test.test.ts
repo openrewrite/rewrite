@@ -1332,7 +1332,17 @@ describe("rewrite test", () => {
                     return autoFormat(cu, p);
                 }
             });
-            return sut.rewriteRun(typescript(`class A {\n  m() {\n  }\n}`, `class A {\n    m() {\n    }\n}`));
+            //language=typescript
+            return sut.rewriteRun(typescript(`
+                class A {
+                  m() {
+                  }
+                }`,
+                `
+                class A {
+                    m() {
+                    }
+                }`));
         });
 
         test("a class formatted with its body set aside passes in a file that holds a bare yield", () => {

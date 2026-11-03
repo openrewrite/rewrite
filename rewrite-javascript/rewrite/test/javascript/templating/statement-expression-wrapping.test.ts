@@ -227,9 +227,18 @@ describe('Statement Expression Wrapping', () => {
         });
 
         return spec.rewriteRun(
+            //language=typescript
             typescript(
-                'switch (x) {\n    case !!y:\n        !!z;\n}',
-                'switch (x) {\n    case y:\n        z;\n}'
+                `
+                switch (x) {
+                    case !!y:
+                        !!z;
+                }`,
+                `
+                switch (x) {
+                    case y:
+                        z;
+                }`
             )
         );
     });
@@ -267,7 +276,13 @@ describe('Statement Expression Wrapping', () => {
         });
 
         // rewriteRun compares the trees with a fresh parse of the text they print
-        return spec.rewriteRun(typescript('for (let i = 0; i < n;) {\n}', 'for (i = 0; i <= n;) {\n}'));
+        //language=typescript
+        return spec.rewriteRun(typescript(`
+            for (let i = 0; i < n;) {
+            }`,
+            `
+            for (i = 0; i <= n;) {
+            }`));
     });
 
     it('should make a statement that replaces the expression of an expression statement the statement itself', () => {
@@ -291,7 +306,13 @@ describe('Statement Expression Wrapping', () => {
             typescript('a || (a = b);', 'a ||= b;'),
             typescript(`foo['bar'];`, 'foo.bar;'),
             // a `for` head holds every expression in an expression statement
-            typescript('for (a || (a = b); ;) {\n}', 'for (a ||= b; ;) {\n}')
+            //language=typescript
+            typescript(`
+                for (a || (a = b); ;) {
+                }`,
+                `
+                for (a ||= b; ;) {
+                }`)
         );
     });
 
@@ -314,7 +335,15 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun(
             typescript('cond && doIt();', 'if (cond) doIt();'),
             // the parser holds a `yield` in a JS.StatementExpression wherever it stands
-            typescript('function* g() {\n    x + 1;\n}', 'function* g() {\n    yield x;\n}')
+            //language=typescript
+            typescript(`
+                function* g() {
+                    x + 1;
+                }`,
+                `
+                function* g() {
+                    yield x;
+                }`)
         );
     });
 
@@ -337,7 +366,13 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun(
             typescript(`new foo['bar']();`, 'new /*~~(found)~~>*/foo.bar();'),
             typescript(`new  foo['bar'];`, 'new  /*~~(found)~~>*/foo.bar;'),
-            typescript(`class A extends foo['bar'] {\n}`, 'class A extends /*~~(found)~~>*/foo.bar {\n}')
+            //language=typescript
+            typescript(`
+                class A extends foo['bar'] {
+                }`,
+                `
+                class A extends /*~~(found)~~>*/foo.bar {
+                }`)
         );
     });
 
@@ -368,7 +403,11 @@ describe('Statement Expression Wrapping', () => {
             }
         });
 
-        return spec.rewriteRun(typescript('go()', 'if (ready) {\n    go()\n}'));
+        //language=typescript
+        return spec.rewriteRun(typescript('go()', `
+            if (ready) {
+                go()
+            }`));
     });
 
     it('should leave an expression that replaces an argument of the call statement a visitor is on bare', () => {

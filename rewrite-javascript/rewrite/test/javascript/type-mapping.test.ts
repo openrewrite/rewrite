@@ -3348,8 +3348,12 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(
                 //language=typescript
                 typescript(
-                    'const c = {a: 1};\nconsole.log(c);',
-                    'const /*~~({} a)~~>*/c = {a: 1};\nconsole.log(/*~~({} a)~~>*/c);'
+                    `
+                    const c = {a: 1};
+                    console.log(c);`,
+                    `
+                    const /*~~({} a)~~>*/c = {a: 1};
+                    console.log(/*~~({} a)~~>*/c);`
                 )
             );
 

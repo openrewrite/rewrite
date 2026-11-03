@@ -69,8 +69,16 @@ describe('object literals in templates and patterns', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                'switch (x) {\n    case key():\n        break;\n}',
-                'switch (x) {\n    case {k: 1}:\n        break;\n}'
+                `
+                switch (x) {
+                    case key():
+                        break;
+                }`,
+                `
+                switch (x) {
+                    case {k: 1}:
+                        break;
+                }`
             )
         );
     });
@@ -180,9 +188,24 @@ describe('object literals in templates and patterns', () => {
             }
         });
         return spec.rewriteRun(
-            typescript('new E({b: 2});', 'new E({\n    a: 1,\n    b: 2,\n});'),
-            typescript('new E({b() {}});', 'new E({\n    a: 1,\n    b() {},\n});'),
-            typescript('new E({...b});', 'new E({\n    a: 1,\n    ...b,\n});')
+            //language=typescript
+            typescript('new E({b: 2});', `
+                new E({
+                    a: 1,
+                    b: 2,
+                });`),
+            //language=typescript
+            typescript('new E({b() {}});', `
+                new E({
+                    a: 1,
+                    b() {},
+                });`),
+            //language=typescript
+            typescript('new E({...b});', `
+                new E({
+                    a: 1,
+                    ...b,
+                });`)
         );
     });
 

@@ -41,8 +41,12 @@ describe('rewriting calls that carry type arguments', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const a = useState<string[]>([]);\nconst b = useState([]);`,
-                `const a = useMyState<string[]>([]);\nconst b = useMyState([]);`
+                `
+                const a = useState<string[]>([]);
+                const b = useState([]);`,
+                `
+                const a = useMyState<string[]>([]);
+                const b = useMyState([]);`
             )
         );
     });
@@ -62,8 +66,12 @@ describe('rewriting calls that carry type arguments', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const a = make(Box);\nconst b = wrap(new Box<number>());`,
-                `const a = new Box<number>();\nconst b = unwrap(Box);`
+                `
+                const a = make(Box);
+                const b = wrap(new Box<number>());`,
+                `
+                const a = new Box<number>();
+                const b = unwrap(Box);`
             )
         );
     });

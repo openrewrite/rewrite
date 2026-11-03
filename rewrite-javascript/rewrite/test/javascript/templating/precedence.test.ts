@@ -504,7 +504,9 @@ describe('template precedence', () => {
             return spec.rewriteRun({
                 ...javascript(
                     `const a = base(p || q);`,
-                    `const a = class A extends (p || q) {\n};`),
+                    `
+                    const a = class A extends (p || q) {
+                    };`),
                 afterRecipe: (cu: JS.CompilationUnit) => {
                     const a = (cu.statements[0].element as J.VariableDeclarations).variables[0].element;
                     const classA = (a.initializer!.element as JS.StatementExpression).statement as J.ClassDeclaration;
