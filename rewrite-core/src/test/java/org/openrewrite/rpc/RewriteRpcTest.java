@@ -592,6 +592,160 @@ class RewriteRpcTest implements RewriteTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void preparedRecipesShareCycleStateAcrossScanGenerateAndEdit(boolean batch) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        PlainText source = PlainText.builder().sourcePath(Path.of("cycle.txt")).text("before").build();
+        RpcRecipe first = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        RpcRecipe second = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "second"));
+        Object previousCycle = null;
+        for (int cycle = 0; cycle < 2; cycle++) {
+            if (batch) {
+                client.batchVisit(source, ctx, null, List.of(
+                  new BatchVisit.BatchVisitItem(requireNonNull(first.getScanVisitor()), null),
+                  new BatchVisit.BatchVisitItem(requireNonNull(second.getScanVisitor()), null)));
+            } else {
+                client.visit(source, requireNonNull(first.getScanVisitor()), ctx);
+            }
+            Object currentCycle = remoteCycle();
+            assertThat(((org.openrewrite.scheduling.RecipeRunCycle<?>) currentCycle).getCycle()).isEqualTo(cycle + 1);
+            assertThat(currentCycle).isNotSameAs(previousCycle);
+            if (!batch) {
+                client.visit(source, requireNonNull(second.getScanVisitor()), ctx);
+                assertThat(remoteCycle()).isSameAs(currentCycle);
+            }
+            assertThat(first.generate(0, ctx)).isEmpty();
+            assertThat(second.generate(0, ctx)).isEmpty();
+            assertThat(remoteCycle()).isSameAs(currentCycle);
+            PlainText after = editCycleStateRecipes(source, ctx, batch, first, second);
+            assertThat(after.getText()).isEqualTo("first.scan[first],second.scan[second]," +
+              "first.generate1[first],second.generate1[second],first.edit1[first],second.edit1[second]");
+            assertThat(remoteCycle()).isSameAs(currentCycle);
+            previousCycle = currentCycle;
+        }
+
+        client.reset();
+        first = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        second = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "second"));
+        client.visit(source, requireNonNull(first.getScanVisitor()), ctx);
+        client.visit(source, requireNonNull(second.getScanVisitor()), ctx);
+        assertThat(remoteCycle()).isNotSameAs(previousCycle);
+        assertThat(((org.openrewrite.scheduling.RecipeRunCycle<?>) remoteCycle()).getCycle()).isEqualTo(1);
+        first.generate(0, ctx);
+        second.generate(0, ctx);
+        assertThat(editCycleStateRecipes(source, ctx, batch, first, second).getText())
+          .isEqualTo("first.scan[first],second.scan[second],first.generate1[first],second.generate1[second]," +
+            "first.edit1[first],second.edit1[second]");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void anotherRecipesFirstScanAfterEditingStillSharesTheCycle(boolean batch) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        PlainText source = PlainText.builder().sourcePath(Path.of("sequential.txt")).text("before").build();
+        RpcRecipe first = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        RpcRecipe second = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "second"));
+        Object cycle = null;
+        for (RpcRecipe recipe : List.of(first, second)) {
+            client.visit(source, requireNonNull(recipe.getScanVisitor()), ctx);
+            recipe.generate(0, ctx);
+            if (batch) {
+                client.batchVisit(source, ctx, null, List.of(new BatchVisit.BatchVisitItem(recipe.getEditVisitor(), null)));
+                source = client.getObject(source.getId().toString(), PlainText.class.getName());
+            } else {
+                source = (PlainText) requireNonNull(client.visit(source, recipe.getEditVisitor(), ctx));
+            }
+            if (cycle == null) {
+                cycle = remoteCycle();
+            }
+            assertThat(remoteCycle()).isSameAs(cycle);
+        }
+        assertThat(source.getText()).isEqualTo("first.scan[first],first.generate1[first],first.edit1[first]," +
+          "second.scan[second],second.generate1[second],second.edit1[second]");
+    }
+
+    @Test
+    void generationAfterEditingStartsANewCycleWithoutInputScanning() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        PlainText source = PlainText.builder().sourcePath(Path.of("generated.txt")).text("before").build();
+        RpcRecipe recipe = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        Object previousCycle = null;
+        for (int cycle = 0; cycle < 2; cycle++) {
+            recipe.generate(0, ctx);
+            Object currentCycle = remoteCycle();
+            assertThat(((org.openrewrite.scheduling.RecipeRunCycle<?>) currentCycle).getCycle()).isEqualTo(cycle + 1);
+            assertThat(currentCycle).isNotSameAs(previousCycle);
+            PlainText after = (PlainText) requireNonNull(client.visit(source, recipe.getEditVisitor(), ctx));
+            assertThat(after.getText()).isEqualTo("first.generate0[first],first.edit0[first]");
+            assertThat(remoteCycle()).isSameAs(currentCycle);
+            previousCycle = currentCycle;
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aSkippedEditDoesNotDelayTheNextCycleUntilAnotherRecipeScans(boolean batch) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        PlainText source = PlainText.builder().sourcePath(Path.of("skipped.txt")).text("before").build();
+        RpcRecipe first = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        RpcRecipe second = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "second"));
+        client.visit(source, requireNonNull(first.getScanVisitor()), ctx);
+        client.visit(source, requireNonNull(second.getScanVisitor()), ctx);
+        first.generate(0, ctx);
+        second.generate(0, ctx);
+        // A precondition or an earlier deletion can skip the first recipe's editor entirely.
+        if (batch) {
+            client.batchVisit(source, ctx, null, List.of(new BatchVisit.BatchVisitItem(second.getEditVisitor(), null)));
+        } else {
+            client.visit(source, second.getEditVisitor(), ctx);
+        }
+        Object previousCycle = remoteCycle();
+        client.visit(source, requireNonNull(first.getScanVisitor()), ctx);
+        assertThat(remoteCycle()).isNotSameAs(previousCycle);
+        client.visit(source, requireNonNull(second.getScanVisitor()), ctx);
+        first.generate(0, ctx);
+        second.generate(0, ctx);
+        assertThat(editCycleStateRecipes(source, ctx, batch, first, second).getText())
+          .isEqualTo("first.scan[first],second.scan[second],first.generate1[first],second.generate1[second]," +
+            "first.edit1[first],second.edit1[second]");
+    }
+
+    @Test
+    void repeatedGenerationWithoutInputOrEditsStartsANewCycle() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RpcRecipe recipe = (RpcRecipe) client.prepareRecipe(CycleStateRecipe.class.getName(), Map.of("label", "first"));
+        Object previousCycle = null;
+        for (int cycle = 0; cycle < 2; cycle++) {
+            recipe.generate(0, ctx);
+            assertThat(remoteCycle()).isNotSameAs(previousCycle);
+            CycleLedger ledger = remoteContext().getMessage("rpc.test.cycle-ledger");
+            assertThat(requireNonNull(ledger).events).containsExactly("first.generate0[first]");
+            previousCycle = remoteCycle();
+        }
+    }
+
+    private Object remoteCycle() {
+        return requireNonNull(remoteContext().getMessage(ExecutionContext.CURRENT_CYCLE));
+    }
+
+    private ExecutionContext remoteContext() {
+        return (ExecutionContext) server.localObjects.values().stream()
+          .filter(ExecutionContext.class::isInstance).findFirst().orElseThrow();
+    }
+
+    private PlainText editCycleStateRecipes(PlainText source, ExecutionContext ctx, boolean batch,
+                                            RpcRecipe first, RpcRecipe second) {
+        if (batch) {
+            client.batchVisit(source, ctx, null, List.of(
+              new BatchVisit.BatchVisitItem(first.getEditVisitor(), null),
+              new BatchVisit.BatchVisitItem(second.getEditVisitor(), null)));
+            return client.getObject(source.getId().toString(), PlainText.class.getName());
+        }
+        PlainText afterFirst = (PlainText) requireNonNull(client.visit(source, first.getEditVisitor(), ctx));
+        return (PlainText) requireNonNull(client.visit(afterFirst, second.getEditVisitor(), ctx));
+    }
+
     @Test
     void runRecipeWithRecipeList() {
         rewriteRun(
@@ -1107,6 +1261,66 @@ class RewriteRpcTest implements RewriteTest {
                 }
             };
         }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    public static class CycleStateRecipe extends ScanningRecipe<int[]> {
+        @Option(displayName = "Label", description = "The prepared recipe's label.", example = "first")
+        String label;
+
+        String displayName = "Share cycle-scoped state";
+        String description = "Shares a cycle-scoped ledger across prepared recipes and phases.";
+
+        @Override
+        public int[] getInitialValue(ExecutionContext ctx) {
+            return new int[1];
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(int[] acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    acc[0]++;
+                    record(ctx, "scan");
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public java.util.Collection<? extends SourceFile> generate(int[] acc, ExecutionContext ctx) {
+            record(ctx, "generate" + acc[0]);
+            return emptyList();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(int[] acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.withText(record(ctx, "edit" + acc[0]));
+                }
+            };
+        }
+
+        private String record(ExecutionContext ctx, String phase) {
+            CycleLedger ledger = ctx.computeMessageIfAbsent("rpc.test.cycle-ledger", k -> new CycleLedger());
+            Object cycle = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+            if (ledger.cycle != cycle) {
+                ledger.cycle = cycle;
+                ledger.events.clear();
+            }
+            CycleStateRecipe current = ctx.getMessage(ExecutionContext.CURRENT_RECIPE);
+            ledger.events.add(label + "." + phase + "[" + (current == null ? "none" : current.label) + "]");
+            return String.join(",", ledger.events);
+        }
+    }
+
+    private static class CycleLedger {
+        Object cycle;
+        final java.util.List<String> events = new java.util.ArrayList<>();
     }
 
     @SuppressWarnings("unused")
