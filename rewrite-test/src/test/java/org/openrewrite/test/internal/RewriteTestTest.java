@@ -166,7 +166,9 @@ class RewriteTestTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
           text("a", "a!!")
         ));
-        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle")
+          .hasMessageContaining("return true from causesAnotherCycle()")
+          .hasMessageContaining("leave this test failing");
     }
 
     @Test
@@ -205,9 +207,10 @@ class RewriteTestTest implements RewriteTest {
             spec -> spec.recipe(new MutateExecutionContext()),
             text("irrelevant")
           ));
-        assertThat(e).hasStackTraceContaining("in a ScanningRecipe's accumulator")
-          .hasStackTraceContaining("in Cursor messages")
-          .hasStackTraceContaining("executionContextUnchanged(false)");
+        assertThat(e).hasStackTraceContaining("in the accumulator of a ScanningRecipe")
+          .hasStackTraceContaining("in cursor messages")
+          .hasStackTraceContaining("getCursor().putMessageOnFirstEnclosing(..)")
+          .hasStackTraceContaining("leave this test failing");
     }
 
     @Test
@@ -217,7 +220,7 @@ class RewriteTestTest implements RewriteTest {
           text("foo")
         ));
         assertThat(e).hasStackTraceContaining("make the edits in getVisitor(acc)")
-          .hasStackTraceContaining("noEditsInScanningPhase(false)");
+          .hasStackTraceContaining("return the tree it was given");
     }
 
     @Test
@@ -1111,7 +1114,7 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
               .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindQualifiedCallsByName): " +
                                     "`Collections.emptyList()` written `emptyList()`")
-              .hasMessageContaining("matchByTypeNotName(false)");
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test
@@ -1649,7 +1652,7 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageStartingWith("Import the types and static members the code the recipe writes names")
               .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.UseObjectsIsNull): " +
                                     "`Objects` (java.util.Objects)")
-              .hasMessageContaining("importReferencedTypes(false)");
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test
@@ -1796,7 +1799,7 @@ class RewriteTestTest implements RewriteTest {
             ));
             assertThat(e).hasMessageStartingWith("Remove the imports the recipe leaves unused")
               .hasMessageContaining(": import java.util.Collections, import java.util.Set\n")
-              .hasMessageContaining("removeUnusedImports(false)");
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test
@@ -1930,7 +1933,7 @@ class RewriteTestTest implements RewriteTest {
               .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.ReturnNullByHand):\n" +
                                     "    `null` has the String value \"null\" of type null where the parser makes the " +
                                     "value null of type null")
-              .hasMessageContaining("parserShapedTrees(false)");
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test
@@ -2164,7 +2167,7 @@ class RewriteTestTest implements RewriteTest {
               .hasMessageContaining("ChangePackage `a.b` to `y` (step 2 of org.openrewrite.test.MovePackagesBroadFirst): " +
                                     "ChangePackage `a` to `x` (step 1 of org.openrewrite.test.MovePackagesBroadFirst) " +
                                     "renamed `a.b` to `x.b` first, so code that named it ends up as `x.b`, not `y`")
-              .hasMessageContaining("orderStepsForEarlierChanges(false)");
+              .hasMessageContaining("leave this test failing");
 
             // every test that runs the composite fails, not just the first
             assertThrows(AssertionError.class, () -> rewriteRun(
@@ -2327,7 +2330,8 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
               .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
                                     "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
-              .hasMessageContaining("lightweightAccumulators(false)");
+              .hasMessageContaining("record what you need from the first while scanning")
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test

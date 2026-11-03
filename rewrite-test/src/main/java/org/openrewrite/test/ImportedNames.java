@@ -114,23 +114,16 @@ final class ImportedNames {
                          "on a file that doesn't, the template's code has no type:\n" + names +
                          "The file needs the import too, so also call maybeAddImport.");
         }
-        if (!failures.isEmpty()) {
-            failures.set(failures.size() - 1, failures.get(failures.size() - 1) + "\nIf the recipe names them " +
-                         "this way on purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
-                         ".importReferencedTypes(false).build()).");
-        }
         if (unused.length() > 0) {
             failures.add("Remove the imports the recipe leaves unused, with maybeRemoveImport(\"java.util.List\") " +
                          "once it has removed the code that used a type, and add imports with maybeAddImport, " +
                          "which imports only what the file names. The recipe left these sources importing what " +
                          "nothing in them uses:\n" + unused +
                          "If the code still names it, the recipe wrote that code without its type, and a later " +
-                         "RemoveUnusedImports would delete an import the code needs. If the recipe keeps them on " +
-                         "purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
-                         ".removeUnusedImports(false).build()).");
+                         "RemoveUnusedImports would delete an import the code needs.");
         }
         if (!failures.isEmpty()) {
-            fail(String.join("\n\n", failures));
+            fail(String.join("\n\n", failures) + "\n\n" + RecipeQualityValidation.WHEN_STUCK);
         }
     }
 

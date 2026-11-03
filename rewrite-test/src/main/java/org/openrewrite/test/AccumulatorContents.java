@@ -321,8 +321,13 @@ final class AccumulatorContents {
                 .append("ends, so what it keeps for each source file adds up over a large repository. A ")
                 .append("MavenResolutionResult or GradleProject can reach the model of a whole build, and a ")
                 .append("JavaSourceSet a whole classpath, while small markers such as JavaProject are fine to keep. ")
-                .append("A recipe that must keep a Heavyweight object opts out with ")
-                .append("RecipeQualityValidation.builder().lightweightAccumulators(false).")
+                .append("Instead:\n")
+                .append("  - keep what the recipe needs from a tree or build model as values: a path, a coordinate, ")
+                .append("a property value, an id\n")
+                .append("  - to change one source file based on another, record what you need from the first while ")
+                .append("scanning, and change the second when the editing visitor reaches it\n")
+                .append("  - to generate a source file, build it in generate() from those values\n")
+                .append(RecipeQualityValidation.WHEN_STUCK)
                 .toString();
     }
 

@@ -80,9 +80,10 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
         Recipe recipe = getMessage(ExecutionContext.CURRENT_RECIPE);
         return (recipe == null ? "A recipe" : recipe.getName()) + " put \"" + key + "\" on the ExecutionContext, " +
                "which every recipe and source file in a run shares, so what it keeps there leaks into the others. " +
-               "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source " +
-               "file in Cursor messages, with getCursor().putMessage(..) or putMessageOnFirstEnclosing(..). A recipe " +
-               "that must change the ExecutionContext opts out with " +
-               "RecipeQualityValidation.builder().executionContextUnchanged(false).";
+               "Instead:\n" +
+               "  - keep state that spans source files in the accumulator of a ScanningRecipe\n" +
+               "  - keep state within one source file in cursor messages, with " +
+               "getCursor().putMessageOnFirstEnclosing(..) and getCursor().getNearestMessage(..)\n" +
+               "If none of these fits the recipe, leave this test failing and describe what the recipe needs.";
     }
 }

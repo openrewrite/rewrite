@@ -109,6 +109,10 @@ public class RecipeQualityValidation {
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
 
+    /// How a failed check's message ends. Without it, an agent told to make the build pass works around the check.
+    static final String WHEN_STUCK = "If none of these fits the recipe, leave this test failing and describe what " +
+                                     "the recipe needs.";
+
     /**
      * Enable all recipe quality checks.
      */

@@ -126,7 +126,11 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                 assertThat(after.printAllTrimmed())
                         .as(
                                 "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
+                                "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\". " +
+                                "A recipe that changes its own output again repeats its edit every time it runs. " +
+                                "Check for the result before making a change, or use a precondition that no longer matches once the change is made. " +
+                                "If one change enables another, make both in the same visit, or return true from causesAnotherCycle() and raise expectedCyclesThatMakeChanges(..) to match. " +
+                                RecipeQualityValidation.WHEN_STUCK
                         )
                         .isEqualTo(before.printAllTrimmed());
             }

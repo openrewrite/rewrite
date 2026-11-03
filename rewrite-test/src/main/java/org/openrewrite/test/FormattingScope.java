@@ -321,8 +321,8 @@ final class FormattingScope extends FormattingListener {
                 .append("  - re-indent statements you moved with autoIndent(..) rather than autoFormat\n")
                 .append("  - JavaTemplate and its coordinates (addAnnotation, addStatement) already format what ")
                 .append("they insert, so drop the extra call\n")
-                .append("Recipes in a *.format package are exempt. Any other recipe whose purpose is formatting ")
-                .append("opts out with RecipeQualityValidation.builder().minimalFormatting(false).\n")
+                .append("Recipes in a *.format package are exempt.\n")
+                .append(RecipeQualityValidation.WHEN_STUCK).append('\n')
                 .toString();
     }
 
