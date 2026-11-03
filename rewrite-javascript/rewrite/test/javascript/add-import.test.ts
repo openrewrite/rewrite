@@ -3978,6 +3978,7 @@ describe('AddImport follows the file it lands in', () => {
     test('a semicolon-free file gets an import without one', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import got from 'got'
@@ -3998,6 +3999,7 @@ describe('AddImport follows the file it lands in', () => {
     test('a semicolon-free file without imports is judged by its other statements', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             const x = 1
@@ -4015,6 +4017,7 @@ describe('AddImport follows the file it lands in', () => {
     test('a file with semicolons keeps them', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import got from 'got';
@@ -4035,6 +4038,7 @@ describe('AddImport follows the file it lands in', () => {
     test('Prettier semi:false outranks the semicolons the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({semi: false, singleQuote: true}));
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import { a } from 'm';
@@ -4053,6 +4057,7 @@ describe('AddImport follows the file it lands in', () => {
     test('a file whose imports are spaced gets a spaced import', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import { a } from "m";
@@ -4073,6 +4078,7 @@ describe('AddImport follows the file it lands in', () => {
     test('a one-per-line import list is no evidence of brace spacing', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import {
@@ -4097,6 +4103,7 @@ describe('AddImport follows the file it lands in', () => {
     test('Prettier bracketSpacing:false outranks the spacing the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({bracketSpacing: false, singleQuote: true}));
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import { a } from 'm';
@@ -4115,6 +4122,7 @@ describe('AddImport follows the file it lands in', () => {
     test('Prettier singleQuote:false outranks the quote the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({singleQuote: false}));
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
             import { a } from 'm';

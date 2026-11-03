@@ -1332,6 +1332,7 @@ describe("rewrite test", () => {
                     return autoFormat(cu, p);
                 }
             });
+            //language=typescript
             return sut.rewriteRun(typescript(`
                 class A {
                   m() {

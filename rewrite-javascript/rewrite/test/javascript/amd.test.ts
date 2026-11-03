@@ -82,6 +82,7 @@ describe("withDependency", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
             `
             sap.ui.define([
@@ -129,6 +130,7 @@ describe("withDependency", () => {
                 `sap.ui.define(["a/B", /* the C */ "a/C"], function (B, C) {});`,
                 `sap.ui.define(["a/B", /* the C */ "a/C", "c/D"], function (B, C, D) {});`
             ),
+            //language=javascript
             javascript(
                 `
                 sap.ui.define([/* a
@@ -137,6 +139,7 @@ describe("withDependency", () => {
                 sap.ui.define([/* a
                  b */ "a/B", "c/D"], function (B, D) {});`
             ),
+            //language=javascript
             javascript(
                 `
                 sap.ui.define([
@@ -167,6 +170,7 @@ describe("withDependency", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
             `
             sap.ui.define([
@@ -231,6 +235,7 @@ describe("withDependency", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
             `
             sap.ui.define([
@@ -260,6 +265,7 @@ describe("withoutDependencyAt", () => {
                     withoutDependencyAt(m, block, 1);
             }
         });
+        //language=javascript
         await spec.rewriteRun(javascript(
             `
             sap.ui.define([

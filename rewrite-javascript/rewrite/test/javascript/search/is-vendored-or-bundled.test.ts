@@ -63,6 +63,7 @@ describe('IsVendoredOrBundled visitor', () => {
 
     test('marks a trailing sourceMappingURL', async () => {
         await spec.rewriteRun({
+            //language=javascript
             ...javascript(
                 `
                 const a = 1;
@@ -79,6 +80,7 @@ describe('IsVendoredOrBundled visitor', () => {
 
     test('marks a legacy trailing sourceMappingURL', async () => {
         await spec.rewriteRun({
+            //language=javascript
             ...javascript(
                 `
                 const a = 1;
@@ -95,6 +97,7 @@ describe('IsVendoredOrBundled visitor', () => {
 
     test('ignores a sourceMappingURL that is not trailing', async () => {
         await spec.rewriteRun({
+            //language=javascript
             ...javascript(`
                 //# sourceMappingURL=index.js.map
                 const a = 1;

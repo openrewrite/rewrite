@@ -609,6 +609,7 @@ describe("change-import", () => {
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(repo.path, {
+                    //language=typescript
                     ...typescript(
                         `
                         import { extend, flatten } from 'lodash';
@@ -664,6 +665,7 @@ describe("change-import", () => {
                 npm(
                     repo.path,
                     {
+                        //language=typescript
                         ...typescript(
                             `
                             import { documentToken } from './token';

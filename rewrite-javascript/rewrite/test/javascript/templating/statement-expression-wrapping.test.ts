@@ -227,6 +227,7 @@ describe('Statement Expression Wrapping', () => {
         });
 
         return spec.rewriteRun(
+            //language=typescript
             typescript(
                 `
                 switch (x) {
@@ -275,6 +276,7 @@ describe('Statement Expression Wrapping', () => {
         });
 
         // rewriteRun compares the trees with a fresh parse of the text they print
+        //language=typescript
         return spec.rewriteRun(typescript(`
             for (let i = 0; i < n;) {
             }`,
@@ -304,6 +306,7 @@ describe('Statement Expression Wrapping', () => {
             typescript('a || (a = b);', 'a ||= b;'),
             typescript(`foo['bar'];`, 'foo.bar;'),
             // a `for` head holds every expression in an expression statement
+            //language=typescript
             typescript(`
                 for (a || (a = b); ;) {
                 }`,
@@ -332,6 +335,7 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun(
             typescript('cond && doIt();', 'if (cond) doIt();'),
             // the parser holds a `yield` in a JS.StatementExpression wherever it stands
+            //language=typescript
             typescript(`
                 function* g() {
                     x + 1;
@@ -362,6 +366,7 @@ describe('Statement Expression Wrapping', () => {
         return spec.rewriteRun(
             typescript(`new foo['bar']();`, 'new /*~~(found)~~>*/foo.bar();'),
             typescript(`new  foo['bar'];`, 'new  /*~~(found)~~>*/foo.bar;'),
+            //language=typescript
             typescript(`
                 class A extends foo['bar'] {
                 }`,
@@ -398,6 +403,7 @@ describe('Statement Expression Wrapping', () => {
             }
         });
 
+        //language=typescript
         return spec.rewriteRun(typescript('go()', `
             if (ready) {
                 go()

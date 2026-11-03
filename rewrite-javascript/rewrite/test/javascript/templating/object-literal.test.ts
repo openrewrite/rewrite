@@ -188,16 +188,19 @@ describe('object literals in templates and patterns', () => {
             }
         });
         return spec.rewriteRun(
+            //language=typescript
             typescript('new E({b: 2});', `
                 new E({
                     a: 1,
                     b: 2,
                 });`),
+            //language=typescript
             typescript('new E({b() {}});', `
                 new E({
                     a: 1,
                     b() {},
                 });`),
+            //language=typescript
             typescript('new E({...b});', `
                 new E({
                     a: 1,

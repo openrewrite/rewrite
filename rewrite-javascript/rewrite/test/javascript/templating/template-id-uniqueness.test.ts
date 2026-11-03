@@ -148,6 +148,7 @@ describe('template id uniqueness', () => {
         spec.recipe = fromVisitor(matchAndReplace(doubleNegation, booleanCall));
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
                 `
                 const a = !!foo;
@@ -166,6 +167,7 @@ describe('template id uniqueness', () => {
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args})`));
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
                 `
                 foo(1, 2);
@@ -252,6 +254,7 @@ describe('template id uniqueness', () => {
         });
 
         return spec.rewriteRun({
+            //language=typescript
             ...typescript(
                 `
                 wrap(1);

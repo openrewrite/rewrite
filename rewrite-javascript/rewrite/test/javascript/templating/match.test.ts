@@ -221,6 +221,7 @@ describe('match extraction', () => {
         });
 
         await spec.rewriteRun(
+            //language=typescript
             typescript(`
                 declare function foo(a: any): void;
                 const s = "x";
@@ -231,6 +232,7 @@ describe('match extraction', () => {
         matched = false;
         const util = typescript(`export function foo(a: any): void {}`);
         util.path = 'util.ts';
+        //language=typescript
         const main = typescript(`
             import {foo} from './util';
             foo("x");`);
@@ -257,6 +259,7 @@ describe('match extraction', () => {
         });
 
         await spec.rewriteRun(
+            //language=typescript
             typescript(`
                 function isDate(value: unknown): boolean { return false; }
                 const result = isDate(new Date());`)
@@ -265,6 +268,7 @@ describe('match extraction', () => {
         expect(capturedArgs).toBeUndefined();
 
         await spec.rewriteRun(
+            //language=typescript
             typescript(`
                 import {isDate as checkDate} from 'node:util/types';
                 const result = checkDate(new Date());`)
