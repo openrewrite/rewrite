@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import {createRequire} from "module";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
@@ -203,73 +204,43 @@ function preloadCoreModules(logger?: rpc.Logger) {
  * Ensures dynamically loaded modules share the same class instances as the host
  * by mapping require.cache entries. This prevents instanceof failures when the
  * same package is installed in multiple node_modules directories.
+ *
+ * The target's copy is located by a require rooted at the target's entry file, so
+ * the mapped keys are the paths Node looks up when the target loads it.
  */
 function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) {
     const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
-    // For local-path installs, targetModulePath is the package dir itself.
-    let targetDir: string;
+    let targetRequire: NodeJS.Require;
     try {
-        targetDir = fs.statSync(targetModulePath).isDirectory()
-            ? targetModulePath
-            : path.dirname(targetModulePath);
+        targetRequire = createRequire(require.resolve(targetModulePath));
     } catch {
-        targetDir = path.dirname(targetModulePath);
+        return; // Loading the target reports why it does not resolve
     }
 
     sharedDeps.forEach(depName => {
         try {
-            // Step 1: Find where this package is currently loaded from (host)
-            const hostPackageEntry = require.resolve(depName);
-
-            // Step 2: Find the package root by looking for package.json
-            let hostPackageRoot = path.dirname(hostPackageEntry);
-            while (hostPackageRoot !== path.dirname(hostPackageRoot)) {
-                const packageJsonPath = path.join(hostPackageRoot, 'package.json');
-                if (fs.existsSync(packageJsonPath)) {
-                    try {
-                        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-                        if (pkg.name === depName) {
-                            break; // Found the package root
-                        }
-                    } catch (e) {
-                        // Not a valid package.json, continue
-                    }
+            const hostPackageRoot = findPackageRoot(require.resolve(depName), depName);
+            if (!hostPackageRoot) {
+                if (logger) {
+                    logger.warn(`[setupSharedDependencies] Could not find the host's package root for ${depName}`);
                 }
-                hostPackageRoot = path.dirname(hostPackageRoot);
+                return;
             }
 
             if (logger) {
                 logger.info(`[setupSharedDependencies] Host package root for ${depName}: ${hostPackageRoot}`);
             }
 
-            // Step 3: Find where the target's node_modules has this package
-            // We explicitly look in node_modules to avoid finding npm-linked global packages
             let targetPackageRoot: string | undefined;
-
-            // Walk up from targetDir looking for node_modules containing this package
-            let searchDir = targetDir;
-            while (searchDir !== path.dirname(searchDir)) {
-                const nodeModulesPath = path.join(searchDir, 'node_modules', ...depName.split('/'));
-                if (fs.existsSync(nodeModulesPath)) {
-                    const packageJsonPath = path.join(nodeModulesPath, 'package.json');
-                    if (fs.existsSync(packageJsonPath)) {
-                        try {
-                            const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-                            if (pkg.name === depName) {
-                                targetPackageRoot = nodeModulesPath;
-                                break;
-                            }
-                        } catch (e) {
-                            // Not a valid package.json, continue
-                        }
-                    }
-                }
-                searchDir = path.dirname(searchDir);
+            try {
+                targetPackageRoot = findPackageRoot(targetRequire.resolve(depName), depName);
+            } catch {
+                // Logged below
             }
 
             if (!targetPackageRoot) {
                 if (logger) {
-                    logger.warn(`[setupSharedDependencies] Could not find ${depName} in target's node_modules`);
+                    logger.warn(`[setupSharedDependencies] Could not resolve ${depName} from ${targetModulePath}`);
                 }
                 return; // Can't map this package
             }
@@ -286,7 +257,7 @@ function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) 
                 return;
             }
 
-            // Step 4: Map all cached modules from host package to target package
+            // Map all cached modules from host package to target package
             const hostPrefix = hostPackageRoot + path.sep;
 
             let mappedCount = 0;
@@ -311,4 +282,20 @@ function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) 
             }
         }
     });
+}
+
+/**
+ * The closest directory above a resolved module file whose package.json is named packageName.
+ */
+function findPackageRoot(moduleFile: string, packageName: string): string | undefined {
+    for (let dir = path.dirname(moduleFile); dir !== path.dirname(dir); dir = path.dirname(dir)) {
+        try {
+            if (JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).name === packageName) {
+                return dir;
+            }
+        } catch {
+            // No readable package.json here
+        }
+    }
+    return undefined;
 }
