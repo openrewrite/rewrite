@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.toolingapi;
 
+import org.gradle.tooling.GradleConnectionException;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.ModelBuilder;
 import org.gradle.tooling.ProjectConnection;
@@ -40,10 +41,11 @@ public class OpenRewriteModelBuilder {
 
     /**
      * Build an OpenRewriteModel for a project directory, using the default Gradle init script bundled within this jar.
-     * The included init script accesses public artifact repositories (Maven Central, Nexus Snapshots) to be able to
-     * download rewrite dependencies, so public repositories must be accessible for this to work. If
-     * {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME} and
-     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, it downloads them from that mirror instead.
+     * The included init script downloads the model plugin at this jar's own version, with its rewrite dependencies, from
+     * Maven Central, or from the mirror at {@code MAVEN_CENTRAL_MIRROR_URL} when it, {@code MAVEN_CENTRAL_MIRROR_USERNAME}
+     * and {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set. Snapshots come from https://artifacts.codegenomeproject.org/maven,
+     * given {@code codegenomeUsername} and {@code codegenomePassword} in the Gradle user home's gradle.properties, or
+     * {@code CODEGENOME_USERNAME} and {@code CODEGENOME_TOKEN} in the environment.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
@@ -133,26 +135,26 @@ public class OpenRewriteModelBuilder {
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             String resolvedInitScript;
+            String pluginVersion = null;
             if (initScript == null) {
                 if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
                     // code path only expected to be taken from within openrewrite/rewrite
                     resolvedInitScript = generateInitScriptFromManifest();
                 } else {
-                    // Use default init.gradle from resources
-                    try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
-                        if (is == null) {
-                            throw new IllegalStateException("Expected to find init.gradle on the classpath");
-                        }
-                        byte[] bytes = readAllBytes(is);
-                        resolvedInitScript = new String(bytes, StandardCharsets.UTF_8);
-                    }
+                    Package modelPackage = OpenRewriteModel.class.getPackage();
+                    pluginVersion = modelPackage == null ? null : modelPackage.getImplementationVersion();
+                    resolvedInitScript = defaultInitScript(pluginVersion);
                 }
             } else {
                 resolvedInitScript = initScript;
             }
             Files.write(init, (resolvedInitScript + mirrorScriptSnippet()).getBytes(StandardCharsets.UTF_8));
             customModelBuilder.withArguments(arguments);
-            return OpenRewriteModel.from(customModelBuilder.get());
+            try {
+                return OpenRewriteModel.from(customModelBuilder.get());
+            } catch (GradleConnectionException e) {
+                throw pluginVersion == null ? e : explainMissingPlugin(e, pluginVersion);
+            }
         } finally {
             try {
                 if (Files.exists(init)) {
@@ -166,6 +168,34 @@ public class OpenRewriteModelBuilder {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    private static final String PLUGIN = "org.openrewrite.gradle.tooling:plugin:";
+
+    /**
+     * The bundled init script, loading the plugin at the given version, so that the markers it builds are the ones this
+     * jar reads. Without a version, as for a model loaded from a classes directory, it loads the newest plugin.
+     */
+    static String defaultInitScript(@Nullable String pluginVersion) throws IOException {
+        try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
+            if (is == null) {
+                throw new IllegalStateException("Expected to find init.gradle on the classpath");
+            }
+            String script = new String(readAllBytes(is), StandardCharsets.UTF_8);
+            return pluginVersion == null ? script : script.replace(PLUGIN + "latest.integration", PLUGIN + pluginVersion);
+        }
+    }
+
+    static GradleConnectionException explainMissingPlugin(GradleConnectionException failure, String pluginVersion) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains(PLUGIN + pluginVersion)) {
+                return new GradleConnectionException("Could not load " + PLUGIN + pluginVersion + ", the version of " +
+                        "this model. Its snapshots are published to https://artifacts.codegenomeproject.org/maven, which " +
+                        "the init script uses when the Gradle user home's gradle.properties sets codegenomeUsername and " +
+                        "codegenomePassword, or the environment sets CODEGENOME_USERNAME and CODEGENOME_TOKEN.", failure);
+            }
+        }
+        return failure;
     }
 
     /**
