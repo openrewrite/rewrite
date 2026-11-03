@@ -58,9 +58,17 @@ public final class NativeLockEngine {
     }
 
     public static Result regenerate(Port port, Request request, ExecutionContext ctx) {
+        return regenerate(port, request, ctx, false);
+    }
+
+    public static Result regenerate(Port port, Request request, ExecutionContext ctx,
+                                    boolean reconcileNpmPeerDependencies) {
         try {
-            return port.regenerate(LockDirectory.of(request), HostInputs.of(ctx, request.getMarker(),
-                    request.getRuntime(), Instant.now()), NodeExecutionContextView.view(ctx).getRegistryClient());
+            LockDirectory directory = LockDirectory.of(request);
+            HostInputs host = HostInputs.of(ctx, request.getMarker(), request.getRuntime(), Instant.now());
+            return reconcileNpmPeerDependencies && port == NpmInputs.PORT ?
+                    NpmInputs.PORT.regenerate(directory, host, NodeExecutionContextView.view(ctx).getRegistryClient(), true) :
+                    port.regenerate(directory, host, NodeExecutionContextView.view(ctx).getRegistryClient());
         } catch (NodeRegistryException nre) {
             return Result.failure(LockOnlyInstall.failure(nre));
         }
