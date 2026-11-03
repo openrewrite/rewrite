@@ -2989,6 +2989,16 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
+    test.each([
+        'let NS = require("m");',
+        'var NS = require("m");',
+        'let NS = await import("m");'
+    ])("a reassignable module object is left alone: %s", async declaration => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(javascript(`${declaration}\nNS = {Old: () => 1};\nNS.Old();`));
+    });
+
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
         // `D.Old` reads the default export's property, which is the member only where the module's
         // default is its namespace object, as `export =` typings make it
