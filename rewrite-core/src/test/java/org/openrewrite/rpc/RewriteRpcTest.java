@@ -983,6 +983,56 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void scanBatchHonoursScanPreconditions() {
+        // given
+        RecordingScanner.SCANNED.clear();
+        Recipe r1 = scanningRpcRecipe(new FindSourceFiles("a.txt").getVisitor());
+        Recipe r2 = scanningRpcRecipe(new FindSourceFiles("a.txt").getVisitor());
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
+
+        // when
+        new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(r1, r2)),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
+            PlainText.builder().text("b").sourcePath(Path.of("b.txt")).build())),
+          new InMemoryExecutionContext(errors::add), 1, 1);
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(RecordingScanner.SCANNED).containsExactly("a.txt", "a.txt");
+    }
+
+    @Test
+    void scanBatchSkipsSourceFilesNotInRemoteLanguages() {
+        // given
+        RecordingScanner.SCANNED.clear();
+        Recipe r1 = scanningRpcRecipe(null);
+        Recipe r2 = scanningRpcRecipe(null);
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(r1, r2)),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
+            new org.openrewrite.quark.Quark(UUID.randomUUID(), Path.of("unknown.bin"), Markers.EMPTY, null, null))),
+          new InMemoryExecutionContext(errors::add), 1, 1);
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(run.getChangeset().getAllResults()).isEmpty();
+        assertThat(RecordingScanner.SCANNED).containsExactly("a.txt", "a.txt");
+    }
+
+    private Recipe scanningRpcRecipe(@Nullable TreeVisitor<?, ExecutionContext> scanPrecondition) {
+        RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(RecordingScanner.class.getName(), Map.of());
+        String scanVisitor = requireNonNull(prepared.getScanVisitor());
+        return new RpcRecipe(client, scanVisitor.substring("scan:".length()), prepared.getDescriptor(),
+          prepared.getEditVisitor(), null, scanVisitor, scanPrecondition, List.of(), false);
+    }
+
+    @Test
     void getCursor() {
         var parent = new Cursor(null, Cursor.ROOT_VALUE);
         var c1 = new Cursor(parent, 0);
@@ -1038,6 +1088,39 @@ class RewriteRpcTest implements RewriteTest {
         public PlainText visitText(PlainText text, Integer p) {
             RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
             return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
+        }
+    }
+
+    public static class RecordingScanner extends ScanningRecipe<Integer> {
+        static final List<String> SCANNED = new CopyOnWriteArrayList<>();
+
+        @Override
+        public String getDisplayName() {
+            return "Recording scanner";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Records the paths of the source files it scans.";
+        }
+
+        @Override
+        public Integer getInitialValue(ExecutionContext ctx) {
+            return 0;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
+            return new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                    stopAfterPreVisit();
+                    if (tree instanceof SourceFile sourceFile) {
+                        SCANNED.add(sourceFile.getSourcePath().toString());
+                    }
+                    return tree;
+                }
+            };
         }
     }
 

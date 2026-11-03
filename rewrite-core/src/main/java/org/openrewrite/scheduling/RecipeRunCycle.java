@@ -227,12 +227,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
 
                                 if (isInBatch) {
-                                    scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
-                                    scanBatch.recipeStacks.add(recipeStack);
-                                    if (scanBatch.originalBeforeBatch == null) {
-                                        scanBatch.originalBeforeBatch = source;
+                                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(source.getClass())) &&
+                                        preconditionPasses(((RpcRecipe) recipe).getScanPreconditionVisitor(), source)) {
+                                        scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
+                                        scanBatch.recipeStacks.add(recipeStack);
+                                        if (scanBatch.originalBeforeBatch == null) {
+                                            scanBatch.originalBeforeBatch = source;
+                                        }
+                                        scanBatch.rpc = currentRpc;
                                     }
-                                    scanBatch.rpc = currentRpc;
 
                                     // If this is the last recipe in the batch, flush now
                                     if (nextRpc != currentRpc || nextScanVisitor == null) {
@@ -280,6 +283,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             });
         }
         return sourceSet;
+    }
+
+    private boolean preconditionPasses(@Nullable TreeVisitor<?, ExecutionContext> precondition, SourceFile source) {
+        if (precondition == null) {
+            return true;
+        }
+        //noinspection unchecked
+        return ((TreeVisitor<Tree, ExecutionContext>) precondition).visit(source, ctx, rootCursor) != source;
     }
 
     private void flushScanBatch(BatchState batch, SourceFile source) {
@@ -500,15 +511,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         // editVisitor names directly. Without this gate, every batched recipe
                         // would visit every file regardless of preconditions, defeating the
                         // optimization.
-                        TreeVisitor<?, ExecutionContext> precondition = rpcRecipe.getEditPreconditionVisitor();
-                        boolean preconditionPasses = true;
-                        if (precondition != null) {
-                            //noinspection unchecked
-                            TreeVisitor<Tree, ExecutionContext> typed =
-                                    (TreeVisitor<Tree, ExecutionContext>) precondition;
-                            preconditionPasses = typed.visit(src, ctx, rootCursor) != src;
-                        }
-                        if (preconditionPasses) {
+                        if (preconditionPasses(rpcRecipe.getEditPreconditionVisitor(), src)) {
                             batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
                             batch.recipeStacks.add(recipeStack);
                             if (batch.originalBeforeBatch == null) {
