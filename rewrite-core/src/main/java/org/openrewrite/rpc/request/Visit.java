@@ -29,11 +29,9 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiFunction;
 
 @Value
@@ -124,18 +122,17 @@ public class Visit implements RpcRequest {
             state = new RpcCycle(cycle);
             ctx.putMessage(RPC_CYCLE, state);
         }
-        // A recipe's scan/generate after its edit is the next scheduling cycle. Different recipes can
-        // interleave in one cycle, so an edit followed by another recipe's first scan is not a boundary.
-        if (phase != Phase.EDIT && state.edited.contains(recipe)) {
+        // A recipe scans before generating once per cycle. Its next scan/generate after generation or
+        // editing starts a new cycle, including when a precondition skipped its edit. A different
+        // recipe's first scan/generate still belongs to this cycle.
+        Phase previous = state.phases.get(recipe);
+        if (phase != Phase.EDIT && previous != null && previous != Phase.SCAN) {
             state.clearAccumulators(preparedRecipes);
             state = new RpcCycle(newCycle(recipe, ctx, state.cycle.getCycle() + 1));
             ctx.putCycle(state.cycle);
             ctx.putMessage(RPC_CYCLE, state);
         }
-        state.recipes.add(recipe);
-        if (phase == Phase.EDIT) {
-            state.edited.add(recipe);
-        }
+        state.phases.put(recipe, phase);
         ctx.putCurrentRecipe(recipe);
         return ctx;
     }
@@ -149,15 +146,14 @@ public class Visit implements RpcRequest {
 
     private static final class RpcCycle {
         final RecipeRunCycle<?> cycle;
-        final Set<Recipe> recipes = Collections.newSetFromMap(new IdentityHashMap<>());
-        final Set<Recipe> edited = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Map<Recipe, Phase> phases = new IdentityHashMap<>();
 
         private RpcCycle(RecipeRunCycle<?> cycle) {
             this.cycle = cycle;
         }
 
         private void clearAccumulators(PreparedRecipeCache preparedRecipes) {
-            for (Recipe recipe : recipes) {
+            for (Recipe recipe : phases.keySet()) {
                 preparedRecipes.getRecipeCursors().remove(recipe);
             }
         }
