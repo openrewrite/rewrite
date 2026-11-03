@@ -2099,8 +2099,8 @@ describe("maybeUnbind on an ESM file", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(dropModule("sap/m/Button"));
         await spec.rewriteRun(typescript(
-            `import Button from "sap/m/Button";\n\nconsole.log(1);`,
-            `console.log(1);`
+            `import Button from "sap/m/Button";\n\nexport const x = 1;`,
+            `export const x = 1;`
         ));
     });
 
@@ -2113,8 +2113,8 @@ describe("maybeUnbind on an ESM file", () => {
             }
         });
         await spec.rewriteRun(typescript(
-            `import Button from "sap/m/Button";\n\nconsole.log(1);`,
-            `console.log(1);`
+            `import Button from "sap/m/Button";\n\nexport const x = 1;`,
+            `export const x = 1;`
         ));
     });
 
@@ -2128,8 +2128,8 @@ describe("maybeUnbind on an ESM file", () => {
                 }
             });
             return spec.rewriteRun(typescript(
-                `import Button from "sap/m/Button";\n\nconsole.log(1);`,
-                `console.log(1);`
+                `import Button from "sap/m/Button";\n\nexport const x = 1;`,
+                `export const x = 1;`
             ));
         };
 

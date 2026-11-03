@@ -323,6 +323,26 @@ function readModuleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
     return esm ? "esm" : commonJs ? "commonjs" : "none";
 }
 
+/**
+ * `cu` without an empty `export {};`, which only marks a file without imports as a module, as
+ * `RemoveImport` leaves one. An import makes it redundant. One carrying a comment is kept.
+ */
+function withoutModuleMarker(cu: JS.CompilationUnit): JS.CompilationUnit {
+    const statements = cu.statements.filter(({element}) => !isModuleMarker(element));
+    return statements.length === cu.statements.length ? cu : {...cu, statements};
+}
+
+function isModuleMarker(element: J | undefined): boolean {
+    if (element?.kind !== JS.Kind.ExportDeclaration) {
+        return false;
+    }
+    const declaration = element as JS.ExportDeclaration;
+    return declaration.prefix.comments.length === 0 && declaration.modifiers.length === 0 &&
+        !declaration.typeOnly.element && declaration.moduleSpecifier === undefined &&
+        declaration.exportClause?.kind === JS.Kind.NamedExports &&
+        (declaration.exportClause as JS.NamedExports).elements.elements.every(e => e.element.kind === J.Kind.Empty);
+}
+
 /** An import or any export form. */
 function isEsmStatement(element: J | undefined): boolean {
     // `export {a, b}`, `export * from` and `export default` are statements of their own.
@@ -954,7 +974,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         });
 
-        return formatImport(withImport, newImport.id, p, detectBraceSpacing(compilationUnit));
+        return formatImport(withoutModuleMarker(withImport), newImport.id, p, detectBraceSpacing(compilationUnit));
     }
 
     /**
