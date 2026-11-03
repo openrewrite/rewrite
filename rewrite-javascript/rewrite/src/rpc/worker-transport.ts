@@ -176,7 +176,7 @@ export class WorkerPageChannel {
     /**
      * Runs `serve` for each object the remote asks for. Its sink blocks until the main thread has
      * taken the previous page, and throws {@link PageAbortedError} once the remote aborts. An error
-     * `serve` throws answers the remote's next request for the object.
+     * `serve` throws before its last page answers the remote's next request for the object.
      */
     onServe(serve: (params: { id: string, sourceFileType?: string },
                     sink: (page: RpcObjectData[]) => void) => Promise<void>): void {
@@ -184,9 +184,14 @@ export class WorkerPageChannel {
             if (m.t !== "serve") {
                 return;
             }
-            serve(m.params, page => this.handOver("result", page, endsTransfer(page)))
+            let ended = false;
+            serve(m.params, page => {
+                ended = endsTransfer(page);
+                this.handOver("result", page, ended);
+            })
                 .catch(e => {
-                    if (!(e instanceof PageAbortedError)) {
+                    // No request follows the last page, so an error after it has nothing to answer
+                    if (!(e instanceof PageAbortedError) && !ended) {
                         this.handOver("error", {code: -32603, message: String(e?.message ?? e)}, true);
                     }
                 })
@@ -221,13 +226,18 @@ export class WorkerPageChannel {
             text.copy(view);
         }
         this.control[OUT_LEN] = length;
-        Atomics.store(this.control, OUT_STATE, FULL);
+        // the remote may have aborted while the answer was written
+        this.throwIfAborted(Atomics.compareExchange(this.control, OUT_STATE, EMPTY, FULL));
         this.port.postMessage({t: "answer", member, last} satisfies ToMain);
     }
 
     private awaitTaken(): void {
         Atomics.wait(this.control, OUT_STATE, FULL);
-        if (Atomics.load(this.control, OUT_STATE) === ABORTED) {
+        this.throwIfAborted(Atomics.load(this.control, OUT_STATE));
+    }
+
+    private throwIfAborted(state: number): void {
+        if (state === ABORTED) {
             Atomics.store(this.control, OUT_STATE, EMPTY);
             throw new PageAbortedError("The remote aborted the transfer");
         }

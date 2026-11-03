@@ -34,12 +34,13 @@ interface Response {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
-    let worker: Worker;
-    let stdin: PassThrough;
+    let worker: Worker | undefined;
+    let stdin: PassThrough | undefined;
 
     afterEach(async () => {
-        stdin.end();
-        await worker.terminate();
+        stdin?.end();
+        await worker?.terminate();
+        stdin = worker = undefined;
     });
 
     /**
@@ -55,9 +56,9 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
             const {WorkerPageChannel} = require(workerData.transport);
             new WorkerPageChannel(workerData.port, workerData.buffers).onServe(${serve});
         `, {eval: true, workerData: {transport, port: port2, buffers}, transferList: [port2]});
-        stdin = new PassThrough();
+        const input = stdin = new PassThrough();
         const stdout = new PassThrough();
-        new StdioRelay(stdin, stdout, new PassThrough(), port1, buffers);
+        new StdioRelay(input, stdout, new PassThrough(), port1, buffers);
 
         const answer = new Map<number, (response: Response) => void>();
         let received = Buffer.alloc(0);
@@ -81,7 +82,7 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
         let nextId = 0;
         const send = (method: string, params: object): void => {
             const body = Buffer.from(JSON.stringify({jsonrpc: "2.0", id: nextId++, method, params}));
-            stdin.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
+            input.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
         };
         return {
             send,
@@ -132,6 +133,40 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
         // Blocks this thread, so the worker reports the serve over before the relay reads the abort
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
         remote.send("AbortGetObject", {id: "tree"});
+
+        expect(await remote.request("GetObject", {id: "other"})).toMatchObject({result: [{state: "END_OF_OBJECT"}]});
+    });
+
+    test("an abort while the worker writes a page ends the serve", async () => {
+        const remote = start(`async (params, sink) => {
+            if (params.id === "tree") {
+                sink([{state: "ADD"}]);
+                sink([{state: "ADD"}]);
+                sink([{
+                    toJSON() {
+                        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+                        return {state: "ADD"};
+                    }
+                }]);
+            }
+            sink([{state: "END_OF_OBJECT"}]);
+        }`);
+
+        await remote.request("GetObject", {id: "tree"});
+        await remote.request("GetObject", {id: "tree"});
+        // while the worker writes the third page
+        remote.send("AbortGetObject", {id: "tree"});
+
+        expect(await remote.request("GetObject", {id: "other"})).toMatchObject({result: [{state: "END_OF_OBJECT"}]});
+    });
+
+    test("a serve that fails after its last page lets the next transfer start", async () => {
+        const remote = start(`async (params, sink) => {
+            sink([{state: "END_OF_OBJECT"}]);
+            throw new Error("after the last page");
+        }`);
+
+        await remote.request("GetObject", {id: "tree"});
 
         expect(await remote.request("GetObject", {id: "other"})).toMatchObject({result: [{state: "END_OF_OBJECT"}]});
     });
