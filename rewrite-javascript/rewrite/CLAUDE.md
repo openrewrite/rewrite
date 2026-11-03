@@ -365,8 +365,9 @@ The four above that still apply, plus these:
 - the file binds its modules with `require`, `from` is an ES import, and the move would need a new
   import, because that import binds something else too or the two differ in default/namespace/named shape
 
-One call moves one binding. Where a second statement binds the same member under a name of its own,
-it is left as it stands: the name read from the first would bind twice if it were applied to both.
+One call moves one binding. Where a second binding of the same member has a name of its own, in
+another statement or beside it in one (`import {a, a as b}`), it is left as it stands: the name read
+from the first would bind twice if it were applied to both.
 
 ## RPC Sender/Receiver
 
