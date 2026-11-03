@@ -3203,6 +3203,24 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
+    test.each([
+        'const {Old, ...rest} = require("m");',
+        'const {Old}: any = require("m");'
+    ])("a refused require leaves all member spellings unchanged: %s", async declaration => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        await spec.rewriteRun(typescript(
+            `${declaration}
+const NS = require("m");
+Old();
+NS.Old();
+type T = import("m").Old;
+export {Old} from "m";`
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
     test("a move refused for the named binding renames no other spelling either", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
