@@ -25,15 +25,22 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
@@ -125,6 +132,7 @@ public class OpenRewriteModelBuilder {
                 arguments.add(buildFile.getAbsolutePath());
             }
         }
+        ForkGradleUserHome.configure(connector);
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
                 // Leaving commented out because the exact consequences of this internal API are unclear
@@ -321,5 +329,118 @@ public class OpenRewriteModelBuilder {
         initScript.append("}\n");
 
         return initScript.toString();
+    }
+
+    /**
+     * A Gradle user home of this test JVM's own, whose script and transform caches, and the locks on them, only this
+     * JVM's daemons use. It links to the default home's dependency cache, and the connector keeps distributions in the
+     * default home, so all forks share their downloads. It has copies of the default home's settings and init scripts.
+     * Only openrewrite/rewrite's own tests set the property, and their test task clears the homes when it starts.
+     */
+    static final class ForkGradleUserHome {
+        private static final Path DEFAULT_HOME = defaultGradleUserHome();
+        private static final @Nullable File HOME = forThisJvm();
+
+        static void configure(DefaultGradleConnector connector) {
+            if (HOME != null) {
+                connector.useGradleUserHomeDir(HOME);
+                connector.useDistributionBaseDir(DEFAULT_HOME.toFile());
+                // Nothing reuses these daemons once the JVM's tests are done
+                connector.daemonMaxIdleTime(3, TimeUnit.MINUTES);
+            }
+        }
+
+        private static @Nullable File forThisJvm() {
+            String homes = System.getProperty("org.openrewrite.gradle.local.gradle-user-homes");
+            if (homes == null) {
+                return null;
+            }
+            String name = System.getProperty("org.gradle.test.worker", ManagementFactory.getRuntimeMXBean().getName());
+            try {
+                Path home = create(Paths.get(homes), name, DEFAULT_HOME);
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> delete(home)));
+                return home.toFile();
+            } catch (IOException | RuntimeException e) {
+                // Where the link can't be made, such as on Windows without the privilege, builds use the default home
+                return null;
+            }
+        }
+
+        static Path create(Path homes, String name, Path defaultHome) throws IOException {
+            Path home = homes.resolve(name);
+            Path dependencyCache = Files.createDirectories(defaultHome.resolve("caches/modules-2"));
+            Path link = home.resolve("caches/modules-2");
+            Files.createDirectories(link.getParent());
+            // A home left behind by an earlier JVM with the same worker name already has its link
+            if (!Files.isSymbolicLink(link)) {
+                Files.createSymbolicLink(link, dependencyCache);
+            }
+            // Test builds get the proxy settings, credentials and mirror scripts every build in the default home gets
+            copySettings(defaultHome, home);
+            return home;
+        }
+
+        private static void copySettings(Path defaultHome, Path home) throws IOException {
+            Path properties = defaultHome.resolve("gradle.properties");
+            if (Files.isRegularFile(properties)) {
+                Files.copy(properties, home.resolve("gradle.properties"), StandardCopyOption.REPLACE_EXISTING);
+            }
+            Path initScripts = defaultHome.resolve("init.d");
+            if (Files.isDirectory(initScripts)) {
+                Path copies = Files.createDirectories(home.resolve("init.d"));
+                try (DirectoryStream<Path> scripts = Files.newDirectoryStream(initScripts)) {
+                    for (Path script : scripts) {
+                        if (Files.isRegularFile(script)) {
+                            Files.copy(script, copies.resolve(script.getFileName().toString()),
+                                    StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Deletes as much of the home as it can, as a daemon can still be writing to it. It doesn't follow the home's
+         * link, so the default home's dependency cache stays intact.
+         */
+        static void delete(Path home) {
+            try {
+                Files.walkFileTree(home, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                        deleteIfPossible(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException e) {
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, @Nullable IOException e) {
+                        deleteIfPossible(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (IOException ignored) {
+                // Only the visitor's own exceptions surface here, and it throws none
+            }
+        }
+
+        private static void deleteIfPossible(Path path) {
+            try {
+                Files.delete(path);
+            } catch (IOException ignored) {
+            }
+        }
+
+        private static Path defaultGradleUserHome() {
+            String home = System.getProperty("gradle.user.home");
+            if (home == null) {
+                home = System.getenv("GRADLE_USER_HOME");
+            }
+            return home == null ? Paths.get(System.getProperty("user.home"), ".gradle") : Paths.get(home);
+        }
     }
 }

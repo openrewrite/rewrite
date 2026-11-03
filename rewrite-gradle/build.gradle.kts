@@ -1,3 +1,4 @@
+import javax.inject.Inject
 import nl.javadude.gradle.plugins.license.LicenseExtension
 
 plugins {
@@ -100,6 +101,10 @@ java {
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    val forkGradleUserHomes = temporaryDir.resolve("gradle-user-homes")
+    val fileSystem = objects.newInstance<InjectedFileSystem>().fs
+    // What daemons write to a home after its JVM is gone. Gradle's delete removes the link, not the cache behind it.
+    doFirst { fileSystem.delete { delete(forkGradleUserHomes) } }
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
@@ -111,8 +116,13 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifest: File = manifestFile
 
+        // Where each test JVM keeps a Gradle user home of its own (OpenRewriteModelBuilder.ForkGradleUserHome)
+        @get:Internal
+        val gradleUserHomes: File = forkGradleUserHomes
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${gradleUserHomes.absolutePath}"
         )
     })
     maxHeapSize = "2g"
@@ -143,4 +153,9 @@ tasks.register<JavaExec>("syncWrapperScripts") {
     classpath = sourceSets.test.get().runtimeClasspath + sourceSets.test.get().output
     mainClass = "org.openrewrite.gradle.internal.GradleWrapperScriptDownloader"
     workingDir = project.rootDir
+}
+
+interface InjectedFileSystem {
+    @get:Inject
+    val fs: FileSystemOperations
 }
