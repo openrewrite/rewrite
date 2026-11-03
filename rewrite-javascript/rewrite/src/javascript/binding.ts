@@ -148,6 +148,9 @@ interface ModuleObjectBinding {
 
     /** A type-only import erases, so the name it binds stands for no value at runtime. */
     typeOnly: boolean;
+
+    /** A variable that can be reassigned need not still name the module at each read. */
+    reassignable: boolean;
 }
 
 /**
@@ -196,7 +199,8 @@ function wholeModuleBindingsVia(
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
-                bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false});
+                bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false,
+                    reassignable: !declaration.modifiers.some(m => m.keyword === "const")});
             }
         }
     }
@@ -223,7 +227,8 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         const clause = jsImport.importClause;
         const typeOnly = clause?.typeOnly ?? false;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
-            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly});
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly,
+                reassignable: false});
         }
         // `namedBindings` is a `JS.Alias` only for `import * as X from "m"`; a renamed
         // named import (`{a as b}`) nests its alias inside `NamedImports` instead.
@@ -231,7 +236,8 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (named?.kind === JS.Kind.Alias) {
             const alias = (named as JS.Alias).alias;
             if (alias?.kind === J.Kind.Identifier) {
-                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace", typeOnly});
+                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace", typeOnly,
+                    reassignable: false});
             }
         }
     }
@@ -418,7 +424,8 @@ function renameMemberSpellings(visitor: JavaScriptVisitor<any>, cu: JS.Compilati
     }
     // A default import is the module object only where its default is, as `export =` typings make it
     const moduleObjects = new Set([
-        ...moduleObjectBindings(cu).filter(b => b.shape !== "default" && sameModule(b.module, options.from.module)).map(b => b.name),
+        ...moduleObjectBindings(cu).filter(b => b.shape !== "default" && !b.reassignable &&
+            sameModule(b.module, options.from.module)).map(b => b.name),
         ...importEqualsNames(cu, options.from.module)
     ]);
     visitor.afterVisit.push(new RenameMemberSpellings(
