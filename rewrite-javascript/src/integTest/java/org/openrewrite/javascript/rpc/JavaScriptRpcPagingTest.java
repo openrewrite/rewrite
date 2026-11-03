@@ -54,6 +54,7 @@ class JavaScriptRpcPagingTest {
     @AfterEach
     void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Test

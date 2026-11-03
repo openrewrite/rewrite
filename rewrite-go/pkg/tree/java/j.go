@@ -644,10 +644,9 @@ type MethodDeclaration struct {
 	MethodType         *JavaTypeMethod      // the method type signature (nullable)
 }
 
-func (*MethodDeclaration) IsTree()       {}
-func (*MethodDeclaration) IsJ()          {}
-func (*MethodDeclaration) IsStatement()  {}
-func (*MethodDeclaration) IsExpression() {} // for function literals
+func (*MethodDeclaration) IsTree()      {}
+func (*MethodDeclaration) IsJ()         {}
+func (*MethodDeclaration) IsStatement() {}
 
 func (n *MethodDeclaration) WithPrefix(prefix Space) *MethodDeclaration {
 	if SpaceEqual(n.Prefix, prefix) {
@@ -1298,6 +1297,7 @@ type FieldAccess struct {
 func (*FieldAccess) IsTree()       {}
 func (*FieldAccess) IsJ()          {}
 func (*FieldAccess) IsExpression() {}
+func (*FieldAccess) IsStatement()  {}
 
 func (n *FieldAccess) WithPrefix(prefix Space) *FieldAccess {
 	if SpaceEqual(n.Prefix, prefix) {
@@ -1718,8 +1718,9 @@ type Import struct {
 	Qualid *FieldAccess
 }
 
-func (*Import) IsTree() {}
-func (*Import) IsJ()    {}
+func (*Import) IsTree()      {}
+func (*Import) IsJ()         {}
+func (*Import) IsStatement() {}
 
 // Path returns the import path that Qualid's name spells.
 func (n *Import) Path() string {

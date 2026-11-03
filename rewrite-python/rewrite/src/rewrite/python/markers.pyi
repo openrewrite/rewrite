@@ -8,7 +8,7 @@ from uuid import UUID
 import weakref
 
 from enum import Enum, auto
-from rewrite import Marker
+from rewrite import Heavyweight, Marker
 from rewrite.utils import replace_if_changed
 
 @dataclass(frozen=True)
@@ -98,7 +98,7 @@ class ExecSyntax(Marker):
     def with_id(self, id_: int | UUID) -> 'ExecSyntax': ...
 
 @dataclass(frozen=True)
-class PythonResolutionResult(Marker):
+class PythonResolutionResult(Marker, Heavyweight):
     class PackageManager(Enum):
         Uv = ...
         Pip = ...
@@ -125,7 +125,7 @@ class PythonResolutionResult(Marker):
         def with_default_index(self, default_index: bool) -> PythonResolutionResult.SourceIndex: ...
 
     @dataclass(frozen=True)
-    class ResolvedDependency:
+    class ResolvedDependency(Heavyweight):
         _name: str
         _version: str
         _source: Optional[str]

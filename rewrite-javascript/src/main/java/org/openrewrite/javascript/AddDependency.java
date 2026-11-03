@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -32,7 +33,9 @@ import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -61,6 +64,28 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             example = "dependencies",
             required = false)
     @Nullable String scope;
+
+    @Option(displayName = "Only if declaring",
+            description = "Add the dependency only to a `package.json` that itself declares, in any scope, a package " +
+                    "matching one of these glob patterns. Declarations are read as they stand before the recipes in a " +
+                    "cycle edit them, so in a migration name the package being migrated away from. Leave unset to " +
+                    "add the dependency to every `package.json`.",
+            example = "jest, react-scripts",
+            required = false)
+    @Nullable List<String> onlyIfDeclaring;
+
+    public AddDependency(String packageName, String version, @Nullable String scope) {
+        this(packageName, version, scope, null);
+    }
+
+    @JsonCreator
+    public AddDependency(String packageName, String version, @Nullable String scope,
+                         @Nullable List<String> onlyIfDeclaring) {
+        this.packageName = packageName;
+        this.version = version;
+        this.scope = scope;
+        this.onlyIfDeclaring = onlyIfDeclaring;
+    }
 
     @Override public String getDisplayName() { return "Add npm dependency"; }
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
@@ -101,7 +126,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
         Json.Document pkg = decision.getManifest();
-        if (!matchesAdd(pkg)) {
+        if (!matchesAdd(pkg) || !declaresAMatch(decision)) {
             return;
         }
         if (PackageJsonHelper.isNonObjectMember(pkg, targetScope())) {
@@ -182,6 +207,23 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     private static void declined(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String why) {
         decision.warn(why);
         decision.decline(ctx, why);
+    }
+
+    private boolean declaresAMatch(NodeDependencyEdits.Decision decision) {
+        if (onlyIfDeclaring == null) {
+            return true;
+        }
+        for (String glob : onlyIfDeclaring) {
+            Pattern pattern = PackageJsonHelper.compileGlobPattern(glob);
+            for (Map<String, String> declared : decision.scannedDeclarations().values()) {
+                for (String name : declared.keySet()) {
+                    if (pattern.matcher(name).matches()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private boolean matchesAdd(Json.Document pkg) {

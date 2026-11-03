@@ -783,6 +783,31 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void quotedNamesAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> jest = List.of(
+          //language=json
+          """
+            {
+              "moduleNameMapper": {
+                "\\\\.(css|less)$": "identity-obj-proxy"
+              },
+              "testRegex": ["\\\\.test\\\\.js$"]
+            }
+            """
+        );
+        assertMatched(
+          "$.moduleNameMapper['\\\\.(css|less)$']",
+          jest,
+          List.of("\"\\\\.(css|less)$\": \"identity-obj-proxy\"")
+        );
+        assertMatched(
+          "$.testRegex[?(@ == '\\\\.test\\\\.js$')]",
+          jest,
+          List.of("\"testRegex\": [\"\\\\.test\\\\.js$\"]")
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1607")
     @Test
     void unaryExpressionByBracketOperator() {

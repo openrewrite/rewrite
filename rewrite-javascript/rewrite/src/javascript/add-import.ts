@@ -1,6 +1,6 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
-import {isObjectBindingPattern, JS, JSX} from "./tree";
+import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TextComment, TrailingComma, Type} from "../java";
+import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
@@ -12,6 +12,7 @@ import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, i
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
+import ts from "typescript";
 
 export type QuoteChar = "'" | '"';
 
@@ -322,6 +323,26 @@ function readModuleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
     return esm ? "esm" : commonJs ? "commonjs" : "none";
 }
 
+/**
+ * `cu` without an empty `export {};`, which only marks a file without imports as a module, as
+ * `RemoveImport` leaves one. An import makes it redundant. One carrying a comment is kept.
+ */
+function withoutModuleMarker(cu: JS.CompilationUnit): JS.CompilationUnit {
+    const statements = cu.statements.filter(({element}) => !isModuleMarker(element));
+    return statements.length === cu.statements.length ? cu : {...cu, statements};
+}
+
+function isModuleMarker(element: J | undefined): boolean {
+    if (element?.kind !== JS.Kind.ExportDeclaration) {
+        return false;
+    }
+    const declaration = element as JS.ExportDeclaration;
+    return declaration.prefix.comments.length === 0 && declaration.modifiers.length === 0 &&
+        !declaration.typeOnly.element && declaration.moduleSpecifier === undefined &&
+        declaration.exportClause?.kind === JS.Kind.NamedExports &&
+        (declaration.exportClause as JS.NamedExports).elements.elements.every(e => e.element.kind === J.Kind.Empty);
+}
+
 /** An import or any export form. */
 function isEsmStatement(element: J | undefined): boolean {
     // `export {a, b}`, `export * from` and `export default` are statements of their own.
@@ -487,8 +508,8 @@ function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member
         return undefined;
     }
     const alias = specifier.specifier as JS.Alias;
-    return alias.propertyName?.element?.kind === J.Kind.Identifier && alias.alias?.kind === J.Kind.Identifier
-        ? {name: (alias.alias as J.Identifier).simpleName, member: (alias.propertyName.element as J.Identifier).simpleName}
+    return alias.propertyName?.element && alias.alias?.kind === J.Kind.Identifier
+        ? {name: (alias.alias as J.Identifier).simpleName, member: moduleExportName(alias.propertyName.element)}
         : undefined;
 }
 
@@ -562,7 +583,8 @@ function claimedName(v: unknown): string | undefined {
 /**
  * The parser lifts surrogate pairs out of `valueSource` into `unicodeEscapes` and, when it does,
  * sets `value` to the quoted source (`parser.ts` `mapLiteral`), so neither field alone is the
- * module name. Reuniting them and stripping the quotes yields it for either shape of literal.
+ * module name. Reuniting them and reading the quoted text as the language does yields it for
+ * either shape of literal.
  */
 export function moduleNameOf(module: string | J.Literal): string {
     if (typeof module === 'string') {
@@ -579,6 +601,13 @@ export function moduleNameOf(module: string | J.Literal): string {
         cut = escape.valueSourceIndex;
     }
     restored += source.slice(cut);
+    // an escape such as `\u00dc` names the character it spells
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, restored);
+    const token = scanner.scan();
+    if ((token === ts.SyntaxKind.StringLiteral || token === ts.SyntaxKind.NoSubstitutionTemplateLiteral) &&
+        scanner.getTokenEnd() === restored.length) {
+        return scanner.getTokenValue();
+    }
     const quote = restored.charAt(0);
     return (quote === "'" || quote === '"' || quote === '`') && restored.endsWith(quote) && restored.length > 1
         ? restored.slice(1, -1)
@@ -899,24 +928,20 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
-            if (insertionIndex === 0) {
-                // Insert at the beginning
+            if (insertionIndex === prologueLength(compilationUnit)) {
                 // The `after` space should be empty since any semicolon is printed after it
-                // The spacing comes from updating the next statement's prefix
-                const updatedStatements = compilationUnit.statements.length > 0
-                    ? [
-                        rightPadded(newImport, emptySpace, semicolonMarkers),
-                        {
-                            ...compilationUnit.statements[0],
-                            element: compilationUnit.statements[0].element
-                                ? {...compilationUnit.statements[0].element, prefix: space("\n\n")}
-                                : undefined
-                        } as J.RightPadded<Statement>,
-                        ...compilationUnit.statements.slice(1)
-                    ]
-                    : [rightPadded(newImport, emptySpace, semicolonMarkers)];
-
-                draft.statements = updatedStatements;
+                const next = compilationUnit.statements[insertionIndex];
+                draft.statements = [
+                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    rightPadded(newImport, emptySpace, semicolonMarkers),
+                    ...(next ? [{
+                        ...next,
+                        element: next.element
+                            ? {...next.element, prefix: splitAtBodyStart(next.element.prefix).behind}
+                            : undefined
+                    } as J.RightPadded<Statement>] : []),
+                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                ];
             } else {
                 // Insert after existing imports
                 const before = compilationUnit.statements.slice(0, insertionIndex);
@@ -949,7 +974,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         });
 
-        return formatImport(withImport, newImport.id, p, detectBraceSpacing(compilationUnit));
+        return formatImport(withoutModuleMarker(withImport), newImport.id, p, detectBraceSpacing(compilationUnit));
     }
 
     /**
@@ -1583,7 +1608,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             value: this.module,
             valueSource,
             unicodeEscapes: this.moduleUnicodeEscapes,
-            type: undefined
+            type: Type.Primitive.String
         };
     }
 
@@ -1719,19 +1744,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Determine the appropriate spacing before the import statement
      */
     private determineImportPrefix(compilationUnit: JS.CompilationUnit, insertionIndex: number): J.Space {
-        // If inserting at the beginning (index 0), use the prefix of the first statement
-        // but only the whitespace part (preserve comments on the original first statement)
-        if (insertionIndex === 0 && compilationUnit.statements.length > 0) {
-            const firstPrefix = compilationUnit.statements[0].element?.prefix;
-            if (firstPrefix) {
-                // Keep only whitespace, not comments
-                return {
-                    kind: J.Kind.Space,
-                    comments: [],
-                    whitespace: firstPrefix.whitespace
-                };
-            }
-            return emptySpace;
+        if (insertionIndex === prologueLength(compilationUnit) && insertionIndex < compilationUnit.statements.length) {
+            const nextPrefix = compilationUnit.statements[insertionIndex].element?.prefix;
+            return nextPrefix ? splitAtBodyStart(nextPrefix).ahead : emptySpace;
         }
 
         // If inserting after other statements, ensure we have at least one newline
@@ -1760,8 +1775,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return lastImportIndex + 1;
         }
 
-        // No imports found, insert at the beginning
-        return 0;
+        return prologueLength(compilationUnit);
     }
 
 
@@ -1808,14 +1822,51 @@ function newIdentifier(name: string): J.Identifier {
     };
 }
 
-function isUseStrict(statement: J | undefined): boolean {
+function isDirective(statement: J | undefined): boolean {
     const expression = statement?.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
-    return expression?.kind === J.Kind.Literal && (expression as J.Literal).value === 'use strict';
+    return quoteOf(expression) !== undefined;
+}
+
+function prologueLength(cu: JS.CompilationUnit): number {
+    const statements = cu.statements;
+    let length = 0;
+    while (length < statements.length &&
+        (statements[length].element?.kind === JS.Kind.Shebang || isDirective(statements[length].element))) {
+        length++;
+    }
+    return length;
+}
+
+// Keep comments through the last triple-slash directive ahead of the import.
+function splitAtBodyStart(prefix: J.Space): {ahead: J.Space; behind: J.Space} {
+    let ahead = prefix.comments.length;
+    while (ahead > 0 && !isTripleSlashDirective(prefix.comments[ahead - 1])) {
+        ahead--;
+    }
+    return {
+        ahead: {kind: J.Kind.Space, whitespace: prefix.whitespace, comments: prefix.comments.slice(0, ahead)},
+        behind: {...prefix, whitespace: "\n\n", comments: prefix.comments.slice(ahead)}
+    };
+}
+
+const TRIPLE_SLASH_DIRECTIVES = ['<reference', '<amd-module', '<amd-dependency'];
+
+function isTripleSlashDirective(comment: Comment): boolean {
+    if (comment.kind !== J.Kind.TextComment || (comment as TextComment).multiline) {
+        return false;
+    }
+    // TextComment.text excludes the leading //.
+    const text = (comment as TextComment).text;
+    if (!text.startsWith('/')) {
+        return false;
+    }
+    const rest = text.slice(1).trimStart();
+    return TRIPLE_SLASH_DIRECTIVES.some(directive => rest.startsWith(directive));
 }
 
 /**
  * `cu` with `statement` after its last top-level `require`. A file with none takes it first,
- * after a `'use strict'` directive, which has to open the file to apply.
+ * after a shebang and any directives, which have to open the file to apply.
  */
 function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
     const statements = cu.statements;
@@ -1836,13 +1887,13 @@ function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.
     if (next === undefined) {
         return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
     }
-    // The new statement takes the place of the one it goes before, which gets a blank line of its own.
+    const {ahead, behind} = splitAtBodyStart(next.prefix);
     return {
         ...cu,
         statements: [
             ...statements.slice(0, at),
-            {...padded, element: {...statement, prefix: space(next.prefix.whitespace)}},
-            {...statements[at], element: {...next, prefix: {...next.prefix, whitespace: "\n\n"}}},
+            {...padded, element: {...statement, prefix: ahead}},
+            {...statements[at], element: {...next, prefix: behind}},
             ...statements.slice(at + 1)
         ]
     };
@@ -1883,16 +1934,12 @@ export function requireBinds(
 }
 
 /**
- * Where the file's leading requires start, after a shebang and `'use strict'`, and end. Every
+ * Where the file's leading requires start, after a shebang and any directives, and end. Every
  * top-level statement after them runs once they are initialised, so a binding placed there is read after it.
  */
 function leadingRequires(cu: JS.CompilationUnit): {start: number; end: number} {
     const statements = cu.statements;
-    let start = 0;
-    while (start < statements.length &&
-        (statements[start].element?.kind === JS.Kind.Shebang || isUseStrict(statements[start].element))) {
-        start++;
-    }
+    const start = prologueLength(cu);
     let end = start;
     while (end < statements.length && isRequireStatement(statements[end].element)) {
         end++;
@@ -1983,8 +2030,7 @@ function namedSpecifierImports(specifier: JS.ImportSpecifier["specifier"], key: 
         return specifier.simpleName === key;
     }
     if (specifier.kind === JS.Kind.Alias) {
-        const propertyName = (specifier as JS.Alias).propertyName.element;
-        return isIdentifier(propertyName) && propertyName.simpleName === key;
+        return moduleExportName((specifier as JS.Alias).propertyName.element) === key;
     }
     return false;
 }
@@ -2410,14 +2456,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * A decorator and the other type-name positions reach the tree through this hook, which the
-     * base visitor holds closed; a reference in one of them is a reference like any other.
-     */
-    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: P): Promise<N> {
-        return await this.visit(nameTree, p) as N;
-    }
-
-    /**
      * An export specifier's own name is the module's public surface, which its consumers read and
      * the rename leaves alone. See CLAUDE.md: Which name a rebind binds.
      */
@@ -2523,11 +2561,11 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 }
 
-/** Points `literal` at `module`, keeping its quotes. */
-function respecify(literal: Draft<J.Literal>, module: string): void {
+/** Points `literal` at `name`, keeping its quotes. */
+function respecify(literal: Draft<J.Literal>, name: string): void {
     const quoteChar = (literal.valueSource ?? '"').startsWith("'") ? "'" : '"';
-    literal.value = module;
-    literal.valueSource = `${quoteChar}${module}${quoteChar}`;
+    literal.value = name;
+    literal.valueSource = `${quoteChar}${name.replace(/\\/g, '\\\\').split(quoteChar).join(`\\${quoteChar}`)}${quoteChar}`;
     literal.unicodeEscapes = undefined;
 }
 
@@ -2858,7 +2896,12 @@ function rewriteNamedSpecifier(
             // standing in for it takes that prefix.
             specifier.specifier = {...local, prefix: (alias ?? local).prefix, simpleName: member};
         } else if (alias) {
-            (alias.propertyName.element as Draft<J.Identifier>).simpleName = member;
+            const propertyName = alias.propertyName.element;
+            if (propertyName.kind === J.Kind.Literal) {
+                respecify(propertyName, member);
+            } else {
+                propertyName.simpleName = member;
+            }
             local.simpleName = boundName;
         } else {
             specifier.specifier = aliasing({...local, simpleName: boundName}, member) as Draft<JS.Alias>;

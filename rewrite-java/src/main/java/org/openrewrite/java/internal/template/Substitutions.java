@@ -19,10 +19,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.ParenthesizeVisitor;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
@@ -35,7 +37,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.newSetFromMap;
-import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 
 @RequiredArgsConstructor
 @ToString
@@ -61,6 +62,15 @@ public class Substitutions {
         return splicedParameterIds.add(parameter.getId()) ?
                 parameter :
                 new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
+    }
+
+    public boolean isParameter(J j) {
+        for (Object parameter : parameters) {
+            if (parameter instanceof J && ((J) parameter).getId().equals(j.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String substitute() {
@@ -179,7 +189,7 @@ public class Substitutions {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
             } else {
-                return TypeUtils.toString(genericType.getBounds().get(0));
+                return toDenotableTypeName(genericType.getBounds().get(0));
             }
         }
         if (type instanceof JavaType.FullyQualified) {
@@ -193,13 +203,54 @@ public class Substitutions {
                 }
             }
         }
-        String typeName = TypeUtils.toString(type).replace("$", ".");
+        String typeName = toDenotableTypeName(type).replace("$", ".");
         if (containsLocalOrAnonymousClassName(typeName)) {
             // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
             // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
             return "java.lang.Object";
         }
         return typeName;
+    }
+
+    /**
+     * Like {@link TypeUtils#toString(JavaType)}, but writes each intersection type as its first bound,
+     * since an inferred intersection such as {@code Number & Comparable<...>} is not denotable as a
+     * type argument or wildcard bound.
+     */
+    private static String toDenotableTypeName(JavaType type) {
+        return toDenotableTypeName(type, new IdentityHashMap<>());
+    }
+
+    private static String toDenotableTypeName(JavaType type, IdentityHashMap<JavaType, Boolean> recursiveTypes) {
+        if (type instanceof JavaType.Intersection) {
+            List<JavaType> bounds = ((JavaType.Intersection) type).getBounds();
+            return bounds.isEmpty() ? "java.lang.Object" : toDenotableTypeName(bounds.get(0), recursiveTypes);
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            StringJoiner joiner = new StringJoiner(", ", "<", ">");
+            for (JavaType parameter : parameterized.getTypeParameters()) {
+                joiner.add(toDenotableTypeName(parameter, recursiveTypes));
+            }
+            return toDenotableTypeName(parameterized.getType(), recursiveTypes) + joiner;
+        } else if (type instanceof JavaType.Array) {
+            return toDenotableTypeName(((JavaType.Array) type).getElemType(), recursiveTypes) + "[]";
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
+            if (!"?".equals(genericType.getName()) ||
+                genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
+                genericType.getBounds().size() != 1) {
+                return TypeUtils.toString(genericType);
+            } else if (recursiveTypes.containsKey(genericType)) {
+                recursiveTypes.put(genericType, true);
+                return "?";
+            }
+            recursiveTypes.put(genericType, false);
+            String variance = genericType.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT ? "? extends " : "? super ";
+            String bound = toDenotableTypeName(genericType.getBounds().get(0), recursiveTypes);
+            boolean recursive = recursiveTypes.remove(genericType);
+            return recursive ? "?" : variance + bound;
+        }
+        return TypeUtils.toString(type);
     }
 
     private static boolean containsLocalOrAnonymousClassName(String typeName) {
@@ -315,6 +366,14 @@ public class Substitutions {
      */
     public J toStatement(J j) {
         return j;
+    }
+
+    /**
+     * Parenthesizes a parameter or template result that takes the place of the tree at {@code cursor} where the
+     * template's language would otherwise group it differently.
+     */
+    public Expression maybeParenthesize(Expression newTree, Cursor cursor) {
+        return ParenthesizeVisitor.maybeParenthesize(newTree, cursor);
     }
 
     /**

@@ -69,9 +69,41 @@ class BunReleaseTest {
     }
 
     @Test
+    void keepsAnExplicitEmptyTrustedListFrom144() {
+        String lock = EMPTY_ROOT.replace("  \"packages\":", "  \"trustedDependencies\": [],\n  \"packages\":");
+        assertThat(writtenBack("1.4.3", lock)).doesNotContain("trustedDependencies");
+        assertThat(writtenBack("1.4.4", lock)).contains("\"trustedDependencies\": [],");
+    }
+
+    @Test
+    void prefersANonDeprecatedRangeMatchFrom144() {
+        String packument = "{\"name\":\"ms\",\"dist-tags\":{\"latest\":\"2.1.3\"}," +
+          "\"versions\":{\"2.1.2\":{},\"2.1.3\":{\"deprecated\":\"use 2.1.2\"}}}";
+        for (String release : java.util.Arrays.asList("1.4.3", "1.4.4")) {
+            BunRelease bun = BunRelease.of(release);
+            PackageManifest manifest = requireNonNull(PackageManifest.parse(bun, new Log(), packument, "ms", false));
+            SemverQuery.Group range = requireNonNull(DependencyVersion.parse("ms", null, "^2", bun)).npm().version;
+            assertThat(requireNonNull(manifest.findBestVersion(range)).version.toString())
+              .isEqualTo(release.equals("1.4.4") ? "2.1.2" : "2.1.3");
+            assertThat(requireNonNull(manifest.findByDistTag("latest")).version.toString()).isEqualTo("2.1.3");
+        }
+    }
+
+    @Test
+    void rejectsAMalformedNonemptyIntegrityFrom144() {
+        String text = lock("", MS).replace("\"lockfileVersion\": 1", "\"lockfileVersion\": 2")
+          .replace(INTEGRITY, "sha999-invalid");
+        assertThat(writtenBack("1.4.3", text)).contains("{}, \"\"]");
+        assertThatThrownBy(() -> writtenBack("1.4.4", text))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Unsupported or malformed integrity hash");
+    }
+
+    @Test
     void installsAsTheReleaseThatBuiltTheLst() {
         assertThat(BunReleases.installedAs(null)).isEqualTo(BunRelease.PORTED);
         assertThat(BunReleases.installedAs("1.3.10")).hasToString("1.3.10");
+        assertThat(BunReleases.installedAs("1.4.4")).hasToString("1.4.4");
         assertThat(BunReleases.all()).startsWith("1.1.39").contains("1.3.10");
     }
 

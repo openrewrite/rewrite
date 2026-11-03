@@ -92,6 +92,7 @@ final class Cleaner {
             lockfile.textLockfileVersion = old.textLockfileVersion;
         }
         lockfile.patchedDependencies = new LinkedHashMap<>(old.patchedDependencies);
+        lockfile.packageExtensions = old.packageExtensions;
         return lockfile;
     }
 

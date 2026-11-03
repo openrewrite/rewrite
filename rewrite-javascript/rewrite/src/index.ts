@@ -33,6 +33,7 @@ export * from "./util";
 export * from "./recipe";
 export * from "./run";
 export * from "./marketplace";
+export {registerHeavyweight} from "./heavyweight";
 
 // Install all recipes in this package
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {

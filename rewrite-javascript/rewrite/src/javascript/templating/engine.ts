@@ -207,6 +207,19 @@ function isTypeReference(name: string): boolean {
     return /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(name);
 }
 
+/** A type as TypeScript writes it, and how tightly it binds, which is where it needs parentheses. */
+interface WrittenType {
+    readonly text: string;
+    readonly binding: 'union' | 'intersection' | 'primary';
+}
+
+/** The TypeScript type of each primitive keyword: the parser types a bigint as a long, and undefined with none. */
+const primitiveTypes = new Map([
+    ['String', 'string'], ['boolean', 'boolean'], ['void', 'void'], ['null', 'null'], ['', 'undefined'],
+    ['long', 'bigint'], ['double', 'number'], ['float', 'number'], ['int', 'number'], ['short', 'number'],
+    ['byte', 'number']
+]);
+
 /**
  * The compiler's diagnostic for code that did not parse, as one line: the marker states it ahead
  * of a stack, and its positions index the whole parsed text, context statements included.
@@ -481,50 +494,97 @@ export class TemplateEngine {
      * Converts a Type instance to a TypeScript type string.
      *
      * @param type The Type instance
+     * @param enclosing The types that `type` is a type argument, element type, member or bound of
      * @returns A TypeScript type string
      */
-    private static typeToString(type: Type): string {
-        // Handle Type.Class and Type.ShallowClass - return their fully qualified names
-        if (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) {
-            const classType = type as Type.Class;
-            // A module qualifies its types by where they come from — `src/a.Foo` — and a path that
-            // is no type reference cannot be declared for. Naming a module's type takes a `context`
-            // statement of the caller's own, which `type` then names.
-            return isTypeReference(classType.fullyQualifiedName) ? classType.fullyQualifiedName : 'any';
-        }
+    private static typeToString(type: Type, enclosing: Type[] = []): string {
+        return this.writeType(type, enclosing).text;
+    }
 
-        // Handle Type.Primitive - map to TypeScript primitive types
-        if (type.kind === Type.Kind.Primitive) {
-            const primitiveType = type as Type.Primitive;
-            switch (primitiveType.keyword) {
-                case 'String':
-                    return 'string';
-                case 'boolean':
-                    return 'boolean';
-                case 'double':
-                case 'float':
-                case 'int':
-                case 'long':
-                case 'short':
-                case 'byte':
-                    return 'number';
-                case 'void':
-                    return 'void';
-                default:
-                    return 'any';
+    /** {@link typeToString}, with how tightly the type it writes binds, to parenthesize it by. */
+    private static writeType(type: Type, enclosing: Type[]): WrittenType {
+        // A recursive type, such as `type A = Array<A>`, is any where it holds itself
+        if (enclosing.includes(type)) {
+            return {text: 'any', binding: 'primary'};
+        }
+        const nested = [...enclosing, type];
+        const primary = (text: string): WrittenType => ({text, binding: 'primary'});
+        const typeArguments = (args: Type[]) => args.map(t => this.typeToString(t, nested)).join(', ');
+
+        switch (type.kind) {
+            case Type.Kind.Class:
+            case Type.Kind.ShallowClass: {
+                const classType = type as Type.Class;
+                const name = this.className(classType);
+                // A generic type the parser leaves without its arguments, as it does `Array<T>` where `T`
+                // is a type variable, takes what each of its own type variables stands for
+                return primary(!name ? 'any' :
+                    classType.typeParameters?.length ? `${name}<${typeArguments(classType.typeParameters)}>` : name);
             }
+            case Type.Kind.Parameterized: {
+                // An array, a map or any other generic type, with its type arguments
+                const {type: base, typeParameters} = type as Type.Parameterized;
+                if (typeParameters.length === 0) {
+                    return this.writeType(base, nested);
+                }
+                const name = this.className(base);
+                return primary(name ? `${name}<${typeArguments(typeParameters)}>` : 'any');
+            }
+            case Type.Kind.Primitive:
+                return primary(primitiveTypes.get((type as Type.Primitive).keyword) ?? 'any');
+            case Type.Kind.Array: {
+                const elemType = this.writeType((type as Type.Array).elemType, nested);
+                return primary(`${elemType.binding === 'primary' ? elemType.text : `(${elemType.text})`}[]`);
+            }
+            case Type.Kind.Union: {
+                // A member that could be anything makes the union so too
+                const members = this.writeMembers((type as Type.Union).bounds, nested);
+                const top = members.find(m => m.text === 'any') ?? members.find(m => m.text === 'unknown');
+                return top ?? (members.length === 1 ? members[0] :
+                    {text: members.map(m => m.text).join(' | '), binding: 'union'});
+            }
+            case Type.Kind.Intersection: {
+                // A value of an intersection is a value of each member, so the members that can be written
+                // still type it, where the rest would make it any
+                const all = this.writeMembers((type as Type.Intersection).bounds, nested);
+                const members = all.filter(m => m.text !== 'any' && m.text !== 'unknown');
+                return members.length === 0 ? primary(all.some(m => m.text === 'any') ? 'any' : 'unknown') :
+                    members.length === 1 ? members[0] : {
+                        text: members.map(m => m.binding === 'union' ? `(${m.text})` : m.text).join(' & '),
+                        binding: 'intersection'
+                    };
+            }
+            case Type.Kind.GenericTypeVariable: {
+                // No declaration can name a type variable of the code being edited, so it is what bounds
+                // it, or unknown, as TypeScript reads an unconstrained one
+                const bounds = (type as Type.GenericTypeVariable).bounds;
+                return bounds.length === 0 ? primary('unknown') : this.writeType(bounds.length === 1 ? bounds[0] :
+                    {kind: Type.Kind.Intersection, bounds} as Type.Intersection, nested);
+            }
+            default:
+                // A method, a variable, an annotation or an unknown type
+                return primary('any');
         }
+    }
 
-        // Handle Type.Array - render component type plus []
-        if (type.kind === Type.Kind.Array) {
-            const arrayType = type as Type.Array;
-            const componentTypeString = this.typeToString(arrayType.elemType);
-            return `${componentTypeString}[]`;
+    /** The distinct members of a union or an intersection as TypeScript writes them. */
+    private static writeMembers(bounds: Type[], enclosing: Type[]): WrittenType[] {
+        const members = new Map<string, WrittenType>();
+        for (const bound of bounds) {
+            const member = this.writeType(bound, enclosing);
+            members.set(member.text, member);
         }
+        return [...members.values()];
+    }
 
-        // For other types, return 'any' as a fallback
-        // TODO: Implement proper Type to string conversion for other Type.Kind values
-        return 'any';
+    /**
+     * The name of a class, where it is a type reference. A module qualifies its types by where they come from
+     * — `src/a.Foo` — and naming one takes a `context` statement of the caller's own, which `type` then names.
+     */
+    private static className(type: Type): string | undefined {
+        const name = (type.kind === Type.Kind.Class || type.kind === Type.Kind.ShallowClass) ?
+            (type as Type.Class).fullyQualifiedName : undefined;
+        return name !== undefined && isTypeReference(name) ? name : undefined;
     }
 
     /**
@@ -756,17 +816,22 @@ class MarkerAttachmentVisitor extends JavaScriptVisitor<undefined> {
 }
 
 // FIXME: This is a heuristic to determine if the parent expects a statement child
-function expectsStatement(parentTree: J): boolean {
+function expectsStatement(parentTree: J, childId: string): boolean {
+    if (parentTree.kind === J.Kind.Case) {
+        // the labels of a case are expressions
+        return !(parentTree as J.Case).caseLabels.elements.some(label => label.element.id === childId);
+    }
     return parentTree.kind === J.Kind.Block ||
-        parentTree.kind === J.Kind.Case ||
         parentTree.kind === J.Kind.DoWhileLoop ||
         parentTree.kind === J.Kind.ForEachLoop ||
         parentTree.kind === J.Kind.ForLoop ||
         parentTree.kind === J.Kind.If ||
         parentTree.kind === J.Kind.IfElse ||
+        parentTree.kind === J.Kind.Label ||
         parentTree.kind === J.Kind.WhileLoop ||
         parentTree.kind === JS.Kind.CompilationUnit ||
-        parentTree.kind === JS.Kind.ForInLoop;
+        parentTree.kind === JS.Kind.ForInLoop ||
+        parentTree.kind === JS.Kind.WithStatement;
 }
 
 /** Whether the code opens with `{`, which is a block where a statement goes and an object literal elsewhere. */
@@ -775,14 +840,42 @@ export function opensWithBrace(templateParts: TemplateStringsArray): boolean {
 }
 
 /** Whether code opening with `{` that replaces `tree`, which `cursor` points at, is an object literal. */
-export function replacedByObjectLiteral(tree: J, cursor: Cursor): boolean {
+export async function replacedByObjectLiteral(tree: J, cursor: Cursor): Promise<boolean> {
     if (tree.kind === J.Kind.Block) {
         return false;
     } else if (!isStatement(tree)) {
         return true;
     }
-    const parentTree = cursor.parentTree()?.value;
-    return parentTree !== undefined && !expectsStatement(parentTree);
+    const parentTree = await replacedParent(tree, cursor);
+    return parentTree !== undefined && !expectsStatement(parentTree, tree.id);
+}
+
+/** The trees templates made, each in place of the tree it replaced, even where it keeps the id of a capture. */
+const templateResults = new WeakSet<J>();
+
+/**
+ * The tree that holds `tree`. The cursor points at `tree`, at what it stands in for, or at a tree that
+ * holds it, as where a recipe applies a template to a child of the node it visits.
+ */
+async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | undefined> {
+    const owner = cursor?.value;
+    let holder: J | undefined;
+    if (isTree(owner) && owner.id !== tree.id) {
+        // A chained rule's result stands in for the owner, though it can keep the id of a capture inside it
+        const held = (t: J) => t === tree || (t.id === tree.id && !templateResults.has(tree));
+        await new class extends JavaScriptVisitor<undefined> {
+            protected override async preVisit(t: J, p: undefined): Promise<J | undefined> {
+                if (holder === undefined && held(t)) {
+                    holder = this.cursor.parentTree()?.value;
+                }
+                if (holder !== undefined) {
+                    this.stopAfterPreVisit();
+                }
+                return t;
+            }
+        }().visit(owner, undefined);
+    }
+    return holder ?? cursor?.parentTree()?.value;
 }
 
 /**
@@ -830,46 +923,35 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        let resultToUse = this.wrapTree(originalTree, this.ast);
+        const parentTree = await replacedParent(originalTree, this.cursor);
+        let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
         // A replaced node spliced back in as a capture carries its own trailing markers
         const trailing = trailingMarkers(originalTree);
         const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
         if (slotMarkers) {
             resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
         }
-        const slot = this.replacedSlot(originalTree);
+        const slot = this.replacedSlot(originalTree, parentTree);
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
             {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        return this.format(resultToUse, originalTree);
+        const result = await this.format(resultToUse, originalTree);
+        templateResults.add(result);
+        return result;
     }
 
-    /** The node holding the tree being replaced and the id it holds it under, per the cursor. */
-    private replacedSlot(originalTree: J): [J, string] | undefined {
-        const frames: J[] = [];
-        for (let c: Cursor | undefined = this.cursor; c && frames.length < 2; c = c.parent) {
-            if (isTree(c.value)) {
-                frames.push(c.value as J);
-            }
-        }
-        if (frames.length === 0) {
+    /** The node holding the tree being replaced and the id it holds it under. */
+    private replacedSlot(originalTree: J, parentTree: J | undefined): [J, string] | undefined {
+        if (parentTree === undefined) {
             return undefined;
-        }
-
-        // The visitor may sit on the node holding what is being replaced rather than on it
-        if (requiredPrecedence(frames[0], originalTree.id) !== undefined) {
-            return [frames[0], originalTree.id];
-        }
-        if (frames.length < 2) {
-            return undefined;
-        }
-        if (requiredPrecedence(frames[1], originalTree.id) !== undefined) {
-            return [frames[1], originalTree.id];
+        } else if (requiredPrecedence(parentTree, originalTree.id) !== undefined) {
+            return [parentTree, originalTree.id];
         }
         // A chained rule rewrites the previous rule's detached result, leaving the cursor on the node
         // that result stands in for; a wrong guess here only ever adds parentheses, never drops them
-        return frames[0].id !== originalTree.id && requiredPrecedence(frames[1], frames[0].id) !== undefined ?
-            [frames[1], frames[0].id] : undefined;
+        const standIn = this.cursor?.value;
+        return isTree(standIn) && standIn.id !== originalTree.id &&
+            requiredPrecedence(parentTree, standIn.id) !== undefined ? [parentTree, standIn.id] : undefined;
     }
 
     private async format(resultToUse: J, originalTree: J) {
@@ -910,12 +992,22 @@ export class TemplateApplier {
         return {...laidOut!, id: resultToUse.id};
     }
 
-    private wrapTree(originalTree: J, resultToUse: J) {
-        const parentTree = this.cursor?.parentTree()?.value;
+    private wrapTree(originalTree: J, resultToUse: J, parentTree: J | undefined) {
+        // A `for` head holds each expression of its init and update in an expression statement, as the parser does
+        if (parentTree?.kind === J.Kind.ForLoopControl &&
+            (parentTree as J.ForLoop.Control).condition?.element.id !== originalTree.id) {
+            return isExpression(resultToUse) && resultToUse.kind !== JS.Kind.ExpressionStatement ? {
+                kind: JS.Kind.ExpressionStatement,
+                id: randomId(),
+                prefix: resultToUse.prefix,
+                markers: wrapperMarkers(resultToUse),
+                expression: {...resultToUse, prefix: emptySpace}
+            } as JS.ExpressionStatement : resultToUse;
+        }
 
         // Only apply wrapping logic if we have parent context
         if (parentTree) {
-            const parentExpectsStatement = expectsStatement(parentTree);
+            const parentExpectsStatement = expectsStatement(parentTree, originalTree.id);
             const originalIsStatement = isStatement(originalTree);
 
             const resultIsStatement = isStatement(resultToUse);
@@ -935,8 +1027,9 @@ export class TemplateApplier {
                         expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
-            } else if (!parentExpectsStatement) {
-                // Expression context: wrap in StatementExpression if result is statement-only
+            } else if (!parentExpectsStatement && isExpression(originalTree)) {
+                // Expression context: wrap in StatementExpression if result is statement-only. A slot that held
+                // a statement-only node, such as an arrow function's block body, takes one unwrapped.
                 if (resultIsStatement && !resultIsExpression) {
                     const stmt = resultToUse as Statement;
                     resultToUse = {

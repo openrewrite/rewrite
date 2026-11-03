@@ -225,4 +225,33 @@ class AddKeyValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keyIsWrittenEscapedAndFoundByTheTextItStandsFor() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "\\.(css|less)$", "\"identity-obj-proxy\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "y"
+              }
+              """,
+            """
+              {
+                  "x": "y",
+                  "\\\\.(css|less)$": "identity-obj-proxy"
+              }
+              """
+          ),
+          //language=json
+          json(
+            """
+              {
+                  "\\\\.(css|less)$": "other"
+              }
+              """
+          )
+        );
+    }
 }

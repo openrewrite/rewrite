@@ -90,8 +90,22 @@ public class JavaTemplateParser {
         this.annotationTemplateGenerator = annotationTemplateGenerator;
     }
 
+    /**
+     * A source file with a single class whose first member is a method declaring the parameters at `#{}`.
+     */
+    protected String parameterStub() {
+        return PARAMETER_STUB;
+    }
+
+    /**
+     * A source file with a single class declaring the type parameters at `#{}`.
+     */
+    protected String typeParametersStub() {
+        return TYPE_PARAMS_STUB;
+    }
+
     public List<Statement> parseParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(cursor, substitute(PARAMETER_STUB, template));
+        String stub = addImports(cursor, substitute(parameterStub(), template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
             JavaSourceFile cu = compileTemplate(cursor, stub);
@@ -169,7 +183,7 @@ public class JavaTemplateParser {
     }
 
     public List<J.TypeParameter> parseTypeParameters(Cursor cursor, String template) {
-        @Language("java") String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
+        String stub = addImports(substitute(typeParametersStub(), template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
             JavaSourceFile cu = compileTemplate(cursor, stub);

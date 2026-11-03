@@ -22,7 +22,7 @@ namespace OpenRewrite.CSharp;
 /// Metadata about a .NET project (.csproj) extracted from MSBuild evaluation.
 /// Attached as a marker to the Xml.Document representing the .csproj file in the LST.
 /// </summary>
-public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatable<MSBuildProject>
+public sealed class MSBuildProject : Marker, IHeavyweight, IRpcCodec<MSBuildProject>, IEquatable<MSBuildProject>
 {
     public Guid Id { get; }
     public string? Sdk { get; }
@@ -109,7 +109,7 @@ public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatab
     public override int GetHashCode() => Id.GetHashCode();
 }
 
-public sealed class TargetFramework : IRpcCodec<TargetFramework>
+public sealed class TargetFramework : IHeavyweight, IRpcCodec<TargetFramework>
 {
     public string TargetFrameworkMoniker { get; }
     public IList<PackageReference> PackageReferences { get; }
@@ -218,7 +218,7 @@ public sealed class PackageReference : IRpcCodec<PackageReference>
 /// package-relative paths with <c>_._</c> placeholder entries stripped, so an empty list means
 /// "the package provides no assets of that kind".
 /// </summary>
-public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
+public sealed class ResolvedPackage : IHeavyweight, IRpcCodec<ResolvedPackage>
 {
     public string Name { get; }
     public string ResolvedVersion { get; }

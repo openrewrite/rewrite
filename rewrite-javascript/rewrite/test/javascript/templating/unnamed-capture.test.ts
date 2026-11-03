@@ -42,8 +42,8 @@ describe('unnamed capture', () => {
             typescript(`
                 const a = 2 * 2 + 3;
             `, `
-                const a = 3 + 2 + 2;
-            `),
+                const a = 3 + (2 + 2);
+            `)
         );
     });
 

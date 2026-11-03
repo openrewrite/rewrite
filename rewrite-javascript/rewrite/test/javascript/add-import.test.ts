@@ -489,6 +489,128 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('imports follow directives, but not template or parenthesized strings', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useId', onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    'use strict';
+                    'use client';
+
+                    export const id = useId();
+                    `,
+                    `
+                    'use strict';
+                    'use client';
+
+                    import {useId} from 'react';
+
+                    export const id = useId();
+                    `
+                ),
+                typescript(
+                    `
+                    \`use client\`;
+                    `,
+                    `
+                    import {useId} from 'react';
+
+                    \`use client\`;
+                    `
+                ),
+                typescript(
+                    `
+                    ('use server');
+                    `,
+                    `
+                    import {useId} from 'react';
+
+                    ('use server');
+                    `
+                )
+            );
+        });
+
+        test('imports follow shebangs and triple-slash directives, leaving later comments on their statement', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+            for (const directive of [
+                '/// <reference types="node" />',
+                '/// <amd-module name="x" />',
+                '/// <amd-dependency path="y" />'
+            ]) {
+                await spec.rewriteRun(typescript(
+                    `
+                    #!/usr/bin/env node
+                    /// <reference lib="es2022" />
+                    /* Copyright Acme */
+                    ${directive}
+                    /// plain
+                    //// <reference types="other" />
+                    export const c = useState(0);
+                    `,
+                    `
+                    #!/usr/bin/env node
+                    /// <reference lib="es2022" />
+                    /* Copyright Acme */
+                    ${directive}
+                    import {useState} from 'react';
+
+                    /// plain
+                    //// <reference types="other" />
+                    export const c = useState(0);
+                    `
+                ));
+            }
+        });
+
+        test('drops an empty export, which the import makes redundant', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+                    `
+                )
+            );
+        });
+
+        test('keeps an empty export that carries a comment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
@@ -956,6 +1078,39 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const fs = require('fs');
+                    `
+                )
+            );
+        });
+
+        test('requires follow directives and triple-slash directives after a shebang', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                javascript(
+                    `
+                    'use client';
+                    module.exports = readFile;
+                    `,
+                    `
+                    'use client';
+                    const {readFile} = require('fs');
+
+                    module.exports = readFile;
+                    `
+                ),
+                javascript(
+                    `
+                    #!/usr/bin/env node
+                    /// <reference types="node" />
+                    module.exports = readFile;
+                    `,
+                    `
+                    #!/usr/bin/env node
+                    /// <reference types="node" />
+                    const {readFile} = require('fs');
+
+                    module.exports = readFile;
                     `
                 )
             );

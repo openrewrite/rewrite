@@ -566,6 +566,32 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void scanningAccumulatorIsSharedByScanGenerateAndEdit(boolean batch) {
+        RpcRecipe recipe = (RpcRecipe) client.prepareRecipe(ScanThenEdit.class.getName(), Map.of());
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        PlainText first = PlainText.builder().sourcePath(Path.of("first.txt")).text("first").build();
+        PlainText second = PlainText.builder().sourcePath(Path.of("second.txt")).text("second").build();
+        client.visit(first, requireNonNull(recipe.getScanVisitor()), ctx);
+        client.visit(second, requireNonNull(recipe.getScanVisitor()), ctx);
+        assertThat(recipe.generate(0, ctx)).isEmpty();
+
+        for (PlainText source : List.of(first, second)) {
+            PlainText after;
+            if (batch) {
+                BatchVisitResponse response = client.batchVisit(source, ctx, null,
+                  List.of(new BatchVisit.BatchVisitItem(recipe.getEditVisitor(), null)));
+                assertThat(response.getResults()).singleElement()
+                  .satisfies(result -> assertThat(result.isModified()).isTrue());
+                after = client.getObject(source.getId().toString(), PlainText.class.getName());
+            } else {
+                after = (PlainText) client.visit(source, recipe.getEditVisitor(), ctx);
+            }
+            assertThat(requireNonNull(after).getText()).isEqualTo("first,second:generated");
+        }
+    }
+
     @Test
     void runRecipeWithRecipeList() {
         rewriteRun(
@@ -1031,6 +1057,53 @@ class RewriteRpcTest implements RewriteTest {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     return Markup.warn(text, new IllegalStateException(message));
+                }
+            };
+        }
+    }
+
+    public static class ScanThenEdit extends ScanningRecipe<StringBuilder> {
+        @Override
+        public String getDisplayName() {
+            return "Edit from scanned data";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Uses data from both scanning and generation to edit every source file.";
+        }
+
+        @Override
+        public StringBuilder getInitialValue(ExecutionContext ctx) {
+            return new StringBuilder();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(StringBuilder acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (acc.length() > 0) {
+                        acc.append(',');
+                    }
+                    acc.append(text.getText());
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public java.util.Collection<? extends SourceFile> generate(StringBuilder acc, ExecutionContext ctx) {
+            acc.append(":generated");
+            return emptyList();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(StringBuilder acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return acc.length() == 0 ? text : text.withText(acc.toString());
                 }
             };
         }

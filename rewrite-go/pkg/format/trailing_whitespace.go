@@ -24,8 +24,8 @@ import (
 )
 
 // RemoveTrailingWhitespaceVisitor strips trailing space/tab characters
-// from the end of each line inside `Space.Whitespace` fields. Indent
-// whitespace at the start of the next line is preserved.
+// from the end of each line inside `Space.Whitespace` fields and comment
+// suffixes. Indent whitespace at the start of the next line is preserved.
 //
 // Input:  "foo \t\n  bar"
 // Output: "foo\n  bar"
@@ -51,19 +51,35 @@ func (v *RemoveTrailingWhitespaceVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
+// VisitSpace strips the lines that end in s, ahead of its comments and in
+// the suffix after each of them.
 func (v *RemoveTrailingWhitespaceVisitor) VisitSpace(s java.Space, p any) java.Space {
-	if s.Whitespace() == "" || !strings.ContainsAny(s.Whitespace(), " \t") {
-		return s
+	whitespace := stripTrailingPerLine(s.Whitespace())
+	var comments []java.Comment
+	for i, c := range s.Comments() {
+		suffix := stripTrailingPerLine(c.Suffix)
+		if suffix == c.Suffix {
+			continue
+		}
+		if comments == nil {
+			comments = append([]java.Comment(nil), s.Comments()...)
+		}
+		comments[i].Suffix = suffix
 	}
-	s = java.MakeSpace(s.Comments(), stripTrailingPerLine(s.Whitespace()))
-	return s
+	if comments == nil {
+		if whitespace == s.Whitespace() {
+			return s
+		}
+		comments = s.Comments()
+	}
+	return java.MakeSpace(comments, whitespace)
 }
 
 // stripTrailingPerLine removes trailing space/tab characters from each
 // line. The trailing portion of the LAST line is preserved because it's
 // the leading indent of whatever syntax follows.
 func stripTrailingPerLine(ws string) string {
-	if !strings.Contains(ws, "\n") {
+	if !strings.Contains(ws, "\n") || !strings.ContainsAny(ws, " \t") {
 		return ws
 	}
 	lines := strings.Split(ws, "\n")

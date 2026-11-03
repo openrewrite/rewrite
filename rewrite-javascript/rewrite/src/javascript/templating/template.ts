@@ -428,7 +428,7 @@ export class Template {
             }
         }
 
-        const expression = opensWithBrace(this.templateParts) && replacedByObjectLiteral(tree, cursor);
+        const expression = opensWithBrace(this.templateParts) && await replacedByObjectLiteral(tree, cursor);
         const ast = await this.getTemplateTree(expression, normalizedValues);
 
         // Delegate to TemplateEngine for placeholder substitution and application

@@ -305,6 +305,21 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void quotedKeyNameHoldsTheTextTheEscapesStandFor() {
+        rewriteRun(
+          toml(
+            """
+              "a\\tb\\u00e9" = 1
+              'a\\tb' = 2
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Identifier) ((Toml.KeyValue) kv).getKey()).getName())
+              .containsExactly("a\tbé", "a\\tb"))
+          )
+        );
+    }
+
+    @Test
     void quotedKeys() {
         rewriteRun(
           toml(

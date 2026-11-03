@@ -4717,8 +4717,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Tree.RandomId(),
             prefix,
             Markers.Empty,
-            node.TextToken.ValueText,  // Unescaped value
-            node.TextToken.Text,       // Source text (with {{ and }})
+            node.TextToken.ValueText,  // Escape sequences resolved, but {{ and }} still doubled
+            node.TextToken.Text,       // Source text
             null,
             JavaType.Primitive.Of(JavaType.PrimitiveKind.String)
         );

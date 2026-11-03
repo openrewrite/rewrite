@@ -40,4 +40,32 @@ describe('label mapping', () => {
                 /*1*/alsoLabel/*2*/:/*3*/console.log("A")/*4*/
             `)
         ));
+
+    test('as control flow body', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                if (enabled) {
+                    if (ready) label: a();
+                }
+                if (a) l1: b() ; else l2: c() ;
+                while (a) l3: b();
+                for (;;) l4: b();
+                for (const x of xs) l5: b();
+                for (const x in xs) l6: b();
+                do l7: b(); while (a);
+            `)
+        ));
+
+    test('nested labels', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function f() {
+                    outer: inner: console.log("A") ;
+                }
+                if (a) outer: inner: b();
+                outer: inner: console.log("A")
+            `)
+        ));
 });

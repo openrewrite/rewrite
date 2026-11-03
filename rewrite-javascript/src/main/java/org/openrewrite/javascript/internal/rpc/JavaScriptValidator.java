@@ -64,7 +64,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JS.Alias visitAlias(JS.Alias alias, P p) {
-        visitAndValidateNonNull(alias.getPropertyName(), J.Identifier.class, p);
+        visitAndValidateNonNull(alias.getPropertyName(), Expression.class, p);
         visitAndValidateNonNull(alias.getAlias(), Expression.class, p);
         return alias;
     }

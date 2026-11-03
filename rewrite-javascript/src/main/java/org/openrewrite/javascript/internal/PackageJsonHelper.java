@@ -1016,7 +1016,7 @@ public class PackageJsonHelper {
             return null;
         }
         String content = printed(packageJson);
-        return regen.regenerate(LockFileRegeneration.Request.builder()
+        return regen.regenerateStable(LockFileRegeneration.Request.builder()
                 .packageJson(content)
                 .lock(capturedLockContent)
                 .marker(marker)
