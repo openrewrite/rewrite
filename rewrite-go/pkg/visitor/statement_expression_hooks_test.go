@@ -17,6 +17,7 @@
 package visitor_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -85,4 +86,34 @@ func TestVisitStatementReturningNilDeletesTheStatement(t *testing.T) {
 
 	// then
 	assert.Equal(t, "package main\n\nfunc f() {\n\th := 1\n\t_ = h\n}\n", printer.Print(out))
+}
+
+type hookOrderRecorder struct {
+	visitor.GoVisitor
+	calls map[string][]string
+}
+
+func (r *hookOrderRecorder) VisitStatement(s java.Statement, p any) java.J {
+	r.calls[fmt.Sprintf("%T", s)] = append(r.calls[fmt.Sprintf("%T", s)], "Statement")
+	return s
+}
+
+func (r *hookOrderRecorder) VisitExpression(e java.Expression, p any) java.J {
+	r.calls[fmt.Sprintf("%T", e)] = append(r.calls[fmt.Sprintf("%T", e)], "Expression")
+	return e
+}
+
+func TestHooksRunInJavaVisitorOrder(t *testing.T) {
+	// given
+	cu, err := parser.NewGoParser().Parse("hooks.go", "package main\n\nvar a = s.N\nvar b = g()\n")
+	require.NoError(t, err)
+	r := &hookOrderRecorder{calls: map[string][]string{}}
+	r.Self = r
+
+	// when
+	r.Visit(cu, nil)
+
+	// then
+	assert.Equal(t, []string{"Expression", "Statement"}, r.calls["*java.FieldAccess"])
+	assert.Equal(t, []string{"Statement", "Expression"}, r.calls["*java.MethodInvocation"])
 }

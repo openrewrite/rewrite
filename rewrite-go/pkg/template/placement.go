@@ -35,7 +35,8 @@ func placeAt(result java.J, site *visitor.Cursor) java.J {
 		return result
 	}
 	var out java.J
-	if expr, ok := result.(java.Expression); ok && !isStatement(expr) && inStatementSlot(site) {
+	_, isStatement := result.(java.Statement)
+	if expr, ok := result.(java.Expression); ok && !isStatement && inStatementSlot(site) {
 		out = &golang.ExpressionStatement{
 			ID:         uuid.New(),
 			Prefix:     getLeadingPrefix(replaced),
@@ -48,11 +49,6 @@ func placeAt(result java.J, site *visitor.Cursor) java.J {
 		return formatted
 	}
 	return out
-}
-
-func isStatement(j java.J) bool {
-	_, ok := j.(java.Statement)
-	return ok
 }
 
 // parenthesized applies parenthesize.Maybe to anything that is an expression.
@@ -84,6 +80,9 @@ func inStatementSlot(site *visitor.Cursor) bool {
 // heldAsStatement looks through the padding and lists of v, but not into
 // other nodes, for an interface of type java.Statement pointing at node.
 func heldAsStatement(v reflect.Value, node uintptr) bool {
+	if t := v.Type(); t == spaceType || t == markersType || t.Implements(javaTypeType) {
+		return false
+	}
 	switch v.Kind() {
 	case reflect.Interface:
 		e := v.Elem()

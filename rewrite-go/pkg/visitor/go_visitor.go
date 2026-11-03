@@ -103,8 +103,8 @@ func (v *GoVisitor) PendingAfterVisits() []AfterVisitor {
 //  2. PreVisit(t, p) is called via virtual dispatch — subclasses
 //     (e.g. RPC sender/receiver) override it to handle cross-cutting
 //     fields (id, prefix, markers) once per node.
-//  3. VisitStatement and then VisitExpression are called on a node that
-//     is one, where JavaVisitor calls visitStatement/visitExpression.
+//  3. VisitStatement and VisitExpression are called on a node that is
+//     one, where and in the order JavaVisitor calls them.
 //  4. The type-specific Visit* method is dispatched via virtual
 //     dispatch on the (possibly modified) tree returned so far.
 //  5. cursor pops on return.
@@ -299,22 +299,37 @@ func (v *GoVisitor) visitStatementAndExpression(t java.Tree, p any) (java.Tree, 
 	case *java.Import, *java.ParenthesizedTypeTree:
 		// JavaVisitor gives these neither hook.
 		return t, true
-	}
-	if s, ok := t.(java.Statement); ok {
-		r := v.self().VisitStatement(s, p)
-		if reflect.TypeOf(r) != reflect.TypeOf(t) {
-			return r, false
+	case *java.FieldAccess:
+		// JavaVisitor.visitFieldAccess calls visitExpression first.
+		t, ok := v.visitExpressionHook(t, p)
+		if !ok {
+			return t, false
 		}
-		t = r
+		return v.visitStatementHook(t, p)
 	}
-	if e, ok := t.(java.Expression); ok {
-		r := v.self().VisitExpression(e, p)
-		if reflect.TypeOf(r) != reflect.TypeOf(t) {
-			return r, false
-		}
-		t = r
+	t, ok := v.visitStatementHook(t, p)
+	if !ok {
+		return t, false
 	}
-	return t, true
+	return v.visitExpressionHook(t, p)
+}
+
+func (v *GoVisitor) visitStatementHook(t java.Tree, p any) (java.Tree, bool) {
+	s, ok := t.(java.Statement)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitStatement(s, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
+}
+
+func (v *GoVisitor) visitExpressionHook(t java.Tree, p any) (java.Tree, bool) {
+	e, ok := t.(java.Expression)
+	if !ok {
+		return t, true
+	}
+	r := v.self().VisitExpression(e, p)
+	return r, reflect.TypeOf(r) == reflect.TypeOf(t)
 }
 
 func (v *GoVisitor) self() VisitorI {
@@ -434,8 +449,8 @@ func (v *GoVisitor) PreVisit(t java.Tree, p any) java.Tree { return t }
 func (v *GoVisitor) VisitStatement(s java.Statement, p any) java.J { return s }
 
 // VisitExpression is called on an expression before its type-specific Visit*
-// method, and after VisitStatement on a node that is both, wherever
-// JavaVisitor calls visitExpression. The default returns it unchanged.
+// method, wherever JavaVisitor calls visitExpression. The default returns it
+// unchanged.
 func (v *GoVisitor) VisitExpression(e java.Expression, p any) java.J { return e }
 
 func (v *GoVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
