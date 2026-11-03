@@ -1204,6 +1204,25 @@ describe("maybeBind and type-only imports", () => {
         expect(names).toEqual(["vi_1", "vi_1"]);
     });
 
+    test("a type-only request beside a type-only default import gets an import of its own", async () => {
+        // `import type R, {X}` doesn't compile: a type-only import names a default or named bindings, not both
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "react", member: "ReactElement", typeOnly: true}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import type R from "react";
+                let a: R.ReactChild;
+            `,
+            `
+                import type R from "react";
+                import type {ReactElement} from "react";
+                let a: R.ReactChild;
+            `
+        ));
+        expect(bound.name).toBe("ReactElement");
+    });
+
     test("a namespace import answers a type-only request for the whole module", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -1820,6 +1839,91 @@ describe("maybeRebind", () => {
             function f() { interface Old {} return New.go(); }
             function g() { const Old = 1; let y: New; return {Old}; }`
         ));
+    });
+
+    test("a value read of a name a type-only import shares reads the value declared beside it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+
+                const Old = 1;
+                export const x = Old;
+                export type C = Old;
+            `,
+            `
+                import type { New } from "m2";
+
+                const Old = 1;
+                export const x = Old;
+                export type C = New;
+            `
+        ));
+    });
+
+    test("a value read of a name a type-only import shares reads a destructured value declared beside it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+
+                const { Old } = { Old: 1 };
+                export const x = Old;
+                export type C = Old<{}>;
+            `,
+            `
+                import type { New } from "m2";
+
+                const { Old } = { Old: 1 };
+                export const x = Old;
+                export type C = New<{}>;
+            `
+        ));
+    });
+
+    test("a second specifier of the moved member stays as it stands", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import { Old, Old as O } from "m";
+
+                let a: Old;
+                let b: O;
+            `,
+            `
+                import { New, Old as O } from "m";
+
+                let a: New;
+                let b: O;
+            `
+        ));
+        expect(bound.name).toBe("New");
+    });
+
+    test("a second specifier of the moved member stays as it stands when the move leaves the statement", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import { Old as O, Old } from "m";
+
+                let a: Old;
+                let b: O;
+            `,
+            `
+                import { Old } from "m";
+                import { New as O } from "m2";
+
+                let a: Old;
+                let b: O;
+            `
+        ));
+        expect(bound.name).toBe("O");
     });
 
     test("a type-only import is renamed where `typeof` reads it as a value", async () => {

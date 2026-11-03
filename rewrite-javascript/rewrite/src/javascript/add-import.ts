@@ -8,7 +8,10 @@ import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
+import {
+    bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, readMeaning, resolve, scopeOf,
+    valuesDeclaredAtTopLevel, walk
+} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -2092,6 +2095,10 @@ function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boole
         !sameModule(moduleNameOf(specifier as J.Literal), module)) {
         return false;
     }
+    // A type-only import names a default or named bindings, never both: `import type R, {X}` doesn't compile
+    if (clause.typeOnly && clause.name !== undefined) {
+        return false;
+    }
     return clause.namedBindings ? clause.namedBindings.kind === JS.Kind.NamedImports : clause.name !== undefined;
 }
 
@@ -2188,11 +2195,12 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
 
 /**
  * Drops the binding for `member` from `jsImport`'s clause — the default, the namespace alias, or
- * one entry of the named list, whichever `member` names — keeping everything else the clause
- * binds. `ElementRemovalFormatter` carries the dropped binding's prefix onto whatever prints
- * next, and a dropped last entry's trailing space onto the new last, as `RemoveImport` does.
+ * the one entry of the named list that binds `localName`, whichever `member` names — keeping
+ * everything else the clause binds, another entry of the same member included. `ElementRemovalFormatter`
+ * carries the dropped binding's prefix onto whatever prints next, and a dropped last entry's trailing
+ * space onto the new last, as `RemoveImport` does.
  */
-function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Import {
+function removeBinding(jsImport: JS.Import, member: string | undefined, localName: string): JS.Import {
     const importClause = jsImport.importClause;
     if (!importClause) {
         return jsImport;
@@ -2230,10 +2238,13 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
         return jsImport;
     }
     const namedImports = importClause.namedBindings as JS.NamedImports;
+    // `import {a, a as b}` binds one member twice, and only the binding that moves goes
+    const removed = (specifier: JS.ImportSpecifier) =>
+        namedSpecifierImports(specifier.specifier, key) && specifierBinding(specifier)?.name === localName;
     const formatter = new ElementRemovalFormatter<JS.ImportSpecifier>();
     const kept: J.RightPadded<JS.ImportSpecifier>[] = [];
     for (const entry of namedImports.elements.elements) {
-        if (namedSpecifierImports(entry.element.specifier, key)) {
+        if (removed(entry.element)) {
             formatter.markRemoved(entry.element);
         } else {
             kept.push({...entry, element: formatter.processKept(entry.element)});
@@ -2247,7 +2258,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
     // The space before `}` and any trailing comma belong to the last entry, so they move onto the
     // new last entry when the old one is dropped.
     const originalLast = namedImports.elements.elements[namedImports.elements.elements.length - 1];
-    if (namedSpecifierImports(originalLast.element.specifier, key)) {
+    if (removed(originalLast.element)) {
         kept[kept.length - 1] = {...kept[kept.length - 1], after: originalLast.after, markers: originalLast.markers};
     }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
@@ -2381,7 +2392,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         this.fromModule = importedModule(imp);
 
         if (!isOnlyMember(imp)) {
-            return removeBinding(imp, this.from.member);
+            return removeBinding(imp, this.from.member, this.localName);
         }
         if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
             this.dropped = imp.id;
@@ -2517,7 +2528,13 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     private readsModuleBinding(identifier: J.Identifier): boolean {
-        return resolve(this.cursor, identifier)?.kind === JS.Kind.CompilationUnit;
+        if (resolve(this.cursor, identifier)?.kind !== JS.Kind.CompilationUnit) {
+            return false;
+        }
+        // A type-only import binds no value, so a value read of its name reads the value the module
+        // scope declares beside it: `import type {X}; const X = 1; f(X)`
+        return !(this.typeOnly && readMeaning(this.cursor, identifier) === 'value' &&
+            valuesDeclaredAtTopLevel(this.cu!).has(identifier.simpleName));
     }
 
     /**
