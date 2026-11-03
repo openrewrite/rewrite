@@ -286,7 +286,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (!Space.firstPrefix(control.getInit()).getLastWhitespace().contains("\n") && evaluate(() -> wrappingStyle.getForStatement().getAlignWhenMultiline(), false)) {
                             sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             positionService = sourceFile.service(SourcePositionService.class);
-                            ColSpan colSpan = positionService.columnsOf(getCursor(), control.getInit().get(0));
+                            ColSpan colSpan = positionService.columnsOf(getCursor().getParentTreeCursor(), control.getInit().get(0));
                             getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getIndent() - 1 + indent);
                             getCursor().putMessage("indentType", IndentType.ALIGN);
                         }

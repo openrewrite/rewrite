@@ -20,12 +20,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -59,6 +62,36 @@ class TabsAndIndentsTest implements RewriteTest {
               )
             )
           )));
+    }
+
+    @Test
+    void formatMultilineForSubtree() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                  return autoFormat(forLoop, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j=handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j = handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """
+          )
+        );
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
