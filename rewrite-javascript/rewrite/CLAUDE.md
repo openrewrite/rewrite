@@ -219,9 +219,7 @@ describe('OrderImports', () => {
 });
 ```
 
-`rewriteRun` dedents each source, so write it over real lines rather than with `\n`. A
-`//language=typescript` comment (`javascript`, `tsx`, `jsx`, `json`) above the call lets IntelliJ
-highlight both strings.
+Prefer writing test sources over real lines rather than with `\n`.
 
 ### Sharing a `RecipeSpec` across tests
 
