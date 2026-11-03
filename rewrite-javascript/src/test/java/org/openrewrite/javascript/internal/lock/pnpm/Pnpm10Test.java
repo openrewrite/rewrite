@@ -42,6 +42,11 @@ class Pnpm10Test {
         }
     }
 
+    @Test
+    void registryAliasesAreWithinTheNativeProfile() {
+        assertThat(Pnpm10Profile.unsupportedSpecifier("npm:wrap-ansi@^7.0.0")).isFalse();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
     void keepsLockedPreferredVersionsUnweighted(String version) {
@@ -110,6 +115,6 @@ class Pnpm10Test {
             assertThat(result.isSuccess()).as(scenario.getName() + ": " + result.getErrorMessage()).isTrue();
             assertThat(result.getLockFileContent()).as(scenario.getName()).isEqualTo(scenario.file("after"));
         }
-        assertThat(count).isGreaterThanOrEqualTo(6);
+        assertThat(count).isGreaterThanOrEqualTo(8);
     }
 }

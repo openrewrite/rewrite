@@ -186,7 +186,7 @@ final class Pnpm10Profile {
     }
 
     static boolean unsupportedSpecifier(String specifier) {
-        return specifier.contains(":") && !specifier.startsWith("workspace:") &&
+        return specifier.contains(":") && !specifier.startsWith("npm:") && !specifier.startsWith("workspace:") &&
                !specifier.startsWith("catalog:") && !specifier.startsWith("link:");
     }
 
