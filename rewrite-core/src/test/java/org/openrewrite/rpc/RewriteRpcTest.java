@@ -46,6 +46,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
 import org.openrewrite.table.SourcesFileResults;
+import org.openrewrite.table.SourcesFiles;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
@@ -991,7 +992,7 @@ class RewriteRpcTest implements RewriteTest {
         List<Throwable> errors = new CopyOnWriteArrayList<>();
 
         // when
-        new RecipeScheduler().scheduleRun(
+        RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(r1, r2)),
           new InMemoryLargeSourceSet(List.of(
             PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
@@ -1001,6 +1002,7 @@ class RewriteRpcTest implements RewriteTest {
         // then
         assertThat(errors).isEmpty();
         assertThat(RecordingScanner.SCANNED).containsExactly("a.txt", "a.txt");
+        assertThat(run.getDataTableRows(SourcesFiles.class)).isEmpty();
     }
 
     @Test

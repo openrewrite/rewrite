@@ -227,8 +227,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
 
                                 if (isInBatch) {
-                                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(source.getClass())) &&
-                                        preconditionPasses(((RpcRecipe) recipe).getScanPreconditionVisitor(), source)) {
+                                    if (isBatchable(currentRpc, ((RpcRecipe) recipe).getScanPreconditionVisitor(), source)) {
                                         scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
                                         scanBatch.recipeStacks.add(recipeStack);
                                         if (scanBatch.originalBeforeBatch == null) {
@@ -285,13 +284,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         return sourceSet;
     }
 
-    private boolean preconditionPasses(@Nullable TreeVisitor<?, ExecutionContext> precondition, SourceFile source) {
-        if (precondition == null) {
-            return true;
-        }
-        //noinspection unchecked
-        return ((TreeVisitor<Tree, ExecutionContext>) precondition).visit(source, ctx, rootCursor) != source;
+    private boolean isBatchable(RewriteRpc rpc, @Nullable TreeVisitor<?, ExecutionContext> precondition, SourceFile source) {
+        return rpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(source.getClass())) &&
+               (precondition == null ||
+                Preconditions.check(precondition, PRECONDITION_PASSED).visit(source, ctx, rootCursor) != source);
     }
+
+    // Going through Preconditions.check keeps the precondition's data table rows suppressed, as on the non-batch path
+    private static final TreeVisitor<Tree, ExecutionContext> PRECONDITION_PASSED = new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+            return null;
+        }
+    };
 
     private void flushScanBatch(BatchState batch, SourceFile source) {
         if (batch.rpc == null || batch.items.isEmpty()) {
@@ -503,22 +508,21 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     // the subclass name. getLanguages() reports canonical type names (the same
                     // ones used as the RPC sourceFileType), so a raw name comparison never
                     // matches for those, silently dropping every batched recipe but the last.
-                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
-                        RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                        // Evaluate the precondition locally before batching. The non-batch
-                        // path runs the precondition via getVisitor()'s Preconditions.check
-                        // wrapper; the batch path bypasses that wrapper because it dispatches
-                        // editVisitor names directly. Without this gate, every batched recipe
-                        // would visit every file regardless of preconditions, defeating the
-                        // optimization.
-                        if (preconditionPasses(rpcRecipe.getEditPreconditionVisitor(), src)) {
-                            batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                            batch.recipeStacks.add(recipeStack);
-                            if (batch.originalBeforeBatch == null) {
-                                batch.originalBeforeBatch = src;
-                            }
-                            batch.rpc = currentRpc;
+                    //
+                    // Evaluate the precondition locally before batching. The non-batch
+                    // path runs the precondition via getVisitor()'s Preconditions.check
+                    // wrapper; the batch path bypasses that wrapper because it dispatches
+                    // editVisitor names directly. Without this gate, every batched recipe
+                    // would visit every file regardless of preconditions, defeating the
+                    // optimization.
+                    RpcRecipe rpcRecipe = (RpcRecipe) recipe;
+                    if (isBatchable(currentRpc, rpcRecipe.getEditPreconditionVisitor(), src)) {
+                        batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                        batch.recipeStacks.add(recipeStack);
+                        if (batch.originalBeforeBatch == null) {
+                            batch.originalBeforeBatch = src;
                         }
+                        batch.rpc = currentRpc;
                     }
 
                     // If this is the last recipe in the batch, flush now
