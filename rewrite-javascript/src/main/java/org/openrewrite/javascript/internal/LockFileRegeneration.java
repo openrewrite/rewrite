@@ -345,7 +345,13 @@ public final class LockFileRegeneration {
      * converge retain their original diagnostics.
      */
     public Result regenerateStable(Request request, ExecutionContext ctx) {
-        return pm == PackageManager.Npm ? stabilize(request, r -> regenerate(r, ctx)) : regenerate(request, ctx);
+        return regenerateStable(request, ctx, false);
+    }
+
+    /** Only opted-in coordinated updates may recover a peer conflict caused by a stale npm lock. */
+    public Result regenerateStable(Request request, ExecutionContext ctx, boolean reconcileNpmPeerDependencies) {
+        return pm == PackageManager.Npm ? stabilize(request,
+                r -> NativeLockEngine.regenerate(port, r, ctx, reconcileNpmPeerDependencies)) : regenerate(request, ctx);
     }
 
     static Result stabilize(Request request, Function<Request, Result> regenerate) {

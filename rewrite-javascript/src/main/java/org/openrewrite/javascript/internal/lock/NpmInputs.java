@@ -66,13 +66,20 @@ final class NpmInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
+        return regenerate(dir, host, client, false);
+    }
+
+    Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client,
+                      boolean reconcileNpmPeerDependencies) {
         Inputs inputs;
         try {
             inputs = from(dir, host);
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new NpmLockRegenerator(inputs, new NpmRegistryPackuments(host.transport(), client)).regenerate();
+        NpmLockRegenerator regeneration = new NpmLockRegenerator(inputs,
+                new NpmRegistryPackuments(host.transport(), client));
+        return reconcileNpmPeerDependencies ? regeneration.regenerateForUpdate() : regeneration.regenerate();
     }
 
     /**

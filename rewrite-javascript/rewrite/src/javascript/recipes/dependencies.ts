@@ -73,6 +73,21 @@ export function upgradeDependencyVersion(options: UpgradeDependencyVersionOption
     return prepareJavaRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", options);
 }
 
+export interface UpgradeDependencyVersionsOptions {
+    /** Nonempty package-name glob map. Overlapping patterns must specify the same target constraint. */
+    versions: Record<string, string>;
+    /** Verify the upgraded manifest before recovering from stale npm lock peer conflicts. Defaults to false. */
+    reconcileNpmPeerDependencies?: boolean;
+}
+
+/**
+ * Upgrade matching npm dependencies together and regenerate the lock file once.
+ * Delegates to `org.openrewrite.javascript.UpgradeDependencyVersions` via RPC.
+ */
+export function upgradeDependencyVersions(options: UpgradeDependencyVersionsOptions): Promise<Recipe> {
+    return prepareJavaRecipe("org.openrewrite.javascript.UpgradeDependencyVersions", options);
+}
+
 export interface ChangeDependencyOptions {
     oldPackageName: string;
     newPackageName: string;

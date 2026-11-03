@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+package org.openrewrite.maven;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.CompositeMavenPomCache;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
@@ -31,8 +30,8 @@ import java.util.Optional;
 
 /**
  * Shares the POMs, metadata and repository probes that recipes download through the default {@link ExecutionContext}
- * among all the tests in a test JVM, so each is fetched once per JVM rather than once per test. Auto-registered like
- * {@link MavenSettingsAutoLoadingExtension}.
+ * among all the tests in a test JVM, so each is fetched once per JVM rather than once per test. Registered through
+ * {@code META-INF/services}, so a test JVM with {@code junit.jupiter.extensions.autodetection.enabled=true} uses it.
  */
 public class SharedMavenPomCacheExtension implements BeforeAllCallback {
 
@@ -45,9 +44,14 @@ public class SharedMavenPomCacheExtension implements BeforeAllCallback {
                 SharedMavenPomCacheExtension::shareDownloads);
     }
 
-    private static void shareDownloads(ExecutionContext ctx) {
+    /**
+     * Gives the context a POM cache of its own in front of the test JVM's downloads. For tests that set up their own
+     * context, which this extension leaves alone.
+     */
+    public static <T extends ExecutionContext> T shareDownloads(T ctx) {
         MavenExecutionContextView.view(ctx)
                 .setPomCache(new CompositeMavenPomCache(new InMemoryMavenPomCache(), DOWNLOADS));
+        return ctx;
     }
 
     /**
