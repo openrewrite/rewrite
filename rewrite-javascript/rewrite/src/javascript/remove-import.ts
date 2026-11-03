@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {isIdentifier, J} from "../java";
+import {isIdentifier, J, TextComment} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
@@ -105,9 +105,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     }
 
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
-        const usedNames = collectUsedNames(compilationUnit);
-        const keepsModuleBindings = this.member !== undefined && this.member !== '*' && this.member !== 'default' &&
-            hasJsx(compilationUnit);
+        const memberScoped = this.member !== undefined && this.member !== '*' && this.member !== 'default';
+        const usedNames = collectUsedNames(compilationUnit, memberScoped ? jsxFactory(compilationUnit) : undefined);
         return this.produceJavaScript(compilationUnit, p, async draft => {
             const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
@@ -117,7 +116,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 // Handle ES6 imports
                 if (statement?.kind === JS.Kind.Import) {
                     const jsImport = statement as JS.Import;
-                    const result = await this.processImport(jsImport, usedNames, keepsModuleBindings, p);
+                    const result = await this.processImport(jsImport, usedNames, p);
                     if (result === undefined) {
                         formatter.markRemoved(statement);
                         return undefined;
@@ -132,7 +131,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 // Multi-variable declarations might come as JS.ScopedVariableDeclarations
                 if (statement?.kind === J.Kind.VariableDeclarations) {
                     const varDecl = statement as J.VariableDeclarations;
-                    const result = await this.processRequireFromVarDecls(varDecl, usedNames.all, keepsModuleBindings, p);
+                    const result = await this.processRequireFromVarDecls(varDecl, usedNames.all, p);
                     if (result === undefined) {
                         formatter.markRemoved(statement);
                         return undefined;
@@ -153,7 +152,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     for (const v of scopedVarDecl.variables) {
                         const varDecl = v.element;
                         if (varDecl?.kind === J.Kind.VariableDeclarations) {
-                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedNames.all, keepsModuleBindings, p);
+                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedNames.all, p);
                             if (result === undefined) {
                                 hasChanges = true;
                                 varFormatter.markRemoved(varDecl);
@@ -212,12 +211,11 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     private async processImport(
         jsImport: JS.Import,
         used: UsedNames,
-        keepsModuleBindings: boolean,
         p: P
     ): Promise<JS.Import | undefined> {
         // Handle import-equals-require syntax: import util = require("util");
         if (jsImport.initializer) {
-            return keepsModuleBindings ? jsImport : this.processImportEqualsRequire(jsImport, used.all, p);
+            return this.processImportEqualsRequire(jsImport, used.all, p);
         }
 
         // Check if this import is from the target module
@@ -290,7 +288,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
                 // A member-scoped removal removes the whole namespace when it's unused
                 if (this.member !== undefined) {
-                    if (!keepsModuleBindings && !usedNames.has(name)) {
+                    if (!usedNames.has(name)) {
                         if (!importClause.name) {
                             return undefined;
                         }
@@ -315,7 +313,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
                 // Same as above: member-scoped removal removes unused namespace
                 if (this.member !== undefined) {
-                    if (!keepsModuleBindings && !usedNames.has(aliasName)) {
+                    if (!usedNames.has(aliasName)) {
                         if (!importClause.name) {
                             return undefined;
                         }
@@ -484,7 +482,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     private async processRequireFromVarDecls(
         varDecls: J.VariableDeclarations,
         usedNames: ReadonlySet<string>,
-        keepsModuleBindings: boolean,
         p: P
     ): Promise<J.VariableDeclarations | undefined> {
         // Check if this is a require() call
@@ -509,7 +506,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         }
 
         // Handle: const fs = require('fs')
-        if (isIdentifier(pattern) && !keepsModuleBindings && !usedNames.has(pattern.simpleName)) {
+        if (isIdentifier(pattern) && !usedNames.has(pattern.simpleName)) {
             return undefined; // Remove the entire require statement
         }
 
@@ -680,9 +677,9 @@ interface UsedNames {
 /**
  * The names the file references, less its own imports: a specifier names what it binds, so counting
  * one would read an import as a use of itself. A value read reaches a type-only import, as `typeof X`
- * does, only where the file declares no value of that name itself.
+ * does, only where the file declares no value of that name itself. The JSX factory is read as a value.
  */
-function collectUsedNames(cu: JS.CompilationUnit): UsedNames {
+function collectUsedNames(cu: JS.CompilationUnit, jsxFactory: string | undefined): UsedNames {
     const all = new Set<string>();
     const types = new Set<string>();
     for (const statement of cu.statements) {
@@ -695,10 +692,30 @@ function collectUsedNames(cu: JS.CompilationUnit): UsedNames {
     }
     const values = valuesDeclaredAtTopLevel(cu);
     all.forEach(name => !values.has(name) && types.add(name));
+    if (jsxFactory) {
+        all.add(jsxFactory);
+    }
     return {all, types};
 }
 
-/** Classic JSX reads the factory, `React.createElement`, from whatever binds it, so no reference names it. */
+/**
+ * The name classic JSX reads its factory through, `React` for `React.createElement`, unless a leading
+ * `@jsx` pragma names another. No reference in the file spells it.
+ */
+function jsxFactory(cu: JS.CompilationUnit): string | undefined {
+    if (!hasJsx(cu)) {
+        return undefined;
+    }
+    const first = cu.statements.find(s => s.element.kind !== JS.Kind.Shebang)?.element;
+    for (const comment of [...cu.prefix.comments, ...(first?.prefix.comments ?? [])]) {
+        const pragma = comment.kind === J.Kind.TextComment && /@jsx\s+([\w$]+)/.exec((comment as TextComment).text);
+        if (pragma) {
+            return pragma[1];
+        }
+    }
+    return 'React';
+}
+
 function hasJsx(cu: JS.CompilationUnit): boolean {
     let found = false;
     walk(cu.statements, node => {

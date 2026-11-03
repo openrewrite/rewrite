@@ -2142,6 +2142,42 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('a member-scoped removal removes a namespace import that JSX does not read', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("lodash", "map"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        import * as _ from 'lodash';
+
+                        export const A = () => <div/>;
+                    `,
+                    `
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
+        test('a @jsx pragma names the binding JSX reads', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("preact", "render"));
+
+            //language=tsx
+            await spec.rewriteRun(
+                tsx(
+                    `
+                        /** @jsx preact.h */
+                        import * as preact from 'preact';
+
+                        export const A = () => <div/>;
+                    `
+                )
+            );
+        });
+
         test('removing the namespace by name still removes it', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("react", "*"));
