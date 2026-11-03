@@ -29,8 +29,11 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 @Value
@@ -86,25 +89,77 @@ public class Visit implements RpcRequest {
 
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP(), request.getSourceFileType());
-            if (p instanceof ExecutionContext) {
-                String visitorName = request.getVisitor();
+            return visitorP(p, request.getVisitor(), preparedRecipes);
+        }
+    }
 
-                if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
-                    Recipe recipe = preparedRecipes.getInstantiated().get(visitorName.substring(
-                            "edit:".length() /* 'scan:' has same length*/));
-                    // This is really probably particular to the Java implementation,
-                    // because we are carrying forward the legacy of cycles that are likely to be
-                    // removed from OpenRewrite in the future.
-                    WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
-                    ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
-                            new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
-                            new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
-                            LargeSourceSet::edit));
-                    ctx.putCurrentRecipe(recipe);
-                    return ctx;
-                }
+    private static final String RPC_CYCLE = Visit.class.getName() + ".cycle";
+
+    enum Phase { SCAN, GENERATE, EDIT }
+
+    static Object visitorP(Object p, String visitor, PreparedRecipeCache preparedRecipes) {
+        if (p instanceof ExecutionContext && (visitor.startsWith("scan:") || visitor.startsWith("edit:"))) {
+            Recipe recipe = preparedRecipes.getInstantiated().get(visitor.substring("edit:".length()));
+            return recipeContext((ExecutionContext) p, recipe,
+                    visitor.startsWith("scan:") ? Phase.SCAN : Phase.EDIT, preparedRecipes);
+        }
+        return p;
+    }
+
+    /** One remote scheduling cycle spans all recipes' scan, generate and edit requests. */
+    static ExecutionContext recipeContext(ExecutionContext p, Recipe recipe, Phase phase,
+                                          PreparedRecipeCache preparedRecipes) {
+        WatchableExecutionContext ctx = new WatchableExecutionContext(p);
+        RpcCycle state = ctx.getMessage(RPC_CYCLE);
+        RecipeRunCycle<?> cycle = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+        if (state != null && state.cycle != cycle) {
+            state.clearAccumulators(preparedRecipes);
+            state = null;
+        }
+        if (state == null) {
+            if (cycle == null) {
+                cycle = newCycle(recipe, ctx, 1);
+                ctx.putCycle(cycle);
             }
-            return p;
+            state = new RpcCycle(cycle);
+            ctx.putMessage(RPC_CYCLE, state);
+        }
+        // A recipe's scan/generate after its edit is the next scheduling cycle. Different recipes can
+        // interleave in one cycle, so an edit followed by another recipe's first scan is not a boundary.
+        if (phase != Phase.EDIT && state.edited.contains(recipe)) {
+            state.clearAccumulators(preparedRecipes);
+            state = new RpcCycle(newCycle(recipe, ctx, state.cycle.getCycle() + 1));
+            ctx.putCycle(state.cycle);
+            ctx.putMessage(RPC_CYCLE, state);
+        }
+        state.recipes.add(recipe);
+        if (phase == Phase.EDIT) {
+            state.edited.add(recipe);
+        }
+        ctx.putCurrentRecipe(recipe);
+        return ctx;
+    }
+
+    private static RecipeRunCycle<?> newCycle(Recipe recipe, WatchableExecutionContext ctx, int cycle) {
+        return new RecipeRunCycle<>(recipe, cycle, new Cursor(null, Cursor.ROOT_VALUE), ctx,
+                new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
+                new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
+                LargeSourceSet::edit);
+    }
+
+    private static final class RpcCycle {
+        final RecipeRunCycle<?> cycle;
+        final Set<Recipe> recipes = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<Recipe> edited = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        private RpcCycle(RecipeRunCycle<?> cycle) {
+            this.cycle = cycle;
+        }
+
+        private void clearAccumulators(PreparedRecipeCache preparedRecipes) {
+            for (Recipe recipe : recipes) {
+                preparedRecipes.getRecipeCursors().remove(recipe);
+            }
         }
     }
 }
