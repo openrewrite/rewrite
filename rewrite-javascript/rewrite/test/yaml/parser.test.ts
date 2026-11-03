@@ -15,7 +15,7 @@
  */
 import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
 import {findMarker, printer} from "../../src";
-import {RecipeSpec} from "../../src/test";
+import {dedent, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -513,6 +513,73 @@ host: "{C App}.colruyt.int/{C App}"`;
 host: {C App}.colruyt.int/{C App}`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
+    });
+});
+
+describe('Multi-line flow scalars', () => {
+    const spec = new RecipeSpec();
+
+    test('plain scalar continued on the following lines', () =>
+        spec.rewriteRun(
+            yaml(`
+                build:
+                  - script: npm ci &&
+                            npm test &&
+                            npm run build
+            `)
+        ));
+
+    test('plain scalar with a blank line and extra indentation', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: one
+                  two
+
+                    three
+            `)
+        ));
+
+    test('plain scalars in flow collections', () =>
+        spec.rewriteRun(
+            yaml(`
+                seq: [one
+                  two, three]
+                map: {a: one
+                  two}
+            `)
+        ));
+
+    test('single-quoted scalar with an escaped quote and a line break', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: 'it''s
+                  continued'
+            `)
+        ));
+
+    test('double-quoted scalar with escapes and an escaped line break', () =>
+        spec.rewriteRun(
+            yaml(String.raw`
+                a: "tab\t, quote \", escaped \
+                  line break"
+            `)
+        ));
+
+    test('scalar value is the source text between any quotes', async () => {
+        const docs = await parseYaml(dedent(String.raw`
+            plain: one
+              two
+            single: 'it''s'
+            double: "a\tb"
+        `));
+        const [plain, single, double] = (docs.documents[0].block as Yaml.Mapping).entries
+            .map(e => (e.value as Yaml.Scalar).value);
+
+        expect(plain).toBe(dedent(`
+            one
+              two`));
+        expect(single).toBe("it''s");
+        expect(double).toBe(String.raw`a\tb`);
     });
 });
 
