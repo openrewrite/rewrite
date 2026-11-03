@@ -83,4 +83,30 @@ class InheritedManagedPluginVersionTest implements RewriteTest {
     void preservesMissingVersionWhenInsertionDisabled() {
         rewriteRun(spec -> spec.recipe(new UpgradePluginVersion("org.apache.maven.plugins", "maven-plugin-plugin", "3.15.2", null, false, false)), pomXml(POM));
     }
+    @Test
+    void localActiveProfileManagementDoesNotAddRedundantChildVersion() {
+        String profile = POM.replace("<build>", "<profiles><profile><id>local</id><activation><activeByDefault>true</activeByDefault></activation><build>")
+          .replace("</build>", "</build></profile></profiles>");
+        String managed = profile.replace("<plugins>", "<pluginManagement><plugins><plugin><groupId>org.apache.maven.plugins</groupId>" +
+          "<artifactId>maven-plugin-plugin</artifactId><version>3.15.1</version></plugin></plugins></pluginManagement><plugins>");
+        rewriteRun(spec -> spec.recipe(recipe(false, "3.15.2")), pomXml(managed, spec -> spec.after(after -> {
+            assertThat(after.split("<version>3[.]15[.]2</version>", -1)).hasSize(2);
+            assertThat(after).containsPattern("<artifactId>maven-plugin-plugin</artifactId>\\s*</plugin>");
+            return after;
+        })));
+    }
+
+    @Test
+    void preservesNewerPluginInAnotherProfile() {
+        String before = POM.replace("</project>", """
+          <profiles><profile><id>future</id><build><plugins><plugin>
+            <groupId>org.apache.maven.plugins</groupId><artifactId>maven-plugin-plugin</artifactId>
+            <version>4.0.0-beta-1</version>
+          </plugin></plugins></build></profile></profiles></project>
+          """.stripTrailing());
+        rewriteRun(spec -> spec.recipe(recipe(false, "3.15.2")), pomXml(before, spec -> spec.after(after -> {
+            assertThat(after).contains("<version>4.0.0-beta-1</version>").contains("<version>3.15.2</version>");
+            return after;
+        })));
+    }
 }

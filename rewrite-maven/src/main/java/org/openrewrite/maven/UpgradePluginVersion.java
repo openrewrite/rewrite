@@ -24,6 +24,7 @@ import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -33,7 +34,9 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
@@ -127,8 +130,12 @@ public class UpgradePluginVersion extends Recipe {
                             assert tagGroupId != null;
                             assert tagArtifactId != null;
 
+                            String profileId = getCursor().getPathAsStream()
+                                    .filter(Xml.Tag.class::isInstance).map(Xml.Tag.class::cast)
+                                    .filter(parent -> "profile".equals(parent.getName())).findFirst()
+                                    .flatMap(profile -> profile.getChildValue("id")).orElse(null);
                             boolean overrideInheritedVersion = Boolean.FALSE.equals(trustParent) &&
-                                    !hasLocallyManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId);
+                                    !hasLocallyManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId, profileId);
                             final String versionLookup;
                             if (maybeVersionValue.isPresent()) {
                                 versionLookup = resolvedPom.getValue(maybeVersionValue.get().trim());
@@ -145,7 +152,7 @@ public class UpgradePluginVersion extends Recipe {
 
                             findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
                                     doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer,
-                                            Boolean.TRUE.equals(addVersionIfMissing), overrideInheritedVersion))
+                                            Boolean.TRUE.equals(addVersionIfMissing), overrideInheritedVersion, tag.getId()))
                             );
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
@@ -174,8 +181,23 @@ public class UpgradePluginVersion extends Recipe {
         return getManagedPluginVersion(resolvedPom, groupId, artifactId) != null;
     }
 
-    private static boolean hasLocallyManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
-        for (Plugin p : resolvedPom.getRequested().getPluginManagement()) {
+    private static boolean hasLocallyManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId,
+                                                         @Nullable String profileId) {
+        if (hasManagedPluginVersion(resolvedPom.getRequested().getPluginManagement(), groupId, artifactId)) {
+            return true;
+        }
+        if (profileId != null) {
+            for (Profile profile : resolvedPom.getRequested().getProfiles()) {
+                if (profileId.equals(profile.getId()) && hasManagedPluginVersion(profile.getPluginManagement(), groupId, artifactId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasManagedPluginVersion(List<Plugin> plugins, String groupId, String artifactId) {
+        for (Plugin p : plugins) {
             if (p.getGroupId().equals(groupId) && p.getArtifactId().equals(artifactId) && p.getVersion() != null) {
                 return true;
             }
@@ -203,10 +225,11 @@ public class UpgradePluginVersion extends Recipe {
         String newVersion;
         boolean addVersionIfMissing;
         boolean overrideInheritedVersion;
+        UUID tagId;
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isPluginTag(groupId, artifactId)) {
+            if (tag.getId().equals(tagId) && isPluginTag(groupId, artifactId)) {
                 Optional<Xml.Tag> versionTag = tag.getChild("version");
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
