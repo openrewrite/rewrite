@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "openrewrite"
 description = "OpenRewrite automated refactoring for Python."
 version = "0.0.0"  # Updated dynamically during release
 authors = [{ name = "Moderne Inc.", email = "support@moderne.io" }]
-license = { text = "Moderne Source Available License" }
+license = "LicenseRef-Moderne-Source-Available"
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -40,7 +40,7 @@ dev = [
 ]
 publish = [
     "build>=1.0.0",
-    "twine>=5.0.0",
+    "twine>=6.1.0",
 ]
 # Continuous profiling for production recipe-worker subprocesses; the RPC
 # server's _init_pyroscope() is a no-op when this isn't installed.
