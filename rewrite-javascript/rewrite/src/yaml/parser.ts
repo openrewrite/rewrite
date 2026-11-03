@@ -963,7 +963,6 @@ class YamlCstReader {
         return tokens.map(t => t.source).join('');
     }
 
-    /** The text between a quoted scalar's quotes, with its escapes and line breaks as written. */
     private unwrapQuotes(source: string): string {
         return source.substring(1, source.length - 1);
     }
