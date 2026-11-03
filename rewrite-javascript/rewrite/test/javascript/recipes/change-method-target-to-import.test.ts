@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec, SourceSpec} from "../../../src/test";
-import {ChangeMethodTargetToImport, JS, MethodMatcher, npm, packageJson, typescript} from "../../../src/javascript";
+import {ChangeMethodTargetToImport, javascript, JS, MethodMatcher, npm, packageJson, typescript} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 import {activate, RecipeMarketplace} from "../../../src";
 import {withDir} from "tmp-promise";
@@ -140,6 +140,48 @@ describe("change-method-target-to-import", () => {
                 getJest().fn();
             `
         ));
+    });
+
+    test("binds the target as the file does, unless told the import style", async () => {
+        const jestFnToVi = (importStyle?: "ES6Named") => new ChangeMethodTargetToImport({
+            methodPattern: "jest fn(..)",
+            targetModule: "vitest",
+            targetMember: "vi",
+            importStyle
+        });
+        const commonJs = `
+            const CC = require('./');
+            test('instantiates', () => { const onChange = jest.fn(); });
+        `;
+        const spec = new RecipeSpec();
+        spec.recipe = jestFnToVi();
+        await withTypes(spec, jestTypes, javascript(commonJs,
+            `
+                const CC = require('./');
+                const {vi} = require('vitest');
+                test('instantiates', () => { const onChange = vi.fn(); });
+            `
+        ));
+
+        spec.recipe = jestFnToVi("ES6Named");
+        await withTypes(spec, jestTypes, javascript(commonJs,
+            `
+                import {vi} from 'vitest';
+
+                const CC = require('./');
+                test('instantiates', () => { const onChange = vi.fn(); });
+            `
+        ));
+    });
+
+    test("rejects an import style it does not know, rather than falling back to the file's", () => {
+        expect(() => new ChangeMethodTargetToImport({
+            methodPattern: "jest fn(..)",
+            targetModule: "vitest",
+            targetMember: "vi",
+            // A declarative recipe's typo, which the type system does not see.
+            importStyle: "ES6named" as any
+        })).toThrow("Unknown import style `ES6named`, expected one of ES6Named, CommonJS.");
     });
 
     test("is installed in the marketplace", async () => {
