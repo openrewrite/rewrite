@@ -400,7 +400,8 @@ function rebindingName(
         (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
     const alias = options.to.alias;
     if (alias !== undefined) {
-        return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
+        return isBindableName(alias) && (alias === existing.localName ||
+            !sharesNameWithValue(cu, existing) && !taken(alias)) ? alias : undefined;
     }
     const member = memberName(options.to.member);
     if (existing.aliased || member === undefined || member === '*' || member === existing.localName ||

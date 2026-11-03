@@ -1867,6 +1867,21 @@ describe("maybeRebind", () => {
         expect(bound.name).toBe("Old");
     });
 
+    test("a pinned alias cannot split an import from its same-named exported value", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New", alias: "Renamed"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import type {Old} from "m";
+                const Old = 1;
+                export {Old};
+                export type T = Old;
+            `
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
     test("a value import of a type keeps its name beside a destructured value of that name", async () => {
         // Without `isolatedModules`, TypeScript lets an import that binds only a type share its name with a value
         const spec = new RecipeSpec();
