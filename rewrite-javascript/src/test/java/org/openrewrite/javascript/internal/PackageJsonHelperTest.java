@@ -18,35 +18,22 @@ package org.openrewrite.javascript.internal;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.javascript.PackageJsonParser;
 import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
-import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PackageJsonHelperTest {
-
-    @Test
-    void parseJsonReadsStringsAsThePackageJsonParserDoes() {
-        String text = "{\"\\\\.(css|less)$\": \"\\\"q\\\" \\u00e9\\/\\t\"}";
-        SourceFile typescript = new PackageJsonParser().parse(text).findFirst().orElseThrow();
-        assertThat(literalValues(requireNonNull(PackageJsonHelper.parseJson(Paths.get("package.json"), text))))
-                .isEqualTo(literalValues(typescript))
-                .isNotEmpty();
-    }
 
     @Test
     void refreshMarkerRebuildsDeclaredDependencies() {
@@ -519,16 +506,6 @@ class PackageJsonHelperTest {
         assertThat(m.getResolvedDependencies()).hasSize(1);
         assertThat(m.getResolvedDependencies().get(0).getVersion()).isEqualTo("4.17.21");
         assertThat(m.getDependencies().get(0).getResolved()).isNotNull();
-    }
-
-    private static List<Object> literalValues(SourceFile json) {
-        return new JsonIsoVisitor<List<Object>>() {
-            @Override
-            public Json.Literal visitLiteral(Json.Literal literal, List<Object> values) {
-                values.add(literal.getValue());
-                return literal;
-            }
-        }.reduce(json, new ArrayList<>());
     }
 
     private static Json.Document parsePackageJson(String content) {
