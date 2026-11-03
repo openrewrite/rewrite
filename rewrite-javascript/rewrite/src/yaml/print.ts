@@ -70,6 +70,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         if (mapping.anchor) {
             await this.visit(mapping.anchor, p);
         }
+        if (mapping.tag) {
+            await this.visit(mapping.tag, p);
+        }
         if (mapping.openingBracePrefix !== undefined) {
             p.append(mapping.openingBracePrefix);
             p.append('{');
@@ -137,6 +140,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.beforeSyntax(sequence, p);
         if (sequence.anchor) {
             await this.visit(sequence.anchor, p);
+        }
+        if (sequence.tag) {
+            await this.visit(sequence.tag, p);
         }
         if (sequence.openingBracketPrefix !== undefined) {
             p.append(sequence.openingBracketPrefix);

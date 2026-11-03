@@ -607,3 +607,30 @@ describe('Anchor and tag on a scalar', () => {
             `)
         ));
 });
+
+describe('Tag on a mapping or sequence', () => {
+    const spec = new RecipeSpec();
+
+    test('block and flow collections, with and without an anchor', () =>
+        spec.rewriteRun(
+            yaml(`
+                map: !!map
+                  k: v
+                anchoredMap: &m !!map
+                  k: v
+                seq: !!seq
+                  - x
+                anchoredSeq: &s !!seq
+                  - x
+                flowMap: !!map {k: v}
+                flowSeq: &f !!seq [x]
+                local: !custom
+                  k: v
+                entries:
+                  - !!map
+                    k: v
+                  - !!seq [x]
+                aliases: [*m, *s, *f]
+            `)
+        ));
+});
