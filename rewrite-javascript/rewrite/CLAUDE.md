@@ -278,6 +278,21 @@ A caller that renames references itself defeats this: the name it writes in is t
 wants, so the collision check sees it as taken and the binding keeps an alias instead. Drop such a
 pass rather than run it alongside.
 
+### The member's other spellings
+
+A named member is spelled through its module as well as through a binding of it, and those spellings
+move with it: `NS.Old` where `NS` is a module object the file binds at module scope (`import * as NS`,
+`import NS = require`, `const NS = require`), as a type, a call or a `new`; `import("m").Old`, with
+`typeof` too; and `export {Old} from "m"`, which keeps the name it publishes as `export {New as Old}`,
+while `export {Old as X}` only reads the new member. They move when the binding does, and also where
+nothing binds `from`, which still answers `undefined` since no binding moved. A move refused for the
+binding renames none of them, so the file is never left half-moved.
+
+A module object keeps naming `from`'s module, so `NS.Old` moves only within one module. An `import()`
+type and a re-export spell their module and move it too, a re-export only where it re-exports nothing
+else. A default import is left alone: `D.Old` reads a property of the default export, which is the
+member only where the default is the module object, as `export =` typings make it.
+
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
@@ -352,7 +367,7 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 The four above that still apply, plus these:
 
-- nothing binds `from`
+- nothing binds `from` (its spellings through the module still move; see "The member's other spellings")
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out

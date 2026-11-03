@@ -2199,7 +2199,7 @@ export function existingImportBinding(
  * attribution it holds, and the alias takes its prefix: that whitespace separates the specifier
  * from a `type` keyword before it.
  */
-function aliasing(local: J.Identifier, member: string): JS.Alias {
+export function aliasing(local: J.Identifier, member: string): JS.Alias {
     const propertyName: J.Identifier = {
         id: randomId(),
         kind: J.Kind.Identifier,
@@ -2601,7 +2601,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 }
 
 /** Points `literal` at `name`, keeping its quotes. */
-function respecify(literal: Draft<J.Literal>, name: string): void {
+export function respecify(literal: Draft<J.Literal>, name: string): void {
     literal.value = name;
     literal.valueSource = quoted(name, literal.valueSource);
     literal.unicodeEscapes = undefined;

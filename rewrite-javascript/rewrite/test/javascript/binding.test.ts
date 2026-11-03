@@ -3017,6 +3017,195 @@ function dropModule(module: string, member?: string) {
     };
 }
 
+describe("maybeRebind and the member's other spellings", () => {
+    test("a member read through a namespace import is renamed, as a type and as a value", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+
+                let a: NS.Old<{}>;
+                let b: typeof NS.Old;
+                NS.Old();
+                new NS.Old();
+            `,
+            `
+                import * as NS from "m";
+
+                let a: NS.New<{}>;
+                let b: typeof NS.New;
+                NS.New();
+                new NS.New();
+            `
+        ));
+        // Nothing binds `Old` by name, so no binding moved
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("the named binding and the namespace spelling move together", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                import * as NS from "m";
+
+                let a: Old;
+                let b: NS.Old;
+            `,
+            `
+                import { New } from "m";
+                import * as NS from "m";
+
+                let a: New;
+                let b: NS.New;
+            `
+        ));
+        expect(bound.name).toBe("New");
+    });
+
+    test("a member read through a required module object is renamed", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(
+            typescript(
+                `
+                    import NS = require("m");
+
+                    let a: NS.Old;
+                `,
+                `
+                    import NS = require("m");
+
+                    let a: NS.New;
+                `
+            ),
+            javascript(
+                `
+                    const NS = require("m");
+
+                    NS.Old();
+                `,
+                `
+                    const NS = require("m");
+
+                    NS.New();
+                `
+            )
+        );
+    });
+
+    test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
+        // `D.Old` reads the default export's property, which is the member only where the module's
+        // default is its namespace object, as `export =` typings make it
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                import D from "m";
+                import * as Other from "other";
+                import * as NS from "m";
+
+                let a: D.Old;
+                let b: Other.Old;
+                function f(NS: any) { return NS.Old; }
+            `
+        ));
+    });
+
+    test("a move to another module leaves a namespace spelling alone, since the namespace still names the old module", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+
+                let a: NS.Old;
+            `
+        ));
+    });
+
+    test("an import() type follows the move, to another module too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                let a: import("m").Old;
+                let b: import("m").Old<{}>;
+                let c: typeof import("m").Old;
+            `,
+            `
+                let a: import("m").New;
+                let b: import("m").New<{}>;
+                let c: typeof import("m").New;
+            `
+        ));
+
+        const toOther = new RecipeSpec();
+        toOther.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await toOther.rewriteRun(typescript(
+            `
+                let a: import('m').Old;
+            `,
+            `
+                let a: import('m2').New;
+            `
+        ));
+    });
+
+    test("a re-export straight from the module keeps the name it publishes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { Old } from "m";
+                export { Old as Renamed } from "m";
+                export type { Old as T } from "m";
+            `,
+            `
+                export { New as Old } from "m";
+                export { New as Renamed } from "m";
+                export type { New as T } from "m";
+            `
+        ));
+    });
+
+    test("a re-export moves to another module only where it re-exports nothing else", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { Old } from "m";
+                export { Old as O, Other } from "m";
+            `,
+            `
+                export { New as Old } from "m2";
+                export { Old as O, Other } from "m";
+            `
+        ));
+    });
+
+    test("a move refused for the named binding renames no other spelling either", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New", alias: "Taken"}, bound);
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                import * as NS from "m";
+
+                const Taken = 1;
+                let a: Old;
+                let b: NS.Old;
+            `
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+});
+
 describe("maybeUnbind on an AMD block", () => {
     test("an unreferenced dependency goes with its parameter", async () => {
         const spec = new RecipeSpec();

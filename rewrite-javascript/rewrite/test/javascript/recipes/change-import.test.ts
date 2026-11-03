@@ -338,6 +338,25 @@ describe("change-import", () => {
         });
     });
 
+    describe("spellings through the module", () => {
+        test("renames a member read through a namespace import", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({oldModule: "react", oldMember: "SFC", newModule: "react", newMember: "FC"});
+            await spec.rewriteRun(typescript(
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.SFC<{name: string}> = ({name}) => null;
+                `,
+                `
+                    import * as React from "react";
+
+                    export const Greeting: React.FC<{name: string}> = ({name}) => null;
+                `
+            ));
+        });
+    });
+
     describe("member renaming", () => {
         test("renames aliased member when changing import", async () => {
             const spec = new RecipeSpec();
