@@ -2968,6 +2968,27 @@ describe("maybeRebind and the member's other spellings", () => {
         );
     });
 
+    test("a member read through a module object is renamed as a JSX tag, and through an awaited import", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(tsx(
+            `
+                import * as NS from "m";
+                const Lazy = await import("m");
+
+                const a = <NS.Old x={1} />;
+                const b = <Lazy.Old>hi</Lazy.Old>;
+            `,
+            `
+                import * as NS from "m";
+                const Lazy = await import("m");
+
+                const a = <NS.New x={1} />;
+                const b = <Lazy.New>hi</Lazy.New>;
+            `
+        ));
+    });
+
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
         // `D.Old` reads the default export's property, which is the member only where the module's
         // default is its namespace object, as `export =` typings make it
