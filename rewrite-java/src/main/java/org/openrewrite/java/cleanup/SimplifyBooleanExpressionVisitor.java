@@ -42,26 +42,28 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
+            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
             if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
+            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
@@ -200,6 +202,38 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             return ternary;
         }
         return j;
+    }
+
+    private boolean canDiscardEvaluation(Expression expression) {
+        if (!(getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit)) {
+            return true;
+        }
+        expression = expression.unwrap();
+        if (expression instanceof J.Literal) {
+            return true;
+        }
+        if (expression instanceof J.Identifier) {
+            JavaType.Variable variable = ((J.Identifier) expression).getFieldType();
+            return variable != null && !variable.hasFlags(Flag.Volatile) && !variable.hasFlags(Flag.Static);
+        }
+        if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            return binary.getOperator() != J.Binary.Type.Division && binary.getOperator() != J.Binary.Type.Modulo &&
+                   isPrimitiveOperand(binary.getLeft()) && isPrimitiveOperand(binary.getRight()) &&
+                   canDiscardEvaluation(binary.getLeft()) && canDiscardEvaluation(binary.getRight());
+        }
+        if (expression instanceof J.Unary) {
+            J.Unary unary = (J.Unary) expression;
+            return (unary.getOperator() == J.Unary.Type.Not || unary.getOperator() == J.Unary.Type.Positive ||
+                    unary.getOperator() == J.Unary.Type.Negative || unary.getOperator() == J.Unary.Type.Complement) &&
+                   isPrimitiveOperand(unary.getExpression()) && canDiscardEvaluation(unary.getExpression());
+        }
+        // Calls, field/array access, casts and assignments can have effects or throw.
+        return false;
+    }
+
+    private static boolean isPrimitiveOperand(Expression expression) {
+        return expression.getType() instanceof JavaType.Primitive && expression.getType() != JavaType.Primitive.String;
     }
 
     private static boolean isBoxedBoolean(Expression expression) {
