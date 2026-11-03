@@ -28,10 +28,13 @@ import org.openrewrite.tree.ParseError;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.json.Assertions.json;
 
 @SuppressWarnings({"JsonStandardCompliance", "JsonDuplicatePropertyKeys"})
@@ -343,6 +346,36 @@ class JsonParserTest implements RewriteTest {
                   "regex": "// pattern"
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void stringValueHoldsTheTextTheEscapesStandFor() {
+        rewriteRun(
+          json(
+            """
+              {
+                "\\\\.(css|less)$": "\\"quoted\\" \\u00e9",
+                'it\\'s': '\\x41\\0\\v\\a\\/\\t\\n',
+                "continued": "a\\
+              b",
+                "crlf": "c\\\r\nd"
+              }
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Map<Object, Object> members = new LinkedHashMap<>();
+                for (Json member : ((Json.JsonObject) doc.getValue()).getMembers()) {
+                    members.put(((Json.Literal) ((Json.Member) member).getKey()).getValue(),
+                      ((Json.Literal) ((Json.Member) member).getValue()).getValue());
+                }
+                assertThat(members).containsExactly(
+                  entry("\\.(css|less)$", "\"quoted\" é"),
+                  entry("it's", "A\0\u000Ba/\t\n"),
+                  entry("continued", "ab"),
+                  entry("crlf", "cd")
+                );
+            })
           )
         );
     }
