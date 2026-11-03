@@ -20,7 +20,10 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static java.util.Collections.singletonMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -93,10 +96,44 @@ class UpgradeDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void anEmptyBatchDoesNothing() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersions(Map.of(), true)),
-          packageJson("{\"dependencies\":{\"typescript\":\"4.9.x\"}}", null, nodeResolutionResult(PackageManager.Npm))
-        );
+    void rejectsMissingOrEmptyVersions() {
+        assertThat(new UpgradeDependencyVersions(null, null).validate().isInvalid()).isTrue();
+        assertThat(new UpgradeDependencyVersions(Map.of(), null).validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void rejectsNullOrBlankPatternsAndTargets() {
+        for (Map<String, String> versions : java.util.List.<Map<String, String>>of(
+          singletonMap(null, "2.x"), singletonMap("", "2.x"), singletonMap(" \t", "2.x"),
+          singletonMap("compiler", null), singletonMap("compiler", ""), singletonMap("compiler", " \n"))) {
+            assertThat(new UpgradeDependencyVersions(versions, null).validate().isInvalid()).isTrue();
+        }
+    }
+
+    @Test
+    void rejectsConflictingOverlapsRegardlessOfInsertionOrder() {
+        for (String[] patterns : new String[][] {
+          {"@angular/*", "@angular/core"}, {"*core", "@angular/*"}, {"a?c", "a*"},
+          {"*", "compiler"}, {"a*b", "ab*"}, {"a?", "?b"}
+        }) {
+            Map<String, String> forward = new LinkedHashMap<>();
+            forward.put(patterns[0], "2.x");
+            forward.put(patterns[1], "3.x");
+            Map<String, String> reverse = new LinkedHashMap<>();
+            reverse.put(patterns[1], "3.x");
+            reverse.put(patterns[0], "2.x");
+            assertThat(new UpgradeDependencyVersions(forward, null).validate().isInvalid()).isTrue();
+            assertThat(new UpgradeDependencyVersions(reverse, null).validate().isInvalid()).isTrue();
+        }
+    }
+
+    @Test
+    void acceptsDisjointGlobsAndOverlapsWithTheSameTarget() {
+        assertThat(new UpgradeDependencyVersions(Map.of("@angular-devkit/s*", "16.x",
+          "@angular-devkit/architect*", "0.1602.x"), null).validate().isValid()).isTrue();
+        assertThat(new UpgradeDependencyVersions(Map.of("a?", "2.x", "b*", "3.x"), null).validate().isValid()).isTrue();
+        assertThat(new UpgradeDependencyVersions(Map.of("ab", "2.x", "a", "3.x"), null).validate().isValid()).isTrue();
+        assertThat(new UpgradeDependencyVersions(Map.of("@angular/*", "16.x", "@angular/core", "16.x"), null)
+          .validate().isValid()).isTrue();
     }
 }

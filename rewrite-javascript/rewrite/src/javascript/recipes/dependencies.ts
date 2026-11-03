@@ -74,7 +74,7 @@ export function upgradeDependencyVersion(options: UpgradeDependencyVersionOption
 }
 
 export interface UpgradeDependencyVersionsOptions {
-    /** Package-name glob patterns mapped to target version constraints. */
+    /** Nonempty package-name glob map. Overlapping patterns must specify the same target constraint. */
     versions: Record<string, string>;
     /** Verify the upgraded manifest before recovering from stale npm lock peer conflicts. Defaults to false. */
     reconcileNpmPeerDependencies?: boolean;

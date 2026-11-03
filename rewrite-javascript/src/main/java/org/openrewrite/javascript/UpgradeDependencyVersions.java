@@ -19,12 +19,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @EqualsAndHashCode(callSuper = false)
@@ -37,7 +41,8 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
 
     @Option(displayName = "Versions",
             description = "Package-name glob patterns mapped to target version constraints. All matching upgrades " +
-                    "are decided together before regenerating the lock file.",
+                    "are decided together before regenerating the lock file. Must not be empty. " +
+                    "Overlapping patterns must specify the same target constraint.",
             example = "{\"@angular/*\": \"16.x\", \"typescript\": \"5.0.x\"}")
     Map<String, String> versions;
 
@@ -60,6 +65,66 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
                 "Optionally reconciles stale npm lock peer conflicts after verifying the upgraded dependencies " +
                 "resolve together. Not safe to use as a precondition: consults the package registry over the " +
                 "network and publishes per-project state shared with other dependency recipes.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate().and(Validated.test("versions",
+                "Must contain at least one package pattern and target version.", versions,
+                v -> v != null && !v.isEmpty()));
+        if (versions == null) {
+            return validated;
+        }
+        boolean entriesValid = versions.entrySet().stream().allMatch(e ->
+                e.getKey() != null && !StringUtils.isBlank(e.getKey()) &&
+                e.getValue() != null && !StringUtils.isBlank(e.getValue()));
+        validated = validated.and(Validated.test("versions",
+                "Package patterns and target versions must not be null or blank.", versions, v -> entriesValid));
+        if (!entriesValid) {
+            return validated;
+        }
+        List<String> patterns = new ArrayList<>(versions.keySet());
+        Collections.sort(patterns);
+        for (int i = 0; i < patterns.size(); i++) {
+            for (int j = i + 1; j < patterns.size(); j++) {
+                String left = patterns.get(i);
+                String right = patterns.get(j);
+                if (!versions.get(left).equals(versions.get(right)) && patternsOverlap(left, right)) {
+                    validated = validated.and(Validated.invalid("versions", versions,
+                            "Overlapping package patterns `" + left + "` and `" + right +
+                                    "` must specify the same target version constraint."));
+                }
+            }
+        }
+        return validated;
+    }
+
+    // Intersection of the * and ? glob languages used by PackageJsonHelper.compileGlobPattern.
+    // Each reachable pair is a position in the two patterns after consuming the same package-name prefix.
+    private static boolean patternsOverlap(String left, String right) {
+        boolean[][] reachable = new boolean[left.length() + 1][right.length() + 1];
+        reachable[0][0] = true;
+        for (int i = 0; i <= left.length(); i++) {
+            for (int j = 0; j <= right.length(); j++) {
+                if (!reachable[i][j]) {
+                    continue;
+                }
+                boolean leftStar = i < left.length() && left.charAt(i) == '*';
+                boolean rightStar = j < right.length() && right.charAt(j) == '*';
+                if (leftStar) {
+                    reachable[i + 1][j] = true;
+                }
+                if (rightStar) {
+                    reachable[i][j + 1] = true;
+                }
+                if (i < left.length() && j < right.length() &&
+                    (leftStar || rightStar || left.charAt(i) == '?' || right.charAt(j) == '?' ||
+                     left.charAt(i) == right.charAt(j))) {
+                    reachable[leftStar ? i : i + 1][rightStar ? j : j + 1] = true;
+                }
+            }
+        }
+        return reachable[left.length()][right.length()];
     }
 
     @Override
