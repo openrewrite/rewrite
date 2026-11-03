@@ -16,6 +16,8 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ValidationException;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
@@ -26,6 +28,7 @@ import java.util.Map;
 import static java.util.Collections.singletonMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
@@ -125,6 +128,16 @@ class UpgradeDependencyVersionsTest implements RewriteTest {
             assertThat(new UpgradeDependencyVersions(forward, null).validate().isInvalid()).isTrue();
             assertThat(new UpgradeDependencyVersions(reverse, null).validate().isInvalid()).isTrue();
         }
+    }
+
+    @Test
+    void ambiguousTargetsAreRejectedBeforeAnAccumulatorCanScan() {
+        // Even when core is already at 3.x, neither wildcard 4.x nor exact 2.x may act on this invalid map.
+        UpgradeDependencyVersions recipe = new UpgradeDependencyVersions(
+          Map.of("@angular/*", "4.x", "@angular/core", "2.x"), true);
+        assertThatThrownBy(() -> recipe.getInitialValue(new InMemoryExecutionContext()))
+          .isInstanceOf(ValidationException.class)
+          .hasMessageContaining("Overlapping package patterns");
     }
 
     @Test

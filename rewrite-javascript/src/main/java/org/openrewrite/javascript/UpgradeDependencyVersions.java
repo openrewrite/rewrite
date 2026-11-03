@@ -129,6 +129,10 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
+        Validated<Object> validated = validate();
+        if (validated.isInvalid()) {
+            throw new ValidationException(validated);
+        }
         return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined, null),
                 Boolean.TRUE.equals(reconcileNpmPeerDependencies));
     }
