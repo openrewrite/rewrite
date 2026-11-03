@@ -640,14 +640,4 @@ describe('Text after the last document', () => {
                 # only a comment
             `)
         ));
-
-    test('empty or comment-only file is one document with an empty mapping', async () => {
-        for (const text of ["", "# only a comment\n"]) {
-            const docs = await parseYaml(text);
-
-            expect(docs.documents).toHaveLength(1);
-            expect(docs.documents[0].prefix).toBe(text);
-            expect((docs.documents[0].block as Yaml.Mapping).entries).toEqual([]);
-        }
-    });
 });

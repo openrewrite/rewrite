@@ -123,30 +123,6 @@ class YamlCstReader {
             }
         }
 
-        if (documents.length === 0) {
-            documents.push({
-                kind: Yaml.Kind.Document,
-                id: randomId(),
-                prefix: pendingPrefix,
-                markers: emptyMarkers,
-                directives: [],
-                explicit: false,
-                block: {
-                    kind: Yaml.Kind.Mapping,
-                    id: randomId(),
-                    prefix: "",
-                    markers: emptyMarkers,
-                    openingBracePrefix: undefined,
-                    entries: [],
-                    closingBracePrefix: undefined,
-                    anchor: undefined,
-                    tag: undefined
-                },
-                end: {kind: Yaml.Kind.DocumentEnd, id: randomId(), prefix: "", markers: emptyMarkers, explicit: false}
-            });
-            pendingPrefix = "";
-        }
-
         return {
             kind: Yaml.Kind.Documents,
             id: randomId(),
