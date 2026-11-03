@@ -31,6 +31,8 @@ export interface AddDependencyOptions {
     packageName: string;
     version: string;
     scope?: NpmDependencyScope;
+    /** Add only to a `package.json` that declared a package matching one of these globs before the cycle's edits. */
+    onlyIfDeclaring?: string[];
 }
 
 /**
