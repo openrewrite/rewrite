@@ -515,3 +515,63 @@ host: {C App}.colruyt.int/{C App}`;
         expect(result).toBe(yaml);
     });
 });
+
+describe('Multi-line flow scalars', () => {
+    const spec = new RecipeSpec();
+
+    test('plain scalar continued on the following lines', () =>
+        spec.rewriteRun(
+            yaml(`
+                build:
+                  - script: npm ci &&
+                            npm test &&
+                            npm run build
+            `)
+        ));
+
+    test('plain scalar with a blank line and extra indentation', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: one
+                  two
+
+                    three
+            `)
+        ));
+
+    test('plain scalars in flow collections', () =>
+        spec.rewriteRun(
+            yaml(`
+                seq: [one
+                  two, three]
+                map: {a: one
+                  two}
+            `)
+        ));
+
+    test('single-quoted scalar with an escaped quote and a line break', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: 'it''s
+                  continued'
+            `)
+        ));
+
+    test('double-quoted scalar with escapes and an escaped line break', () =>
+        spec.rewriteRun(
+            yaml(String.raw`
+                a: "tab\t, quote \", escaped \
+                  line break"
+            `)
+        ));
+
+    test('scalar value is the source text between any quotes', async () => {
+        const docs = await parseYaml(String.raw`plain: one
+  two
+single: 'it''s'
+double: "a\tb"`);
+        const mapping = docs.documents[0].block as Yaml.Mapping;
+        expect(mapping.entries.map(e => (e.value as Yaml.Scalar).value))
+            .toEqual(["one\n  two", "it''s", String.raw`a\tb`]);
+    });
+});

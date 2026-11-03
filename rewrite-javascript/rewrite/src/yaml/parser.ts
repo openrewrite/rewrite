@@ -749,20 +749,22 @@ class YamlCstReader {
     }
 
     private convertFlowScalarWithTrailing(cst: CstFlowScalar): {node: Yaml.Scalar, trailing: string} {
-        const resolved = CST.resolveAsScalar(cst);
-        const value = resolved?.value ?? "";
-
-        // Determine scalar style
+        // Keep the scalar's source text, as the Java YamlParser does. The resolved value folds
+        // line breaks and unescapes quoted scalars, so it would not print back to the input.
         let style: Yaml.ScalarStyle;
+        let value: string;
         switch (cst.type) {
             case 'single-quoted-scalar':
                 style = Yaml.ScalarStyle.SINGLE_QUOTED;
+                value = this.unwrapQuotes(cst.source);
                 break;
             case 'double-quoted-scalar':
                 style = Yaml.ScalarStyle.DOUBLE_QUOTED;
+                value = this.unwrapQuotes(cst.source);
                 break;
             default:
                 style = Yaml.ScalarStyle.PLAIN;
+                value = cst.source;
         }
 
         // End tokens contain trailing whitespace/newlines
@@ -961,6 +963,11 @@ class YamlCstReader {
 
     private concatenateSources(tokens: CstSourceToken[]): string {
         return tokens.map(t => t.source).join('');
+    }
+
+    /** The text between a quoted scalar's quotes, with its escapes and line breaks as written. */
+    private unwrapQuotes(source: string): string {
+        return source.substring(1, source.length - 1);
     }
 }
 
