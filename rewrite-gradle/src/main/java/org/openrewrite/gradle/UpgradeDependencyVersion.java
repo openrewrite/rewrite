@@ -865,7 +865,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                         // Find a declarable configuration to add the dependency to
                         GradleDependencyConfiguration depConfig = findDependencyConfiguration(configuration);
-                        if (depConfig == null) {
+                        if (depConfig == null || !isOnSourceSetClasspath(depConfig)) {
                             continue;
                         }
 
@@ -949,6 +949,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         /**
          * Finds a declarable configuration to add the dependency to.
          */
+        /**
+         * Whether a compile or runtime classpath of a source set extends from the configuration, so that what is
+         * declared in it is a dependency of the project. Configurations that no classpath extends from, such as the
+         * Kotlin plugin's {@code swiftExportClasspath} or {@code kotlinCompilerPluginClasspath}, hold the plugin's
+         * own tooling, which follows the plugin's version and is upgraded by upgrading the plugin.
+         */
+        private boolean isOnSourceSetClasspath(GradleDependencyConfiguration declarable) {
+            if (gradleProject == null) {
+                return false;
+            }
+            for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                String name = configuration.getName();
+                if (("compileClasspath".equals(name) || "runtimeClasspath".equals(name) ||
+                        name.endsWith("CompileClasspath") || name.endsWith("RuntimeClasspath")) &&
+                        configuration.allExtendsFrom().stream().anyMatch(c -> c.getName().equals(declarable.getName()))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private @Nullable GradleDependencyConfiguration findDependencyConfiguration(GradleDependencyConfiguration config) {
             for (GradleDependencyConfiguration parent : config.allExtendsFrom()) {
                 if (parent.isCanBeDeclared()) {

@@ -3470,6 +3470,26 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         }
 
         /**
+         * The Kotlin plugin resolves its own tooling, such as swift-export-embeddable, at the plugin's version.
+         * That is no dependency of the project, so no declaration is added for it.
+         */
+        @Test
+        void doesNotDeclarePluginToolingDependency() {
+            rewriteRun(
+              spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "swift-export-embeddable", "2.3.x", null)),
+              buildGradleKts(
+                //language=kotlin
+                """
+                  plugins {
+                      kotlin("jvm") version "2.2.21"
+                  }
+                  repositories { mavenCentral() }
+                  """
+              )
+            );
+        }
+
+        /**
          * Transitive dependencies from plugins should not be upgraded by this recipe.
          * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
          */
