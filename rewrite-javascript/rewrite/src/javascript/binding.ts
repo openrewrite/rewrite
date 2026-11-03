@@ -20,7 +20,7 @@ import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, s
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
-    isCommonJs, memberName, moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
+    isCommonJs, memberName, moduleNameOf, moduleScopeBindings, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
     requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
@@ -366,7 +366,12 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     }
     const existing = existingImportBinding(cu, options.from.module, options.from.member);
     if (existing === undefined) {
-        renameMemberSpellings(visitor, cu, options);
+        // A binding that cannot move (a typed require or one with rest) is still a binding.
+        const bound = moduleScopeBindings(cu).some(b => b.module !== undefined &&
+            sameModule(b.module, options.from.module) && b.member === memberName(options.from.member));
+        if (!bound) {
+            renameMemberSpellings(visitor, cu, options);
+        }
         return undefined;
     }
     // A binding leaving a `let` or `var` destructuring would land in a `const` require.
