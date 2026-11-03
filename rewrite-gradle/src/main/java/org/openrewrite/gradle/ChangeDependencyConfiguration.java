@@ -72,7 +72,9 @@ public class ChangeDependencyConfiguration extends Recipe {
     }
 
     String description = "A common example is the need to change `compile` to `api`/`implementation` as " +
-               "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
+               "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later. " +
+               "A declaration with no coordinates to compare, such as `files('x')`, changes only when every dependency " +
+               "(`*:*`) of a named configuration was asked for.";
 
     @Override
     public Validated<Object> validate() {
@@ -92,8 +94,12 @@ public class ChangeDependencyConfiguration extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                 boolean kotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
-                if (kotlin && !isKotlinDependencyDsl(m)) {
+                if (kotlin && !isDependencyDsl(m)) {
                     return m;
+                }
+
+                if (matchesDeclarationWithoutCoordinates(m)) {
+                    return changeConfiguration(m, ctx);
                 }
 
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
@@ -242,7 +248,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                 return m.withName(m.getName().withSimpleName(newConfiguration));
             }
 
-            private boolean isKotlinDependencyDsl(J.MethodInvocation method) {
+            private boolean isDependencyDsl(J.MethodInvocation method) {
                 if (method.getSelect() != null) {
                     return false;
                 }
@@ -270,6 +276,24 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
                 }
                 return dependencies;
+            }
+
+            /**
+             * {@code files('x')}, {@code gradleApi()}, a variable or a catalog entry has no coordinates to compare, so it
+             * matches only a request for every dependency of a named configuration, which is how a removed configuration
+             * is migrated.
+             */
+            private boolean matchesDeclarationWithoutCoordinates(J.MethodInvocation m) {
+                if (!"*".equals(groupId) || !"*".equals(artifactId) || !m.getSimpleName().equals(configuration) ||
+                    m.getArguments().isEmpty() || !isDependencyDsl(m)) {
+                    return false;
+                }
+                Expression notation = m.getArguments().get(0);
+                if (notation instanceof J.MethodInvocation) {
+                    String name = ((J.MethodInvocation) notation).getSimpleName();
+                    return !"project".equals(name) && !"platform".equals(name) && !"enforcedPlatform".equals(name);
+                }
+                return notation instanceof J.Identifier || notation instanceof J.FieldAccess;
             }
 
             private boolean matchesOtherDependency(J.MethodInvocation m) {
