@@ -1,6 +1,6 @@
 import {JavaScriptVisitor} from "./visitor";
 import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TextComment, TrailingComma, Type} from "../java";
-import {isObjectBindingPattern, JS, JSX} from "./tree";
+import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
@@ -508,8 +508,8 @@ function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member
         return undefined;
     }
     const alias = specifier.specifier as JS.Alias;
-    return alias.propertyName?.element?.kind === J.Kind.Identifier && alias.alias?.kind === J.Kind.Identifier
-        ? {name: (alias.alias as J.Identifier).simpleName, member: (alias.propertyName.element as J.Identifier).simpleName}
+    return alias.propertyName?.element && alias.alias?.kind === J.Kind.Identifier
+        ? {name: (alias.alias as J.Identifier).simpleName, member: moduleExportName(alias.propertyName.element)}
         : undefined;
 }
 
@@ -2030,8 +2030,7 @@ function namedSpecifierImports(specifier: JS.ImportSpecifier["specifier"], key: 
         return specifier.simpleName === key;
     }
     if (specifier.kind === JS.Kind.Alias) {
-        const propertyName = (specifier as JS.Alias).propertyName.element;
-        return isIdentifier(propertyName) && propertyName.simpleName === key;
+        return moduleExportName((specifier as JS.Alias).propertyName.element) === key;
     }
     return false;
 }
@@ -2562,11 +2561,11 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 }
 
-/** Points `literal` at `module`, keeping its quotes. */
-function respecify(literal: Draft<J.Literal>, module: string): void {
+/** Points `literal` at `name`, keeping its quotes. */
+function respecify(literal: Draft<J.Literal>, name: string): void {
     const quoteChar = (literal.valueSource ?? '"').startsWith("'") ? "'" : '"';
-    literal.value = module;
-    literal.valueSource = `${quoteChar}${module}${quoteChar}`;
+    literal.value = name;
+    literal.valueSource = `${quoteChar}${name}${quoteChar}`;
     literal.unicodeEscapes = undefined;
 }
 
@@ -2897,7 +2896,12 @@ function rewriteNamedSpecifier(
             // standing in for it takes that prefix.
             specifier.specifier = {...local, prefix: (alias ?? local).prefix, simpleName: member};
         } else if (alias) {
-            (alias.propertyName.element as Draft<J.Identifier>).simpleName = member;
+            const propertyName = alias.propertyName.element;
+            if (propertyName.kind === J.Kind.Literal) {
+                respecify(propertyName, member);
+            } else {
+                propertyName.simpleName = member;
+            }
             local.simpleName = boundName;
         } else {
             specifier.specifier = aliasing({...local, simpleName: boundName}, member) as Draft<JS.Alias>;

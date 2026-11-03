@@ -1059,6 +1059,14 @@ describe("maybeBind and type-only imports", () => {
         await spec.rewriteRun(typescript(`import * as v from "vitest";\nlet m: v.Mocked<{}>;`));
         expect(bound.name).toBe("v");
     });
+
+    test("a member imported under its string-literal name answers a request for it", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "lodash", member: "assign"}, bound);
+        await spec.rewriteRun(typescript(`import { "assign" as merge } from "lodash";\n\nmerge({}, {});`));
+        expect(bound.name).toBe("merge");
+    });
 });
 
 describe("maybeRebind", () => {
@@ -1133,6 +1141,44 @@ describe("maybeRebind", () => {
         });
         await spec.rewriteRun(typescript(
             `import { extend as assign } from "lodash";\n\nassign({}, {});`,
+            `import { assign } from "lodash";\n\nassign({}, {});`
+        ));
+        expect(bound.name).toBe("assign");
+    });
+
+    test("a member imported under its string-literal name keeps that form and its quotes", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name ??= maybeRebind(this, {
+                    from: {module: "@angular/http", member: "Http"},
+                    to: {module: "@angular/common/http", member: "HttpClient"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {'Http' as AngularHttp} from '@angular/http';\n\nexport class WidgetService { constructor(private http: AngularHttp) {} }`,
+            `import {'HttpClient' as AngularHttp} from '@angular/common/http';\n\nexport class WidgetService { constructor(private http: AngularHttp) {} }`
+        ));
+        expect(bound.name).toBe("AngularHttp");
+    });
+
+    test("a string-literal name the new member makes redundant becomes a bare specifier", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name ??= maybeRebind(this, {
+                    from: {module: "lodash", member: "extend"},
+                    to: {module: "lodash", member: "assign"}
+                });
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import { "extend" as assign } from "lodash";\n\nassign({}, {});`,
             `import { assign } from "lodash";\n\nassign({}, {});`
         ));
         expect(bound.name).toBe("assign");
