@@ -22,8 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -32,7 +31,7 @@ class MadeChangesInThisCycleTest implements RewriteTest {
     @SuppressWarnings("deprecation")
     @Test
     void recipeCannotForceAnotherCycleThroughTheSchedulersState() {
-        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+        assertThatThrownBy(() -> rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
               public PlainText visitText(PlainText text, ExecutionContext ctx) {
@@ -41,7 +40,8 @@ class MadeChangesInThisCycleTest implements RewriteTest {
               }
           })),
           text("hello")
-        ));
-        assertThat(e).hasStackTraceContaining("returns true from Recipe#causesAnotherCycle()");
+        ))
+          .isInstanceOf(AssertionError.class)
+          .hasStackTraceContaining("returns true from Recipe#causesAnotherCycle()");
     }
 }
