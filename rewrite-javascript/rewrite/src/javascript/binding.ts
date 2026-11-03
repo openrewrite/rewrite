@@ -188,8 +188,9 @@ function wholeModuleBindingsVia(
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
+                const modifiers = (stmt.element as J.VariableDeclarations | JS.ScopedVariableDeclarations).modifiers;
                 bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false,
-                    reassignable: !declaration.modifiers.some(m => m.keyword === "const")});
+                    reassignable: !modifiers.some(m => m.keyword === "const")});
             }
         }
     }

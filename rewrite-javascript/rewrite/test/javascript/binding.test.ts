@@ -2999,6 +2999,15 @@ describe("maybeRebind and the member's other spellings", () => {
         await spec.rewriteRun(javascript(`${declaration}\nNS = {Old: () => 1};\nNS.Old();`));
     });
 
+    test("a module object stays constant in a declaration list", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(javascript(
+            'const NS = require("m"), Other = require("other");\nNS.Old();\nOther.Old();',
+            'const NS = require("m"), Other = require("other");\nNS.New();\nOther.Old();'
+        ));
+    });
+
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
         // `D.Old` reads the default export's property, which is the member only where the module's
         // default is its namespace object, as `export =` typings make it
