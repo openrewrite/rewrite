@@ -110,8 +110,22 @@ describe('capture types', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().getCurrentNavigation();',
-                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().currentNavigation();'
+                `
+                class Router {
+                    getCurrentNavigation() {}
+
+                    currentNavigation() {}
+                }
+
+                new Router().getCurrentNavigation();`,
+                `
+                class Router {
+                    getCurrentNavigation() {}
+
+                    currentNavigation() {}
+                }
+
+                new Router().currentNavigation();`
             )
         );
     });
@@ -130,7 +144,12 @@ describe('capture types', () => {
         });
         return spec.rewriteRun({
             //language=typescript
-            ...typescript('const s = "abc";\nconst b = new Buffer(s);', 'const s = "abc";\nconst b = Buffer.from(s);'),
+            ...typescript(`
+                const s = "abc";
+                const b = new Buffer(s);`,
+                `
+                const s = "abc";
+                const b = Buffer.from(s);`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const b = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
                 const returnType = (b.initializer!.element as J.MethodInvocation).methodType!.returnType as Type.Parameterized;
@@ -168,8 +187,16 @@ describe('capture types', () => {
         return spec.rewriteRun({
             //language=typescript
             ...typescript(
-                'const arr: number[] = [1];\nconst map = new Map<string, number>();\nhas(arr);\nlookup(map);',
-                'const arr: number[] = [1];\nconst map = new Map<string, number>();\narr.includes(1);\nmap.get("k");'
+                `
+                const arr: number[] = [1];
+                const map = new Map<string, number>();
+                has(arr);
+                lookup(map);`,
+                `
+                const arr: number[] = [1];
+                const map = new Map<string, number>();
+                arr.includes(1);
+                map.get("k");`
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const [includes, get] = [2, 3].map(i => (cu.statements[i].element as J.MethodInvocation).methodType!);
@@ -193,8 +220,14 @@ describe('capture types', () => {
         return spec.rewriteRun({
             //language=typescript
             ...typescript(
-                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nhas(nested);',
-                'type Nested = Array<Nested>;\nconst nested: Nested = [];\nnested.includes(1);'
+                `
+                type Nested = Array<Nested>;
+                const nested: Nested = [];
+                has(nested);`,
+                `
+                type Nested = Array<Nested>;
+                const nested: Nested = [];
+                nested.includes(1);`
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const includes = (cu.statements[2].element as J.MethodInvocation).methodType!;
@@ -312,8 +345,18 @@ describe('capture types', () => {
         return spec.rewriteRun({
             //language=typescript
             ...typescript(
-                'export class Foo {\n}\n\nconst f = new Foo();\nuse(f);',
-                'export class Foo {\n}\n\nconst f = new Foo();\nwrap(f);'
+                `
+                export class Foo {
+                }
+
+                const f = new Foo();
+                use(f);`,
+                `
+                export class Foo {
+                }
+
+                const f = new Foo();
+                wrap(f);`
             ),
             // The module path is what qualifies `Foo`, giving the parameter a type no preamble can name
             path: 'src/a.ts'

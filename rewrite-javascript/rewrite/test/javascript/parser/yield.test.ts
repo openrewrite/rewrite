@@ -69,7 +69,14 @@ describe('yield mapping', () => {
         });
         return dropValue.rewriteRun(
             //language=typescript
-            typescript('function* g() {\n    yield 42;\n}', 'function* g() {\n    yield;\n}')
+            typescript(`
+                function* g() {
+                    yield 42;
+                }`,
+                `
+                function* g() {
+                    yield;
+                }`)
         );
     });
     test('delegated', () =>

@@ -40,8 +40,14 @@ describe('templates that declare module bindings', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const Theming = 1;\napplyTheme('dark');`,
-                `import Theming_1 from 'sap/ui/core/Theming';\n\nconst Theming = 1;\nTheming_1.setTheme('dark');`
+                `
+                const Theming = 1;
+                applyTheme('dark');`,
+                `
+                import Theming_1 from 'sap/ui/core/Theming';
+
+                const Theming = 1;
+                Theming_1.setTheme('dark');`
             )
         );
     });
@@ -55,8 +61,14 @@ describe('templates that declare module bindings', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `import Th from 'sap/ui/core/Theming';\n\napplyTheme('dark');`,
-                `import Th from 'sap/ui/core/Theming';\n\nTh.setTheme('dark');`
+                `
+                import Th from 'sap/ui/core/Theming';
+
+                applyTheme('dark');`,
+                `
+                import Th from 'sap/ui/core/Theming';
+
+                Th.setTheme('dark');`
             )
         );
     });
@@ -74,7 +86,11 @@ describe('templates that declare module bindings', () => {
             //language=typescript
             typescript(
                 `applyTheme('dark');`,
-                `import Locale from 'sap/ui/core/Locale';\nimport Localization from 'sap/base/i18n/Localization';\n\nnew Locale(Localization.getLanguageTag('dark'));`
+                `
+                import Locale from 'sap/ui/core/Locale';
+                import Localization from 'sap/base/i18n/Localization';
+
+                new Locale(Localization.getLanguageTag('dark'));`
             )
         );
     });
@@ -88,8 +104,14 @@ describe('templates that declare module bindings', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const Theming = 1;\napplyTheme(props);`,
-                `import Theming_1 from 'sap/ui/core/Theming';\n\nconst Theming = 1;\nTheming_1.setTheme(props.Theming);`
+                `
+                const Theming = 1;
+                applyTheme(props);`,
+                `
+                import Theming_1 from 'sap/ui/core/Theming';
+
+                const Theming = 1;
+                Theming_1.setTheme(props.Theming);`
             )
         );
     });
@@ -103,8 +125,14 @@ describe('templates that declare module bindings', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const merge = 1;\napplyTheme('dark');`,
-                `import merge_1 from 'sap/base/util/merge';\n\nconst merge = 1;\nmerge_1('dark', {}).merge();`
+                `
+                const merge = 1;
+                applyTheme('dark');`,
+                `
+                import merge_1 from 'sap/base/util/merge';
+
+                const merge = 1;
+                merge_1('dark', {}).merge();`
             )
         );
     });
@@ -121,7 +149,10 @@ describe('templates that declare module bindings', () => {
             //language=typescript
             typescript(
                 `applyTheme(svc);`,
-                `import {Mocked} from 'vitest';\n\nsvc as unknown as Mocked<typeof svc>;`
+                `
+                import {Mocked} from 'vitest';
+
+                svc as unknown as Mocked<typeof svc>;`
             )
         );
     });
@@ -135,8 +166,14 @@ describe('templates that declare module bindings', () => {
         await spec.rewriteRun(
             //language=typescript
             typescript(
-                `const Mocked = 1;\napplyTheme(svc);`,
-                `import {Mocked as Mocked_1} from 'vitest';\n\nconst Mocked = 1;\nsvc as unknown as Mocked_1<typeof svc>;`
+                `
+                const Mocked = 1;
+                applyTheme(svc);`,
+                `
+                import {Mocked as Mocked_1} from 'vitest';
+
+                const Mocked = 1;
+                svc as unknown as Mocked_1<typeof svc>;`
             )
         );
     });
@@ -154,7 +191,10 @@ describe('templates that declare module bindings', () => {
             //language=typescript
             typescript(
                 `applyTheme('dark');`,
-                `import Theming from 'sap/ui/core/Theming';\n\nTheming.setTheme('dark');`
+                `
+                import Theming from 'sap/ui/core/Theming';
+
+                Theming.setTheme('dark');`
             )
         );
     });
@@ -167,7 +207,9 @@ describe('templates that declare module bindings', () => {
 
         await spec.rewriteRun(
             //language=typescript
-            typescript(`const x = Theming;\nsomethingElse('dark');`)
+            typescript(`
+                const x = Theming;
+                somethingElse('dark');`)
         );
     });
 

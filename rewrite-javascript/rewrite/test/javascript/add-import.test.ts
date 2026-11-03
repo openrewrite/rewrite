@@ -672,8 +672,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n    zzz,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                        zzz,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -685,8 +696,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n    zzz\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                        zzz
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -698,8 +720,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    readdir,\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readdir,
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -711,8 +744,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    access,\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        access,
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -724,8 +768,17 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -950,8 +1003,14 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import { join } from 'path';\nimport {} from 'fs';\n`,
-                    `import { join } from 'path';\nimport { readFile } from 'fs';\n`
+                    `
+                    import { join } from 'path';
+                    import {} from 'fs';
+                    `,
+                    `
+                    import { join } from 'path';
+                    import { readFile } from 'fs';
+                    `
                 )
             );
         });
@@ -3920,8 +3979,19 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
         await spec.rewriteRun(typescript(
-            `import got from 'got'\nimport http from 'http'\n\nconst x = 1\n`,
-            `import got from 'got'\nimport http from 'http'\nimport {b} from 'n'\n\nconst x = 1\n`
+            `
+            import got from 'got'
+            import http from 'http'
+
+            const x = 1
+            `,
+            `
+            import got from 'got'
+            import http from 'http'
+            import {b} from 'n'
+
+            const x = 1
+            `
         ));
     });
 
@@ -3929,8 +3999,16 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
         await spec.rewriteRun(typescript(
-            `const x = 1\nconsole.log(x)\n`,
-            `import {b} from 'n'\n\nconst x = 1\nconsole.log(x)\n`
+            `
+            const x = 1
+            console.log(x)
+            `,
+            `
+            import {b} from 'n'
+
+            const x = 1
+            console.log(x)
+            `
         ));
     });
 
@@ -3938,8 +4016,19 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
         await spec.rewriteRun(typescript(
-            `import got from 'got';\nimport http from 'http';\n\nconst x = 1;\n`,
-            `import got from 'got';\nimport http from 'http';\nimport {b} from 'n';\n\nconst x = 1;\n`
+            `
+            import got from 'got';
+            import http from 'http';
+
+            const x = 1;
+            `,
+            `
+            import got from 'got';
+            import http from 'http';
+            import {b} from 'n';
+
+            const x = 1;
+            `
         ));
     });
 
@@ -3947,8 +4036,17 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({semi: false, singleQuote: true}));
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport { b } from 'n'\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import { b } from 'n'
+
+            const x = [a];
+            `
         ));
     });
 
@@ -3956,8 +4054,19 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
         await spec.rewriteRun(typescript(
-            `import { a } from "m";\nimport { c } from "o";\n\nconst x = [a, c];\n`,
-            `import { a } from "m";\nimport { c } from "o";\nimport { b } from "n";\n\nconst x = [a, c];\n`
+            `
+            import { a } from "m";
+            import { c } from "o";
+
+            const x = [a, c];
+            `,
+            `
+            import { a } from "m";
+            import { c } from "o";
+            import { b } from "n";
+
+            const x = [a, c];
+            `
         ));
     });
 
@@ -3965,8 +4074,23 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
         await spec.rewriteRun(typescript(
-            `import {\n    a,\n    c,\n} from "m";\n\nconst x = [a, c];\n`,
-            `import {\n    a,\n    c,\n} from "m";\nimport {b} from "n";\n\nconst x = [a, c];\n`
+            `
+            import {
+                a,
+                c,
+            } from "m";
+
+            const x = [a, c];
+            `,
+            `
+            import {
+                a,
+                c,
+            } from "m";
+            import {b} from "n";
+
+            const x = [a, c];
+            `
         ));
     });
 
@@ -3974,8 +4098,17 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({bracketSpacing: false, singleQuote: true}));
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport {b} from 'n';\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import {b} from 'n';
+
+            const x = [a];
+            `
         ));
     });
 
@@ -3983,8 +4116,17 @@ describe('AddImport follows the file it lands in', () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({singleQuote: false}));
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport { b } from "n";\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import { b } from "n";
+
+            const x = [a];
+            `
         ));
     });
 });

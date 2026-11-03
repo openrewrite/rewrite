@@ -64,8 +64,14 @@ describe('IsVendoredOrBundled visitor', () => {
     test('marks a trailing sourceMappingURL', async () => {
         await spec.rewriteRun({
             ...javascript(
-                `const a = 1;\n//# sourceMappingURL=index.js.map\n`,
-                `/*~~>*/const a = 1;\n//# sourceMappingURL=index.js.map\n`
+                `
+                const a = 1;
+                //# sourceMappingURL=index.js.map
+                `,
+                `
+                /*~~>*/const a = 1;
+                //# sourceMappingURL=index.js.map
+                `
             ),
             path: "lib/index.js"
         });
@@ -74,8 +80,14 @@ describe('IsVendoredOrBundled visitor', () => {
     test('marks a legacy trailing sourceMappingURL', async () => {
         await spec.rewriteRun({
             ...javascript(
-                `const a = 1;\n//@ sourceMappingURL=index.js.map\n`,
-                `/*~~>*/const a = 1;\n//@ sourceMappingURL=index.js.map\n`
+                `
+                const a = 1;
+                //@ sourceMappingURL=index.js.map
+                `,
+                `
+                /*~~>*/const a = 1;
+                //@ sourceMappingURL=index.js.map
+                `
             ),
             path: "lib/index.js"
         });
@@ -83,7 +95,10 @@ describe('IsVendoredOrBundled visitor', () => {
 
     test('ignores a sourceMappingURL that is not trailing', async () => {
         await spec.rewriteRun({
-            ...javascript(`//# sourceMappingURL=index.js.map\nconst a = 1;\n`),
+            ...javascript(`
+                //# sourceMappingURL=index.js.map
+                const a = 1;
+            `),
             path: "lib/index.js"
         });
     });

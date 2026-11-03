@@ -83,8 +83,20 @@ describe("withDependency", () => {
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`,
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`
+            `
+            sap.ui.define([
+                "a/B"
+            ], function (
+                B
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], function (
+                B,
+                D
+            ) {});`
         ));
     });
 
@@ -118,12 +130,25 @@ describe("withDependency", () => {
                 `sap.ui.define(["a/B", /* the C */ "a/C", "c/D"], function (B, C, D) {});`
             ),
             javascript(
-                `sap.ui.define([/* a\n b */ "a/B"], function (B) {});`,
-                `sap.ui.define([/* a\n b */ "a/B", "c/D"], function (B, D) {});`
+                `
+                sap.ui.define([/* a
+                 b */ "a/B"], function (B) {});`,
+                `
+                sap.ui.define([/* a
+                 b */ "a/B", "c/D"], function (B, D) {});`
             ),
             javascript(
-                `sap.ui.define([\n    // the B\n    "a/B"\n], function (B) {});`,
-                `sap.ui.define([\n    // the B\n    "a/B",\n    "c/D"\n], function (B, D) {});`
+                `
+                sap.ui.define([
+                    // the B
+                    "a/B"
+                ], function (B) {});`,
+                `
+                sap.ui.define([
+                    // the B
+                    "a/B",
+                    "c/D"
+                ], function (B, D) {});`
             )
         );
     });
@@ -143,8 +168,20 @@ describe("withDependency", () => {
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B"\n], (\n    B\n) => {});`,
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], (\n    B,\n    D\n) => {});`
+            `
+            sap.ui.define([
+                "a/B"
+            ], (
+                B
+            ) => {});`,
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], (
+                B,
+                D
+            ) => {});`
         ));
     });
 
@@ -195,8 +232,20 @@ describe("withDependency", () => {
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
         spec.cycles = 1;
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B" // note\n], function (\n    B\n) {});`,
-            `sap.ui.define([\n    "a/B" // note\n,\n    "c/D"], function (\n    B,\n    D\n) {});`
+            `
+            sap.ui.define([
+                "a/B" // note
+            ], function (
+                B
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B" // note
+            ,
+                "c/D"], function (
+                B,
+                D
+            ) {});`
         ));
     });
 });
@@ -212,8 +261,20 @@ describe("withoutDependencyAt", () => {
             }
         });
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`,
-            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], function (
+                B,
+                D
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B"
+            ], function (
+                B
+            ) {});`
         ));
     });
 

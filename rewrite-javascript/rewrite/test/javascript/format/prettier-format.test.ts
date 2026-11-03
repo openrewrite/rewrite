@@ -69,7 +69,12 @@ describe('AutoformatVisitor with Prettier', () => {
             [prettierStyle(randomId(), {parser: 'no-such-parser'})]));
         await spec.rewriteRun(
             //language=typescript
-            typescript('const x   =   1+2\n\n\n\nconst  y=3')
+            typescript(`
+                const x   =   1+2
+
+
+
+                const  y=3`)
         );
         expect(warn).toHaveBeenCalledWith('Prettier formatting failed:',
             expect.objectContaining({message: expect.stringContaining('no-such-parser')}));
