@@ -70,6 +70,9 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         }
         return produce(visited as J.MethodInvocation, draft => {
             draft.name.simpleName = this.to.member;
+            if (draft.methodType) {
+                draft.methodType = {...draft.methodType, name: this.to.member};
+            }
         });
     }
 
