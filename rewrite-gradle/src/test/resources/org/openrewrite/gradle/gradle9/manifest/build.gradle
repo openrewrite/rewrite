@@ -1,0 +1,39 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+plugins { id 'java' }
+
+allprojects {
+    jar {
+        manifest {
+            attributes('Existing': 'retained')
+            attributes += ['Main-Class':'pt.lsts.neptus.loader.NeptusMain']
+        }
+    }
+}
+
+tasks.register('verifyManifest') {
+    dependsOn jar
+    doLast {
+        def artifact = new java.util.jar.JarFile(tasks.jar.archiveFile.get().asFile)
+        try {
+            assert artifact.manifest.mainAttributes.getValue('Existing') == 'retained'
+            assert artifact.manifest.mainAttributes.getValue('Main-Class') == 'pt.lsts.neptus.loader.NeptusMain'
+        } finally {
+            artifact.close()
+        }
+    }
+}
+check.dependsOn verifyManifest
