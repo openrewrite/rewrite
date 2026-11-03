@@ -634,3 +634,37 @@ describe('Tag on a mapping or sequence', () => {
             `)
         ));
 });
+
+describe('Text after the last document', () => {
+    const spec = new RecipeSpec();
+
+    test('newline, blank lines and comments after the last document end marker', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: b
+                ...
+            `),
+            yaml(`
+                ---
+                a: b
+                ...
+
+
+            `),
+            yaml(`
+                a: b
+                ...
+                ---
+                c: d
+                ...
+                # trailing
+            `)
+        ));
+
+    test('file with only a comment', () =>
+        spec.rewriteRun(
+            yaml(`
+                # only a comment
+            `)
+        ));
+});

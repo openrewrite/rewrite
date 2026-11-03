@@ -129,7 +129,7 @@ class YamlCstReader {
             prefix: "",
             markers: emptyMarkers,
             documents,
-            suffix: undefined
+            suffix: pendingPrefix || undefined
         };
     }
 
