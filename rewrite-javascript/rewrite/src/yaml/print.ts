@@ -99,7 +99,6 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     protected async visitScalar(scalar: Yaml.Scalar, p: PrintOutputCapture): Promise<Yaml | undefined> {
         await this.beforeSyntax(scalar, p);
-        // Anchor before tag, as the Java YamlPrinter prints them. A tag written first holds its anchor in its suffix.
         if (scalar.anchor) {
             await this.visit(scalar.anchor, p);
         }
