@@ -456,7 +456,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (println.matches(method) || !(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                  if (println.matches(method)) {
                       return method;
                   }
                   return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
@@ -490,7 +490,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                         types.add(String.valueOf(method.getMethodType()));
                         types.add(String.valueOf(method.getArguments().getFirst().getType()));
                     }
-                    return super.visitMethodInvocation(method, types);
+                    return method;
                 }
             }.reduce(cu, new ArrayList<>())).containsExactly(
               "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
@@ -498,6 +498,42 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
               "java.io.Serializable & java.lang.Comparable<Generic{? extends java.io.Serializable & java.lang.Comparable<Generic{?}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc"
             ))
+          )
+        );
+    }
+
+    @Test
+    void anyWithExtendsObjectWildcardTypeArgument() {
+        MethodMatcher println = new MethodMatcher("java.io.PrintStream println(..)");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (println.matches(method)) {
+                      return method;
+                  }
+                  return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
+              }
+          })),
+          java(
+            """
+              import java.util.Map;
+              abstract class Test {
+                  abstract Map.Entry<String, ? extends Object> entry();
+                  void test() {
+                      entry();
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+              abstract class Test {
+                  abstract Map.Entry<String, ? extends Object> entry();
+                  void test() {
+                      System.out.println(entry());
+                  }
+              }
+              """
           )
         );
     }
