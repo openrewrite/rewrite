@@ -18,7 +18,7 @@ import {isIdentifier, J} from "../java";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve} from "./scope";
-import {aliasing, moduleNameOf, newIdentifier, respecify} from "./add-import";
+import {aliasing, moduleNameOf, newIdentifier, requiredModuleOf, respecify} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -152,16 +152,10 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 /** The names `import X = require("m")` declarations bind `module`'s module object under. */
 export function importEqualsNames(cu: JS.CompilationUnit, module: string): string[] {
     return cu.statements.flatMap(s => {
-        const jsImport = s.element as JS.Import;
-        if (jsImport?.kind !== JS.Kind.Import) {
-            return [];
-        }
-        const required = jsImport.initializer?.element as J.MethodInvocation | undefined;
-        const argument = required?.kind === J.Kind.MethodInvocation && required.name.simpleName === "require" && !required.select ?
-            required.arguments.elements[0]?.element : undefined;
-        const name = jsImport.importClause?.name?.element;
-        return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string" &&
-            name !== undefined && isIdentifier(name) &&
-            sameModule(moduleNameOf(argument as J.Literal), module) ? [name.simpleName] : [];
+        const jsImport = s.element?.kind === JS.Kind.Import ? s.element as JS.Import : undefined;
+        const call = jsImport?.initializer?.element;
+        const required = call?.kind === J.Kind.MethodInvocation ? requiredModuleOf(call as J.MethodInvocation) : undefined;
+        const name = jsImport?.importClause?.name?.element;
+        return required !== undefined && sameModule(required, module) && name !== undefined && isIdentifier(name) ? [name.simpleName] : [];
     });
 }
