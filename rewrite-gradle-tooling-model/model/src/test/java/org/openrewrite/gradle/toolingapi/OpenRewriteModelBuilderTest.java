@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OpenRewriteModelBuilderTest {
@@ -38,6 +39,19 @@ class OpenRewriteModelBuilderTest {
         assertThat(Files.isSameFile(home.resolve("caches/modules-2"), defaultHome.resolve("caches/modules-2"))).isTrue();
         // Distributions stay out of reach of the cache cleanup that the fork home's daemons run
         assertThat(home.resolve("wrapper")).doesNotExist();
+    }
+
+    @Test
+    void forkGradleUserHomeCarriesTheDefaultHomesSettingsAndInitScripts(@TempDir Path tmp) throws IOException {
+        Path defaultHome = tmp.resolve("default");
+        Files.createDirectories(defaultHome.resolve("init.d"));
+        Files.write(defaultHome.resolve("gradle.properties"), "systemProp.https.proxyHost=proxy".getBytes(UTF_8));
+        Files.write(defaultHome.resolve("init.d/mirror.gradle"), "// a mirror".getBytes(UTF_8));
+
+        Path home = ForkGradleUserHome.create(tmp.resolve("homes"), "1", defaultHome);
+
+        assertThat(home.resolve("gradle.properties")).isRegularFile().hasContent("systemProp.https.proxyHost=proxy");
+        assertThat(home.resolve("init.d/mirror.gradle")).isRegularFile().hasContent("// a mirror");
     }
 
     @Test

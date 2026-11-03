@@ -28,11 +28,13 @@ import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -332,8 +334,8 @@ public class OpenRewriteModelBuilder {
     /**
      * A Gradle user home of this test JVM's own, whose script and transform caches, and the locks on them, only this
      * JVM's daemons use. It links to the default home's dependency cache, and the connector keeps distributions in the
-     * default home, so all forks share their downloads. Only openrewrite/rewrite's own tests set the property, and
-     * their test task clears the homes when it starts.
+     * default home, so all forks share their downloads. It has copies of the default home's settings and init scripts.
+     * Only openrewrite/rewrite's own tests set the property, and their test task clears the homes when it starts.
      */
     static final class ForkGradleUserHome {
         private static final Path DEFAULT_HOME = defaultGradleUserHome();
@@ -373,7 +375,28 @@ public class OpenRewriteModelBuilder {
             if (!Files.isSymbolicLink(link)) {
                 Files.createSymbolicLink(link, dependencyCache);
             }
+            // Test builds get the proxy settings, credentials and mirror scripts every build in the default home gets
+            copySettings(defaultHome, home);
             return home;
+        }
+
+        private static void copySettings(Path defaultHome, Path home) throws IOException {
+            Path properties = defaultHome.resolve("gradle.properties");
+            if (Files.isRegularFile(properties)) {
+                Files.copy(properties, home.resolve("gradle.properties"), StandardCopyOption.REPLACE_EXISTING);
+            }
+            Path initScripts = defaultHome.resolve("init.d");
+            if (Files.isDirectory(initScripts)) {
+                Path copies = Files.createDirectories(home.resolve("init.d"));
+                try (DirectoryStream<Path> scripts = Files.newDirectoryStream(initScripts)) {
+                    for (Path script : scripts) {
+                        if (Files.isRegularFile(script)) {
+                            Files.copy(script, copies.resolve(script.getFileName().toString()),
+                                    StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                }
+            }
         }
 
         /**
