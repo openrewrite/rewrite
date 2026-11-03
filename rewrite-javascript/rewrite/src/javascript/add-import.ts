@@ -1809,7 +1809,7 @@ function isRequireStatement(statement: J | undefined): boolean {
         : declarationsOf(statement).some(d => d.variables.some(v => requiredModule(v.element.initializer?.element) !== undefined));
 }
 
-function newIdentifier(name: string): J.Identifier {
+export function newIdentifier(name: string): J.Identifier {
     return {
         kind: J.Kind.Identifier,
         id: randomId(),

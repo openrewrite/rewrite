@@ -3043,6 +3043,21 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
+    test("a re-export spelling the member as a string literal reads it by name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { "Old" } from "m";
+                export { "Old" as Renamed } from "m";
+            `,
+            `
+                export { New as "Old" } from "m";
+                export { New as Renamed } from "m";
+            `
+        ));
+    });
+
     test("a re-export moves to another module only where it re-exports nothing else", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});

@@ -18,7 +18,7 @@ import {isIdentifier, J} from "../java";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve} from "./scope";
-import {aliasing, moduleNameOf, respecify} from "./add-import";
+import {aliasing, moduleNameOf, newIdentifier, respecify} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
@@ -121,9 +121,10 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
                 }
                 const specifier = element.element as Draft<JS.ExportSpecifier>;
                 if (specifier.specifier.kind === JS.Kind.Alias) {
-                    // `export {Old as X}`: only the member it reads changes, X is the module's own name for it
+                    // `export {Old as X}`: only the member it reads changes, X is the module's own name for it.
+                    // A fresh identifier, since `export {"Old" as X}` spells the member as a string literal.
                     const name = (specifier.specifier as Draft<JS.Alias>).propertyName;
-                    name.element = {...name.element, kind: J.Kind.Identifier, simpleName: this.to.member} as Draft<J.Identifier>;
+                    name.element = {...newIdentifier(this.to.member), prefix: name.element.prefix} as Draft<J.Identifier>;
                 } else {
                     // `export {Old}` keeps publishing `Old`, now as `export {New as Old}`
                     specifier.specifier = aliasing(specifier.specifier as J.Identifier, this.to.member) as Draft<JS.Alias>;
