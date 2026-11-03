@@ -143,7 +143,7 @@ describe("change-method-target-to-import", () => {
     });
 
     test("binds the target as the file does, unless told the import style", async () => {
-        const jestFnToVi = (importStyle?: "ES6Named") => new ChangeMethodTargetToImport({
+        const jestFnToVi = (importStyle?: "ES6Named" | "CommonJS") => new ChangeMethodTargetToImport({
             methodPattern: "jest fn(..)",
             targetModule: "vitest",
             targetMember: "vi",
@@ -172,16 +172,31 @@ describe("change-method-target-to-import", () => {
                 test('instantiates', () => { const onChange = vi.fn(); });
             `
         ));
+
+        spec.recipe = jestFnToVi("CommonJS");
+        await withTypes(spec, jestTypes, javascript(
+            `
+                jest.fn();
+            `,
+            `
+                const {vi} = require('vitest');
+
+                vi.fn();
+            `
+        ));
     });
 
-    test("rejects an import style it does not know, rather than falling back to the file's", () => {
-        expect(() => new ChangeMethodTargetToImport({
+    test("rejects an import style it does not know, taking null as unset", () => {
+        const withStyle = (importStyle: any) => () => new ChangeMethodTargetToImport({
             methodPattern: "jest fn(..)",
             targetModule: "vitest",
             targetMember: "vi",
-            // A declarative recipe's typo, which the type system does not see.
-            importStyle: "ES6named" as any
-        })).toThrow("Unknown import style `ES6named`, expected one of ES6Named, CommonJS.");
+            importStyle
+        });
+        // A declarative recipe's typo, which the type system does not see.
+        expect(withStyle("ES6named")).toThrow("Unknown import style `ES6named`, expected one of ES6Named, CommonJS.");
+
+        expect(withStyle(null)).not.toThrow();
     });
 
     test("is installed in the marketplace", async () => {

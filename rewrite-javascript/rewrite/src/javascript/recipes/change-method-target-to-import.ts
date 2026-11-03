@@ -101,7 +101,7 @@ export class ChangeMethodTargetToImport extends Recipe {
         importStyle?: typeof IMPORT_STYLES[number];
     }) {
         super(options);
-        if (this.importStyle !== undefined && !IMPORT_STYLES.includes(this.importStyle)) {
+        if (this.importStyle != null && !IMPORT_STYLES.includes(this.importStyle)) {
             throw new Error(`Unknown import style \`${this.importStyle}\`, expected one of ${IMPORT_STYLES.join(", ")}.`);
         }
     }
@@ -110,7 +110,7 @@ export class ChangeMethodTargetToImport extends Recipe {
         const matcher = new MethodMatcher(this.methodPattern, this.matchOverrides);
         const module = this.targetModule;
         const member = this.targetMember;
-        const style = this.importStyle === undefined ? undefined : ImportStyle[this.importStyle];
+        const style = this.importStyle == null ? undefined : ImportStyle[this.importStyle];
         // Named after the specifier, as the parser names a module object.
         const moduleObject = classNamed(module);
         const memberType = this.targetType ? classNamed(this.targetType) : Type.unknownType as Type.FullyQualified;
