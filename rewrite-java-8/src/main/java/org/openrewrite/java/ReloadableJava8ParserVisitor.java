@@ -46,7 +46,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
@@ -93,7 +92,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     @Nullable
     private Throwable reportedException;
 
-    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava8ParserVisitor(Path sourcePath,
                                         @Nullable FileAttributes fileAttributes,
