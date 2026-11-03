@@ -175,27 +175,19 @@ export class PrepareRecipe {
             if (wireEntry) {
                 preconditions.push(wireEntry);
                 if (phase === "edit") {
-                    recipe = Object.assign(
-                        Object.create(Object.getPrototypeOf(recipe)),
-                        recipe,
-                        {
-                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                                return visitor.v;
-                            }
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                            return visitor.v;
                         }
-                    )
+                    });
                 } else {
-                    const original = recipe as ScanningRecipe<any>;
-                    recipe = Object.assign(
-                        Object.create(Object.getPrototypeOf(original)),
-                        original,
-                        {
-                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
-                                const checkVisitor = await original.scanner(acc);
-                                return (checkVisitor as Check<any>).v;
-                            }
+                    const scanner = (recipe as ScanningRecipe<any>).scanner;
+                    recipe = PrepareRecipe.withOverrides(recipe, {
+                        async scanner(this: ScanningRecipe<any>, acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                            const scanVisitor = await scanner.call(this, acc);
+                            return scanVisitor instanceof Check ? scanVisitor.v : scanVisitor;
                         }
-                    )
+                    });
                 }
             }
             await this.visitorTypePrecondition(preconditions, visitor.v);
@@ -203,6 +195,10 @@ export class PrepareRecipe {
             await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
+    }
+
+    private static withOverrides(recipe: Recipe, overrides: object): Recipe {
+        return Object.assign(Object.create(Object.getPrototypeOf(recipe)), recipe, overrides);
     }
 
     /**
