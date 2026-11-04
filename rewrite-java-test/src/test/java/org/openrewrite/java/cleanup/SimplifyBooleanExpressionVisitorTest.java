@@ -52,6 +52,25 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void preserveShortCircuitedPatternBindings() {
+        rewriteRun(java(
+          """
+            class A {
+                void f(Object value) {
+                    if (false && value instanceof String text) {
+                        System.out.println(text.length());
+                    }
+                    if (true || !(value instanceof String text)) {
+                    } else {
+                        System.out.println(text.length());
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
     void preserveVolatileBooleanRead() {
         rewriteRun(java("class A { volatile boolean flag; boolean f() { return flag && false; } }"));
     }

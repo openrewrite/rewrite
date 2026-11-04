@@ -26,6 +26,8 @@ import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
@@ -40,7 +42,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         }
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
-            if (isLiteralFalse(asBinary.getLeft())) {
+            if (isLiteralFalse(asBinary.getLeft()) && !declaresPatternVariable(asBinary.getRight())) {
                 j = asBinary.getLeft();
             } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
                        canDiscardEvaluation(asBinary.getLeft())) {
@@ -54,7 +56,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
-            if (isLiteralTrue(asBinary.getLeft())) {
+            if (isLiteralTrue(asBinary.getLeft()) && !declaresPatternVariable(asBinary.getRight())) {
                 j = asBinary.getLeft();
             } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
                        canDiscardEvaluation(asBinary.getLeft())) {
@@ -202,6 +204,20 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             return ternary;
         }
         return j;
+    }
+
+    private static boolean declaresPatternVariable(Expression expression) {
+        AtomicBoolean found = new AtomicBoolean();
+        new JavaVisitor<AtomicBoolean>() {
+            @Override
+            public J visitInstanceOf(J.InstanceOf instanceOf, AtomicBoolean found) {
+                if (instanceOf.getPattern() != null) {
+                    found.set(true);
+                }
+                return super.visitInstanceOf(instanceOf, found);
+            }
+        }.visit(expression, found);
+        return found.get();
     }
 
     private boolean canDiscardEvaluation(Expression expression) {
