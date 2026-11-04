@@ -1637,6 +1637,47 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyUpgradesExistingWhenNoFamilyMemberResolves() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null,
+            null, "com.google.common.math.IntMath", null, null, "org.example*", null)),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:28.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void addDependencyAlignsWithFamilyVersion() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.release", null,

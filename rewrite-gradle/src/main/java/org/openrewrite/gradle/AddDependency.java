@@ -153,8 +153,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public Scanned getInitialValue(ExecutionContext ctx) {
         Scanned acc = new Scanned();
-        // Upgrading to the requested version would break alignment with the family
-        if (version != null && familyPattern == null) {
+        if (version != null) {
             acc.upgradeState = upgradeDependencyVersion().getInitialValue(ctx);
         }
         return acc;
@@ -281,7 +280,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return s;
                         }
 
-                        String versionToAdd = Optional.ofNullable(familyVersion(gp)).orElse(version);
+                        String familyVersion = version != null && version.startsWith("$") ? null : familyVersion(gp);
+                        String versionToAdd = familyVersion != null ? familyVersion : version;
                         Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
@@ -397,7 +397,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             return;
         }
         GradleProject gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
-        if (gradleProject == null) {
+        // Upgrading to the requested version would break alignment with the family
+        if (gradleProject == null || familyVersion(gradleProject) != null) {
             return;
         }
         for (GradleDependencyConfiguration c : gradleProject.getConfigurations()) {
