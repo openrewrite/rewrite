@@ -17,6 +17,7 @@ import {Markers} from "./markers";
 import {UUID} from "./uuid";
 import {PlainText} from "./text";
 import {RpcCodecs} from "./rpc";
+import {registerHeavyweight} from "./heavyweight";
 
 export const TreeKind = {
     Checksum: "org.openrewrite.Checksum",
@@ -112,6 +113,8 @@ export class Cursor {
     }
 }
 
+registerHeavyweight(Cursor);
+
 export function rootCursor(): Cursor {
     return new Cursor("root");
 }
@@ -124,9 +127,10 @@ export interface Checksum {
 
 export interface FileAttributes {
     kind: typeof TreeKind.FileAttributes
-    readonly creationDate?: Date
-    readonly lastModifiedTime?: Date
-    readonly lastAccessTime?: Date
+    // ISO-8601, as sent by org.openrewrite.FileAttributes#rpcSend
+    readonly creationDate?: string
+    readonly lastModifiedTime?: string
+    readonly lastAccessTime?: string
     readonly isReadable: boolean
     readonly isWritable: boolean
     readonly isExecutable: boolean

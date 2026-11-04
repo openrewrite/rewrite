@@ -77,6 +77,40 @@ class ReplaceConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceConstantInLambda() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import java.util.function.Supplier;
+              import static com.google.common.base.Charsets.UTF_8;
+
+              class Test {
+                  void run(Supplier<Object> supplier) {
+                  }
+
+                  void method() {
+                      run(() -> UTF_8);
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier;
+
+              class Test {
+                  void run(Supplier<Object> supplier) {
+                  }
+
+                  void method() {
+                      run(() -> "UTF_8");
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1752")
     @Test
     void doesNotChangeOriginalVariableDeclaration() {

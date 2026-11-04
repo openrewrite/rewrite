@@ -3,7 +3,8 @@ parser grammar JsonPathParser;
 options { tokenVocab=JsonPathLexer; }
 
 jsonPath
-    : ROOT? expression+
+    : ROOT expression*
+    | expression+
     ;
 
 expression
@@ -35,6 +36,12 @@ filterExpression
     | regexExpression
     | containsExpression
     | unaryExpression
+    | negationExpression
+    ;
+
+negationExpression
+    : NOT LPAREN filterExpression RPAREN
+    | NOT unaryExpression
     ;
 
 binaryExpression
@@ -50,6 +57,14 @@ binaryExpression
     | containsExpression LOGICAL_OPERATOR containsExpression
     | containsExpression LOGICAL_OPERATOR binaryExpression
     | containsExpression LOGICAL_OPERATOR regexExpression
+    // Negation logical operators.
+    | negationExpression LOGICAL_OPERATOR negationExpression
+    | negationExpression LOGICAL_OPERATOR binaryExpression
+    | negationExpression LOGICAL_OPERATOR regexExpression
+    | negationExpression LOGICAL_OPERATOR containsExpression
+    | binaryExpression LOGICAL_OPERATOR negationExpression
+    | regexExpression LOGICAL_OPERATOR negationExpression
+    | containsExpression LOGICAL_OPERATOR negationExpression
     // Equality operators.
     | unaryExpression EQUALITY_OPERATOR literalExpression
     | literalExpression EQUALITY_OPERATOR unaryExpression

@@ -15,20 +15,17 @@
  */
 package org.openrewrite.xml.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 public class AutoFormat extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Format XML";
-    }
+    @Getter
+    final String displayName = "Format XML";
 
-    @Override
-    public String getDescription() {
-        return "Indents XML using the most common indentation size and tabs or space choice in use in the file.";
-    }
+    @Getter
+    final String description = "Indents XML using the most common indentation size and tabs or space choice in use in the file.";
 
     @Override
     public AutoFormatVisitor<ExecutionContext> getVisitor() {

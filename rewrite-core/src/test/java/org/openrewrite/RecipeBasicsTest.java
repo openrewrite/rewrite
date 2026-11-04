@@ -16,11 +16,16 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -104,5 +109,167 @@ class RecipeBasicsTest {
     void optionExposedViaConstructorParameter() {
         RecipeDescriptor d = new RecipeWithConstructorParameter("option").createRecipeDescriptor();
         assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
+    }
+
+    static class RecipeWithListOption extends Recipe {
+        @Option(displayName = "Field names", description = "Field names.", example = "firstName,lastName")
+        List<String> fieldNames;
+
+        public RecipeWithListOption(List<String> fieldNames) {
+            this.fieldNames = fieldNames;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Recipe with list option";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Recipe with list option.";
+        }
+    }
+
+    enum Color { RED, GREEN, BLUE }
+
+    @Getter
+    static class RecipeWithEnumField extends Recipe {
+        private final String displayName = "Enum field recipe";
+        private final String description = "Enum field recipe.";
+
+        @Option(displayName = "Color", description = "Pick a color.")
+        final Color color;
+
+        public RecipeWithEnumField(Color color) {
+            this.color = color;
+        }
+    }
+
+    @Test
+    void enumFieldOptionDeducesValidValues() {
+        RecipeDescriptor d = new RecipeWithEnumField(Color.RED).createRecipeDescriptor();
+        OptionDescriptor opt = d.getOptions().getFirst();
+        assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
+    }
+
+    static class RecipeWithEnumMethod extends RecipeBase {
+        Color color;
+
+        public RecipeWithEnumMethod(Color color) {
+            super("ignored");
+            this.color = color;
+        }
+
+        @Option(displayName = "Color", description = "Pick a color.")
+        Color getColor() {
+            return color;
+        }
+    }
+
+    @Test
+    void enumMethodOptionDeducesValidValues() {
+        RecipeDescriptor d = new RecipeWithEnumMethod(Color.GREEN).createRecipeDescriptor();
+        OptionDescriptor opt = d.getOptions().stream()
+                .filter(o -> o.getName().equals("color"))
+                .findFirst().orElseThrow();
+        assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
+    }
+
+    @Getter
+    static class RecipeWithEnumConstructorParam extends Recipe {
+        private final String displayName = "Enum constructor param recipe";
+        private final String description = "Enum constructor param recipe.";
+        final Color color;
+
+        public RecipeWithEnumConstructorParam(
+                @Option(displayName = "Color", description = "Pick a color.") Color color) {
+            this.color = color;
+        }
+    }
+
+    @Test
+    void enumConstructorParamOptionDeducesValidValues() {
+        RecipeDescriptor d = new RecipeWithEnumConstructorParam(Color.BLUE).createRecipeDescriptor();
+        OptionDescriptor opt = d.getOptions().getFirst();
+        assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
+    }
+
+    @Getter
+    static class RecipeWithExplicitValid extends Recipe {
+        private final String displayName = "Explicit valid recipe";
+        private final String description = "Explicit valid recipe.";
+
+        @Option(displayName = "Color", description = "Pick a color.", valid = {"RED", "GREEN"})
+        final Color color;
+
+        public RecipeWithExplicitValid(Color color) {
+            this.color = color;
+        }
+    }
+
+    @Test
+    void explicitValidTakesPrecedenceOverEnumConstants() {
+        RecipeDescriptor d = new RecipeWithExplicitValid(Color.RED).createRecipeDescriptor();
+        OptionDescriptor opt = d.getOptions().getFirst();
+        assertThat(opt.getValid()).containsExactly("RED", "GREEN");
+    }
+
+    @Test
+    void withOptionsDeserializesCommaSeparatedStringToList() {
+        // given
+        RecipeWithListOption recipe = new RecipeWithListOption(List.of());
+        Map<String, Object> options = new HashMap<>();
+        options.put("fieldNames", "firstName,lastName,email,emailAddress");
+
+        // when
+        Recipe result = recipe.withOptions(options);
+
+        // then
+        assertThat(result).isInstanceOf(RecipeWithListOption.class);
+        assertThat(((RecipeWithListOption) result).fieldNames)
+                .containsExactly("firstName", "lastName", "email", "emailAddress");
+    }
+
+    @Test
+    void withOptionsPreservesNonStringOptionValuesInDescriptor() {
+        // given
+        RecipeWithMixedOptionTypes recipe = new RecipeWithMixedOptionTypes(null, null, null);
+        Map<String, Object> options = new HashMap<>();
+        options.put("text", "hello");
+        options.put("flag", true);
+        options.put("count", 5);
+
+        // when
+        Recipe result = recipe.withOptions(options);
+
+        // then the descriptor must report every supplied value, not just the String one
+        Map<String, Object> values = new HashMap<>();
+        for (OptionDescriptor o : result.getDescriptor().getOptions()) {
+            values.put(o.getName(), o.getValue());
+        }
+        assertThat(values.get("text")).isEqualTo("hello");
+        assertThat(values.get("flag")).isEqualTo(true);
+        assertThat(values.get("count")).isEqualTo(5);
+    }
+
+    @Getter
+    static class RecipeWithMixedOptionTypes extends Recipe {
+        private final String displayName = "Mixed option types recipe";
+        private final String description = "Mixed option types recipe.";
+
+        @Option(displayName = "Text", description = "A string option.", example = "hello")
+        final @Nullable String text;
+
+        @Option(displayName = "Flag", description = "A boolean option.", required = false)
+        final @Nullable Boolean flag;
+
+        @Option(displayName = "Count", description = "An integer option.", required = false)
+        final @Nullable Integer count;
+
+        public RecipeWithMixedOptionTypes(@Nullable String text, @Nullable Boolean flag, @Nullable Integer count) {
+            this.text = text;
+            this.flag = flag;
+            this.count = count;
+        }
     }
 }

@@ -16,10 +16,14 @@
 package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
@@ -49,7 +53,7 @@ import static java.util.stream.Collectors.toMap;
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleDependencyConfiguration implements Serializable, Attributed {
+public class GradleDependencyConfiguration implements Heavyweight, Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -96,12 +100,25 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     List<ResolvedDependency> directResolved;
 
     /**
-     * The list of direct dependencies resolved for this configuration.
+     * The list of direct dependencies resolved for this configuration. Each returned dependency has its full
+     * transitive tree populated under {@link ResolvedDependency#getDependencies()}.
      */
     public List<ResolvedDependency> getDirectResolved() {
         if (resolutionContext.isResolveRequired()) {
             resolutionContext.resolve();
         }
+        //noinspection ConstantValue
+        return directResolved == null ? emptyList() : directResolved;
+    }
+
+    /**
+     * Like {@link #getDirectResolved()}, but avoids downloading the transitive closure of each direct dependency.
+     * Each returned dependency has an empty {@link ResolvedDependency#getDependencies()} list unless a full
+     * resolution has already been performed previously. Use this when you only need the declared coordinates of
+     * direct dependencies and do not intend to walk into their transitives.
+     */
+    public List<ResolvedDependency> getDirectResolvedShallow() {
+        resolutionContext.resolveDirect();
         //noinspection ConstantValue
         return directResolved == null ? emptyList() : directResolved;
     }
@@ -180,19 +197,29 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return this;
     }
     private class LazyResolutionContext {
-        private @Getter boolean resolveRequired;
+        private boolean resolveRequired;
+        private boolean transitivesResolved;
         private @Nullable List<MavenRepository> repositories;
         private @Nullable ExecutionContext ctx;
         private @Nullable List<ResolvedDependency> resolved;
 
+        public boolean isResolveRequired() {
+            // Resolution (or upgrade-to-deep) is still possible as long as we retain repositories + ctx.
+            return (resolveRequired || !transitivesResolved) && repositories != null && ctx != null;
+        }
+
         public void markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
             this.repositories = repositories;
             this.resolveRequired = true;
+            this.transitivesResolved = false;
             this.ctx = ctx;
         }
 
         /**
-         * Attempt to download the maven poms of the direct dependencies to produce an updated set of resolved dependencies.
+         * Ensure {@code directResolved} is populated with the complete transitive dependency tree under each
+         * direct dependency. If only a shallow resolution has been done previously within this run, this will
+         * upgrade the state to a full resolution. After deep resolution succeeds, the captured repositories and
+         * execution context are released.
          * It is expected that some dependencies may both be valid and beyond our ability to resolve.
          * Anything coming from an ivy repository, flat directory, gcp artifact service, etc., OpenRewrite does not support.
          * This method has not been tested in a Gradle composite build.
@@ -202,7 +229,34 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
          * It is the responsibility of recipes to report this to the user, typically via GradleProject.maybeWarn()
          */
         public void resolve() {
-            if (!resolveRequired || repositories == null || ctx == null) {
+            if (transitivesResolved || repositories == null || ctx == null) {
+                return;
+            }
+            doResolve(true);
+            transitivesResolved = true;
+            repositories = null;
+            ctx = null;
+        }
+
+        /**
+         * Populate {@code directResolved} with direct dependencies only, skipping the download of their transitive
+         * closure. If a full resolution has already happened this is a no-op. Repositories + ctx are retained so
+         * that a later call to {@link #resolve()} can upgrade the state to a full resolution if a caller that walks
+         * transitive dependencies needs it.
+         */
+        public void resolveDirect() {
+            if (!resolveRequired) {
+                return;
+            }
+            if (repositories == null || ctx == null) {
+                return;
+            }
+            doResolve(false);
+            resolveRequired = false;
+        }
+
+        private void doResolve(boolean resolveTransitives) {
+            if (repositories == null || ctx == null) {
                 return;
             }
             if (isCanBeResolved) {
@@ -222,8 +276,10 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                         } else {
                             Pom singlePom = singleDependencyPom(dep, requested, repositories, ctx);
                             ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
-                            ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
-                            newResolved.add(resolved);
+                            List<ResolvedDependency> resolvedList = resolveTransitives
+                                    ? singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx)
+                                    : singleDependencyResolved.resolveDirectDependencies(Scope.Compile, mpd, ctx);
+                            newResolved.add(resolvedList.get(0));
                         }
                     } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
                         MavenDownloadingException m;
@@ -253,12 +309,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 resolved = null;
             }
             resolveRequired = false;
-            repositories = null;
-            ctx = null;
         }
 
         public List<ResolvedDependency> getResolved() {
             if (resolved == null) {
+                resolve();
                 List<ResolvedDependency> newResolved = new ArrayList<>(getDirectResolved());
                 Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
                 Map<String, Version> versionCache = new HashMap<>();
@@ -393,6 +448,44 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             ResolvedDependency dependency = d.findDependency(groupId == null ? "" : groupId, artifactId);
             if (dependency != null) {
                 return dependency;
+            }
+        }
+        return null;
+    }
+
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx) {
+        return getPlatformManagedVersion(ga, repositories, ctx, bomGa -> null);
+    }
+
+    /**
+     * The version a platform imported by this configuration supplies for a coordinate, or null when no such
+     * platform governs it. A version supplied by a constraint rather than a platform is not reported here.
+     * <p>
+     * {@code bomVersionOverride} answers, for a platform's own coordinate, the version it is being upgraded to
+     * in the same run so the answer reflects the state the build is moving toward; it returns null when a
+     * platform's version is unchanged.
+     */
+    public @Nullable String getPlatformManagedVersion(GroupArtifact ga, List<MavenRepository> repositories, ExecutionContext ctx,
+                                                      Function<GroupArtifact, @Nullable String> bomVersionOverride) {
+        MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+        for (Dependency dependency : requested) {
+            if (!dependency.findAttribute(Category.class).filter(Category::isBom).isPresent()) {
+                continue;
+            }
+            GroupArtifactVersion bomGav = dependency.getGav();
+            String override = bomVersionOverride.apply(bomGav.asGroupArtifact());
+            if (override != null) {
+                bomGav = bomGav.withVersion(override);
+            }
+            try {
+                String managedVersion = downloader.download(bomGav, null, null, repositories)
+                        .resolve(emptyList(), downloader, ctx)
+                        .getManagedVersion(ga.getGroupId(), ga.getArtifactId(), null, null);
+                if (managedVersion != null) {
+                    return managedVersion;
+                }
+            } catch (MavenDownloadingException ignored) {
+                // A platform that cannot be downloaded cannot be shown to govern this coordinate
             }
         }
         return null;
@@ -602,7 +695,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             }
             return it;
         }, repositories, ctx);
-        if (maybeUpdated == this) {
+        if (maybeUpdated == this && (constraints == null || constraints.stream().noneMatch(it ->
+                Objects.equals(it.getArtifactId(), constraint.getArtifactId()) &&
+                Objects.equals(it.getGroupId(), constraint.getGroupId())))) {
             maybeUpdated = addConstraint(constraint, repositories, ctx);
         }
         return maybeUpdated;

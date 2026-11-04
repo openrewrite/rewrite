@@ -19,6 +19,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
+import static org.openrewrite.rpc.Reference.asRef;
 
 public class YamlSender extends YamlVisitor<RpcSendQueue> {
 
@@ -26,7 +27,7 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
     public Yaml preVisit(Yaml y, RpcSendQueue q) {
         q.getAndSend(y, Tree::getId);
         q.getAndSend(y, Yaml::getPrefix);
-        q.getAndSend(y, Tree::getMarkers);
+        q.getAndSend(y, mk -> asRef(mk.getMarkers()));
         return y;
     }
 
@@ -45,10 +46,19 @@ public class YamlSender extends YamlVisitor<RpcSendQueue> {
 
     @Override
     public Yaml visitDocument(Yaml.Document document, RpcSendQueue q) {
+        q.getAndSendList(document, Yaml.Document::getDirectives, dir -> dir.getId(),
+                dir -> visit(dir, q));
         q.getAndSend(document, Yaml.Document::isExplicit);
         q.getAndSend(document, Yaml.Document::getBlock, b -> visit(b, q));
         q.getAndSend(document, Yaml.Document::getEnd, e -> visit(e, q));
         return document;
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, RpcSendQueue q) {
+        q.getAndSend(directive, Yaml.Directive::getValue);
+        q.getAndSend(directive, Yaml.Directive::getSuffix);
+        return directive;
     }
 
     @Override

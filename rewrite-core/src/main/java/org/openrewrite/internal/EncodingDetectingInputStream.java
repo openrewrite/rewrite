@@ -33,18 +33,16 @@ public class EncodingDetectingInputStream extends InputStream {
     @Nullable
     private Charset charset;
 
+    private final boolean charsetProvided;
+
     private boolean bomChecked;
     private boolean charsetBomMarked;
 
     /**
-     * Last byte read
+     * Number of UTF-8 continuation bytes (0x80-0xBF) still expected
+     * to complete the current multi-byte sequence. Zero when idle.
      */
-    private int prev;
-    private int prev2;
-
-    boolean maybeTwoByteSequence = false;
-    boolean maybeThreeByteSequence = false;
-    boolean maybeFourByteSequence = false;
+    int remainingContinuationBytes = 0;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this(inputStream, null);
@@ -53,6 +51,7 @@ public class EncodingDetectingInputStream extends InputStream {
     public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
         this.inputStream = inputStream;
         this.charset = charset;
+        this.charsetProvided = charset != null;
     }
 
     public Charset getCharset() {
@@ -83,13 +82,7 @@ public class EncodingDetectingInputStream extends InputStream {
 
         // if we haven't yet determined a charset...
         if (read == -1) {
-            if (charset == null) {
-                if (maybeTwoByteSequence || maybeThreeByteSequence || maybeFourByteSequence) {
-                    charset = WINDOWS_1252;
-                } else {
-                    charset = StandardCharsets.UTF_8;
-                }
-            }
+            endOfInput();
         } else if (charset == null) {
             guessCharset(read);
         }
@@ -99,8 +92,7 @@ public class EncodingDetectingInputStream extends InputStream {
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if (charset == null) {
-            // we need to read the bytes one-by-one to determine the encoding
-            return super.read(b, off, len);
+            return readGuessingCharset(b, off, len);
         } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
             int read = checkAndSkipUtf8Bom();
             if (read == -1) {
@@ -115,44 +107,67 @@ public class EncodingDetectingInputStream extends InputStream {
         }
     }
 
-    private void guessCharset(int aByte) {
-        if (utf8TwoByteSequence(aByte)) {
-            maybeTwoByteSequence = true;
-        } else if (utf8ThreeByteSequence(aByte)) {
-            maybeThreeByteSequence = true;
-        } else if (utf8FourByteSequence(aByte)) {
-            maybeFourByteSequence = true;
-        } else if (maybeTwoByteSequence) {
-            if (!utf8SequenceEnd(aByte)) {
-                charset = WINDOWS_1252;
-            } else {
-                maybeTwoByteSequence = false;
-                prev = -1;
-            }
-        } else if (maybeThreeByteSequence) {
-            if (!utf8SequenceEnd(aByte)) {
-                charset = WINDOWS_1252;
-            }
-
-            if (utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                maybeThreeByteSequence = false;
-                prev = -1;
-            }
-        } else if (maybeFourByteSequence) {
-            if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) || utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) || !utf8SequenceEnd(aByte)) {
-                charset = WINDOWS_1252;
-            }
-
-            if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                maybeFourByteSequence = false;
-                prev = -1;
-            }
-        } else if (utf8SequenceEnd(aByte)) {
-            charset = WINDOWS_1252;
+    /**
+     * Like {@link InputStream#read(byte[], int, int)}, fills {@code b} until it is full or the input ends,
+     * but reads the delegate a chunk at a time instead of a byte at a time.
+     */
+    private int readGuessingCharset(byte[] b, int off, int len) throws IOException {
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
         }
 
-        prev2 = prev;
-        prev = aByte;
+        int n = 0;
+        if (!bomChecked) {
+            // the first byte comes from read(), which skips a byte order mark
+            int read = read();
+            if (read == -1) {
+                return -1;
+            }
+            b[off] = (byte) read;
+            n = 1;
+        }
+        while (n < len) {
+            int read = inputStream.read(b, off + n, len - n);
+            if (read == -1) {
+                endOfInput();
+                return n == 0 ? -1 : n;
+            }
+            for (int i = off + n; charset == null && i < off + n + read; i++) {
+                guessCharset(b[i] & 0xFF);
+            }
+            n += read;
+        }
+        return n;
+    }
+
+    private void endOfInput() {
+        if (charset == null) {
+            charset = remainingContinuationBytes > 0 ? WINDOWS_1252 : StandardCharsets.UTF_8;
+        }
+    }
+
+    private void guessCharset(int aByte) {
+        if (remainingContinuationBytes > 0) {
+            if (aByte >= 0x80 && aByte <= 0xBF) {
+                remainingContinuationBytes--;
+            } else {
+                charset = WINDOWS_1252;
+            }
+        } else if (aByte <= 0x7F) {
+            // ASCII — valid, nothing to track
+        } else if (aByte >= 0xC2 && aByte <= 0xDF) {
+            remainingContinuationBytes = 1;
+        } else if (aByte >= 0xE0 && aByte <= 0xEF) {
+            remainingContinuationBytes = 2;
+        } else if (aByte >= 0xF0 && aByte <= 0xF4) {
+            remainingContinuationBytes = 3;
+        } else {
+            // 0x80-0xBF (bare continuation), 0xC0-0xC1 (overlong),
+            // 0xF5-0xFF (above max Unicode) — all invalid UTF-8
+            charset = WINDOWS_1252;
+        }
     }
 
     public String readFully() {
@@ -170,7 +185,28 @@ public class EncodingDetectingInputStream extends InputStream {
                 bos.write(buffer, 0, n);
             }
 
-            return bos.toString();
+            Charset detectedCharset = getCharset();
+            String result = bos.toString();
+
+            // If the detected charset can't re-encode the content, the detection
+            // was likely wrong — fall back to UTF-8. This catches cases where
+            // UTF-8 files with CJK content are misdetected as Windows-1252,
+            // since Windows-1252 has undefined byte positions that decode to
+            // U+FFFD (which can't be re-encoded as Windows-1252).
+            //
+            // Only guessed charsets are second-guessed; an explicitly supplied
+            // charset is respected. U+FFFD is the only char a REPLACE-decode can
+            // produce that the charset can't re-encode, so this cheap scan gates
+            // the expensive encoder check and skips it for genuine content.
+            if (!charsetProvided &&
+                    detectedCharset != StandardCharsets.UTF_8 &&
+                    result.indexOf('\uFFFD') >= 0 &&
+                    !detectedCharset.newEncoder().canEncode(result)) {
+                charset = StandardCharsets.UTF_8;
+                return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+            }
+
+            return result;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -197,25 +233,7 @@ public class EncodingDetectingInputStream extends InputStream {
         return -2;
     }
 
-    // The first byte of a UTF-8 two byte sequence is between 0xC0 - 0xDF.
-    private boolean utf8TwoByteSequence(int b) {
-        return 0xC0 <= b && b <= 0xDF;
-    }
 
-    // The first byte of a UTF-8 three byte sequence is between 0xE0 - 0xEF.
-    private boolean utf8ThreeByteSequence(int b) {
-        return 0xE0 <= b && b <= 0xEF;
-    }
-
-    // The first byte of a UTF-8 four byte sequence is between 0xF0 - 0xF7.
-    private boolean utf8FourByteSequence(int b) {
-        return 0xF0 <= b && b <= 0xF7;
-    }
-
-    // A UTF-8 byte sequence must end between 0x80 - 0xBF.
-    private boolean utf8SequenceEnd(int b) {
-        return 0x80 <= b && b <= 0xBF;
-    }
 
     @Override
     public void close() throws IOException {

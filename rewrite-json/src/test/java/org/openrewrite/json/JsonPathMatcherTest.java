@@ -198,6 +198,130 @@ class JsonPathMatcherTest {
         );
     }
 
+    private final List<String> numbers = List.of(
+      //language=json5
+      """
+        {
+          "list": [
+            {"n": 1},
+            {"n": 2},
+            {"n": -1},
+            {"n": 1.0},
+            {"n": 1000},
+            {"n": 3000000000},
+            {"n": 12345678901234567890},
+            {"n": "1"}
+          ]
+        }
+        """
+    );
+
+    @Test
+    void numericEquality() {
+        assertMatched(
+          "$.list[?(@.n == 1)]",
+          numbers,
+          List.of("{\"n\": 1}", "{\"n\": 1.0}")
+        );
+        assertMatched(
+          "$.list[?(@.n == -1)]",
+          numbers,
+          List.of("{\"n\": -1}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 3000000000)]",
+          numbers,
+          List.of("{\"n\": 3000000000}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 12345678901234567890)]",
+          numbers,
+          List.of("{\"n\": 12345678901234567890}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 1e3)]",
+          numbers,
+          List.of("{\"n\": 1000}")
+        );
+    }
+
+    @Test
+    void numericInequality() {
+        assertMatched(
+          "$.list[?(@.n != 1)]",
+          numbers,
+          List.of(
+            "{\"n\": 2}",
+            "{\"n\": -1}",
+            "{\"n\": 1000}",
+            "{\"n\": 3000000000}",
+            "{\"n\": 12345678901234567890}",
+            "{\"n\": \"1\"}"
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnScalarList() {
+        assertMatched(
+          "$.list[?(@ == 2)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [1, 2, 3]
+              }
+              """
+          ),
+          List.of("2")
+        );
+    }
+
+    @Test
+    void numericEqualityIsStrictAboutStrings() {
+        assertNotMatched(
+          "$[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": "1"
+              }
+              """
+          )
+        );
+        assertNotMatched(
+          "$[?(@.n == '1')]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnNonFiniteNumbers() {
+        assertNotMatched(
+          "$.list[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [
+                  {"n": NaN},
+                  {"n": Infinity},
+                  {"n": -Infinity}
+                ]
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void multipleWildcards() {
         assertMatched(
@@ -659,6 +783,31 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void quotedNamesAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> jest = List.of(
+          //language=json
+          """
+            {
+              "moduleNameMapper": {
+                "\\\\.(css|less)$": "identity-obj-proxy"
+              },
+              "testRegex": ["\\\\.test\\\\.js$"]
+            }
+            """
+        );
+        assertMatched(
+          "$.moduleNameMapper['\\\\.(css|less)$']",
+          jest,
+          List.of("\"\\\\.(css|less)$\": \"identity-obj-proxy\"")
+        );
+        assertMatched(
+          "$.testRegex[?(@ == '\\\\.test\\\\.js$')]",
+          jest,
+          List.of("\"testRegex\": [\"\\\\.test\\\\.js$\"]")
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1607")
     @Test
     void unaryExpressionByBracketOperator() {
@@ -857,6 +1006,109 @@ class JsonPathMatcherTest {
               """),
           emptyList()
         );
+    }
+
+    @Test
+    void negateUnaryExistence() {
+        assertMatched(
+          "$.list[?(!@.item1)]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void negateUnaryExistenceMatchesNone() {
+        assertNotMatched(
+          "$.list[?(!@.property)]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpression() {
+        assertNotMatched(
+          "$.list[?(!(@.property == 'property'))]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpressionPartialMatch() {
+        assertMatched(
+          "$.list[?(!(@.item1 == 'index0'))]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void negateWithLogicalAnd() {
+        assertMatched(
+          "$.list[?(!@.item1 && @.property == 'property')]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4937")
+    @Test
+    void dollarToMatchTheRoot() {
+        var matcher = new JsonPathMatcher("$");
+        var results = new JsonVisitor<List<Json.JsonObject>>() {
+            @Override
+            public Json visitObject(Json.JsonObject obj, List<Json.JsonObject> p) {
+                var e = super.visitObject(obj, p);
+                if (matcher.matches(getCursor())) {
+                    p.add(obj);
+                }
+                return e;
+            }
+        }.reduce(JsonParser.builder().build()
+            .parse(simple.toArray(new String[0]))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Could not parse as JSON")), new ArrayList<>());
+        // $ should match exactly one object - the root
+        assertThat(results).hasSize(1);
     }
 
     @Test

@@ -48,15 +48,15 @@ class JavaSendReceiveTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
         Environment env = Environment.builder().build();
 
-        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
-        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
         server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);

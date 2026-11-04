@@ -23,27 +23,52 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.JsonParser;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleReader;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
+import org.openrewrite.yaml.tree.Yaml;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
@@ -74,6 +99,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         if (Files.exists(tempDir.resolve("rpc.log"))) {
             System.out.println(Files.readString(tempDir.resolve("rpc.log")));
         }
+        // Restore the default factory so this test's per-test @TempDir-backed
+        // factory does not leak into later test classes that lazily (re)start
+        // the RPC process on the same thread.
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Override
@@ -105,6 +134,30 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             spec -> spec.path("package.json")
           )
         );
+    }
+
+    @Test
+    void startsWhenLogParentDirectoryIsMissing() {
+        // given a log path whose parent directory does not exist yet (mimics a
+        // torn-down @TempDir that a stale factory still references)
+        Path missingParent = tempDir.resolve("does-not-exist-yet");
+        Path log = missingParent.resolve("rpc.log");
+        assertThat(Files.exists(missingParent)).isFalse();
+
+        // when starting the RPC process configured to log there
+        JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(log)
+          .get();
+
+        // then the process starts and the log (with its parent) is created
+        // rather than failing with NoSuchFileException
+        try {
+            assertThat(rpc).isNotNull();
+            assertThat(Files.exists(log)).isTrue();
+        } finally {
+            rpc.shutdown();
+        }
     }
 
     @Test
@@ -161,6 +214,28 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @ValueSource(booleans = {true, false})
+    void runSearchRecipeWithNegatedJavaRecipeActingAsPrecondition(boolean vendored) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.find-identifier-outside-vendored-or-bundled",
+              Map.of("identifier", "hello"))),
+          vendored ?
+            javascript(
+              "const hello = 'world'",
+              spec -> spec.path("vendor/hello.js")
+            ) :
+            javascript(
+              "const hello = 'world'",
+              "const /*~~>*/hello = 'world'",
+              spec -> spec.path("src/hello.js")
+            )
+        );
+    }
+
     @Test
     void printJava() {
         assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
@@ -192,17 +267,19 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void installRecipesFromNpm() {
         assertThat(client().installRecipes("@openrewrite/recipes-npm").getRecipesInstalled()).isEqualTo(1);
         assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null)).getAllRecipes()).satisfiesExactly(
-          d -> {
-              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
-          }
+          d ->
+              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`")
         );
     }
 
     @Test
     void getRecipes() {
-        installRecipes();
-        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+        // recipes installed from a file belong to the bundle named by that file's absolute path
+        File recipes = installRecipes();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", recipes.getPath(), null, null, null))
           .getAllRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+          .getAllRecipes()).isEmpty();
     }
 
     @Test
@@ -211,6 +288,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client().prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+        assertThat(recipe.getDescriptor().getOptions().size()).isEqualTo(1);
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
@@ -343,11 +421,167 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of())),
           text("file1", "file1 (count: 2)"),
           text("file2", "file2 (count: 2)")
+        );
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesJavaScript() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.generate-file",
+            Map.of("sourcePath", "eslint.config.mjs", "text", "export default [\n  {rules: {}},\n];\n"))),
+          javascript(
+            null,
+            """
+              export default [
+                {rules: {}},
+              ];
+              """,
+            spec -> spec.path("eslint.config.mjs")
+              .afterRecipe(cu -> assertThat(cu).isInstanceOf(JS.CompilationUnit.class))
+          )
+        );
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesJson() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.generate-file",
+            Map.of("sourcePath", ".vscode/extensions.json", "text", "{\n  \"recommendations\": [\"dbaeumer.vscode-eslint\"]\n}\n"))),
+          json(
+            null,
+            """
+              {
+                "recommendations": ["dbaeumer.vscode-eslint"]
+              }
+              """,
+            spec -> spec.path(".vscode/extensions.json")
+              .afterRecipe(doc -> assertThat(doc).isInstanceOf(Json.Document.class))
+          )
+        );
+    }
+
+    @Test
+    void runRecipeThatDeletes() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.json.delete-file",
+              Map.of("sourcePath", "tslint.json")))
+            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
+              .anySatisfy(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
+                  assertThat(row.getAfterSourcePath()).isEmpty();
+              })),
+          json(
+            """
+              {"rules": {"no-console": true}}
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          json(
+            """
+              {"name": "my-project"}
+              """,
+            spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @Test
+    void runBatchedRecipesThatDelete() throws IOException {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipes(
+              client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
+              client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
+            )
+            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
+              .anySatisfy(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
+                  assertThat(row.getAfterSourcePath()).isEmpty();
+              })),
+          json(
+            """
+              {"rules": {"no-console": true}}
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          json(
+            """
+              {"name": "my-project", "version": "0.0.1"}
+              """,
+            """
+              {"name": "my-project", "version": "1.0.0"}
+              """,
+            spec -> spec.path("package.json")
+          )
+        );
+        assertThat(Files.readString(tempDir.resolve("rpc.log"))).contains("BatchVisit");
+    }
+
+    @Test
+    void treeDeletedInBatchVisitIsNotServedAfterwards() {
+        // given
+        installRecipes();
+        RpcRecipe delete = (RpcRecipe) client().prepareRecipe("org.openrewrite.example.json.delete-file",
+          Map.of("sourcePath", "tslint.json"));
+        Json.Document tslint = JsonParser.builder().build()
+          .parse("{\"rules\": {}}")
+          .map(sf -> (Json.Document) sf.withSourcePath(Path.of("tslint.json")))
+          .findFirst()
+          .orElseThrow();
+
+        // when
+        BatchVisitResponse response = client().batchVisit(tslint, new InMemoryExecutionContext(), null,
+          List.of(new BatchVisit.BatchVisitItem(delete.getEditVisitor(), null)));
+
+        // then
+        assertThat(response.getResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.isDeleted()).isTrue());
+        assertThat((Object) client().getObject(tslint.getId().toString(), Json.Document.class.getName())).isNull();
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesFromScannedFileAndDeletesIt() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.javascript.migrate-tslint", Map.of())),
+          json(
+            """
+              {
+                "rules": {
+                  "no-console": true,
+                  "no-debugger": true
+                }
+              }
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          javascript(
+            null,
+            """
+              export default [
+                {
+                  rules: {
+                    "no-console": "error",
+                    "no-debugger": "error",
+                  },
+                },
+              ];
+              """,
+            spec -> spec.path("eslint.config.mjs")
+              .afterRecipe(cu -> assertThat(cu).isInstanceOf(JS.CompilationUnit.class))
+          )
         );
     }
 
@@ -370,7 +604,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProject(@TempDir Path projectDir) throws IOException {
+    void parseProject(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -409,7 +643,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -429,6 +663,189 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectFailureReadsFileUnderRelativeTo(@TempDir Path repo) throws Exception {
+        Path project = Files.createDirectories(repo.resolve("app"));
+        Files.writeString(project.resolve("package.json"), """
+          {"name": "app", "version": "1.0.0"}
+          """);
+        Files.writeString(project.resolve("index.js"), "const x = 1;");
+        String workspace = """
+          packages:
+            - 'packages/*'
+          """;
+        Files.writeString(project.resolve("pnpm-workspace.yaml"), workspace);
+
+        // Refusing a file once it has arrived takes the same path as failing to receive it.
+        Path failing = Path.of("app", "pnpm-workspace.yaml");
+        ExecutionContext ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext())
+          .setParsingListener(new ParsingEventListener() {
+              @Override
+              public void startedParsing(Parser.Input input) {
+                  if (input.getPath().equals(failing)) {
+                      throw new IllegalStateException("Cannot take " + input.getPath());
+                  }
+              }
+          });
+
+        // Source paths are relative to the repository, a directory above the project being parsed.
+        List<SourceFile> sourceFiles = client()
+          .parseProject(project, null, repo, ctx)
+          .toList();
+
+        assertThat(sourceFiles)
+          .extracting(SourceFile::getSourcePath)
+          .containsExactlyInAnyOrder(Path.of("app", "package.json"), Path.of("app", "index.js"), failing);
+        assertThat(sourceFiles)
+          .filteredOn(sf -> sf.getSourcePath().equals(failing))
+          .singleElement()
+          .isInstanceOfSatisfying(ParseError.class, parseError ->
+            assertThat(parseError.getText()).isEqualTo(workspace));
+        assertThat(sourceFiles)
+          .filteredOn(sf -> !sf.getSourcePath().equals(failing))
+          .noneMatch(sf -> sf instanceof ParseError);
+    }
+
+    @Test
+    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Simple nested mappings
+        Files.writeString(projectDir.resolve("simple.yml"), """
+          top:
+            middle:
+              bottom: value
+          """);
+
+        // Anchors and aliases
+        Files.writeString(projectDir.resolve("anchors.yml"), """
+          defaults: &defaults
+            adapter: postgres
+            host: localhost
+          development:
+            database: dev_db
+            <<: *defaults
+          """);
+
+        // Sequences with nested mappings
+        Files.writeString(projectDir.resolve("sequences.yml"), """
+          items:
+            - name: first
+              value: 1
+            - name: second
+              value: 2
+          """);
+
+        // Multi-document
+        Files.writeString(projectDir.resolve("multi.yml"), """
+          ---
+          doc1: value1
+          ---
+          doc2: value2
+          """);
+
+        // Flow sequences and flow mappings
+        Files.writeString(projectDir.resolve("flow.yml"), """
+          flow_seq: [a, b, c]
+          flow_map: {key1: val1, key2: val2}
+          nested_flow: {outer: {inner: deep}}
+          """);
+
+        // Deeply nested (3+ levels)
+        Files.writeString(projectDir.resolve("deep.yml"), """
+          level1:
+            level2:
+              level3:
+                level4: deep_value
+              sibling3: sibling_value
+            sibling2: value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        List<SourceFile> yamlFiles = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith(".yml"))
+          .toList();
+
+        assertThat(yamlFiles).hasSize(6);
+        for (SourceFile yamlFile : yamlFiles) {
+            assertThat(yamlFile)
+              .as("File %s should parse as YAML, not ParseError", yamlFile.getSourcePath())
+              .isInstanceOf(Yaml.Documents.class)
+              .isNotInstanceOf(ParseError.class);
+            assertThat(client().print(yamlFile))
+              .as("File %s should print non-empty", yamlFile.getSourcePath())
+              .isNotEmpty();
+        }
+    }
+
+    @Test
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        // Reproduces the pattern from GitHub Actions workflow files like:
+        //   on: { push: {}, pull_request: {} }
+        // where nested flow mappings caused "Yaml.Mapping may not have a non-empty prefix"
+        // during RPC deserialization on the Java side.
+        Files.createDirectories(projectDir.resolve(".github/workflows"));
+        Files.writeString(projectDir.resolve(".github/workflows/ci.yml"), """
+          name: CI
+          on: { push: {}, pull_request: {} }
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("ci.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
+    }
+
+    @Test
+    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Flow mapping used as a mapping key (valid YAML, no ? needed)
+        // The yaml npm CST parser produces a flow-collection token as the key,
+        // which the TS parser converts to Yaml.Mapping - but MappingEntry.key
+        // expects YamlKey (Scalar | Alias). This causes ClassCastException
+        // when sent via RPC to Java.
+        Files.writeString(projectDir.resolve("complex-keys.yml"), """
+          {a: 1}: value1
+          {b: 2, c: 3}: value2
+          simple: normal_value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("complex-keys.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
     }
 
     /**
@@ -477,10 +894,137 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+    /**
+     * A JS composite whose {@code recipeList()} delegates to a Java recipe: the JS peer sends that
+     * child as a {@code delegatesTo} stand-in, which the host resolves from its marketplace only
+     * when the composite runs.
+     */
+    @Test
+    void jsCompositeWithJavaDelegateChild() {
+        File fixture = new File("rewrite/dist-fixtures/composite-with-java-delegate.js");
+        String composite = "org.openrewrite.example.npm.composite-with-java-delegate";
+        // Declarative on purpose: the host's inbound PrepareRecipe handler loads class names off the
+        // classpath, so only a marketplace-only delegate proves nothing was prepared before the run.
+        String delegate = "org.openrewrite.example.host.replace-hello";
+        String optionDelegate = "org.openrewrite.text.FindAndReplace";
+
+        // Builder defaults: no marketplace to resolve the delegate from, yet install and describe succeed.
+        assertThat(client().installRecipes(fixture).getRecipesInstalled()).isGreaterThan(0);
+        Recipe unwired = client().prepareRecipe(composite);
+        assertThat(unwired.getDescriptor().getRecipeList())
+          .extracting(RecipeDescriptor::getName)
+          .containsExactly(delegate, optionDelegate);
+        assertThatThrownBy(unwired::getRecipeList)
+          .hasMessageContaining("no recipe found in marketplace")
+          .hasMessageContaining(delegate);
+
+        JavaScriptRewriteRpc.shutdownCurrent();
+        Environment env = Environment.builder()
+          .scanRuntimeClasspath("org.openrewrite.text")
+          .load(new YamlResourceLoader(new ByteArrayInputStream("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: %s
+            displayName: Replace hello
+            description: Replaces hello with goodbye.
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: hello
+                  replace: goodbye
+            """.formatted(delegate).getBytes(StandardCharsets.UTF_8)), URI.create("rewrite.yml"), new Properties()))
+          .build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(env.toMarketplace(RecipeBundle.runtimeClasspath()))
+          .resolvers(List.of(new RuntimeClasspathResolver(env)))
+          .log(tempDir.resolve("rpc.log")));
+        assertThat(client().installRecipes(fixture).getRecipesInstalled()).isGreaterThan(0);
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe(composite)),
+          text("hello world", "farewell world")
+        );
+    }
+
+    /**
+     * A {@link RecipeBundleResolver} that materializes a listed recipe from an {@link Environment}
+     * scanned off the JVM classpath, the shape of a host's runtime-classpath resolver.
+     */
+    private static class RuntimeClasspathResolver implements RecipeBundleResolver {
+        private final Environment env;
+
+        RuntimeClasspathResolver(Environment env) {
+            this.env = env;
+        }
+
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return env.toMarketplace(bundle);
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return prepare(listing, Map.of()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    return env.listRecipes().stream()
+                      .filter(r -> r instanceof DeclarativeRecipe && r.getName().equals(listing.getName()))
+                      .findFirst()
+                      .orElseGet(() -> new RecipeLoader(null).load(listing.getName(), options));
+                }
+            };
+        }
+    }
+
+    /**
+     * Regression test for <a href="https://github.com/moderneinc/customer-requests/issues/2234">#2234</a>:
+     * a string enum declaration would send a {@link JavaType.Primitive} (resolved from the union of
+     * enum literals) for {@code J.ClassDeclaration.type}, which the Java-side RPC receiver rejects
+     * with "A class can only be type attributed with a fully qualified type name".
+     */
+    @Test
+    void parseStringEnumDeclaration() {
+        rewriteRun(
+          typescript(
+            """
+              export enum ContentType {
+                APPLICATION_JSON = 'application/json',
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    assertThat(classDecl.getType())
+                      .as("enum declaration must have a FullyQualified type")
+                      .isInstanceOf(JavaType.Class.class);
+                    JavaType.Class type = (JavaType.Class) classDecl.getType();
+                    assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                    assertThat(type.getFullyQualifiedName()).contains("ContentType");
+                    return classDecl;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    private File installRecipes() {
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js").getAbsoluteFile();
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
+        return exampleRecipes;
     }
 
     private JavaScriptRewriteRpc client() {

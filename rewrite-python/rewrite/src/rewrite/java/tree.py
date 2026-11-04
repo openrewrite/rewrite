@@ -1,26 +1,22 @@
 from __future__ import annotations
 
 import weakref
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+from rewrite.utils import lst_dataclass, replace_if_changed
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Generic
 from uuid import UUID
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
-from . import extensions
 from .support_types import *
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class AnnotatedType(Expression, TypeTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -55,13 +51,9 @@ class AnnotatedType(Expression, TypeTree):
         return v.visit_annotated_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Annotation(Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -89,7 +81,7 @@ class Annotation(Expression):
 
     @property
     def arguments(self) -> Optional[List[Expression]]:
-        return self._arguments.elements
+        return self._arguments.elements if self._arguments else None
 
 
     @dataclass
@@ -101,28 +93,19 @@ class Annotation(Expression):
             return self._t._arguments
 
         def replace(self, **kwargs) -> Annotation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Annotation.PaddingHelper
         if self._padding is None:
             p = Annotation.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Annotation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -131,13 +114,9 @@ class Annotation(Expression):
         return v.visit_annotation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ArrayAccess(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -179,13 +158,9 @@ class ArrayAccess(Expression, TypedTree):
         return v.visit_array_access(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ArrayType(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -234,13 +209,9 @@ class ArrayType(TypeTree, Expression):
         return v.visit_array_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Assert(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -275,13 +246,9 @@ class Assert(Statement):
         return v.visit_assert(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Assignment(Statement, Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -328,28 +295,19 @@ class Assignment(Statement, Expression, TypedTree):
             return self._t._assignment
 
         def replace(self, **kwargs) -> Assignment:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Assignment.PaddingHelper
         if self._padding is None:
             p = Assignment.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Assignment.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -358,13 +316,9 @@ class Assignment(Statement, Expression, TypedTree):
         return v.visit_assignment(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class AssignmentOperation(Statement, Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -434,28 +388,19 @@ class AssignmentOperation(Statement, Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> AssignmentOperation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: AssignmentOperation.PaddingHelper
         if self._padding is None:
             p = AssignmentOperation.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = AssignmentOperation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -464,13 +409,9 @@ class AssignmentOperation(Statement, Expression, TypedTree):
         return v.visit_assignment_operation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Binary(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -545,28 +486,19 @@ class Binary(Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> Binary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Binary.PaddingHelper
         if self._padding is None:
             p = Binary.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Binary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -575,13 +507,9 @@ class Binary(Expression, TypedTree):
         return v.visit_binary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Block(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -632,28 +560,19 @@ class Block(Statement):
             return self._t._statements
 
         def replace(self, **kwargs) -> Block:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Block.PaddingHelper
         if self._padding is None:
             p = Block.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Block.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -661,17 +580,10 @@ class Block(Statement):
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_block(self, p)
 
-    def get_coordinates(self) -> CoordinateBuilder.Block:
-        return CoordinateBuilder.Block(self)
-
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Break(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -699,13 +611,9 @@ class Break(Statement):
         return v.visit_break(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Case(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -778,28 +686,19 @@ class Case(Statement):
             return self._t._body
 
         def replace(self, **kwargs) -> Case:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Case.PaddingHelper
         if self._padding is None:
             p = Case.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Case.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -808,13 +707,9 @@ class Case(Statement):
         return v.visit_case(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ClassDeclaration(Statement, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -859,14 +754,14 @@ class ClassDeclaration(Statement, TypedTree):
 
     @property
     def type_parameters(self) -> Optional[List[TypeParameter]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _primary_constructor: Optional[JContainer[Statement]]
 
     @property
     def primary_constructor(self) -> Optional[List[Statement]]:
-        return self._primary_constructor.elements
+        return self._primary_constructor.elements if self._primary_constructor else None
 
 
     _extends: Optional[JLeftPadded[TypeTree]]
@@ -880,14 +775,14 @@ class ClassDeclaration(Statement, TypedTree):
 
     @property
     def implements(self) -> Optional[List[TypeTree]]:
-        return self._implements.elements
+        return self._implements.elements if self._implements else None
 
 
     _permits: Optional[JContainer[TypeTree]]
 
     @property
     def permits(self) -> Optional[List[TypeTree]]:
-        return self._permits.elements
+        return self._permits.elements if self._permits else None
 
 
     _body: Block
@@ -905,16 +800,12 @@ class ClassDeclaration(Statement, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Kind(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> ClassDeclaration.Kind:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> ClassDeclaration.Kind:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -923,7 +814,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ClassDeclaration.Kind:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -932,7 +823,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ClassDeclaration.Kind:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _annotations: List[Annotation]
 
@@ -941,7 +832,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._annotations
 
         def with_annotations(self, annotations: List[Annotation]) -> ClassDeclaration.Kind:
-            return self if annotations is self._annotations else replace(self, _annotations=annotations)
+            return replace_if_changed(self, _annotations=annotations)
 
         _type: Type
 
@@ -950,7 +841,7 @@ class ClassDeclaration(Statement, TypedTree):
             return self._type
 
         def with_type(self, type: Type) -> ClassDeclaration.Kind:
-            return self if type is self._type else replace(self, _type=type)
+            return replace_if_changed(self, _type=type)
 
         class Type(Enum):
             Class = 0
@@ -992,28 +883,19 @@ class ClassDeclaration(Statement, TypedTree):
             return self._t._permits
 
         def replace(self, **kwargs) -> ClassDeclaration:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ClassDeclaration.PaddingHelper
         if self._padding is None:
             p = ClassDeclaration.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ClassDeclaration.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1022,13 +904,9 @@ class ClassDeclaration(Statement, TypedTree):
         return v.visit_class_declaration(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class CompilationUnit(JavaSourceFile, SourceFile):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1121,28 +999,19 @@ class CompilationUnit(JavaSourceFile, SourceFile):
             return self._t._imports
 
         def replace(self, **kwargs) -> CompilationUnit:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: CompilationUnit.PaddingHelper
         if self._padding is None:
             p = CompilationUnit.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = CompilationUnit.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1150,20 +1019,15 @@ class CompilationUnit(JavaSourceFile, SourceFile):
     def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]:
         if factory := PrinterFactory.current():
             return factory.create_printer(cursor)
-        from .printer import JavaPrinter
-        return JavaPrinter[PrintOutputCapture[P]]()
+        raise NotImplementedError("JavaPrinter is not yet implemented. Use PrinterFactory to provide a printer.")
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_compilation_unit(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Continue(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1191,13 +1055,9 @@ class Continue(Statement):
         return v.visit_continue(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class DoWhileLoop(Loop):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1241,28 +1101,19 @@ class DoWhileLoop(Loop):
             return self._t._while_condition
 
         def replace(self, **kwargs) -> DoWhileLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: DoWhileLoop.PaddingHelper
         if self._padding is None:
             p = DoWhileLoop.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = DoWhileLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1271,13 +1122,9 @@ class DoWhileLoop(Loop):
         return v.visit_do_while_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Empty(Statement, Expression, TypeTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1298,13 +1145,9 @@ class Empty(Statement, Expression, TypeTree):
         return v.visit_empty(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class EnumValue(J):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1346,13 +1189,9 @@ class EnumValue(J):
         return v.visit_enum_value(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class EnumValueSet(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1392,28 +1231,19 @@ class EnumValueSet(Statement):
             return self._t._enums
 
         def replace(self, **kwargs) -> EnumValueSet:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: EnumValueSet.PaddingHelper
         if self._padding is None:
             p = EnumValueSet.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = EnumValueSet.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1422,13 +1252,9 @@ class EnumValueSet(Statement):
         return v.visit_enum_value_set(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class FieldAccess(TypeTree, Expression, Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1475,28 +1301,19 @@ class FieldAccess(TypeTree, Expression, Statement):
             return self._t._name
 
         def replace(self, **kwargs) -> FieldAccess:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: FieldAccess.PaddingHelper
         if self._padding is None:
             p = FieldAccess.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = FieldAccess.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1505,13 +1322,9 @@ class FieldAccess(TypeTree, Expression, Statement):
         return v.visit_field_access(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ForEachLoop(Loop):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1543,16 +1356,12 @@ class ForEachLoop(Loop):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Control(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> ForEachLoop.Control:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> ForEachLoop.Control:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1561,7 +1370,7 @@ class ForEachLoop(Loop):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ForEachLoop.Control:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -1570,7 +1379,7 @@ class ForEachLoop(Loop):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ForEachLoop.Control:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _variable: JRightPadded[Statement]
 
@@ -1603,28 +1412,19 @@ class ForEachLoop(Loop):
                 return self._t._iterable
 
             def replace(self, **kwargs) -> ForEachLoop.Control:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: ForEachLoop.Control.PaddingHelper
             if self._padding is None:
                 p = ForEachLoop.Control.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = ForEachLoop.Control.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -1641,28 +1441,19 @@ class ForEachLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> ForEachLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ForEachLoop.PaddingHelper
         if self._padding is None:
             p = ForEachLoop.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ForEachLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1671,13 +1462,9 @@ class ForEachLoop(Loop):
         return v.visit_for_each_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ForLoop(Loop):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1709,16 +1496,12 @@ class ForLoop(Loop):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Control(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> ForLoop.Control:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> ForLoop.Control:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1727,7 +1510,7 @@ class ForLoop(Loop):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> ForLoop.Control:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -1736,7 +1519,7 @@ class ForLoop(Loop):
             return self._markers
 
         def with_markers(self, markers: Markers) -> ForLoop.Control:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _init: List[JRightPadded[Statement]]
 
@@ -1782,28 +1565,19 @@ class ForLoop(Loop):
                 return self._t._update
 
             def replace(self, **kwargs) -> ForLoop.Control:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: ForLoop.Control.PaddingHelper
             if self._padding is None:
                 p = ForLoop.Control.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = ForLoop.Control.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -1820,28 +1594,19 @@ class ForLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> ForLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ForLoop.PaddingHelper
         if self._padding is None:
             p = ForLoop.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ForLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1850,13 +1615,9 @@ class ForLoop(Loop):
         return v.visit_for_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ParenthesizedTypeTree(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1891,13 +1652,9 @@ class ParenthesizedTypeTree(TypeTree, Expression):
         return v.visit_parenthesized_type_tree(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Identifier(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1946,13 +1703,9 @@ class Identifier(TypeTree, Expression):
         return v.visit_identifier(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class If(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1991,16 +1744,12 @@ class If(Statement):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Else(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> If.Else:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> If.Else:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -2009,7 +1758,7 @@ class If(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> If.Else:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -2018,7 +1767,7 @@ class If(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> If.Else:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _body: JRightPadded[Statement]
 
@@ -2038,28 +1787,19 @@ class If(Statement):
                 return self._t._body
 
             def replace(self, **kwargs) -> If.Else:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: If.Else.PaddingHelper
             if self._padding is None:
                 p = If.Else.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = If.Else.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -2076,28 +1816,19 @@ class If(Statement):
             return self._t._then_part
 
         def replace(self, **kwargs) -> If:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: If.PaddingHelper
         if self._padding is None:
             p = If.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = If.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2106,13 +1837,9 @@ class If(Statement):
         return v.visit_if(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Import(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2163,28 +1890,19 @@ class Import(Statement):
             return self._t._alias
 
         def replace(self, **kwargs) -> Import:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Import.PaddingHelper
         if self._padding is None:
             p = Import.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Import.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2193,13 +1911,9 @@ class Import(Statement):
         return v.visit_import(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class InstanceOf(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2253,28 +1967,19 @@ class InstanceOf(Expression, TypedTree):
             return self._t._expression
 
         def replace(self, **kwargs) -> InstanceOf:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: InstanceOf.PaddingHelper
         if self._padding is None:
             p = InstanceOf.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = InstanceOf.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2283,13 +1988,9 @@ class InstanceOf(Expression, TypedTree):
         return v.visit_instance_of(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class DeconstructionPattern(TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2336,28 +2037,19 @@ class DeconstructionPattern(TypedTree):
             return self._t._nested
 
         def replace(self, **kwargs) -> DeconstructionPattern:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: DeconstructionPattern.PaddingHelper
         if self._padding is None:
             p = DeconstructionPattern.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = DeconstructionPattern.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2366,13 +2058,9 @@ class DeconstructionPattern(TypedTree):
         return v.visit_deconstruction_pattern(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class IntersectionType(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2405,28 +2093,19 @@ class IntersectionType(TypeTree, Expression):
             return self._t._bounds
 
         def replace(self, **kwargs) -> IntersectionType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: IntersectionType.PaddingHelper
         if self._padding is None:
             p = IntersectionType.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = IntersectionType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2435,13 +2114,9 @@ class IntersectionType(TypeTree, Expression):
         return v.visit_intersection_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Label(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2481,28 +2156,19 @@ class Label(Statement):
             return self._t._label
 
         def replace(self, **kwargs) -> Label:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Label.PaddingHelper
         if self._padding is None:
             p = Label.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Label.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2511,13 +2177,9 @@ class Label(Statement):
         return v.visit_label(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Lambda(Statement, Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2563,16 +2225,12 @@ class Lambda(Statement, Expression, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Parameters(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> Lambda.Parameters:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> Lambda.Parameters:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -2581,7 +2239,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Lambda.Parameters:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -2590,7 +2248,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Lambda.Parameters:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _parenthesized: bool
 
@@ -2599,7 +2257,7 @@ class Lambda(Statement, Expression, TypedTree):
             return self._parenthesized
 
         def with_parenthesized(self, parenthesized: bool) -> Lambda.Parameters:
-            return self if parenthesized is self._parenthesized else replace(self, _parenthesized=parenthesized)
+            return replace_if_changed(self, _parenthesized=parenthesized)
 
         _parameters: List[JRightPadded[J]]
 
@@ -2619,28 +2277,19 @@ class Lambda(Statement, Expression, TypedTree):
                 return self._t._parameters
 
             def replace(self, **kwargs) -> Lambda.Parameters:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: Lambda.Parameters.PaddingHelper
             if self._padding is None:
                 p = Lambda.Parameters.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = Lambda.Parameters.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -2652,13 +2301,9 @@ class Lambda(Statement, Expression, TypedTree):
         return v.visit_lambda(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Literal(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2712,7 +2357,7 @@ class Literal(Expression, TypedTree):
             return self._value_source_index
 
         def with_value_source_index(self, value_source_index: int) -> Literal.UnicodeEscape:
-            return self if value_source_index is self._value_source_index else replace(self, _value_source_index=value_source_index)
+            return replace_if_changed(self, _value_source_index=value_source_index)
 
         _code_point: str
 
@@ -2721,19 +2366,15 @@ class Literal(Expression, TypedTree):
             return self._code_point
 
         def with_code_point(self, code_point: str) -> Literal.UnicodeEscape:
-            return self if code_point is self._code_point else replace(self, _code_point=code_point)
+            return replace_if_changed(self, _code_point=code_point)
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J:
         return v.visit_literal(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class MemberReference(TypedTree, MethodCall):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2761,7 +2402,7 @@ class MemberReference(TypedTree, MethodCall):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _reference: JLeftPadded[Identifier]
@@ -2809,28 +2450,19 @@ class MemberReference(TypedTree, MethodCall):
             return self._t._reference
 
         def replace(self, **kwargs) -> MemberReference:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MemberReference.PaddingHelper
         if self._padding is None:
             p = MemberReference.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MemberReference.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2839,13 +2471,9 @@ class MemberReference(TypedTree, MethodCall):
         return v.visit_member_reference(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class MethodDeclaration(Statement, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2885,11 +2513,17 @@ class MethodDeclaration(Statement, TypedTree):
         return self._return_type_expression
 
 
-    _name: IdentifierWithAnnotations
+    _name_annotations: List[Annotation]
+
+    @property
+    def name_annotations(self) -> List[Annotation]:
+        return self._name_annotations
+
+    _name: Identifier
 
     @property
     def name(self) -> Identifier:
-        return self._name.identifier
+        return self._name
 
     _parameters: JContainer[Statement]
 
@@ -2898,11 +2532,21 @@ class MethodDeclaration(Statement, TypedTree):
         return self._parameters.elements
 
 
+    _dimensions_after_name: List[JLeftPadded[Space]]
+
+    @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]:
+        return self._dimensions_after_name
+
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration:
+        return replace_if_changed(self, _dimensions_after_name=dimensions_after_name)
+
+
     _throws: Optional[JContainer[NameTree]]
 
     @property
     def throws(self) -> Optional[List[NameTree]]:
-        return self._throws.elements
+        return self._throws.elements if self._throws else None
 
 
     _body: Optional[Block]
@@ -2925,26 +2569,11 @@ class MethodDeclaration(Statement, TypedTree):
     def method_type(self) -> Optional[JavaType.Method]:
         return self._method_type
 
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.MethodDeclaration.getType(): the declared return type.
+        return self._method_type.return_type if self._method_type is not None else None
 
-    @dataclass
-    class IdentifierWithAnnotations:
-        _identifier: Identifier
-
-        @property
-        def identifier(self) -> Identifier:
-            return self._identifier
-
-        def with_identifier(self, identifier: Identifier) -> MethodDeclaration.IdentifierWithAnnotations:
-            return self if identifier is self._identifier else replace(self, _identifier=identifier)
-
-        _annotations: List[Annotation]
-
-        @property
-        def annotations(self) -> List[Annotation]:
-            return self._annotations
-
-        def with_annotations(self, annotations: List[Annotation]) -> MethodDeclaration.IdentifierWithAnnotations:
-            return self if annotations is self._annotations else replace(self, _annotations=annotations)
 
     @dataclass
     class PaddingHelper:
@@ -2955,8 +2584,12 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._type_parameters
 
         @property
-        def name(self) -> MethodDeclaration.IdentifierWithAnnotations:
+        def name(self) -> Identifier:
             return self._t._name
+
+        @property
+        def name_annotations(self) -> List[Annotation]:
+            return self._t._name_annotations
 
         @property
         def parameters(self) -> JContainer[Statement]:
@@ -2971,28 +2604,19 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._default_value
 
         def replace(self, **kwargs) -> MethodDeclaration:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MethodDeclaration.PaddingHelper
         if self._padding is None:
             p = MethodDeclaration.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodDeclaration.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3006,48 +2630,54 @@ class MethodDeclaration(Statement, TypedTree):
             return self._t._type_parameters
 
         def with_type_parameters(self, type_parameters: Optional[TypeParameters]) -> MethodDeclaration:
-            return self._t if self._t._type_parameters is type_parameters else replace(self._t, _type_parameters=type_parameters)
+            return replace_if_changed(self._t, _type_parameters=type_parameters)
 
         @property
-        def name(self) -> MethodDeclaration.IdentifierWithAnnotations:
+        def name(self) -> Identifier:
             return self._t._name
 
-        def with_name(self, name: MethodDeclaration.IdentifierWithAnnotations) -> MethodDeclaration:
-            return self._t if self._t._name is name else replace(self._t, _name=name)
+        def with_name(self, name: Identifier) -> MethodDeclaration:
+            return replace_if_changed(self._t, _name=name)
+
+        @property
+        def name_annotations(self) -> List[Annotation]:
+            return self._t._name_annotations
+
+        def with_name_annotations(self, name_annotations: List[Annotation]) -> MethodDeclaration:
+            return replace_if_changed(self._t, _name_annotations=name_annotations)
 
         @property
         def parameters(self) -> JContainer[Statement]:
             return self._t._parameters
 
         def with_parameters(self, parameters: JContainer[Statement]) -> MethodDeclaration:
-            return self._t if self._t._parameters is parameters else replace(self._t, _parameters=parameters)
+            return replace_if_changed(self._t, _parameters=parameters)
 
         @property
         def throws(self) -> Optional[JContainer[NameTree]]:
             return self._t._throws
 
         def with_throws(self, throws: Optional[JContainer[NameTree]]) -> MethodDeclaration:
-            return self._t if self._t._throws is throws else replace(self._t, _throws=throws)
+            return replace_if_changed(self._t, _throws=throws)
 
         @property
         def default_value(self) -> Optional[JLeftPadded[Expression]]:
             return self._t._default_value
 
         def with_default_value(self, default_value: Optional[JLeftPadded[Expression]]) -> MethodDeclaration:
-            return self._t if self._t._default_value is default_value else replace(self._t, _default_value=default_value)
+            return replace_if_changed(self._t, _default_value=default_value)
 
-    _annotations: weakref.ReferenceType[AnnotationsHelper] = None
+    _annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = None
 
     @property
     def annotations(self) -> AnnotationsHelper:
-        p: MethodDeclaration.AnnotationsHelper
         if self._annotations is None:
             p = MethodDeclaration.AnnotationsHelper(self)
             object.__setattr__(self, '_annotations', weakref.ref(p))
         else:
             p = self._annotations()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodDeclaration.AnnotationsHelper(self)
                 object.__setattr__(self, '_annotations', weakref.ref(p))
         return p
@@ -3056,13 +2686,9 @@ class MethodDeclaration(Statement, TypedTree):
         return v.visit_method_declaration(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class MethodInvocation(Statement, TypedTree, MethodCall):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3090,7 +2716,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _name: Identifier
@@ -3112,6 +2738,12 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
     def method_type(self) -> Optional[JavaType.Method]:
         return self._method_type
 
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.MethodInvocation.getType(): the expression type of a call is
+        # the declared return type of the invoked method.
+        return self._method_type.return_type if self._method_type is not None else None
+
 
     @dataclass
     class PaddingHelper:
@@ -3130,28 +2762,19 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
             return self._t._arguments
 
         def replace(self, **kwargs) -> MethodInvocation:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MethodInvocation.PaddingHelper
         if self._padding is None:
             p = MethodInvocation.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodInvocation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3160,13 +2783,9 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
         return v.visit_method_invocation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Modifier(J):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3228,13 +2847,9 @@ class Modifier(J):
         return v.visit_modifier(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class MultiCatch(TypeTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3267,28 +2882,19 @@ class MultiCatch(TypeTree):
             return self._t._alternatives
 
         def replace(self, **kwargs) -> MultiCatch:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: MultiCatch.PaddingHelper
         if self._padding is None:
             p = MultiCatch.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MultiCatch.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3297,13 +2903,9 @@ class MultiCatch(TypeTree):
         return v.visit_multi_catch(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class NewArray(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3338,7 +2940,7 @@ class NewArray(Expression, TypedTree):
 
     @property
     def initializer(self) -> Optional[List[Expression]]:
-        return self._initializer.elements
+        return self._initializer.elements if self._initializer else None
 
 
     _type: Optional[JavaType]
@@ -3357,28 +2959,19 @@ class NewArray(Expression, TypedTree):
             return self._t._initializer
 
         def replace(self, **kwargs) -> NewArray:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: NewArray.PaddingHelper
         if self._padding is None:
             p = NewArray.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NewArray.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3387,13 +2980,9 @@ class NewArray(Expression, TypedTree):
         return v.visit_new_array(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ArrayDimension(J):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3426,28 +3015,19 @@ class ArrayDimension(J):
             return self._t._index
 
         def replace(self, **kwargs) -> ArrayDimension:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ArrayDimension.PaddingHelper
         if self._padding is None:
             p = ArrayDimension.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ArrayDimension.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3456,13 +3036,9 @@ class ArrayDimension(J):
         return v.visit_array_dimension(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class NewClass(Statement, TypedTree, MethodCall):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3520,6 +3096,14 @@ class NewClass(Statement, TypedTree, MethodCall):
     def constructor_type(self) -> Optional[JavaType.Method]:
         return self._constructor_type
 
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.NewClass.getType(): the constructed type (constructor's
+        # return type). The Python parser models constructor calls as
+        # MethodInvocation, so this is reached only for NewClass nodes received
+        # over RPC from the Java side.
+        return self._constructor_type.return_type if self._constructor_type is not None else None
+
 
     @dataclass
     class PaddingHelper:
@@ -3534,28 +3118,19 @@ class NewClass(Statement, TypedTree, MethodCall):
             return self._t._arguments
 
         def replace(self, **kwargs) -> NewClass:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: NewClass.PaddingHelper
         if self._padding is None:
             p = NewClass.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NewClass.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3564,13 +3139,9 @@ class NewClass(Statement, TypedTree, MethodCall):
         return v.visit_new_class(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class NullableType(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3610,28 +3181,19 @@ class NullableType(TypeTree, Expression):
             return self._t._type_tree
 
         def replace(self, **kwargs) -> NullableType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: NullableType.PaddingHelper
         if self._padding is None:
             p = NullableType.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NullableType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3640,13 +3202,9 @@ class NullableType(TypeTree, Expression):
         return v.visit_nullable_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Package(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3681,13 +3239,9 @@ class Package(Statement):
         return v.visit_package(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ParameterizedType(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3715,7 +3269,7 @@ class ParameterizedType(TypeTree, Expression):
 
     @property
     def type_parameters(self) -> Optional[List[Expression]]:
-        return self._type_parameters.elements
+        return self._type_parameters.elements if self._type_parameters else None
 
 
     _type: Optional[JavaType]
@@ -3734,28 +3288,19 @@ class ParameterizedType(TypeTree, Expression):
             return self._t._type_parameters
 
         def replace(self, **kwargs) -> ParameterizedType:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: ParameterizedType.PaddingHelper
         if self._padding is None:
             p = ParameterizedType.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ParameterizedType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3764,13 +3309,9 @@ class ParameterizedType(TypeTree, Expression):
         return v.visit_parameterized_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Parentheses(Expression, Generic[J2]):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3793,42 +3334,34 @@ class Parentheses(Expression, Generic[J2]):
     def tree(self) -> J2:
         return self._tree.element
 
-
     @property
-    def type(self) -> JavaType:
-        return self.tree.type
+    def type(self) -> Optional[JavaType]:
+        if isinstance(self.tree, (Expression, TypedTree)):
+            return self.tree.type
+        return None
 
     @dataclass
-    class PaddingHelper:
-        _t: Parentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: Parentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> Parentheses[J2]:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+        def replace(self, **kwargs) -> Parentheses[J3]:
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[Parentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
-        p: Parentheses[J2].PaddingHelper
+    def padding(self) -> Parentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = Parentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Parentheses[J2].PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3837,13 +3370,9 @@ class Parentheses(Expression, Generic[J2]):
         return v.visit_parentheses(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ControlParentheses(Expression, Generic[J2]):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3868,36 +3397,27 @@ class ControlParentheses(Expression, Generic[J2]):
 
 
     @dataclass
-    class PaddingHelper:
-        _t: ControlParentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: ControlParentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> ControlParentheses[J2]:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+        def replace(self, **kwargs) -> ControlParentheses[J3]:
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[ControlParentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
-        p: ControlParentheses[J2].PaddingHelper
+    def padding(self) -> ControlParentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = ControlParentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ControlParentheses[J2].PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3906,13 +3426,9 @@ class ControlParentheses(Expression, Generic[J2]):
         return v.visit_control_parentheses(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Primitive(TypeTree, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3940,13 +3456,9 @@ class Primitive(TypeTree, Expression):
         return v.visit_primitive(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Return(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -3974,13 +3486,9 @@ class Return(Statement):
         return v.visit_return(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Switch(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4015,13 +3523,9 @@ class Switch(Statement):
         return v.visit_switch(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class SwitchExpression(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4063,13 +3567,9 @@ class SwitchExpression(Expression, TypedTree):
         return v.visit_switch_expression(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Synchronized(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4104,13 +3604,9 @@ class Synchronized(Statement):
         return v.visit_synchronized(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Ternary(Expression, Statement, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4168,28 +3664,19 @@ class Ternary(Expression, Statement, TypedTree):
             return self._t._false_part
 
         def replace(self, **kwargs) -> Ternary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Ternary.PaddingHelper
         if self._padding is None:
             p = Ternary.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Ternary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4198,13 +3685,9 @@ class Ternary(Expression, Statement, TypedTree):
         return v.visit_ternary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Throw(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4232,13 +3715,9 @@ class Throw(Statement):
         return v.visit_throw(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Try(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4259,7 +3738,7 @@ class Try(Statement):
 
     @property
     def resources(self) -> Optional[List[Resource]]:
-        return self._resources.elements
+        return self._resources.elements if self._resources else None
 
 
     _body: Block
@@ -4284,16 +3763,12 @@ class Try(Statement):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Resource(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> Try.Resource:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> Try.Resource:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4302,7 +3777,7 @@ class Try(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Try.Resource:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -4311,7 +3786,7 @@ class Try(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Try.Resource:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _variable_declarations: TypedTree
 
@@ -4320,7 +3795,7 @@ class Try(Statement):
             return self._variable_declarations
 
         def with_variable_declarations(self, variable_declarations: TypedTree) -> Try.Resource:
-            return self if variable_declarations is self._variable_declarations else replace(self, _variable_declarations=variable_declarations)
+            return replace_if_changed(self, _variable_declarations=variable_declarations)
 
         _terminated_with_semicolon: bool
 
@@ -4329,22 +3804,18 @@ class Try(Statement):
             return self._terminated_with_semicolon
 
         def with_terminated_with_semicolon(self, terminated_with_semicolon: bool) -> Try.Resource:
-            return self if terminated_with_semicolon is self._terminated_with_semicolon else replace(self, _terminated_with_semicolon=terminated_with_semicolon)
+            return replace_if_changed(self, _terminated_with_semicolon=terminated_with_semicolon)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_try_resource(self, p)
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Catch(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> Try.Catch:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> Try.Catch:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4353,7 +3824,7 @@ class Try(Statement):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Try.Catch:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -4362,7 +3833,7 @@ class Try(Statement):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Try.Catch:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _parameter: ControlParentheses[VariableDeclarations]
 
@@ -4371,7 +3842,7 @@ class Try(Statement):
             return self._parameter
 
         def with_parameter(self, parameter: ControlParentheses[VariableDeclarations]) -> Try.Catch:
-            return self if parameter is self._parameter else replace(self, _parameter=parameter)
+            return replace_if_changed(self, _parameter=parameter)
 
         _body: Block
 
@@ -4380,7 +3851,7 @@ class Try(Statement):
             return self._body
 
         def with_body(self, body: Block) -> Try.Catch:
-            return self if body is self._body else replace(self, _body=body)
+            return replace_if_changed(self, _body=body)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_catch(self, p)
@@ -4398,28 +3869,19 @@ class Try(Statement):
             return self._t._finally
 
         def replace(self, **kwargs) -> Try:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Try.PaddingHelper
         if self._padding is None:
             p = Try.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Try.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4428,13 +3890,9 @@ class Try(Statement):
         return v.visit_try(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class TypeCast(Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4469,13 +3927,9 @@ class TypeCast(Expression, TypedTree):
         return v.visit_type_cast(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class TypeParameter(J):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4517,7 +3971,7 @@ class TypeParameter(J):
 
     @property
     def bounds(self) -> Optional[List[TypeTree]]:
-        return self._bounds.elements
+        return self._bounds.elements if self._bounds else None
 
 
     @dataclass
@@ -4529,28 +3983,19 @@ class TypeParameter(J):
             return self._t._bounds
 
         def replace(self, **kwargs) -> TypeParameter:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TypeParameter.PaddingHelper
         if self._padding is None:
             p = TypeParameter.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = TypeParameter.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4559,13 +4004,9 @@ class TypeParameter(J):
         return v.visit_type_parameter(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class TypeParameters(J):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4605,28 +4046,19 @@ class TypeParameters(J):
             return self._t._type_parameters
 
         def replace(self, **kwargs) -> TypeParameters:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: TypeParameters.PaddingHelper
         if self._padding is None:
             p = TypeParameters.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = TypeParameters.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4635,13 +4067,9 @@ class TypeParameters(J):
         return v.visit_type_parameters(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Unary(Statement, Expression, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4698,28 +4126,19 @@ class Unary(Statement, Expression, TypedTree):
             return self._t._operator
 
         def replace(self, **kwargs) -> Unary:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Unary.PaddingHelper
         if self._padding is None:
             p = Unary.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Unary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4728,13 +4147,9 @@ class Unary(Statement, Expression, TypedTree):
         return v.visit_unary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class VariableDeclarations(Statement, TypedTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4794,16 +4209,12 @@ class VariableDeclarations(Statement, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class NamedVariable(NameTree):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> VariableDeclarations.NamedVariable:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4812,7 +4223,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> VariableDeclarations.NamedVariable:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -4821,7 +4232,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> VariableDeclarations.NamedVariable:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _name: Identifier
 
@@ -4830,7 +4241,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._name
 
         def with_name(self, name: Identifier) -> VariableDeclarations.NamedVariable:
-            return self if name is self._name else replace(self, _name=name)
+            return replace_if_changed(self, _name=name)
 
         _dimensions_after_name: List[JLeftPadded[Space]]
 
@@ -4839,7 +4250,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._dimensions_after_name
 
         def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> VariableDeclarations.NamedVariable:
-            return self if dimensions_after_name is self._dimensions_after_name else replace(self, _dimensions_after_name=dimensions_after_name)
+            return replace_if_changed(self, _dimensions_after_name=dimensions_after_name)
 
         _initializer: Optional[JLeftPadded[Expression]]
 
@@ -4857,7 +4268,7 @@ class VariableDeclarations(Statement, TypedTree):
             return self._variable_type
 
         def with_variable_type(self, variable_type: Optional[JavaType.Variable]) -> VariableDeclarations.NamedVariable:
-            return self if variable_type is self._variable_type else replace(self, _variable_type=variable_type)
+            return replace_if_changed(self, _variable_type=variable_type)
 
         @dataclass
         class PaddingHelper:
@@ -4868,28 +4279,19 @@ class VariableDeclarations(Statement, TypedTree):
                 return self._t._initializer
 
             def replace(self, **kwargs) -> VariableDeclarations.NamedVariable:
-                mapped = {}
-                for key, value in kwargs.items():
-                    if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                        mapped[f'_{key}'] = value
-                    else:
-                        mapped[key] = value
-                if not mapped:
-                    return self._t
-                return replace(self._t, **mapped)
+                return replace_if_changed(self._t, **kwargs)
 
-        _padding: weakref.ReferenceType[PaddingHelper] = None
+        _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
         @property
         def padding(self) -> PaddingHelper:
-            p: VariableDeclarations.NamedVariable.PaddingHelper
             if self._padding is None:
                 p = VariableDeclarations.NamedVariable.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = VariableDeclarations.NamedVariable.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -4906,28 +4308,19 @@ class VariableDeclarations(Statement, TypedTree):
             return self._t._variables
 
         def replace(self, **kwargs) -> VariableDeclarations:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: VariableDeclarations.PaddingHelper
         if self._padding is None:
             p = VariableDeclarations.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = VariableDeclarations.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4936,13 +4329,9 @@ class VariableDeclarations(Statement, TypedTree):
         return v.visit_variable_declarations(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class WhileLoop(Loop):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -4982,28 +4371,19 @@ class WhileLoop(Loop):
             return self._t._body
 
         def replace(self, **kwargs) -> WhileLoop:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: WhileLoop.PaddingHelper
         if self._padding is None:
             p = WhileLoop.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = WhileLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -5012,13 +4392,9 @@ class WhileLoop(Loop):
         return v.visit_while_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Wildcard(Expression, TypeTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -5062,28 +4438,19 @@ class Wildcard(Expression, TypeTree):
             return self._t._bound
 
         def replace(self, **kwargs) -> Wildcard:
-            mapped = {}
-            for key, value in kwargs.items():
-                if not key.startswith('_') and hasattr(self._t, f'_{key}'):
-                    mapped[f'_{key}'] = value
-                else:
-                    mapped[key] = value
-            if not mapped:
-                return self._t
-            return replace(self._t, **mapped)
+            return replace_if_changed(self._t, **kwargs)
 
-    _padding: weakref.ReferenceType[PaddingHelper] = None
+    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
 
     @property
     def padding(self) -> PaddingHelper:
-        p: Wildcard.PaddingHelper
         if self._padding is None:
             p = Wildcard.PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Wildcard.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -5092,13 +4459,9 @@ class Wildcard(Expression, TypeTree):
         return v.visit_wildcard(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Yield(Statement):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -5133,13 +4496,9 @@ class Yield(Statement):
         return v.visit_yield(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Unknown(Statement, Expression, TypeTree):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space
@@ -5164,16 +4523,12 @@ class Unknown(Statement, Expression, TypeTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @lst_dataclass
     class Source(J):
-        _id: UUID
+        _id: int | UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
-        def with_id(self, id: UUID) -> Unknown.Source:
-            return self if id is self._id else replace(self, _id=id)
+        def with_id(self, id: int | UUID) -> Unknown.Source:
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -5182,7 +4537,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._prefix
 
         def with_prefix(self, prefix: Space) -> Unknown.Source:
-            return self if prefix is self._prefix else replace(self, _prefix=prefix)
+            return replace_if_changed(self, _prefix=prefix)
 
         _markers: Markers
 
@@ -5191,7 +4546,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._markers
 
         def with_markers(self, markers: Markers) -> Unknown.Source:
-            return self if markers is self._markers else replace(self, _markers=markers)
+            return replace_if_changed(self, _markers=markers)
 
         _text: str
 
@@ -5200,7 +4555,7 @@ class Unknown(Statement, Expression, TypeTree):
             return self._text
 
         def with_text(self, text: str) -> Unknown.Source:
-            return self if text is self._text else replace(self, _text=text)
+            return replace_if_changed(self, _text=text)
 
         def accept_java(self, v: JavaVisitor[P], p: P) -> J:
             return v.visit_unknown_source(self, p)
@@ -5209,13 +4564,9 @@ class Unknown(Statement, Expression, TypeTree):
         return v.visit_unknown(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Erroneous(Statement, Expression):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
     _prefix: Space

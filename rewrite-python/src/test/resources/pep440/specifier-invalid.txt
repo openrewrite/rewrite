@@ -1,0 +1,33 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_specifiers.py (test_specifiers_invalid)
+# Retrieved: 2026-07-16
+# Strings that must not parse as specifier clauses.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+2.0
+=>2.0
+==
+~=1.0+5
+>=1.0+deadbeef
+<=1.0+abc123
+>1.0+watwat
+<1.0+1.0
+~=1.0.*
+>=1.0.*
+<=1.0.*
+>1.0.*
+<1.0.*
+==1.0.*+5
+!=1.0.*+deadbeef
+==2.0a1.*
+!=2.0a1.*
+==2.0.post1.*
+!=2.0.post1.*
+==2.0.dev1.*
+!=2.0.dev1.*
+==1.0+5.*
+!=1.0+deadbeef.*
+==1.0.*.5
+~=1
+==1.0.dev1.*
+!=1.0.dev1.*
+==1.2+İ
+==1.2+İıſK

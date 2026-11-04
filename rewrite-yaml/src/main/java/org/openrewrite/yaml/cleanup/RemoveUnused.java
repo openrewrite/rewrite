@@ -15,21 +15,18 @@
  */
 package org.openrewrite.yaml.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class RemoveUnused extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused YAML";
-    }
+    @Getter
+    final String displayName = "Remove unused YAML";
 
-    @Override
-    public String getDescription() {
-        return "Remove YAML mappings and sequence keys that have no value.";
-    }
+    @Getter
+    final String description = "Remove YAML mappings and sequence keys that have no value.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

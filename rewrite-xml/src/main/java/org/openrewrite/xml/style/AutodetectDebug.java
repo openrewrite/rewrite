@@ -15,12 +15,12 @@
  */
 package org.openrewrite.xml.style;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.table.XmlStyleReport;
@@ -35,16 +35,12 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
     private final transient XmlStyleReport report = new XmlStyleReport(this);
 
-    @Override
-    public String getDisplayName() {
-        return "XML style Auto-detection debug";
-    }
+    @Getter
+    final String displayName = "XML style Auto-detection debug";
 
-    @Override
-    public String getDescription() {
-        return "Runs XML Autodetect and records the results in data tables and search markers. " +
-               "A debugging tool for figuring out why XML documents get styled the way they do.";
-    }
+    @Getter
+    final String description = "Runs XML Autodetect and records the results in data tables and search markers. " +
+        "A debugging tool for figuring out why XML documents get styled the way they do.";
 
     public static class Accumulator {
         Autodetect.Detector overallDetector = new Autodetect.Detector();
@@ -147,10 +143,12 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
                 }
 
                 // Attributes have the same depth as their parent tag
-                ListUtils.map(tag.getAttributes(), a -> visitAndCast(a, ctx));
+                tag.getAttributes().forEach(a -> visit(a, ctx));
 
                 depth++;
-                ListUtils.map(tag.getContent(), a -> visitAndCast(a, ctx));
+                if (tag.getContent() != null) {
+                    tag.getContent().forEach(c -> visit(c, ctx));
+                }
                 depth--;
                 return tag;
             }

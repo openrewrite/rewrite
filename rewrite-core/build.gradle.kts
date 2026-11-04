@@ -6,6 +6,13 @@ dependencies {
     api("org.openrewrite.tools:jgit:latest.release")
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
     implementation("io.quarkus.gizmo:gizmo:1.0.+")
+    // Align the four org.ow2.asm artifacts to one version everywhere; gizmo
+    // would otherwise pin -util/-tree/-analysis to 9.3 in modules that don't
+    // request them directly.
+    implementation("org.ow2.asm:asm:latest.release")
+    implementation("org.ow2.asm:asm-util:latest.release")
+    implementation("org.ow2.asm:asm-tree:latest.release")
+    implementation("org.ow2.asm:asm-analysis:latest.release")
     api("com.fasterxml.jackson.core:jackson-core")
     api("com.fasterxml.jackson.core:jackson-databind")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
@@ -14,6 +21,9 @@ dependencies {
     implementation("net.java.dev.jna:jna-platform:latest.release")
 
     api("org.jspecify:jspecify:latest.release")
+
+    // @MustBeClosed on DataTableStore.getRows; CLASS-retention, not needed at runtime.
+    compileOnly("com.google.errorprone:error_prone_annotations:latest.release")
 
     // Recipe marketplace
     implementation("com.univocity:univocity-parsers:latest.release")
@@ -24,14 +34,14 @@ dependencies {
     // For Levenshtein distance of mismatched recipes
     implementation("org.apache.commons:commons-text:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
-    implementation("io.github.classgraph:classgraph:latest.release")
+    implementation("io.micrometer:micrometer-core:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
 }
 
@@ -46,5 +56,5 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/RpcObjectData.java")
+    exclude("**/RpcObjectData.java", "**/RecipeDescriptor.java")
 }

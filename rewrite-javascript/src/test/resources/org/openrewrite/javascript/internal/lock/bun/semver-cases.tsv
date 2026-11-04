@@ -1,0 +1,3136 @@
+order	1.2.3	\n1.2.3	0
+order	1.2.3	\t\n1.2.3	0
+order	1.2.3	 1.2.3	0
+order	\n\t1.2.3	 1.2.3	0
+order	\r\t\n\r1.2.3	 1.2.3	0
+order	0.0.0	0.0.0-foo	1
+order	0.0.0-foo	0.0.0	-1
+order	0.0.0	0.0.0	0
+order	0.0.0-foo	0.0.0-foo	0
+order	0.0.1	0.0.0	1
+order	0.0.0	0.0.1	-1
+order	0.0.1	0.0.1	0
+order	1.0.0	0.9.9	1
+order	0.9.9	1.0.0	-1
+order	1.0.0	1.0.0	0
+order	0.9.9	0.9.9	0
+order	0.10.0	0.9.0	1
+order	0.9.0	0.10.0	-1
+order	0.10.0	0.10.0	0
+order	0.9.0	0.9.0	0
+order	0.99.0	0.10.0	1
+order	0.10.0	0.99.0	-1
+order	0.99.0	0.99.0	0
+order	2.0.0	1.2.3	1
+order	1.2.3	2.0.0	-1
+order	2.0.0	2.0.0	0
+order	1.2.3	1.2.3	0
+order	v0.0.0	0.0.0-foo	1
+order	0.0.0-foo	v0.0.0	-1
+order	v0.0.0	v0.0.0	0
+order	v0.0.1	0.0.0	1
+order	0.0.0	v0.0.1	-1
+order	v0.0.1	v0.0.1	0
+order	v1.0.0	0.9.9	1
+order	0.9.9	v1.0.0	-1
+order	v1.0.0	v1.0.0	0
+order	v0.10.0	0.9.0	1
+order	0.9.0	v0.10.0	-1
+order	v0.10.0	v0.10.0	0
+order	v0.99.0	0.10.0	1
+order	0.10.0	v0.99.0	-1
+order	v0.99.0	v0.99.0	0
+order	v2.0.0	1.2.3	1
+order	1.2.3	v2.0.0	-1
+order	v2.0.0	v2.0.0	0
+order	0.0.0	v0.0.0-foo	1
+order	v0.0.0-foo	0.0.0	-1
+order	v0.0.0-foo	v0.0.0-foo	0
+order	0.0.1	v0.0.0	1
+order	v0.0.0	0.0.1	-1
+order	1.0.0	v0.9.9	1
+order	v0.9.9	1.0.0	-1
+order	v0.9.9	v0.9.9	0
+order	0.10.0	v0.9.0	1
+order	v0.9.0	0.10.0	-1
+order	v0.9.0	v0.9.0	0
+order	0.99.0	v0.10.0	1
+order	v0.10.0	0.99.0	-1
+order	2.0.0	v1.2.3	1
+order	v1.2.3	2.0.0	-1
+order	v1.2.3	v1.2.3	0
+order	1.2.3	1.2.3-asdf	1
+order	1.2.3-asdf	1.2.3	-1
+order	1.2.3-asdf	1.2.3-asdf	0
+order	1.2.3	1.2.3-4	1
+order	1.2.3-4	1.2.3	-1
+order	1.2.3-4	1.2.3-4	0
+order	1.2.3	1.2.3-4-foo	1
+order	1.2.3-4-foo	1.2.3	-1
+order	1.2.3-4-foo	1.2.3-4-foo	0
+order	1.2.3-5-foo	1.2.3-5	1
+order	1.2.3-5	1.2.3-5-foo	-1
+order	1.2.3-5-foo	1.2.3-5-foo	0
+order	1.2.3-5	1.2.3-5	0
+order	1.2.3-5	1.2.3-4	1
+order	1.2.3-4	1.2.3-5	-1
+order	1.2.3-5-foo	1.2.3-5-Foo	1
+order	1.2.3-5-Foo	1.2.3-5-foo	-1
+order	1.2.3-5-Foo	1.2.3-5-Foo	0
+order	3.0.0	2.7.2+asdf	1
+order	2.7.2+asdf	3.0.0	-1
+order	3.0.0	3.0.0	0
+order	2.7.2+asdf	2.7.2+asdf	0
+order	1.2.3-a.10	1.2.3-a.5	1
+order	1.2.3-a.5	1.2.3-a.10	-1
+order	1.2.3-a.10	1.2.3-a.10	0
+order	1.2.3-a.5	1.2.3-a.5	0
+order	1.2.3-a.b	1.2.3-a.5	1
+order	1.2.3-a.5	1.2.3-a.b	-1
+order	1.2.3-a.b	1.2.3-a.b	0
+order	1.2.3-a.b	1.2.3-a	1
+order	1.2.3-a	1.2.3-a.b	-1
+order	1.2.3-a	1.2.3-a	0
+order	1.2.3-a.b.c.10.d.5	1.2.3-a.b.c.5.d.100	1
+order	1.2.3-a.b.c.5.d.100	1.2.3-a.b.c.10.d.5	-1
+order	1.2.3-a.b.c.10.d.5	1.2.3-a.b.c.10.d.5	0
+order	1.2.3-a.b.c.5.d.100	1.2.3-a.b.c.5.d.100	0
+order	1.2.3-r2	1.2.3-r100	1
+order	1.2.3-r100	1.2.3-r2	-1
+order	1.2.3-r2	1.2.3-r2	0
+order	1.2.3-r100	1.2.3-r100	0
+order	1.2.3-r100	1.2.3-R2	1
+order	1.2.3-R2	1.2.3-r100	-1
+order	1.2.3-R2	1.2.3-R2	0
+order	1.0.0-pre.a.b	1.0.0-pre.a	1
+order	1.0.0-pre.a	1.0.0-pre.a.b	-1
+order	1.0.0-pre.a.b	1.0.0-pre.a.b	0
+order	1.0.0-pre.a	1.0.0-pre.a	0
+order	1.0.0-alpha.22-alpha.jkwejf334jkj43	1.0.0-alpha.3	1
+order	1.0.0-alpha.3	1.0.0-alpha.22-alpha.jkwejf334jkj43	-1
+order	1.0.0-alpha.22-alpha.jkwejf334jkj43	1.0.0-alpha.22-alpha.jkwejf334jkj43	0
+order	1.0.0-alpha.3	1.0.0-alpha.3	0
+order	1.0.0-alpha.1beta	1.0.0-alpha.2	1
+order	1.0.0-alpha.2	1.0.0-alpha.1beta	-1
+order	1.0.0-alpha.1beta	1.0.0-alpha.1beta	0
+order	1.0.0-alpha.2	1.0.0-alpha.2	0
+order	0	0.0	1
+order	0.0	0	-1
+order	0	0	0
+order	0.0	0.0	0
+order	1	1.0	1
+order	1.0	1	-1
+order	1	1	0
+order	1.0	1.0	0
+order	1.2	1.2.0	1
+order	1.2.0	1.2	-1
+order	1.2	1.2	0
+order	1.2.0	1.2.0	0
+order	1.x	1.0.x	1
+order	1.0.x	1.x	-1
+order	1.x	1.x	0
+order	1.0.x	1.0.x	0
+order	1.x.x	1.0.x	1
+order	1.0.x	1.x.x	-1
+order	1.x.x	1.x.x	0
+order	2.x	1.x	1
+order	1.x	2.x	-1
+order	2.x	2.x	0
+order	2.x	2.1	1
+order	2.1	2.x	-1
+order	2.1	2.1	0
+order	2	1	1
+order	1	2	-1
+order	2	2	0
+order	3.*	3.1	1
+order	3.1	3.*	-1
+order	3.*	3.*	0
+order	3.1	3.1	0
+order	3.2.*	3.2.0	1
+order	3.2.0	3.2.*	-1
+order	3.2.*	3.2.*	0
+order	3.2.0	3.2.0	0
+order	4294967295.4294967295.x	4294967295.4294967295.4294967294	1
+order	4294967295.4294967295.4294967294	4294967295.4294967295.x	-1
+order	4294967295.4294967295.x	4294967295.4294967295.x	0
+order	4294967295.4294967295.4294967294	4294967295.4294967295.4294967294	0
+order	*	4294967295.4294967295.4294967294	1
+order	4294967295.4294967295.4294967294	*	-1
+order	*	*	0
+order	1.2.3	v1.2.3	0
+order	v1.2.3	1.2.3	0
+order	1.2.3	=1.2.3	0
+order	=1.2.3	1.2.3	0
+order	1.2.3	v 1.2.3	0
+order	v 1.2.3	1.2.3	0
+order	1.2.3	= 1.2.3	0
+order	= 1.2.3	1.2.3	0
+order	1.2.3	 v1.2.3	0
+order	 v1.2.3	1.2.3	0
+order	1.2.3	 =1.2.3	0
+order	 =1.2.3	1.2.3	0
+order	1.2.3	 v 1.2.3	0
+order	 v 1.2.3	1.2.3	0
+order	1.2.3	 = 1.2.3	0
+order	 = 1.2.3	1.2.3	0
+order	1.2.3-0	v1.2.3-0	0
+order	v1.2.3-0	1.2.3-0	0
+order	1.2.3-0	=1.2.3-0	0
+order	=1.2.3-0	1.2.3-0	0
+order	1.2.3-0	v 1.2.3-0	0
+order	v 1.2.3-0	1.2.3-0	0
+order	1.2.3-0	= 1.2.3-0	0
+order	= 1.2.3-0	1.2.3-0	0
+order	1.2.3-0	 v1.2.3-0	0
+order	 v1.2.3-0	1.2.3-0	0
+order	1.2.3-0	 =1.2.3-0	0
+order	 =1.2.3-0	1.2.3-0	0
+order	1.2.3-0	 v 1.2.3-0	0
+order	 v 1.2.3-0	1.2.3-0	0
+order	1.2.3-0	 = 1.2.3-0	0
+order	 = 1.2.3-0	1.2.3-0	0
+order	1.2.3-1	v1.2.3-1	0
+order	v1.2.3-1	1.2.3-1	0
+order	1.2.3-1	=1.2.3-1	0
+order	=1.2.3-1	1.2.3-1	0
+order	1.2.3-1	v 1.2.3-1	0
+order	v 1.2.3-1	1.2.3-1	0
+order	1.2.3-1	= 1.2.3-1	0
+order	= 1.2.3-1	1.2.3-1	0
+order	1.2.3-1	 v1.2.3-1	0
+order	 v1.2.3-1	1.2.3-1	0
+order	1.2.3-1	 =1.2.3-1	0
+order	 =1.2.3-1	1.2.3-1	0
+order	1.2.3-1	 v 1.2.3-1	0
+order	 v 1.2.3-1	1.2.3-1	0
+order	1.2.3-1	 = 1.2.3-1	0
+order	 = 1.2.3-1	1.2.3-1	0
+order	1.2.3-beta	v1.2.3-beta	0
+order	v1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	=1.2.3-beta	0
+order	=1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	v 1.2.3-beta	0
+order	v 1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	= 1.2.3-beta	0
+order	= 1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	 v1.2.3-beta	0
+order	 v1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	 =1.2.3-beta	0
+order	 =1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	 v 1.2.3-beta	0
+order	 v 1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta	 = 1.2.3-beta	0
+order	 = 1.2.3-beta	1.2.3-beta	0
+order	1.2.3-beta+build	 = 1.2.3-beta+otherbuild	0
+order	 = 1.2.3-beta+otherbuild	1.2.3-beta+build	0
+order	1.2.3+build	 = 1.2.3+otherbuild	0
+order	 = 1.2.3+otherbuild	1.2.3+build	0
+order	1.2.3-beta+build	1.2.3-beta+otherbuild	0
+order	1.2.3-beta+otherbuild	1.2.3-beta+build	0
+order	1.2.3+build	1.2.3+otherbuild	0
+order	1.2.3+otherbuild	1.2.3+build	0
+order	  v1.2.3+build	1.2.3+otherbuild	0
+order	1.2.3+otherbuild	  v1.2.3+build	0
+order	1.1.1-next.0 	1.1.1-next.0    	0
+order	1.1.1-next.0    	1.1.1-next.0 	0
+order	1.1.1-next.0.a 	1.1.1-next.0.a    	0
+order	1.1.1-next.0.a    	1.1.1-next.0.a 	0
+order	1.1.1-next.0.a+abc 	1.1.1-next.0.a+jkejf    	0
+order	1.1.1-next.0.a+jkejf    	1.1.1-next.0.a+abc 	0
+satisfies	1.2.3	1.2.3	true
+satisfies	^2.2.3||lol||!!#4_	1.2.3	false
+satisfies	^1.2.3||lol||!!#4_	+!+!+!_)31231.2.3	false
+satisfies	1.2.3	^1.2.3	true
+satisfies	^1.2.3	1.2.3	false
+satisfies	4	4	false
+satisfies	4.0.0	4.0.0	true
+satisfies	4.0	4.0	false
+satisfies	5.0.0-beta.1	5.0.0-beta.1	true
+satisfies	5.0.0-beta.1	5.0.0-beta.2	false
+satisfies	5.0.0-beta.2	5.0.0-beta.1	false
+satisfies	5.0.0-beta.1	5.0.0-beta.0	false
+satisfies	5.0.0-beta.0	5.0.0-beta.1	false
+satisfies	5.0.0-beta.1	5.0.0-beta	false
+satisfies	5.0.0-beta	5.0.0-beta.1	false
+satisfies	5.0.0-beta.1	5.0.0	false
+satisfies	5.0.0	5.0.0-beta.1	false
+satisfies	1.2.3	~1.2.3	true
+satisfies	1.2.0	~1.2	true
+satisfies	1.0.0	~1	true
+satisfies	1.2.0	~1	true
+satisfies	1.2.999	~1	true
+satisfies	0.2.3	~0.2.3	true
+satisfies	0.2.0	~0.2	true
+satisfies	0.2.1	~0.2	true
+satisfies	0.0.0	~0 	true
+satisfies	1.3.0	~1.2.3	false
+satisfies	1.3.0	~1.2	false
+satisfies	2.0.0	~1	false
+satisfies	0.3.0	~0.2.3	false
+satisfies	1.0.0	~0.2.3	false
+satisfies	1.0.0	~0 	false
+satisfies	0.1.0	~0.2	false
+satisfies	0.3.0	~0.2	false
+satisfies	3.3.0	~3.0.5	false
+satisfies	1.1.4	^1.1.4	true
+satisfies	3.5.0	>=3	true
+satisfies	2.999.999	>=3	false
+satisfies	3.5.1	>=3	true
+satisfies	3.x.x	>=3.x.x	false
+satisfies	5.0.0	<6 >= 5	true
+satisfies	4.0.0	<6 >= 5	false
+satisfies	6.0.0	<6 >= 5	false
+satisfies	6.0.1	<6 >= 5	false
+satisfies	3	>2	false
+satisfies	2.1	>2	false
+satisfies	2	>2	false
+satisfies	1.0	>2	false
+satisfies	1.3.1	>1.3	false
+satisfies	2.0.0	>1.3	true
+satisfies	2.2.0	>2.1.0	true
+satisfies	2.2.0	<=2.2.99999	true
+satisfies	2.2.0	>=2.1.99999	true
+satisfies	2.2.0	<2.2.99999	true
+satisfies	2.2.0	>2.1.99999	true
+satisfies	2.0.0	>1.0.0	true
+satisfies	1.0.0	1.0.0	true
+satisfies	2.0.0	1.0.0	false
+satisfies	1.0.0	1.0.0 || 2.0.0	true
+satisfies	1.0.0	2.0.0 || 1.0.0	true
+satisfies	2.0.0	1.0.0 || 2.0.0	true
+satisfies	2.0.0	2.0.0 || 1.0.0	true
+satisfies	2.0.0	2.0.0 || >1.0.0	true
+satisfies	1.0.2	>1.0.0 <2.0.0 <2.0.1 >1.0.1	true
+satisfies	2.0.0	2.x	true
+satisfies	2.1.0	2.x	true
+satisfies	2.2.0	2.x	true
+satisfies	2.3.0	2.x	true
+satisfies	2.1.1	2.x	true
+satisfies	2.2.2	2.x	true
+satisfies	2.3.3	2.x	true
+satisfies	2.0.0	<2.0.1 >1.0.0	true
+satisfies	2.0.0	<=2.0.1 >=1.0.0	true
+satisfies	2.0.0	^2	true
+satisfies	2.9.9	^2	true
+satisfies	2.0.0	~2	true
+satisfies	2.1.0	~2	true
+satisfies	2.2.1	~2.2	true
+satisfies	2.1.0	2.1.0 || > 2.2 || >3	true
+satisfies	2.1.0	 > 2.2 || >3 || 2.1.0	true
+satisfies	2.1.0	 > 2.2 || 2.1.0 || >3	true
+satisfies	2.3.0	> 2.2 || 2.1.0 || >3	true
+satisfies	2.2.1	> 2.2 || 2.1.0 || >3	false
+satisfies	2.2.0	> 2.2 || 2.1.0 || >3	false
+satisfies	3.0.1	> 2.2 || 2.1.0 || >3	true
+satisfies	1.2.2	1.2.0 - 1.3.0	true
+satisfies	1.2.2	1.2 - 1.3	true
+satisfies	1.2.2	1 - 1.3	true
+satisfies	1.3.0	1 - 1.3	true
+satisfies	1.3.1	1.2 - 1.3	true
+satisfies	1.4.0	1.2 - 1.3	false
+satisfies	1.3.1	1 - 1.3	true
+satisfies	6.4.0	1.2 - 1.3 || 5.0	false
+satisfies	1.2.1	1.2 - 1.3 || 5.0	true
+satisfies	1.2.1	5.0 || 1.2 - 1.3	true
+satisfies	5.0	1.2 - 1.3 || 5.0	false
+satisfies	5.0	5.0 || 1.2 - 1.3	false
+satisfies	5.0.2	1.2 - 1.3 || 5.0	true
+satisfies	5.0.2	5.0 || 1.2 - 1.3	true
+satisfies	9.0.2	5.0 || 1.2 - 1.3 || >8	true
+satisfies	0.34.0-next.8	>=0.34.0-next.3 <1.0.0	true
+satisfies	0.34.0-next.8	<1.0.0	false
+satisfies	7.0.0-rc2	<=7.0.0	false
+satisfies	7.0.0-rc2	>=7.0.0	false
+satisfies	7.0.0-rc2	<=7.0.0-rc2	true
+satisfies	7.0.0-rc2	>=7.0.0-rc2	true
+satisfies	1.2.4-alpha.notready	^1.2.3-pr.1 || >=1.2.4-alpha	true
+satisfies	3.0.0-next.2	^3.0.0-next.0||^3.0.0	true
+satisfies	0.1.0	^2 <2.2 || > 2.3	false
+satisfies	0.1.0	> 2.3 || ^2 <2.2	false
+satisfies	0.10.0	^2 <2.2 || > 2.3	false
+satisfies	0.10.0	> 2.3 || ^2 <2.2	false
+satisfies	0.2.0	^2 <2.2 || > 2.3	false
+satisfies	0.2.0	> 2.3 || ^2 <2.2	false
+satisfies	0.2.1	^2 <2.2 || > 2.3	false
+satisfies	0.2.1	> 2.3 || ^2 <2.2	false
+satisfies	0.2.2	^2 <2.2 || > 2.3	false
+satisfies	0.2.2	> 2.3 || ^2 <2.2	false
+satisfies	0.3.0	^2 <2.2 || > 2.3	false
+satisfies	0.3.0	> 2.3 || ^2 <2.2	false
+satisfies	0.3.1	^2 <2.2 || > 2.3	false
+satisfies	0.3.1	> 2.3 || ^2 <2.2	false
+satisfies	0.3.2	^2 <2.2 || > 2.3	false
+satisfies	0.3.2	> 2.3 || ^2 <2.2	false
+satisfies	0.4.0	^2 <2.2 || > 2.3	false
+satisfies	0.4.0	> 2.3 || ^2 <2.2	false
+satisfies	0.4.1	^2 <2.2 || > 2.3	false
+satisfies	0.4.1	> 2.3 || ^2 <2.2	false
+satisfies	0.4.2	^2 <2.2 || > 2.3	false
+satisfies	0.4.2	> 2.3 || ^2 <2.2	false
+satisfies	0.5.0	^2 <2.2 || > 2.3	false
+satisfies	0.5.0	> 2.3 || ^2 <2.2	false
+satisfies	0.5.0-rc.1	^2 <2.2 || > 2.3	false
+satisfies	0.5.0-rc.1	> 2.3 || ^2 <2.2	false
+satisfies	0.5.1	^2 <2.2 || > 2.3	false
+satisfies	0.5.1	> 2.3 || ^2 <2.2	false
+satisfies	0.5.2	^2 <2.2 || > 2.3	false
+satisfies	0.5.2	> 2.3 || ^2 <2.2	false
+satisfies	0.6.0	^2 <2.2 || > 2.3	false
+satisfies	0.6.0	> 2.3 || ^2 <2.2	false
+satisfies	0.6.1	^2 <2.2 || > 2.3	false
+satisfies	0.6.1	> 2.3 || ^2 <2.2	false
+satisfies	0.7.0	^2 <2.2 || > 2.3	false
+satisfies	0.7.0	> 2.3 || ^2 <2.2	false
+satisfies	0.8.0	^2 <2.2 || > 2.3	false
+satisfies	0.8.0	> 2.3 || ^2 <2.2	false
+satisfies	0.8.1	^2 <2.2 || > 2.3	false
+satisfies	0.8.1	> 2.3 || ^2 <2.2	false
+satisfies	0.8.2	^2 <2.2 || > 2.3	false
+satisfies	0.8.2	> 2.3 || ^2 <2.2	false
+satisfies	0.9.0	^2 <2.2 || > 2.3	false
+satisfies	0.9.0	> 2.3 || ^2 <2.2	false
+satisfies	0.9.1	^2 <2.2 || > 2.3	false
+satisfies	0.9.1	> 2.3 || ^2 <2.2	false
+satisfies	0.9.2	^2 <2.2 || > 2.3	false
+satisfies	0.9.2	> 2.3 || ^2 <2.2	false
+satisfies	1.0.0	^2 <2.2 || > 2.3	false
+satisfies	1.0.0	> 2.3 || ^2 <2.2	false
+satisfies	1.0.1	^2 <2.2 || > 2.3	false
+satisfies	1.0.1	> 2.3 || ^2 <2.2	false
+satisfies	1.0.2	^2 <2.2 || > 2.3	false
+satisfies	1.0.2	> 2.3 || ^2 <2.2	false
+satisfies	1.1.0	^2 <2.2 || > 2.3	false
+satisfies	1.1.0	> 2.3 || ^2 <2.2	false
+satisfies	1.1.1	^2 <2.2 || > 2.3	false
+satisfies	1.1.1	> 2.3 || ^2 <2.2	false
+satisfies	1.2.0	^2 <2.2 || > 2.3	false
+satisfies	1.2.0	> 2.3 || ^2 <2.2	false
+satisfies	1.2.1	^2 <2.2 || > 2.3	false
+satisfies	1.2.1	> 2.3 || ^2 <2.2	false
+satisfies	1.3.0	^2 <2.2 || > 2.3	false
+satisfies	1.3.0	> 2.3 || ^2 <2.2	false
+satisfies	1.3.1	^2 <2.2 || > 2.3	false
+satisfies	1.3.1	> 2.3 || ^2 <2.2	false
+satisfies	2.2.0	^2 <2.2 || > 2.3	false
+satisfies	2.2.0	> 2.3 || ^2 <2.2	false
+satisfies	2.2.1	^2 <2.2 || > 2.3	false
+satisfies	2.2.1	> 2.3 || ^2 <2.2	false
+satisfies	2.3.0	^2 <2.2 || > 2.3	false
+satisfies	2.3.0	> 2.3 || ^2 <2.2	false
+satisfies	1.0.0-rc.1	^2 <2.2 || > 2.3	false
+satisfies	1.0.0-rc.1	> 2.3 || ^2 <2.2	false
+satisfies	1.0.0-rc.2	^2 <2.2 || > 2.3	false
+satisfies	1.0.0-rc.2	> 2.3 || ^2 <2.2	false
+satisfies	1.0.0-rc.3	^2 <2.2 || > 2.3	false
+satisfies	1.0.0-rc.3	> 2.3 || ^2 <2.2	false
+satisfies	2.4.0	^2 <2.2 || > 2.3	true
+satisfies	2.4.0	> 2.3 || ^2 <2.2	true
+satisfies	2.4.1	^2 <2.2 || > 2.3	true
+satisfies	2.4.1	> 2.3 || ^2 <2.2	true
+satisfies	3.0.0	^2 <2.2 || > 2.3	true
+satisfies	3.0.0	> 2.3 || ^2 <2.2	true
+satisfies	3.0.1	^2 <2.2 || > 2.3	true
+satisfies	3.0.1	> 2.3 || ^2 <2.2	true
+satisfies	3.1.0	^2 <2.2 || > 2.3	true
+satisfies	3.1.0	> 2.3 || ^2 <2.2	true
+satisfies	3.2.0	^2 <2.2 || > 2.3	true
+satisfies	3.2.0	> 2.3 || ^2 <2.2	true
+satisfies	3.3.0	^2 <2.2 || > 2.3	true
+satisfies	3.3.0	> 2.3 || ^2 <2.2	true
+satisfies	3.3.1	^2 <2.2 || > 2.3	true
+satisfies	3.3.1	> 2.3 || ^2 <2.2	true
+satisfies	3.4.0	^2 <2.2 || > 2.3	true
+satisfies	3.4.0	> 2.3 || ^2 <2.2	true
+satisfies	3.5.0	^2 <2.2 || > 2.3	true
+satisfies	3.5.0	> 2.3 || ^2 <2.2	true
+satisfies	3.6.0	^2 <2.2 || > 2.3	true
+satisfies	3.6.0	> 2.3 || ^2 <2.2	true
+satisfies	3.7.0	^2 <2.2 || > 2.3	true
+satisfies	3.7.0	> 2.3 || ^2 <2.2	true
+satisfies	2.4.2	^2 <2.2 || > 2.3	true
+satisfies	2.4.2	> 2.3 || ^2 <2.2	true
+satisfies	3.8.0	^2 <2.2 || > 2.3	true
+satisfies	3.8.0	> 2.3 || ^2 <2.2	true
+satisfies	3.9.0	^2 <2.2 || > 2.3	true
+satisfies	3.9.0	> 2.3 || ^2 <2.2	true
+satisfies	3.9.1	^2 <2.2 || > 2.3	true
+satisfies	3.9.1	> 2.3 || ^2 <2.2	true
+satisfies	3.9.2	^2 <2.2 || > 2.3	true
+satisfies	3.9.2	> 2.3 || ^2 <2.2	true
+satisfies	3.9.3	^2 <2.2 || > 2.3	true
+satisfies	3.9.3	> 2.3 || ^2 <2.2	true
+satisfies	3.10.0	^2 <2.2 || > 2.3	true
+satisfies	3.10.0	> 2.3 || ^2 <2.2	true
+satisfies	3.10.1	^2 <2.2 || > 2.3	true
+satisfies	3.10.1	> 2.3 || ^2 <2.2	true
+satisfies	4.0.0	^2 <2.2 || > 2.3	true
+satisfies	4.0.0	> 2.3 || ^2 <2.2	true
+satisfies	4.0.1	^2 <2.2 || > 2.3	true
+satisfies	4.0.1	> 2.3 || ^2 <2.2	true
+satisfies	4.1.0	^2 <2.2 || > 2.3	true
+satisfies	4.1.0	> 2.3 || ^2 <2.2	true
+satisfies	4.2.0	^2 <2.2 || > 2.3	true
+satisfies	4.2.0	> 2.3 || ^2 <2.2	true
+satisfies	4.2.1	^2 <2.2 || > 2.3	true
+satisfies	4.2.1	> 2.3 || ^2 <2.2	true
+satisfies	4.3.0	^2 <2.2 || > 2.3	true
+satisfies	4.3.0	> 2.3 || ^2 <2.2	true
+satisfies	4.4.0	^2 <2.2 || > 2.3	true
+satisfies	4.4.0	> 2.3 || ^2 <2.2	true
+satisfies	4.5.0	^2 <2.2 || > 2.3	true
+satisfies	4.5.0	> 2.3 || ^2 <2.2	true
+satisfies	4.5.1	^2 <2.2 || > 2.3	true
+satisfies	4.5.1	> 2.3 || ^2 <2.2	true
+satisfies	4.6.0	^2 <2.2 || > 2.3	true
+satisfies	4.6.0	> 2.3 || ^2 <2.2	true
+satisfies	4.6.1	^2 <2.2 || > 2.3	true
+satisfies	4.6.1	> 2.3 || ^2 <2.2	true
+satisfies	4.7.0	^2 <2.2 || > 2.3	true
+satisfies	4.7.0	> 2.3 || ^2 <2.2	true
+satisfies	4.8.0	^2 <2.2 || > 2.3	true
+satisfies	4.8.0	> 2.3 || ^2 <2.2	true
+satisfies	4.8.1	^2 <2.2 || > 2.3	true
+satisfies	4.8.1	> 2.3 || ^2 <2.2	true
+satisfies	4.8.2	^2 <2.2 || > 2.3	true
+satisfies	4.8.2	> 2.3 || ^2 <2.2	true
+satisfies	4.9.0	^2 <2.2 || > 2.3	true
+satisfies	4.9.0	> 2.3 || ^2 <2.2	true
+satisfies	4.10.0	^2 <2.2 || > 2.3	true
+satisfies	4.10.0	> 2.3 || ^2 <2.2	true
+satisfies	4.11.0	^2 <2.2 || > 2.3	true
+satisfies	4.11.0	> 2.3 || ^2 <2.2	true
+satisfies	4.11.1	^2 <2.2 || > 2.3	true
+satisfies	4.11.1	> 2.3 || ^2 <2.2	true
+satisfies	4.11.2	^2 <2.2 || > 2.3	true
+satisfies	4.11.2	> 2.3 || ^2 <2.2	true
+satisfies	4.12.0	^2 <2.2 || > 2.3	true
+satisfies	4.12.0	> 2.3 || ^2 <2.2	true
+satisfies	4.13.0	^2 <2.2 || > 2.3	true
+satisfies	4.13.0	> 2.3 || ^2 <2.2	true
+satisfies	4.13.1	^2 <2.2 || > 2.3	true
+satisfies	4.13.1	> 2.3 || ^2 <2.2	true
+satisfies	4.14.0	^2 <2.2 || > 2.3	true
+satisfies	4.14.0	> 2.3 || ^2 <2.2	true
+satisfies	4.14.1	^2 <2.2 || > 2.3	true
+satisfies	4.14.1	> 2.3 || ^2 <2.2	true
+satisfies	4.14.2	^2 <2.2 || > 2.3	true
+satisfies	4.14.2	> 2.3 || ^2 <2.2	true
+satisfies	4.15.0	^2 <2.2 || > 2.3	true
+satisfies	4.15.0	> 2.3 || ^2 <2.2	true
+satisfies	4.16.0	^2 <2.2 || > 2.3	true
+satisfies	4.16.0	> 2.3 || ^2 <2.2	true
+satisfies	4.16.1	^2 <2.2 || > 2.3	true
+satisfies	4.16.1	> 2.3 || ^2 <2.2	true
+satisfies	4.16.2	^2 <2.2 || > 2.3	true
+satisfies	4.16.2	> 2.3 || ^2 <2.2	true
+satisfies	4.16.3	^2 <2.2 || > 2.3	true
+satisfies	4.16.3	> 2.3 || ^2 <2.2	true
+satisfies	4.16.4	^2 <2.2 || > 2.3	true
+satisfies	4.16.4	> 2.3 || ^2 <2.2	true
+satisfies	4.16.5	^2 <2.2 || > 2.3	true
+satisfies	4.16.5	> 2.3 || ^2 <2.2	true
+satisfies	4.16.6	^2 <2.2 || > 2.3	true
+satisfies	4.16.6	> 2.3 || ^2 <2.2	true
+satisfies	4.17.0	^2 <2.2 || > 2.3	true
+satisfies	4.17.0	> 2.3 || ^2 <2.2	true
+satisfies	4.17.1	^2 <2.2 || > 2.3	true
+satisfies	4.17.1	> 2.3 || ^2 <2.2	true
+satisfies	4.17.2	^2 <2.2 || > 2.3	true
+satisfies	4.17.2	> 2.3 || ^2 <2.2	true
+satisfies	4.17.3	^2 <2.2 || > 2.3	true
+satisfies	4.17.3	> 2.3 || ^2 <2.2	true
+satisfies	4.17.4	^2 <2.2 || > 2.3	true
+satisfies	4.17.4	> 2.3 || ^2 <2.2	true
+satisfies	4.17.5	^2 <2.2 || > 2.3	true
+satisfies	4.17.5	> 2.3 || ^2 <2.2	true
+satisfies	4.17.9	^2 <2.2 || > 2.3	true
+satisfies	4.17.9	> 2.3 || ^2 <2.2	true
+satisfies	4.17.10	^2 <2.2 || > 2.3	true
+satisfies	4.17.10	> 2.3 || ^2 <2.2	true
+satisfies	4.17.11	^2 <2.2 || > 2.3	true
+satisfies	4.17.11	> 2.3 || ^2 <2.2	true
+satisfies	2.0.0	^2 <2.2 || > 2.3	true
+satisfies	2.0.0	> 2.3 || ^2 <2.2	true
+satisfies	2.1.0	^2 <2.2 || > 2.3	true
+satisfies	2.1.0	> 2.3 || ^2 <2.2	true
+satisfies	1.2.3	1.0.0 - 2.0.0	true
+satisfies	1.2.3	^1.2.3+build	true
+satisfies	1.3.0	^1.2.3+build	true
+satisfies	1.2.3	1.2.3-pre+asdf - 2.4.3-pre+asdf	true
+satisfies	1.2.3	1.2.3pre+asdf - 2.4.3-pre+asdf	true
+satisfies	1.2.3	1.2.3-pre+asdf - 2.4.3pre+asdf	true
+satisfies	1.2.3	1.2.3pre+asdf - 2.4.3pre+asdf	true
+satisfies	1.2.3-pre.2	1.2.3-pre+asdf - 2.4.3-pre+asdf	true
+satisfies	2.4.3-alpha	1.2.3-pre+asdf - 2.4.3-pre+asdf	true
+satisfies	1.2.3	1.2.3+asdf - 2.4.3+asdf	true
+satisfies	0.2.4	>=*	true
+satisfies	1.0.0		true
+satisfies	1.2.3	*	true
+satisfies	v1.2.3	*	true
+satisfies	1.0.0	>=1.0.0	true
+satisfies	1.0.1	>=1.0.0	true
+satisfies	1.1.0	>=1.0.0	true
+satisfies	1.0.1	>1.0.0	true
+satisfies	1.1.0	>1.0.0	true
+satisfies	2.0.0	<=2.0.0	true
+satisfies	1.9999.9999	<=2.0.0	true
+satisfies	0.2.9	<=2.0.0	true
+satisfies	1.9999.9999	<2.0.0	true
+satisfies	0.2.9	<2.0.0	true
+satisfies	1.0.0	>= 1.0.0	true
+satisfies	1.0.1	>=  1.0.0	true
+satisfies	1.1.0	>=   1.0.0	true
+satisfies	1.0.1	> 1.0.0	true
+satisfies	1.1.0	>  1.0.0	true
+satisfies	2.0.0	<=   2.0.0	true
+satisfies	1.9999.9999	<= 2.0.0	true
+satisfies	0.2.9	<=  2.0.0	true
+satisfies	1.9999.9999	<    2.0.0	true
+satisfies	0.2.9	<\t2.0.0	true
+satisfies	v0.1.97	>=0.1.97	true
+satisfies	0.1.97	>=0.1.97	true
+satisfies	1.2.4	0.1.20 || 1.2.4	true
+satisfies	0.0.0	>=0.2.3 || <0.0.1	true
+satisfies	0.2.3	>=0.2.3 || <0.0.1	true
+satisfies	0.2.4	>=0.2.3 || <0.0.1	true
+satisfies	1.3.4	||	true
+satisfies	2.1.3	2.x.x	true
+satisfies	1.2.3	1.2.x	true
+satisfies	2.1.3	1.2.x || 2.x	true
+satisfies	1.2.3	1.2.x || 2.x	true
+satisfies	1.2.3	x	true
+satisfies	2.1.3	2.*.*	true
+satisfies	1.2.3	1.2.*	true
+satisfies	2.1.3	1.2.* || 2.*	true
+satisfies	1.2.3	1.2.* || 2.*	true
+satisfies	2.1.2	2	true
+satisfies	2.3.1	2.3	true
+satisfies	0.0.1	~0.0.1	true
+satisfies	0.0.2	~0.0.1	true
+satisfies	0.0.9	~x	true
+satisfies	2.0.9	~2	true
+satisfies	2.4.0	~2.4	true
+satisfies	2.4.5	~2.4	true
+satisfies	3.2.2	~>3.2.1	true
+satisfies	1.2.3	~1	true
+satisfies	1.2.3	~>1	true
+satisfies	1.2.3	~> 1	true
+satisfies	1.0.2	~1.0	true
+satisfies	1.0.2	~ 1.0	true
+satisfies	1.0.12	~ 1.0.3	true
+satisfies	1.0.12	~ 1.0.3alpha	true
+satisfies	1.0.0	>=1	true
+satisfies	1.0.0	>= 1	true
+satisfies	1.1.1	<1.2	true
+satisfies	1.1.1	< 1.2	true
+satisfies	0.5.5	~v0.5.4-pre	true
+satisfies	0.5.4	~v0.5.4-pre	true
+satisfies	0.7.2	=0.7.x	true
+satisfies	0.7.2	<=0.7.x	true
+satisfies	0.7.2	>=0.7.x	true
+satisfies	0.6.2	<=0.7.x	true
+satisfies	1.2.3	~1.2.1 >=1.2.3	true
+satisfies	1.2.3	~1.2.1 =1.2.3	true
+satisfies	1.2.3	~1.2.1 1.2.3	true
+satisfies	1.2.3	~1.2.1 >=1.2.3 1.2.3	true
+satisfies	1.2.3	~1.2.1 1.2.3 >=1.2.3	true
+satisfies	1.2.3	>=1.2.1 1.2.3	true
+satisfies	1.2.3	1.2.3 >=1.2.1	true
+satisfies	1.2.3	>=1.2.3 >=1.2.1	true
+satisfies	1.2.3	>=1.2.1 >=1.2.3	true
+satisfies	1.2.8	>=1.2	true
+satisfies	1.8.1	^1.2.3	true
+satisfies	0.1.2	^0.1.2	true
+satisfies	0.1.2	^0.1	true
+satisfies	0.0.1	^0.0.1	true
+satisfies	1.4.2	^1.2	true
+satisfies	1.4.2	^1.2 ^1	true
+satisfies	1.2.3-pre	^1.2.3-alpha	true
+satisfies	1.2.0-pre	^1.2.0-alpha	true
+satisfies	0.0.1-beta	^0.0.1-alpha	true
+satisfies	0.0.1	^0.0.1-alpha	true
+satisfies	0.1.1-beta	^0.1.1-alpha	true
+satisfies	1.2.3	^x	true
+satisfies	0.9.7	x - 1.0.0	true
+satisfies	0.9.7	x - 1.x	true
+satisfies	1.9.7	1.0.0 - x	true
+satisfies	1.0.7	1.0.0 - x	true
+satisfies	1.0.7	1.0.0 - 1.x	true
+satisfies	1.0.7	1.0.0 - 1.0.x	true
+satisfies	1.9.7	1.x - x	true
+satisfies	7.9.9	<=7.x	true
+satisfies	3.3.1	>=3.3.0-beta.1 <3.4.0-beta.3	true
+satisfies	3.4.0	^3.3.0-beta.1	true
+satisfies	2.2.3	1.0.0 - 2.0.0	false
+satisfies	1.2.3-pre.2	1.2.3+asdf - 2.4.3+asdf	false
+satisfies	2.4.3-alpha	1.2.3+asdf - 2.4.3+asdf	false
+satisfies	2.0.0	^1.2.3+build	false
+satisfies	1.2.0	^1.2.3+build	false
+satisfies	1.2.3-pre	^1.2.3	false
+satisfies	1.2.0-pre	^1.2	false
+satisfies	1.3.0-beta	>1.2	false
+satisfies	1.2.3-beta	<=1.2.3	false
+satisfies	1.2.3-beta	^1.2.3	false
+satisfies	0.7.0-asdf	=0.7.x	false
+satisfies	0.7.0-asdf	>=0.7.x	false
+satisfies	0.7.0-asdf	<=0.7.x	false
+satisfies	1.0.0beta	1	false
+satisfies	1.0.0beta	<1	false
+satisfies	1.0.0beta	< 1	false
+satisfies	1.0.1	1.0.0	false
+satisfies	0.0.0	>=1.0.0	false
+satisfies	0.0.1	>=1.0.0	false
+satisfies	0.1.0	>=1.0.0	false
+satisfies	0.0.1	>1.0.0	false
+satisfies	0.1.0	>1.0.0	false
+satisfies	3.0.0	<=2.0.0	false
+satisfies	2.9999.9999	<=2.0.0	false
+satisfies	2.2.9	<=2.0.0	false
+satisfies	2.9999.9999	<2.0.0	false
+satisfies	2.2.9	<2.0.0	false
+satisfies	v0.1.93	>=0.1.97	false
+satisfies	0.1.93	>=0.1.97	false
+satisfies	1.2.3	0.1.20 || 1.2.4	false
+satisfies	0.0.3	>=0.2.3 || <0.0.1	false
+satisfies	0.2.2	>=0.2.3 || <0.0.1	false
+satisfies	1.1.3	2.x.x	false
+satisfies	3.1.3	2.x.x	false
+satisfies	1.3.3	1.2.x	false
+satisfies	3.1.3	1.2.x || 2.x	false
+satisfies	1.1.3	1.2.x || 2.x	false
+satisfies	1.1.3	2.*.*	false
+satisfies	3.1.3	2.*.*	false
+satisfies	1.3.3	1.2.*	false
+satisfies	3.1.3	1.2.* || 2.*	false
+satisfies	1.1.3	1.2.* || 2.*	false
+satisfies	1.1.2	2	false
+satisfies	2.4.1	2.3	false
+satisfies	0.1.0-alpha	~0.0.1	false
+satisfies	0.1.0	~0.0.1	false
+satisfies	2.5.0	~2.4	false
+satisfies	2.3.9	~2.4	false
+satisfies	3.3.2	~>3.2.1	false
+satisfies	3.2.0	~>3.2.1	false
+satisfies	0.2.3	~1	false
+satisfies	2.2.3	~>1	false
+satisfies	1.1.0	~1.0	false
+satisfies	1.0.0	<1	false
+satisfies	1.1.1	>=1.2	false
+satisfies	2.0.0beta	1	false
+satisfies	0.5.4-alpha	~v0.5.4-beta	false
+satisfies	0.8.2	=0.7.x	false
+satisfies	0.6.2	>=0.7.x	false
+satisfies	0.7.2	<0.7.x	false
+satisfies	1.2.3-beta	<1.2.3	false
+satisfies	1.2.3-beta	=1.2.3	false
+satisfies	1.2.8	>1.2	false
+satisfies	0.0.2-alpha	^0.0.1	false
+satisfies	0.0.2	^0.0.1	false
+satisfies	2.0.0-alpha	^1.2.3	false
+satisfies	1.2.2	^1.2.3	false
+satisfies	1.1.9	^1.2	false
+satisfies	v1.2.3-foo	*	false
+satisfies	not a version	*	false
+satisfies	glorp	>=2	false
+satisfies	2.0.0-rc1	^1.0.0	false
+satisfies	2.0.0-pre	1 - 2	false
+satisfies	1.0.0-pre	1 - 2	false
+satisfies	1.0.0-pre	1.0 - 2	false
+satisfies	1.0.0-a	1.1.x	false
+satisfies	1.1.0-a	1.1.x	false
+satisfies	1.2.0-a	1.1.x	false
+satisfies	1.0.0-a	1.x	false
+satisfies	1.1.0-a	1.x	false
+satisfies	1.2.0-a	1.x	false
+satisfies	1.1.0	>=1.0.0 <1.1.0	false
+satisfies	1.1.0-pre	>=1.0.0 <1.1.0	false
+satisfies	1.1.0-pre	>=1.0.0 <1.1.0-pre	false
+satisfies	2.0.0	== 1.0.0 || foo	false
+satisfies	3.4.5	>=3.3.0-beta.1 <3.4.0-beta.3	false
+satisfies	0.1.0	2.1.3	false
+satisfies	1.0.0	2.1.3	false
+satisfies	2.1.3	2.1.3	true
+satisfies	3.0.0-canary.202508261745	2.1.3	false
+satisfies	0.6.2	^2.0.0	false
+satisfies	3.0.0-canary.202508261539	^2.0.0	false
+satisfies	0.6.1	2.0.0	false
+satisfies	3.0.0-beta.2	2.0.0	false
+satisfies	0.3.0	~0.6.2	false
+satisfies	0.6.2	~0.6.2	true
+satisfies	2.1.1	~0.6.2	false
+satisfies	4.0.0-nightly.202508270145	~0.6.2	false
+satisfies	2.0.0	~0.7.0	false
+satisfies	3.0.0-canary.202508261745	~0.7.0	false
+satisfies	0.6.2	^2.1.3	false
+satisfies	3.0.0-canary.0	^2.1.3	false
+satisfies	0.4.0	0.6.2	false
+satisfies	2.1.2	0.6.2	false
+satisfies	4.0.0-nightly.202508271358	0.6.2	false
+satisfies	0.7.0	0.7.0	true
+satisfies	0.7.3	0.7.0	false
+satisfies	3.0.0-canary.202508252038	0.7.0	false
+satisfies	0.6.0	0.7.1	false
+satisfies	3.0.0-beta.1	0.7.1	false
+satisfies	0.2.0	0.7.2	false
+satisfies	2.1.0	0.7.2	false
+satisfies	3.0.0-canary.202508261828	0.7.2	false
+satisfies	0.7.0	0.7.3	false
+satisfies	3.0.0-canary.1	0.7.3	false
+satisfies	0.5.0	^2.1.1	false
+satisfies	3.0.0-beta.1	^2.1.1	false
+satisfies	0.2.0	2.1.2	false
+satisfies	2.0.0	2.1.2	false
+satisfies	2.1.2	2.1.2	true
+satisfies	3.0.0-canary.202508261828	2.1.2	false
+satisfies	0.6.0	catalog:	true
+satisfies	1.0.0	catalog:	true
+satisfies	3.0.0-canary.202508261828	catalog:	false
+satisfies	0.2.0	catalog:legacy	true
+satisfies	0.6.2	catalog:legacy	true
+satisfies	2.1.0	catalog:legacy	true
+satisfies	3.0.0-canary.202508261828	catalog:legacy	false
+satisfies	0.4.0	latest	true
+satisfies	0.7.1	latest	true
+satisfies	2.1.2	latest	true
+satisfies	3.0.0-canary.202508261828	latest	false
+satisfies	0.7.0	^2.0	false
+satisfies	3.0.0-canary.202508261745	^2.0	false
+satisfies	0.6.2	^3.0.0-canary.0	false
+satisfies	3.0.0-beta.2	^3.0.0-canary.0	false
+satisfies	3.0.0-canary.0	^3.0.0-canary.0	true
+satisfies	0.7.0	^99.0.0	false
+satisfies	3.0.0-canary.0	^99.0.0	false
+satisfies	0.4.0	~2.1.0	false
+satisfies	2.1.0	~2.1.0	true
+satisfies	3.0.0-beta.1	~2.1.0	false
+satisfies	0.4.0	https://registry.npmjs.org/ms/-/ms-2.1.3.tgz	true
+satisfies	0.7.1	https://registry.npmjs.org/ms/-/ms-2.1.3.tgz	true
+satisfies	2.1.2	https://registry.npmjs.org/ms/-/ms-2.1.3.tgz	true
+satisfies	3.0.0-beta.1	https://registry.npmjs.org/ms/-/ms-2.1.3.tgz	false
+satisfies	1.0.1	2.0.2	false
+satisfies	1.2.4	2.0.2	false
+satisfies	2.0.0	2.0.2	false
+satisfies	3.0.0	^2.0.0	false
+satisfies	3.1.0	^1.1.1	false
+satisfies	3.0.0	^3.1.1	false
+satisfies	3.1.3	^3.1.1	true
+satisfies	3.1.3	^4.0.0	false
+satisfies	0.3.5-2	8.18.0	false
+satisfies	0.4.7	8.18.0	false
+satisfies	0.4.20	8.18.0	false
+satisfies	0.6.0	8.18.0	false
+satisfies	1.1.0	8.18.0	false
+satisfies	1.1.4	8.18.0	false
+satisfies	3.3.3	8.18.0	false
+satisfies	6.1.3	8.18.0	false
+satisfies	7.2.5	8.18.0	false
+satisfies	7.5.1	8.18.0	false
+satisfies	8.4.0	8.18.0	false
+satisfies	8.11.0	8.18.0	false
+satisfies	7.5.10	8.18.0	false
+satisfies	6.2.5	8.18.0	false
+satisfies	0.3.2	~0.3.0	true
+satisfies	0.4.2	~0.3.0	false
+satisfies	1.1.2	~0.3.0	false
+satisfies	1.6.2	~0.3.0	false
+satisfies	2.0.5	~0.3.0	false
+satisfies	2.3.5	~0.3.0	false
+satisfies	2.11.1	~0.3.0	false
+satisfies	2.19.0	~0.3.0	false
+satisfies	2.27.0	~0.3.0	false
+satisfies	0.5.0	~1.0.0	false
+satisfies	1.4.1	~1.0.0	false
+satisfies	1.8.2	~1.0.0	false
+satisfies	2.0.9	~1.0.0	false
+satisfies	2.6.0	~1.0.0	false
+satisfies	2.13.1	~1.0.0	false
+satisfies	2.22.1	~1.0.0	false
+satisfies	0.3.0-wip2	1.4.x	false
+satisfies	0.7.0	1.4.x	false
+satisfies	1.5.3	1.4.x	false
+satisfies	2.0.3	1.4.x	false
+satisfies	2.3.3	1.4.x	false
+satisfies	2.10.0	1.4.x	false
+satisfies	2.17.0	1.4.x	false
+satisfies	2.26.1	1.4.x	false
+satisfies	0.4.3	1.5.x	false
+satisfies	1.2.0	1.5.x	false
+satisfies	1.5.1	1.5.x	true
+satisfies	1.8.3	1.5.x	false
+satisfies	2.1.0	1.5.x	false
+satisfies	2.6.1	1.5.x	false
+satisfies	2.13.2	1.5.x	false
+satisfies	2.22.2	1.5.x	false
+satisfies	0.3.0	^2.19.0	false
+satisfies	0.7.1	^2.19.0	false
+satisfies	1.5.1	^2.19.0	false
+satisfies	2.0.0	^2.19.0	false
+satisfies	2.3.0	^2.19.0	false
+satisfies	2.8.0	^2.19.0	false
+satisfies	2.14.2	^2.19.0	false
+satisfies	2.22.1	^2.19.0	true
+satisfies	2.26.1	^2.19.0	true
+satisfies	0.4.3	^2.20.0	false
+satisfies	1.2.0	^2.20.0	false
+satisfies	1.7.0	^2.20.0	false
+satisfies	2.0.6	^2.20.0	false
+satisfies	2.4.0	^2.20.0	false
+satisfies	2.12.0	^2.20.0	false
+satisfies	2.22.0	^2.20.0	true
+satisfies	2.26.0	^2.20.0	true
+satisfies	0.3.0-wip	^2.13.2	false
+satisfies	0.6.0	^2.13.2	false
+satisfies	1.4.2	^2.13.2	false
+satisfies	1.8.4	^2.13.2	false
+satisfies	2.2.0	^2.13.2	false
+satisfies	2.6.2	^2.13.2	false
+satisfies	2.14.0	^2.13.2	true
+satisfies	2.19.0	^2.13.2	true
+satisfies	2.23.1	^2.13.2	true
+satisfies	2.28.0	^2.13.2	true
+satisfies	0.3.0-wip2	^2.14.1	false
+satisfies	0.7.0	^2.14.1	false
+satisfies	1.4.3	^2.14.1	false
+satisfies	1.9.0	^2.14.1	false
+satisfies	2.2.1	^2.14.1	false
+satisfies	2.7.0	^2.14.1	false
+satisfies	2.18.0	^2.14.1	true
+satisfies	2.23.0	^2.14.1	true
+satisfies	2.27.0	^2.14.1	true
+satisfies	0.3.0-wip	^2.15.0	false
+satisfies	0.6.0	^2.15.0	false
+satisfies	1.4.2	^2.15.0	false
+satisfies	1.8.4	^2.15.0	false
+satisfies	2.2.0	^2.15.0	false
+satisfies	2.6.2	^2.15.0	false
+satisfies	2.14.0	^2.15.0	false
+satisfies	2.19.0	^2.15.0	true
+satisfies	2.23.1	^2.15.0	true
+satisfies	2.28.0	^2.15.0	true
+satisfies	0.5.0	^2.17.0	false
+satisfies	1.4.0	^2.17.0	false
+satisfies	1.8.1	^2.17.0	false
+satisfies	2.0.8	^2.17.0	false
+satisfies	2.5.1	^2.17.0	false
+satisfies	2.13.0	^2.17.0	false
+satisfies	2.22.0	^2.17.0	true
+satisfies	2.26.0	^2.17.0	true
+satisfies	0.4.0	^2.14.2	false
+satisfies	1.1.0	^2.14.2	false
+satisfies	1.5.3	^2.14.2	false
+satisfies	2.0.3	^2.14.2	false
+satisfies	2.3.3	^2.14.2	false
+satisfies	2.10.0	^2.14.2	false
+satisfies	2.15.0	^2.14.2	true
+satisfies	2.22.0	^2.14.2	true
+satisfies	2.26.0	^2.14.2	true
+satisfies	0.3.1	^2.16.0	false
+satisfies	0.8.0	^2.16.0	false
+satisfies	1.5.2	^2.16.0	false
+satisfies	2.0.1	^2.16.0	false
+satisfies	2.3.1	^2.16.0	false
+satisfies	2.9.1	^2.16.0	false
+satisfies	2.15.0	^2.16.0	false
+satisfies	2.17.0	^2.16.0	true
+satisfies	2.22.2	^2.16.0	true
+satisfies	2.26.2	^2.16.0	true
+satisfies	0.5.2	^2.18.0	false
+satisfies	1.5.0	^2.18.0	false
+satisfies	1.8.3	^2.18.0	false
+satisfies	2.1.0	^2.18.0	false
+satisfies	2.6.1	^2.18.0	false
+satisfies	2.13.2	^2.18.0	false
+satisfies	2.21.0	^2.18.0	true
+satisfies	2.25.0	^2.18.0	true
+satisfies	0.4.1	^2.23.0	false
+satisfies	1.1.1	^2.23.0	false
+satisfies	1.6.1	^2.23.0	false
+satisfies	2.0.4	^2.23.0	false
+satisfies	2.3.4	^2.23.0	false
+satisfies	2.11.0	^2.23.0	false
+satisfies	2.18.0	^2.23.0	false
+satisfies	2.23.0	^2.23.0	true
+satisfies	2.27.0	^2.23.0	true
+satisfies	0.4.1	~0.8.0	false
+satisfies	1.1.2	~0.8.0	false
+satisfies	1.6.2	~0.8.0	false
+satisfies	2.0.5	~0.8.0	false
+satisfies	2.3.5	~0.8.0	false
+satisfies	2.11.1	~0.8.0	false
+satisfies	2.19.0	~0.8.0	false
+satisfies	2.27.0	~0.8.0	false
+satisfies	0.5.0	~1.2.0	false
+satisfies	1.4.1	~1.2.0	false
+satisfies	1.8.2	~1.2.0	false
+satisfies	2.0.9	~1.2.0	false
+satisfies	2.6.0	~1.2.0	false
+satisfies	2.13.1	~1.2.0	false
+satisfies	2.22.1	~1.2.0	false
+satisfies	0.3.0-wip2	~1.3.0	false
+satisfies	0.7.0	~1.3.0	false
+satisfies	1.5.1	~1.3.0	false
+satisfies	2.0.0	~1.3.0	false
+satisfies	2.3.0	~1.3.0	false
+satisfies	2.8.0	~1.3.0	false
+satisfies	2.14.2	~1.3.0	false
+satisfies	2.24.0	~1.3.0	false
+satisfies	0.4.0	~1.5.0	false
+satisfies	1.1.0	~1.5.0	false
+satisfies	1.5.1	~1.5.0	true
+satisfies	1.8.0	~1.5.0	false
+satisfies	2.0.7	~1.5.0	false
+satisfies	2.5.0	~1.5.0	false
+satisfies	2.12.1	~1.5.0	false
+satisfies	2.21.0	~1.5.0	false
+satisfies	2.29.0	~1.5.0	false
+satisfies	0.5.2	^1.8.0	false
+satisfies	1.5.0	^1.8.0	false
+satisfies	1.8.4	^1.8.0	true
+satisfies	2.0.3	^1.8.0	false
+satisfies	2.3.3	^1.8.0	false
+satisfies	2.10.0	^1.8.0	false
+satisfies	2.17.0	^1.8.0	false
+satisfies	2.26.1	^1.8.0	false
+satisfies	0.4.3	^2.0.2	false
+satisfies	1.2.0	^2.0.2	false
+satisfies	1.7.0	^2.0.2	false
+satisfies	2.0.7	^2.0.2	true
+satisfies	2.3.1	^2.0.2	true
+satisfies	2.5.1	^2.0.2	true
+satisfies	2.9.2	^2.0.2	true
+satisfies	2.13.1	^2.0.2	true
+satisfies	2.17.0	^2.0.2	true
+satisfies	2.22.2	^2.0.2	true
+satisfies	2.26.2	^2.0.2	true
+satisfies	0.3.2	^2.1.0	false
+satisfies	1.0.0	^2.1.0	false
+satisfies	1.6.0	^2.1.0	false
+satisfies	2.0.2	^2.1.0	false
+satisfies	2.3.0	^2.1.0	true
+satisfies	2.5.0	^2.1.0	true
+satisfies	2.9.1	^2.1.0	true
+satisfies	2.13.0	^2.1.0	true
+satisfies	2.16.0	^2.1.0	true
+satisfies	2.22.1	^2.1.0	true
+satisfies	2.26.1	^2.1.0	true
+satisfies	0.4.0	^2.3.0	false
+satisfies	1.1.0	^2.3.0	false
+satisfies	1.5.3	^2.3.0	false
+satisfies	2.0.3	^2.3.0	false
+satisfies	2.3.2	^2.3.0	true
+satisfies	2.6.0	^2.3.0	true
+satisfies	2.10.0	^2.3.0	true
+satisfies	2.13.2	^2.3.0	true
+satisfies	2.18.0	^2.3.0	true
+satisfies	2.23.0	^2.3.0	true
+satisfies	2.27.0	^2.3.0	true
+satisfies	0.3.1	^2.9.2	false
+satisfies	0.8.0	^2.9.2	false
+satisfies	1.5.2	^2.9.2	false
+satisfies	2.0.1	^2.9.2	false
+satisfies	2.3.1	^2.9.2	false
+satisfies	2.9.1	^2.9.2	false
+satisfies	2.12.0	^2.9.2	true
+satisfies	2.14.2	^2.9.2	true
+satisfies	2.21.0	^2.9.2	true
+satisfies	2.25.0	^2.9.2	true
+satisfies	0.5.2	^2.12.1	false
+satisfies	1.5.0	^2.12.1	false
+satisfies	1.8.3	^2.12.1	false
+satisfies	2.1.0	^2.12.1	false
+satisfies	2.6.1	^2.12.1	false
+satisfies	2.12.1	^2.12.1	true
+satisfies	2.15.0	^2.12.1	true
+satisfies	2.22.0	^2.12.1	true
+satisfies	2.26.0	^2.12.1	true
+satisfies	4.0.0	~5.0.1	false
+satisfies	5.1.0	~5.1.0	true
+satisfies	5.2.0	~5.1.0	false
+satisfies	5.1.2	^5.0.0	true
+satisfies	5.1.2	^5.0.0 || ^5.0.0	true
+satisfies	4.0.0	5.2.1	false
+satisfies	0.1.3	1.16.0	false
+satisfies	0.2.2	1.16.0	false
+satisfies	0.2.15	1.16.0	false
+satisfies	0.3.2	1.16.0	false
+satisfies	0.4.8	1.16.0	false
+satisfies	0.5.5	1.16.0	false
+satisfies	0.8.6	1.16.0	false
+satisfies	1.9.0	1.16.0	false
+satisfies	0.10.1	^0.14.3	false
+satisfies	0.14.2	^0.14.3	false
+satisfies	0.14.5	^0.14.3	true
+satisfies	0.0.4	0.0.3	false
+satisfies	0.0.4	0.0.5	false
+satisfies	0.1.2	^0.2.6	false
+satisfies	0.1.3	0.1.11	false
+satisfies	0.1.11	0.1.11	true
+satisfies	0.1.5	0.2.1	false
+satisfies	0.2.4	0.2.1	false
+satisfies	0.1.11	^0.2.4	false
+satisfies	0.0.7	~0.0.10	false
+satisfies	0.0.9	0.0.3	false
+satisfies	0.0.4	~0.0.4	true
+satisfies	0.0.8	~0.0.6	true
+satisfies	0.0.3	~0.0.8	false
+satisfies	0.0.8	~0.0.8	true
+satisfies	0.1.1	2.3.3	false
+satisfies	0.3.7	2.3.3	false
+satisfies	1.0.11	2.3.3	false
+satisfies	1.2.4	2.3.3	false
+satisfies	2.1.0	2.3.3	false
+satisfies	2.3.2	2.3.3	false
+satisfies	0.0.11	^6.12.6	false
+satisfies	0.1.11	^6.12.6	false
+satisfies	0.2.7	^6.12.6	false
+satisfies	0.3.12	^6.12.6	false
+satisfies	0.4.14	^6.12.6	false
+satisfies	0.5.12	^6.12.6	false
+satisfies	0.6.12	^6.12.6	false
+satisfies	1.3.1	^6.12.6	false
+satisfies	2.0.0-beta.1	^6.12.6	false
+satisfies	2.2.0	^6.12.6	false
+satisfies	3.2.0	^6.12.6	false
+satisfies	3.6.2	^6.12.6	false
+satisfies	3.8.9	^6.12.6	false
+satisfies	4.1.4	^6.12.6	false
+satisfies	4.7.0	^6.12.6	false
+satisfies	5.0.0-beta.1	^6.12.6	false
+satisfies	4.11.2	^6.12.6	false
+satisfies	4.11.7	^6.12.6	false
+satisfies	5.2.2	^6.12.6	false
+satisfies	5.5.2	^6.12.6	false
+satisfies	6.5.4	^6.12.6	false
+satisfies	6.10.2	^6.12.6	false
+satisfies	6.12.6	^6.12.6	true
+satisfies	7.0.0-beta.3	^6.12.6	false
+satisfies	7.0.0	^6.12.6	false
+satisfies	7.2.3	^6.12.6	false
+satisfies	8.4.0	^6.12.6	false
+satisfies	8.11.0	^6.12.6	false
+satisfies	0.0.6	^6.9.1	false
+satisfies	0.1.6	^6.9.1	false
+satisfies	0.2.2	^6.9.1	false
+satisfies	0.3.5	^6.9.1	false
+satisfies	0.4.7	^6.9.1	false
+satisfies	0.5.7	^6.9.1	false
+satisfies	0.6.7	^6.9.1	false
+satisfies	1.0.1	^6.9.1	false
+satisfies	1.4.6	^6.9.1	false
+satisfies	2.0.4	^6.9.1	false
+satisfies	3.0.2	^6.9.1	false
+satisfies	3.5.1	^6.9.1	false
+satisfies	3.8.4	^6.9.1	false
+satisfies	4.0.6	^6.9.1	false
+satisfies	4.4.0	^6.9.1	false
+satisfies	4.8.0	^6.9.1	false
+satisfies	5.0.1-beta.0	^6.9.1	false
+satisfies	5.0.4-beta.0	^6.9.1	false
+satisfies	5.1.4	^6.9.1	false
+satisfies	5.4.0	^6.9.1	false
+satisfies	6.4.0	^6.9.1	false
+satisfies	6.9.0	^6.9.1	false
+satisfies	6.10.2	^6.9.1	true
+satisfies	6.12.5	^6.9.1	true
+satisfies	7.0.0-rc.0	^6.9.1	false
+satisfies	7.2.0	^6.9.1	false
+satisfies	8.0.3	^6.9.1	false
+satisfies	8.7.1	^6.9.1	false
+satisfies	8.16.0	^6.9.1	false
+satisfies	0.1.0	^8.8.2	false
+satisfies	0.1.13	^8.8.2	false
+satisfies	0.2.9	^8.8.2	false
+satisfies	0.4.1	^8.8.2	false
+satisfies	0.5.0	^8.8.2	false
+satisfies	0.6.1	^8.8.2	false
+satisfies	0.6.14	^8.8.2	false
+satisfies	1.4.0	^8.8.2	false
+satisfies	2.0.0-beta.2	^8.8.2	false
+satisfies	2.2.2	^8.8.2	false
+satisfies	3.2.2	^8.8.2	false
+satisfies	3.7.1	^8.8.2	false
+satisfies	4.0.0	^8.8.2	false
+satisfies	4.1.6	^8.8.2	false
+satisfies	4.7.2	^8.8.2	false
+satisfies	4.9.2	^8.8.2	false
+satisfies	5.0.1-beta.3	^8.8.2	false
+satisfies	4.11.8	^8.8.2	false
+satisfies	5.2.4	^8.8.2	false
+satisfies	6.0.1	^8.8.2	false
+satisfies	6.6.0	^8.8.2	false
+satisfies	6.12.0	^8.8.2	false
+satisfies	7.0.0-beta.4	^8.8.2	false
+satisfies	7.0.1	^8.8.2	false
+satisfies	8.0.0-beta.3	^8.8.2	false
+satisfies	8.5.0	^8.8.2	false
+satisfies	8.11.0	^8.8.2	true
+satisfies	8.16.0	^8.8.2	true
+satisfies	0.0.6	>=4.2.0	false
+satisfies	0.1.6	>=4.2.0	false
+satisfies	0.2.2	>=4.2.0	false
+satisfies	0.3.5	>=4.2.0	false
+satisfies	0.4.7	>=4.2.0	false
+satisfies	0.5.7	>=4.2.0	false
+satisfies	0.6.7	>=4.2.0	false
+satisfies	1.0.1	>=4.2.0	false
+satisfies	1.4.6	>=4.2.0	false
+satisfies	2.0.4	>=4.2.0	false
+satisfies	3.0.2	>=4.2.0	false
+satisfies	3.5.1	>=4.2.0	false
+satisfies	3.8.4	>=4.2.0	false
+satisfies	4.0.6	>=4.2.0	false
+satisfies	4.4.0	>=4.2.0	true
+satisfies	4.7.2	>=4.2.0	true
+satisfies	4.8.1	>=4.2.0	true
+satisfies	4.10.1	>=4.2.0	true
+satisfies	5.0.1-beta.1	>=4.2.0	false
+satisfies	4.11.3	>=4.2.0	true
+satisfies	5.0.1	>=4.2.0	true
+satisfies	5.1.6	>=4.2.0	true
+satisfies	5.3.0	>=4.2.0	true
+satisfies	6.0.0-rc.1	>=4.2.0	false
+satisfies	6.1.0	>=4.2.0	true
+satisfies	6.5.1	>=4.2.0	true
+satisfies	6.6.2	>=4.2.0	true
+satisfies	6.10.0	>=4.2.0	true
+satisfies	6.12.3	>=4.2.0	true
+satisfies	7.0.0-rc.0	>=4.2.0	false
+satisfies	7.0.3	>=4.2.0	true
+satisfies	7.2.3	>=4.2.0	true
+satisfies	8.0.5	>=4.2.0	true
+satisfies	8.6.1	>=4.2.0	true
+satisfies	8.8.2	>=4.2.0	true
+satisfies	8.13.0	>=4.2.0	true
+satisfies	6.15.0	>=4.2.0	true
+satisfies	0.0.6	>=4.9.0	false
+satisfies	0.1.6	>=4.9.0	false
+satisfies	0.2.2	>=4.9.0	false
+satisfies	0.3.5	>=4.9.0	false
+satisfies	0.4.7	>=4.9.0	false
+satisfies	0.5.7	>=4.9.0	false
+satisfies	0.6.7	>=4.9.0	false
+satisfies	1.0.1	>=4.9.0	false
+satisfies	1.4.6	>=4.9.0	false
+satisfies	2.0.4	>=4.9.0	false
+satisfies	3.0.2	>=4.9.0	false
+satisfies	3.5.1	>=4.9.0	false
+satisfies	3.8.4	>=4.9.0	false
+satisfies	4.0.6	>=4.9.0	false
+satisfies	4.4.0	>=4.9.0	false
+satisfies	4.8.0	>=4.9.0	false
+satisfies	4.10.1	>=4.9.0	true
+satisfies	4.11.3	>=4.9.0	true
+satisfies	5.0.4-beta.2	>=4.9.0	false
+satisfies	5.0.1	>=4.9.0	true
+satisfies	5.1.6	>=4.9.0	true
+satisfies	5.3.0	>=4.9.0	true
+satisfies	6.1.0	>=4.9.0	true
+satisfies	6.5.1	>=4.9.0	true
+satisfies	6.6.2	>=4.9.0	true
+satisfies	6.10.0	>=4.9.0	true
+satisfies	6.12.3	>=4.9.0	true
+satisfies	7.0.0-beta.4	>=4.9.0	false
+satisfies	7.0.3	>=4.9.0	true
+satisfies	8.0.0-beta.1	>=4.9.0	false
+satisfies	7.2.3	>=4.9.0	true
+satisfies	8.0.5	>=4.9.0	true
+satisfies	8.6.1	>=4.9.0	true
+satisfies	8.8.2	>=4.9.0	true
+satisfies	8.13.0	>=4.9.0	true
+satisfies	6.15.0	>=4.9.0	true
+satisfies	0.1.0	>=4.10.0	false
+satisfies	0.1.13	>=4.10.0	false
+satisfies	0.2.9	>=4.10.0	false
+satisfies	0.4.1	>=4.10.0	false
+satisfies	0.5.0	>=4.10.0	false
+satisfies	0.6.1	>=4.10.0	false
+satisfies	0.6.14	>=4.10.0	false
+satisfies	1.4.0	>=4.10.0	false
+satisfies	2.0.0-beta.2	>=4.10.0	false
+satisfies	2.2.2	>=4.10.0	false
+satisfies	3.2.2	>=4.10.0	false
+satisfies	3.7.1	>=4.10.0	false
+satisfies	4.0.0	>=4.10.0	false
+satisfies	4.1.6	>=4.10.0	false
+satisfies	4.7.2	>=4.10.0	false
+satisfies	4.9.2	>=4.10.0	false
+satisfies	4.11.0	>=4.10.0	true
+satisfies	4.11.7	>=4.10.0	true
+satisfies	5.1.3	>=4.10.0	true
+satisfies	5.2.3	>=4.10.0	true
+satisfies	6.0.0-beta.1	>=4.10.0	false
+satisfies	5.5.2	>=4.10.0	true
+satisfies	6.3.0	>=4.10.0	true
+satisfies	6.5.5	>=4.10.0	true
+satisfies	6.9.0	>=4.10.0	true
+satisfies	6.12.0	>=4.10.0	true
+satisfies	7.0.0-beta.7	>=4.10.0	false
+satisfies	7.0.0	>=4.10.0	true
+satisfies	7.2.0	>=4.10.0	true
+satisfies	8.0.0-beta.4	>=4.10.0	false
+satisfies	8.0.2	>=4.10.0	true
+satisfies	8.4.0	>=4.10.0	true
+satisfies	8.7.1	>=4.10.0	true
+satisfies	8.11.1	>=4.10.0	true
+satisfies	8.17.1	>=4.10.0	true
+satisfies	0.1.3	>=5.0.1-beta.0	false
+satisfies	0.1.16	>=5.0.1-beta.0	false
+satisfies	0.3.2	>=5.0.1-beta.0	false
+satisfies	0.4.4	>=5.0.1-beta.0	false
+satisfies	0.5.4	>=5.0.1-beta.0	false
+satisfies	0.6.4	>=5.0.1-beta.0	false
+satisfies	0.7.1	>=5.0.1-beta.0	false
+satisfies	1.4.3	>=5.0.1-beta.0	false
+satisfies	2.0.1	>=5.0.1-beta.0	false
+satisfies	2.5.0	>=5.0.1-beta.0	false
+satisfies	3.3.1	>=5.0.1-beta.0	false
+satisfies	3.8.1	>=5.0.1-beta.0	false
+satisfies	4.0.3	>=5.0.1-beta.0	false
+satisfies	4.2.0	>=5.0.1-beta.0	false
+satisfies	4.7.5	>=5.0.1-beta.0	false
+satisfies	4.10.1	>=5.0.1-beta.0	false
+satisfies	5.0.1-beta.2	>=5.0.1-beta.0	true
+satisfies	5.0.4-beta.1	>=5.0.1-beta.0	false
+satisfies	5.1.4	>=5.0.1-beta.0	true
+satisfies	5.2.4	>=5.0.1-beta.0	true
+satisfies	6.0.0	>=5.0.1-beta.0	true
+satisfies	6.4.0	>=5.0.1-beta.0	true
+satisfies	6.6.0	>=5.0.1-beta.0	true
+satisfies	6.9.1	>=5.0.1-beta.0	true
+satisfies	6.12.1	>=5.0.1-beta.0	true
+satisfies	7.0.0-alpha.1	>=5.0.1-beta.0	false
+satisfies	7.0.0-rc.2	>=5.0.1-beta.0	false
+satisfies	7.0.1	>=5.0.1-beta.0	true
+satisfies	7.2.1	>=5.0.1-beta.0	true
+satisfies	8.0.3	>=5.0.1-beta.0	true
+satisfies	8.5.0	>=5.0.1-beta.0	true
+satisfies	8.8.0	>=5.0.1-beta.0	true
+satisfies	8.11.2	>=5.0.1-beta.0	true
+satisfies	8.18.0	>=5.0.1-beta.0	true
+satisfies	0.0.8	>=5.0.2-beta.0	false
+satisfies	0.1.8	>=5.0.2-beta.0	false
+satisfies	0.2.4	>=5.0.2-beta.0	false
+satisfies	0.3.7	>=5.0.2-beta.0	false
+satisfies	0.4.9	>=5.0.2-beta.0	false
+satisfies	0.5.9	>=5.0.2-beta.0	false
+satisfies	0.6.9	>=5.0.2-beta.0	false
+satisfies	1.2.0	>=5.0.2-beta.0	false
+satisfies	1.4.8	>=5.0.2-beta.0	false
+satisfies	2.1.2	>=5.0.2-beta.0	false
+satisfies	3.0.4	>=5.0.2-beta.0	false
+satisfies	3.5.3	>=5.0.2-beta.0	false
+satisfies	3.8.6	>=5.0.2-beta.0	false
+satisfies	4.1.1	>=5.0.2-beta.0	false
+satisfies	4.5.0	>=5.0.2-beta.0	false
+satisfies	4.8.2	>=5.0.2-beta.0	false
+satisfies	5.0.1-beta.1	>=5.0.2-beta.0	false
+satisfies	4.11.6	>=5.0.2-beta.0	false
+satisfies	5.1.2	>=5.0.2-beta.0	true
+satisfies	5.2.2	>=5.0.2-beta.0	true
+satisfies	5.5.1	>=5.0.2-beta.0	true
+satisfies	6.2.1	>=5.0.2-beta.0	true
+satisfies	6.5.4	>=5.0.2-beta.0	true
+satisfies	6.8.1	>=5.0.2-beta.0	true
+satisfies	6.11.0	>=5.0.2-beta.0	true
+satisfies	7.0.0-beta.0	>=5.0.2-beta.0	false
+satisfies	6.12.6	>=5.0.2-beta.0	true
+satisfies	7.0.0-rc.3	>=5.0.2-beta.0	false
+satisfies	7.1.1	>=5.0.2-beta.0	true
+satisfies	8.0.1	>=5.0.2-beta.0	true
+satisfies	8.3.0	>=5.0.2-beta.0	true
+satisfies	8.7.0	>=5.0.2-beta.0	true
+satisfies	8.11.0	>=5.0.2-beta.0	true
+satisfies	8.16.0	>=5.0.2-beta.0	true
+satisfies	0.0.9	>=5.0.3-beta.0	false
+satisfies	0.1.9	>=5.0.3-beta.0	false
+satisfies	0.2.5	>=5.0.3-beta.0	false
+satisfies	0.3.8	>=5.0.3-beta.0	false
+satisfies	0.4.10	>=5.0.3-beta.0	false
+satisfies	0.5.10	>=5.0.3-beta.0	false
+satisfies	0.6.10	>=5.0.3-beta.0	false
+satisfies	1.2.1	>=5.0.3-beta.0	false
+satisfies	1.4.9	>=5.0.3-beta.0	false
+satisfies	2.1.3	>=5.0.3-beta.0	false
+satisfies	3.1.0	>=5.0.3-beta.0	false
+satisfies	3.6.0	>=5.0.3-beta.0	false
+satisfies	3.8.7	>=5.0.3-beta.0	false
+satisfies	4.1.2	>=5.0.3-beta.0	false
+satisfies	4.6.0	>=5.0.3-beta.0	false
+satisfies	5.0.0-beta.0	>=5.0.3-beta.0	false
+satisfies	4.11.0	>=5.0.3-beta.0	false
+satisfies	5.0.4-beta.3	>=5.0.3-beta.0	false
+satisfies	5.1.0	>=5.0.3-beta.0	true
+satisfies	5.2.0	>=5.0.3-beta.0	true
+satisfies	5.4.0	>=5.0.3-beta.0	true
+satisfies	6.1.1	>=5.0.3-beta.0	true
+satisfies	6.5.2	>=5.0.3-beta.0	true
+satisfies	6.7.0	>=5.0.3-beta.0	true
+satisfies	6.10.1	>=5.0.3-beta.0	true
+satisfies	6.12.4	>=5.0.3-beta.0	true
+satisfies	7.0.0-beta.1	>=5.0.3-beta.0	false
+satisfies	7.0.0-rc.4	>=5.0.3-beta.0	false
+satisfies	7.0.4	>=5.0.3-beta.0	true
+satisfies	7.2.4	>=5.0.3-beta.0	true
+satisfies	8.1.0	>=5.0.3-beta.0	true
+satisfies	8.6.2	>=5.0.3-beta.0	true
+satisfies	8.9.0	>=5.0.3-beta.0	true
+satisfies	8.14.0	>=5.0.3-beta.0	true
+satisfies	8.20.0	>=5.0.3-beta.0	true
+satisfies	0.0.10	>=5.0.4-beta.0	false
+satisfies	0.1.10	>=5.0.4-beta.0	false
+satisfies	0.2.6	>=5.0.4-beta.0	false
+satisfies	0.3.11	>=5.0.4-beta.0	false
+satisfies	0.4.12	>=5.0.4-beta.0	false
+satisfies	0.5.11	>=5.0.4-beta.0	false
+satisfies	0.6.11	>=5.0.4-beta.0	false
+satisfies	1.3.0	>=5.0.4-beta.0	false
+satisfies	2.0.0-beta.0	>=5.0.4-beta.0	false
+satisfies	2.1.4	>=5.0.4-beta.0	false
+satisfies	3.1.1	>=5.0.4-beta.0	false
+satisfies	3.6.1	>=5.0.4-beta.0	false
+satisfies	3.8.8	>=5.0.4-beta.0	false
+satisfies	4.1.3	>=5.0.4-beta.0	false
+satisfies	4.6.1	>=5.0.4-beta.0	false
+satisfies	4.9.0	>=5.0.4-beta.0	false
+satisfies	4.11.1	>=5.0.4-beta.0	false
+satisfies	5.0.1	>=5.0.4-beta.0	false
+satisfies	5.1.2	>=5.0.4-beta.0	true
+satisfies	5.2.2	>=5.0.4-beta.0	true
+satisfies	5.5.1	>=5.0.4-beta.0	true
+satisfies	6.2.1	>=5.0.4-beta.0	true
+satisfies	6.5.4	>=5.0.4-beta.0	true
+satisfies	6.8.1	>=5.0.4-beta.0	true
+satisfies	6.11.0	>=5.0.4-beta.0	true
+satisfies	6.12.6	>=5.0.4-beta.0	true
+satisfies	7.0.0-beta.5	>=5.0.4-beta.0	false
+satisfies	7.1.1	>=5.0.4-beta.0	true
+satisfies	8.0.0-beta.2	>=5.0.4-beta.0	false
+satisfies	8.0.1	>=5.0.4-beta.0	true
+satisfies	8.3.0	>=5.0.4-beta.0	true
+satisfies	8.7.0	>=5.0.4-beta.0	true
+satisfies	8.11.0	>=5.0.4-beta.0	true
+satisfies	8.16.0	>=5.0.4-beta.0	true
+satisfies	0.1.1	>=5.0.0	false
+satisfies	0.1.14	>=5.0.0	false
+satisfies	0.3.0	>=5.0.0	false
+satisfies	0.4.2	>=5.0.0	false
+satisfies	0.5.2	>=5.0.0	false
+satisfies	0.6.2	>=5.0.0	false
+satisfies	0.6.15	>=5.0.0	false
+satisfies	1.4.1	>=5.0.0	false
+satisfies	2.0.0-beta.3	>=5.0.0	false
+satisfies	2.3.0	>=5.0.0	false
+satisfies	3.2.3	>=5.0.0	false
+satisfies	3.7.2	>=5.0.0	false
+satisfies	4.0.1	>=5.0.0	false
+satisfies	4.1.7	>=5.0.0	false
+satisfies	4.7.3	>=5.0.0	false
+satisfies	4.9.3	>=5.0.0	false
+satisfies	4.11.3	>=5.0.0	false
+satisfies	5.0.1	>=5.0.0	true
+satisfies	5.1.6	>=5.0.0	true
+satisfies	5.3.0	>=5.0.0	true
+satisfies	6.0.0-beta.1	>=5.0.0	false
+satisfies	6.1.0	>=5.0.0	true
+satisfies	6.5.1	>=5.0.0	true
+satisfies	6.6.2	>=5.0.0	true
+satisfies	6.10.0	>=5.0.0	true
+satisfies	6.12.3	>=5.0.0	true
+satisfies	7.0.0-beta.7	>=5.0.0	false
+satisfies	7.0.3	>=5.0.0	true
+satisfies	7.2.3	>=5.0.0	true
+satisfies	8.0.0-beta.4	>=5.0.0	false
+satisfies	8.0.5	>=5.0.0	true
+satisfies	8.6.1	>=5.0.0	true
+satisfies	8.8.2	>=5.0.0	true
+satisfies	8.13.0	>=5.0.0	true
+satisfies	6.15.0	>=5.0.0	true
+satisfies	0.1.3	^5.0.0	false
+satisfies	0.1.16	^5.0.0	false
+satisfies	0.3.2	^5.0.0	false
+satisfies	0.4.4	^5.0.0	false
+satisfies	0.5.4	^5.0.0	false
+satisfies	0.6.4	^5.0.0	false
+satisfies	0.7.1	^5.0.0	false
+satisfies	1.4.4	^5.0.0	false
+satisfies	2.0.3	^5.0.0	false
+satisfies	3.0.2	^5.0.0	false
+satisfies	3.5.1	^5.0.0	false
+satisfies	3.8.4	^5.0.0	false
+satisfies	4.1.0	^5.0.0	false
+satisfies	4.4.1	^5.0.0	false
+satisfies	4.8.1	^5.0.0	false
+satisfies	4.10.4	^5.0.0	false
+satisfies	5.0.4-beta.1	^5.0.0	false
+satisfies	5.2.3	^5.0.0	true
+satisfies	5.5.2	^5.0.0	true
+satisfies	6.1.0	^5.0.0	false
+satisfies	6.6.1	^5.0.0	false
+satisfies	6.12.1	^5.0.0	false
+satisfies	7.0.0-beta.5	^5.0.0	false
+satisfies	7.0.2	^5.0.0	false
+satisfies	8.0.0-beta.4	^5.0.0	false
+satisfies	8.6.0	^5.0.0	false
+satisfies	8.11.2	^5.0.0	false
+satisfies	0.0.6	^6.0.0	false
+satisfies	0.1.6	^6.0.0	false
+satisfies	0.2.2	^6.0.0	false
+satisfies	0.3.5	^6.0.0	false
+satisfies	0.4.7	^6.0.0	false
+satisfies	0.5.7	^6.0.0	false
+satisfies	0.6.7	^6.0.0	false
+satisfies	1.0.1	^6.0.0	false
+satisfies	1.4.6	^6.0.0	false
+satisfies	2.0.4	^6.0.0	false
+satisfies	3.0.2	^6.0.0	false
+satisfies	3.5.1	^6.0.0	false
+satisfies	3.8.4	^6.0.0	false
+satisfies	4.0.6	^6.0.0	false
+satisfies	4.4.0	^6.0.0	false
+satisfies	4.8.0	^6.0.0	false
+satisfies	5.0.1-beta.0	^6.0.0	false
+satisfies	5.0.4-beta.0	^6.0.0	false
+satisfies	5.1.4	^6.0.0	false
+satisfies	5.4.0	^6.0.0	false
+satisfies	6.3.0	^6.0.0	true
+satisfies	6.5.5	^6.0.0	true
+satisfies	6.9.0	^6.0.0	true
+satisfies	6.12.0	^6.0.0	true
+satisfies	7.0.0-beta.5	^6.0.0	false
+satisfies	7.0.2	^6.0.0	false
+satisfies	8.0.0-beta.4	^6.0.0	false
+satisfies	8.6.0	^6.0.0	false
+satisfies	8.11.2	^6.0.0	false
+satisfies	6.14.0	^6.0.0	true
+satisfies	0.0.8	^7.0.0-beta.2	false
+satisfies	0.1.8	^7.0.0-beta.2	false
+satisfies	0.2.4	^7.0.0-beta.2	false
+satisfies	0.3.7	^7.0.0-beta.2	false
+satisfies	0.4.9	^7.0.0-beta.2	false
+satisfies	0.5.9	^7.0.0-beta.2	false
+satisfies	0.6.9	^7.0.0-beta.2	false
+satisfies	1.2.0	^7.0.0-beta.2	false
+satisfies	1.4.8	^7.0.0-beta.2	false
+satisfies	2.1.2	^7.0.0-beta.2	false
+satisfies	3.0.4	^7.0.0-beta.2	false
+satisfies	3.5.3	^7.0.0-beta.2	false
+satisfies	3.8.6	^7.0.0-beta.2	false
+satisfies	4.1.1	^7.0.0-beta.2	false
+satisfies	4.5.0	^7.0.0-beta.2	false
+satisfies	4.8.2	^7.0.0-beta.2	false
+satisfies	5.0.1-beta.1	^7.0.0-beta.2	false
+satisfies	5.0.4-beta.2	^7.0.0-beta.2	false
+satisfies	5.1.6	^7.0.0-beta.2	false
+satisfies	6.0.0-rc.0	^7.0.0-beta.2	false
+satisfies	6.5.1	^7.0.0-beta.2	false
+satisfies	6.9.2	^7.0.0-beta.2	false
+satisfies	7.0.0-beta.0	^7.0.0-beta.2	false
+satisfies	7.0.0-beta.7	^7.0.0-beta.2	true
+satisfies	7.0.0-rc.4	^7.0.0-beta.2	true
+satisfies	7.1.0	^7.0.0-beta.2	true
+satisfies	8.0.5	^7.0.0-beta.2	false
+satisfies	8.8.1	^7.0.0-beta.2	false
+satisfies	8.18.0	^7.0.0-beta.2	false
+satisfies	0.1.0	^7.0.0-beta.3	false
+satisfies	0.1.13	^7.0.0-beta.3	false
+satisfies	0.2.9	^7.0.0-beta.3	false
+satisfies	0.4.1	^7.0.0-beta.3	false
+satisfies	0.5.0	^7.0.0-beta.3	false
+satisfies	0.6.1	^7.0.0-beta.3	false
+satisfies	0.6.14	^7.0.0-beta.3	false
+satisfies	1.4.0	^7.0.0-beta.3	false
+satisfies	2.0.0-beta.2	^7.0.0-beta.3	false
+satisfies	2.2.2	^7.0.0-beta.3	false
+satisfies	3.2.2	^7.0.0-beta.3	false
+satisfies	3.7.1	^7.0.0-beta.3	false
+satisfies	4.0.0	^7.0.0-beta.3	false
+satisfies	4.1.6	^7.0.0-beta.3	false
+satisfies	4.7.2	^7.0.0-beta.3	false
+satisfies	4.9.2	^7.0.0-beta.3	false
+satisfies	5.0.1-beta.3	^7.0.0-beta.3	false
+satisfies	4.11.8	^7.0.0-beta.3	false
+satisfies	5.2.4	^7.0.0-beta.3	false
+satisfies	6.0.1	^7.0.0-beta.3	false
+satisfies	6.6.0	^7.0.0-beta.3	false
+satisfies	6.12.0	^7.0.0-beta.3	false
+satisfies	7.0.0-beta.3	^7.0.0-beta.3	true
+satisfies	7.0.0-rc.0	^7.0.0-beta.3	true
+satisfies	7.0.1	^7.0.0-beta.3	true
+satisfies	7.2.1	^7.0.0-beta.3	true
+satisfies	8.0.0-beta.1	^7.0.0-beta.3	false
+satisfies	8.4.0	^7.0.0-beta.3	false
+satisfies	8.11.0	^7.0.0-beta.3	false
+satisfies	0.0.4	^7.0.0-beta.6	false
+satisfies	0.1.4	^7.0.0-beta.6	false
+satisfies	0.2.0	^7.0.0-beta.6	false
+satisfies	0.3.3	^7.0.0-beta.6	false
+satisfies	0.4.5	^7.0.0-beta.6	false
+satisfies	0.5.5	^7.0.0-beta.6	false
+satisfies	0.6.5	^7.0.0-beta.6	false
+satisfies	0.7.2	^7.0.0-beta.6	false
+satisfies	1.4.4	^7.0.0-beta.6	false
+satisfies	2.0.2	^7.0.0-beta.6	false
+satisfies	3.0.0	^7.0.0-beta.6	false
+satisfies	3.4.0	^7.0.0-beta.6	false
+satisfies	3.8.2	^7.0.0-beta.6	false
+satisfies	4.0.4	^7.0.0-beta.6	false
+satisfies	4.3.0	^7.0.0-beta.6	false
+satisfies	4.7.6	^7.0.0-beta.6	false
+satisfies	4.10.2	^7.0.0-beta.6	false
+satisfies	4.11.4	^7.0.0-beta.6	false
+satisfies	5.1.2	^7.0.0-beta.6	false
+satisfies	6.0.0-beta.1	^7.0.0-beta.6	false
+satisfies	6.2.1	^7.0.0-beta.6	false
+satisfies	6.8.0	^7.0.0-beta.6	false
+satisfies	6.12.4	^7.0.0-beta.6	false
+satisfies	7.0.0-beta.9	^7.0.0-beta.6	true
+satisfies	7.0.0	^7.0.0-beta.6	true
+satisfies	7.2.0	^7.0.0-beta.6	true
+satisfies	8.0.0-beta.2	^7.0.0-beta.6	false
+satisfies	8.5.0	^7.0.0-beta.6	false
+satisfies	8.11.1	^7.0.0-beta.6	false
+satisfies	0.0.5	^7.0.0-beta.8	false
+satisfies	0.1.5	^7.0.0-beta.8	false
+satisfies	0.2.1	^7.0.0-beta.8	false
+satisfies	0.3.4	^7.0.0-beta.8	false
+satisfies	0.4.6	^7.0.0-beta.8	false
+satisfies	0.5.6	^7.0.0-beta.8	false
+satisfies	0.6.6	^7.0.0-beta.8	false
+satisfies	1.0.0	^7.0.0-beta.8	false
+satisfies	1.4.5	^7.0.0-beta.8	false
+satisfies	2.0.3	^7.0.0-beta.8	false
+satisfies	3.0.1	^7.0.0-beta.8	false
+satisfies	3.5.0	^7.0.0-beta.8	false
+satisfies	3.8.3	^7.0.0-beta.8	false
+satisfies	4.0.5	^7.0.0-beta.8	false
+satisfies	4.3.1	^7.0.0-beta.8	false
+satisfies	4.7.7	^7.0.0-beta.8	false
+satisfies	4.10.3	^7.0.0-beta.8	false
+satisfies	4.11.5	^7.0.0-beta.8	false
+satisfies	5.1.3	^7.0.0-beta.8	false
+satisfies	6.0.0-beta.2	^7.0.0-beta.8	false
+satisfies	6.3.0	^7.0.0-beta.8	false
+satisfies	6.8.1	^7.0.0-beta.8	false
+satisfies	6.12.5	^7.0.0-beta.8	false
+satisfies	7.0.0-rc.0	^7.0.0-beta.8	true
+satisfies	7.0.1	^7.0.0-beta.8	true
+satisfies	7.2.1	^7.0.0-beta.8	true
+satisfies	8.0.0-beta.1	^7.0.0-beta.8	false
+satisfies	8.4.0	^7.0.0-beta.8	false
+satisfies	8.11.0	^7.0.0-beta.8	false
+satisfies	0.0.4	^7.0.0-rc.1	false
+satisfies	0.1.4	^7.0.0-rc.1	false
+satisfies	0.2.0	^7.0.0-rc.1	false
+satisfies	0.3.3	^7.0.0-rc.1	false
+satisfies	0.4.5	^7.0.0-rc.1	false
+satisfies	0.5.5	^7.0.0-rc.1	false
+satisfies	0.6.5	^7.0.0-rc.1	false
+satisfies	0.7.2	^7.0.0-rc.1	false
+satisfies	1.4.4	^7.0.0-rc.1	false
+satisfies	2.0.2	^7.0.0-rc.1	false
+satisfies	3.0.0	^7.0.0-rc.1	false
+satisfies	3.4.0	^7.0.0-rc.1	false
+satisfies	3.8.2	^7.0.0-rc.1	false
+satisfies	4.0.4	^7.0.0-rc.1	false
+satisfies	4.3.0	^7.0.0-rc.1	false
+satisfies	4.7.6	^7.0.0-rc.1	false
+satisfies	4.10.2	^7.0.0-rc.1	false
+satisfies	4.11.4	^7.0.0-rc.1	false
+satisfies	5.1.2	^7.0.0-rc.1	false
+satisfies	6.0.0-beta.1	^7.0.0-rc.1	false
+satisfies	6.2.1	^7.0.0-rc.1	false
+satisfies	6.8.0	^7.0.0-rc.1	false
+satisfies	6.12.4	^7.0.0-rc.1	false
+satisfies	7.0.0-beta.8	^7.0.0-rc.1	false
+satisfies	7.0.0-rc.4	^7.0.0-rc.1	true
+satisfies	7.1.0	^7.0.0-rc.1	true
+satisfies	8.0.5	^7.0.0-rc.1	false
+satisfies	8.8.1	^7.0.0-rc.1	false
+satisfies	8.18.0	^7.0.0-rc.1	false
+satisfies	0.1.0	^7.0.0	false
+satisfies	0.1.13	^7.0.0	false
+satisfies	0.2.9	^7.0.0	false
+satisfies	0.4.1	^7.0.0	false
+satisfies	0.5.0	^7.0.0	false
+satisfies	0.6.1	^7.0.0	false
+satisfies	0.6.14	^7.0.0	false
+satisfies	1.4.0	^7.0.0	false
+satisfies	2.0.0-beta.2	^7.0.0	false
+satisfies	2.2.2	^7.0.0	false
+satisfies	3.2.2	^7.0.0	false
+satisfies	3.7.1	^7.0.0	false
+satisfies	4.0.0	^7.0.0	false
+satisfies	4.1.6	^7.0.0	false
+satisfies	4.7.2	^7.0.0	false
+satisfies	4.9.2	^7.0.0	false
+satisfies	5.0.1-beta.3	^7.0.0	false
+satisfies	4.11.8	^7.0.0	false
+satisfies	5.2.4	^7.0.0	false
+satisfies	6.0.1	^7.0.0	false
+satisfies	6.6.0	^7.0.0	false
+satisfies	6.12.0	^7.0.0	false
+satisfies	7.0.0-beta.4	^7.0.0	false
+satisfies	7.0.0	^7.0.0	true
+satisfies	7.2.0	^7.0.0	true
+satisfies	8.0.0-beta.1	^7.0.0	false
+satisfies	8.4.0	^7.0.0	false
+satisfies	8.11.0	^7.0.0	false
+satisfies	0.0.4	^8.0.0-beta.0	false
+satisfies	0.1.4	^8.0.0-beta.0	false
+satisfies	0.2.0	^8.0.0-beta.0	false
+satisfies	0.3.3	^8.0.0-beta.0	false
+satisfies	0.4.5	^8.0.0-beta.0	false
+satisfies	0.5.5	^8.0.0-beta.0	false
+satisfies	0.6.5	^8.0.0-beta.0	false
+satisfies	0.7.2	^8.0.0-beta.0	false
+satisfies	1.4.4	^8.0.0-beta.0	false
+satisfies	2.0.2	^8.0.0-beta.0	false
+satisfies	3.0.0	^8.0.0-beta.0	false
+satisfies	3.4.0	^8.0.0-beta.0	false
+satisfies	3.8.2	^8.0.0-beta.0	false
+satisfies	4.0.4	^8.0.0-beta.0	false
+satisfies	4.3.0	^8.0.0-beta.0	false
+satisfies	4.7.6	^8.0.0-beta.0	false
+satisfies	4.10.2	^8.0.0-beta.0	false
+satisfies	4.11.4	^8.0.0-beta.0	false
+satisfies	5.1.2	^8.0.0-beta.0	false
+satisfies	6.0.0-beta.1	^8.0.0-beta.0	false
+satisfies	6.2.1	^8.0.0-beta.0	false
+satisfies	6.8.0	^8.0.0-beta.0	false
+satisfies	6.12.4	^8.0.0-beta.0	false
+satisfies	7.0.0-beta.8	^8.0.0-beta.0	false
+satisfies	7.1.0	^8.0.0-beta.0	false
+satisfies	8.0.0-beta.2	^8.0.0-beta.0	true
+satisfies	8.0.4	^8.0.0-beta.0	true
+satisfies	8.6.0	^8.0.0-beta.0	true
+satisfies	8.8.1	^8.0.0-beta.0	true
+satisfies	8.12.0	^8.0.0-beta.0	true
+satisfies	8.20.0	^8.0.0-beta.0	true
+satisfies	0.0.8	^8.0.0-beta.4	false
+satisfies	0.1.8	^8.0.0-beta.4	false
+satisfies	0.2.4	^8.0.0-beta.4	false
+satisfies	0.3.7	^8.0.0-beta.4	false
+satisfies	0.4.9	^8.0.0-beta.4	false
+satisfies	0.5.9	^8.0.0-beta.4	false
+satisfies	0.6.9	^8.0.0-beta.4	false
+satisfies	1.2.0	^8.0.0-beta.4	false
+satisfies	1.4.8	^8.0.0-beta.4	false
+satisfies	2.1.2	^8.0.0-beta.4	false
+satisfies	3.0.4	^8.0.0-beta.4	false
+satisfies	3.5.3	^8.0.0-beta.4	false
+satisfies	3.8.6	^8.0.0-beta.4	false
+satisfies	4.1.1	^8.0.0-beta.4	false
+satisfies	4.5.0	^8.0.0-beta.4	false
+satisfies	4.8.2	^8.0.0-beta.4	false
+satisfies	5.0.1-beta.1	^8.0.0-beta.4	false
+satisfies	5.0.4-beta.2	^8.0.0-beta.4	false
+satisfies	5.1.6	^8.0.0-beta.4	false
+satisfies	6.0.0-rc.0	^8.0.0-beta.4	false
+satisfies	6.5.1	^8.0.0-beta.4	false
+satisfies	6.9.2	^8.0.0-beta.4	false
+satisfies	7.0.0-beta.0	^8.0.0-beta.4	false
+satisfies	7.0.0-rc.2	^8.0.0-beta.4	false
+satisfies	8.0.0-beta.0	^8.0.0-beta.4	false
+satisfies	8.0.5	^8.0.0-beta.4	true
+satisfies	8.6.1	^8.0.0-beta.4	true
+satisfies	8.8.2	^8.0.0-beta.4	true
+satisfies	8.13.0	^8.0.0-beta.4	true
+satisfies	0.0.8	^8.0.0	false
+satisfies	0.1.8	^8.0.0	false
+satisfies	0.2.4	^8.0.0	false
+satisfies	0.3.7	^8.0.0	false
+satisfies	0.4.9	^8.0.0	false
+satisfies	0.5.9	^8.0.0	false
+satisfies	0.6.9	^8.0.0	false
+satisfies	1.2.0	^8.0.0	false
+satisfies	1.4.8	^8.0.0	false
+satisfies	2.1.2	^8.0.0	false
+satisfies	3.0.4	^8.0.0	false
+satisfies	3.5.3	^8.0.0	false
+satisfies	3.8.6	^8.0.0	false
+satisfies	4.1.1	^8.0.0	false
+satisfies	4.5.0	^8.0.0	false
+satisfies	4.8.2	^8.0.0	false
+satisfies	5.0.1-beta.1	^8.0.0	false
+satisfies	5.0.4-beta.2	^8.0.0	false
+satisfies	5.1.6	^8.0.0	false
+satisfies	6.0.0-rc.0	^8.0.0	false
+satisfies	6.5.1	^8.0.0	false
+satisfies	6.9.2	^8.0.0	false
+satisfies	7.0.0-beta.0	^8.0.0	false
+satisfies	7.0.0-rc.2	^8.0.0	false
+satisfies	8.0.0-beta.0	^8.0.0	false
+satisfies	8.0.0	^8.0.0	true
+satisfies	8.2.0	^8.0.0	true
+satisfies	8.6.3	^8.0.0	true
+satisfies	8.10.0	^8.0.0	true
+satisfies	8.15.0	^8.0.0	true
+satisfies	0.0.7	^8.17.1	false
+satisfies	0.1.7	^8.17.1	false
+satisfies	0.2.3	^8.17.1	false
+satisfies	0.3.6	^8.17.1	false
+satisfies	0.4.8	^8.17.1	false
+satisfies	0.5.8	^8.17.1	false
+satisfies	0.6.8	^8.17.1	false
+satisfies	1.1.1	^8.17.1	false
+satisfies	1.4.7	^8.17.1	false
+satisfies	2.1.0	^8.17.1	false
+satisfies	3.0.3	^8.17.1	false
+satisfies	3.5.2	^8.17.1	false
+satisfies	3.8.5	^8.17.1	false
+satisfies	4.1.0	^8.17.1	false
+satisfies	4.4.1	^8.17.1	false
+satisfies	4.8.1	^8.17.1	false
+satisfies	4.10.4	^8.17.1	false
+satisfies	5.0.4-beta.1	^8.17.1	false
+satisfies	5.1.5	^8.17.1	false
+satisfies	5.5.0	^8.17.1	false
+satisfies	6.5.0	^8.17.1	false
+satisfies	6.9.1	^8.17.1	false
+satisfies	7.0.0-alpha.1	^8.17.1	false
+satisfies	7.0.0-rc.1	^8.17.1	false
+satisfies	7.2.1	^8.17.1	false
+satisfies	8.0.4	^8.17.1	false
+satisfies	8.8.0	^8.17.1	false
+satisfies	6.14.0	^8.17.1	false
+satisfies	8.20.0	^8.17.1	true
+satisfies	0.0.10	*	true
+satisfies	0.1.4	*	true
+satisfies	0.1.11	*	true
+satisfies	0.2.1	*	true
+satisfies	0.2.8	*	true
+satisfies	0.3.5	*	true
+satisfies	0.4.1	*	true
+satisfies	0.4.8	*	true
+satisfies	0.5.2	*	true
+satisfies	0.5.9	*	true
+satisfies	0.6.3	*	true
+satisfies	0.6.10	*	true
+satisfies	0.7.1	*	true
+satisfies	1.3.0	*	true
+satisfies	1.4.4	*	true
+satisfies	2.0.0	*	true
+satisfies	2.1.3	*	true
+satisfies	2.5.0	*	true
+satisfies	3.1.1	*	true
+satisfies	3.4.0	*	true
+satisfies	3.6.2	*	true
+satisfies	3.8.3	*	true
+satisfies	3.8.10	*	true
+satisfies	4.0.6	*	true
+satisfies	4.1.6	*	true
+satisfies	4.4.1	*	true
+satisfies	4.7.3	*	true
+satisfies	4.8.2	*	true
+satisfies	4.10.2	*	true
+satisfies	5.0.3-beta.0	*	false
+satisfies	4.11.4	*	true
+satisfies	5.1.0	*	true
+satisfies	5.2.0	*	true
+satisfies	5.4.0	*	true
+satisfies	6.1.1	*	true
+satisfies	6.5.2	*	true
+satisfies	6.7.0	*	true
+satisfies	6.10.1	*	true
+satisfies	6.12.4	*	true
+satisfies	7.0.0-beta.1	*	false
+satisfies	7.0.0-rc.4	*	false
+satisfies	7.0.4	*	true
+satisfies	7.2.4	*	true
+satisfies	8.1.0	*	true
+satisfies	8.6.2	*	true
+satisfies	8.9.0	*	true
+satisfies	8.14.0	*	true
+satisfies	8.20.0	*	true
+satisfies	0.0.10	^7.0.0-alpha.1	false
+satisfies	0.1.10	^7.0.0-alpha.1	false
+satisfies	0.2.6	^7.0.0-alpha.1	false
+satisfies	0.3.11	^7.0.0-alpha.1	false
+satisfies	0.4.12	^7.0.0-alpha.1	false
+satisfies	0.5.11	^7.0.0-alpha.1	false
+satisfies	0.6.11	^7.0.0-alpha.1	false
+satisfies	1.3.0	^7.0.0-alpha.1	false
+satisfies	2.0.0-beta.0	^7.0.0-alpha.1	false
+satisfies	2.1.4	^7.0.0-alpha.1	false
+satisfies	3.1.1	^7.0.0-alpha.1	false
+satisfies	3.6.1	^7.0.0-alpha.1	false
+satisfies	3.8.8	^7.0.0-alpha.1	false
+satisfies	4.1.3	^7.0.0-alpha.1	false
+satisfies	4.6.1	^7.0.0-alpha.1	false
+satisfies	4.9.0	^7.0.0-alpha.1	false
+satisfies	4.11.1	^7.0.0-alpha.1	false
+satisfies	5.0.4-beta.3	^7.0.0-alpha.1	false
+satisfies	5.2.1	^7.0.0-alpha.1	false
+satisfies	6.0.0-rc.1	^7.0.0-alpha.1	false
+satisfies	6.5.3	^7.0.0-alpha.1	false
+satisfies	6.10.1	^7.0.0-alpha.1	false
+satisfies	7.0.0-beta.5	^7.0.0-alpha.1	true
+satisfies	7.0.0-rc.2	^7.0.0-alpha.1	true
+satisfies	7.0.3	^7.0.0-alpha.1	true
+satisfies	8.0.0-beta.2	^7.0.0-alpha.1	false
+satisfies	7.2.3	^7.0.0-alpha.1	true
+satisfies	8.5.0	^7.0.0-alpha.1	false
+satisfies	8.11.1	^7.0.0-alpha.1	false
+satisfies	0.0.5	^7.0.0-beta.0	false
+satisfies	0.1.5	^7.0.0-beta.0	false
+satisfies	0.2.1	^7.0.0-beta.0	false
+satisfies	0.3.4	^7.0.0-beta.0	false
+satisfies	0.4.6	^7.0.0-beta.0	false
+satisfies	0.5.6	^7.0.0-beta.0	false
+satisfies	0.6.6	^7.0.0-beta.0	false
+satisfies	1.0.0	^7.0.0-beta.0	false
+satisfies	1.4.5	^7.0.0-beta.0	false
+satisfies	2.0.3	^7.0.0-beta.0	false
+satisfies	3.0.1	^7.0.0-beta.0	false
+satisfies	3.5.0	^7.0.0-beta.0	false
+satisfies	3.8.3	^7.0.0-beta.0	false
+satisfies	4.0.5	^7.0.0-beta.0	false
+satisfies	4.3.1	^7.0.0-beta.0	false
+satisfies	4.7.7	^7.0.0-beta.0	false
+satisfies	4.10.3	^7.0.0-beta.0	false
+satisfies	4.11.5	^7.0.0-beta.0	false
+satisfies	5.1.3	^7.0.0-beta.0	false
+satisfies	6.0.0-beta.2	^7.0.0-beta.0	false
+satisfies	6.3.0	^7.0.0-beta.0	false
+satisfies	6.8.1	^7.0.0-beta.0	false
+satisfies	6.12.5	^7.0.0-beta.0	false
+satisfies	7.0.0-beta.5	^7.0.0-beta.0	true
+satisfies	7.0.0-rc.2	^7.0.0-beta.0	true
+satisfies	7.0.3	^7.0.0-beta.0	true
+satisfies	7.2.3	^7.0.0-beta.0	true
+satisfies	8.0.4	^7.0.0-beta.0	false
+satisfies	8.8.0	^7.0.0-beta.0	false
+satisfies	8.17.1	^7.0.0-beta.0	false
+satisfies	0.0.12	^7.0.0-beta.7	false
+satisfies	0.1.12	^7.0.0-beta.7	false
+satisfies	0.2.8	^7.0.0-beta.7	false
+satisfies	0.4.0	^7.0.0-beta.7	false
+satisfies	0.4.15	^7.0.0-beta.7	false
+satisfies	0.6.0	^7.0.0-beta.7	false
+satisfies	0.6.13	^7.0.0-beta.7	false
+satisfies	1.3.2	^7.0.0-beta.7	false
+satisfies	1.4.10	^7.0.0-beta.7	false
+satisfies	2.2.1	^7.0.0-beta.7	false
+satisfies	3.2.1	^7.0.0-beta.7	false
+satisfies	3.7.0	^7.0.0-beta.7	false
+satisfies	3.8.10	^7.0.0-beta.7	false
+satisfies	4.1.5	^7.0.0-beta.7	false
+satisfies	4.7.1	^7.0.0-beta.7	false
+satisfies	4.9.1	^7.0.0-beta.7	false
+satisfies	5.0.1-beta.2	^7.0.0-beta.7	false
+satisfies	5.0.0	^7.0.0-beta.7	false
+satisfies	5.2.3	^7.0.0-beta.7	false
+satisfies	6.0.0	^7.0.0-beta.7	false
+satisfies	6.5.5	^7.0.0-beta.7	false
+satisfies	6.11.0	^7.0.0-beta.7	false
+satisfies	7.0.0-beta.3	^7.0.0-beta.7	false
+satisfies	7.0.0-rc.2	^7.0.0-beta.7	true
+satisfies	7.0.3	^7.0.0-beta.7	true
+satisfies	7.2.3	^7.0.0-beta.7	true
+satisfies	8.0.4	^7.0.0-beta.7	false
+satisfies	8.8.0	^7.0.0-beta.7	false
+satisfies	8.17.1	^7.0.0-beta.7	false
+satisfies	0.0.12	8.0.0-beta.0	false
+satisfies	0.1.12	8.0.0-beta.0	false
+satisfies	0.2.8	8.0.0-beta.0	false
+satisfies	0.4.0	8.0.0-beta.0	false
+satisfies	0.4.15	8.0.0-beta.0	false
+satisfies	0.6.0	8.0.0-beta.0	false
+satisfies	0.6.13	8.0.0-beta.0	false
+satisfies	1.3.2	8.0.0-beta.0	false
+satisfies	1.4.10	8.0.0-beta.0	false
+satisfies	2.2.1	8.0.0-beta.0	false
+satisfies	3.2.1	8.0.0-beta.0	false
+satisfies	3.7.0	8.0.0-beta.0	false
+satisfies	3.8.10	8.0.0-beta.0	false
+satisfies	4.1.5	8.0.0-beta.0	false
+satisfies	4.7.1	8.0.0-beta.0	false
+satisfies	4.9.1	8.0.0-beta.0	false
+satisfies	5.0.1-beta.2	8.0.0-beta.0	false
+satisfies	5.0.0	8.0.0-beta.0	false
+satisfies	5.2.3	8.0.0-beta.0	false
+satisfies	6.0.0	8.0.0-beta.0	false
+satisfies	6.5.5	8.0.0-beta.0	false
+satisfies	6.11.0	8.0.0-beta.0	false
+satisfies	7.0.0-beta.3	8.0.0-beta.0	false
+satisfies	7.0.0	8.0.0-beta.0	false
+satisfies	8.0.0-beta.3	8.0.0-beta.0	false
+satisfies	8.5.0	8.0.0-beta.0	false
+satisfies	8.11.1	8.0.0-beta.0	false
+satisfies	0.0.5	^6.12.5	false
+satisfies	0.1.5	^6.12.5	false
+satisfies	0.2.1	^6.12.5	false
+satisfies	0.3.4	^6.12.5	false
+satisfies	0.4.6	^6.12.5	false
+satisfies	0.5.6	^6.12.5	false
+satisfies	0.6.6	^6.12.5	false
+satisfies	1.0.0	^6.12.5	false
+satisfies	1.4.5	^6.12.5	false
+satisfies	2.0.3	^6.12.5	false
+satisfies	3.0.1	^6.12.5	false
+satisfies	3.5.0	^6.12.5	false
+satisfies	3.8.3	^6.12.5	false
+satisfies	4.0.5	^6.12.5	false
+satisfies	4.3.1	^6.12.5	false
+satisfies	4.7.7	^6.12.5	false
+satisfies	4.10.3	^6.12.5	false
+satisfies	4.11.5	^6.12.5	false
+satisfies	5.1.3	^6.12.5	false
+satisfies	6.0.0-beta.2	^6.12.5	false
+satisfies	6.3.0	^6.12.5	false
+satisfies	6.8.1	^6.12.5	false
+satisfies	7.0.0-alpha.0	^6.12.5	false
+satisfies	7.0.0-rc.1	^6.12.5	false
+satisfies	7.2.1	^6.12.5	false
+satisfies	8.0.4	^6.12.5	false
+satisfies	8.8.0	^6.12.5	false
+satisfies	8.17.1	^6.12.5	false
+satisfies	0.1.1	^4.11.2	false
+satisfies	0.1.14	^4.11.2	false
+satisfies	0.3.0	^4.11.2	false
+satisfies	0.4.2	^4.11.2	false
+satisfies	0.5.2	^4.11.2	false
+satisfies	0.6.2	^4.11.2	false
+satisfies	0.6.15	^4.11.2	false
+satisfies	1.4.1	^4.11.2	false
+satisfies	2.0.0-beta.3	^4.11.2	false
+satisfies	2.3.0	^4.11.2	false
+satisfies	3.2.3	^4.11.2	false
+satisfies	3.7.2	^4.11.2	false
+satisfies	4.0.1	^4.11.2	false
+satisfies	4.1.7	^4.11.2	false
+satisfies	4.7.3	^4.11.2	false
+satisfies	4.9.3	^4.11.2	false
+satisfies	4.11.2	^4.11.2	true
+satisfies	5.0.3-beta.0	^4.11.2	false
+satisfies	5.1.6	^4.11.2	false
+satisfies	6.0.0-rc.0	^4.11.2	false
+satisfies	6.5.1	^4.11.2	false
+satisfies	6.9.2	^4.11.2	false
+satisfies	7.0.0-beta.0	^4.11.2	false
+satisfies	7.0.0-rc.2	^4.11.2	false
+satisfies	8.0.0-beta.0	^4.11.2	false
+satisfies	8.0.5	^4.11.2	false
+satisfies	8.8.1	^4.11.2	false
+satisfies	8.18.0	^4.11.2	false
+satisfies	0.1.0	^6.1.0	false
+satisfies	0.1.13	^6.1.0	false
+satisfies	0.2.9	^6.1.0	false
+satisfies	0.4.1	^6.1.0	false
+satisfies	0.5.0	^6.1.0	false
+satisfies	0.6.1	^6.1.0	false
+satisfies	0.6.14	^6.1.0	false
+satisfies	1.4.0	^6.1.0	false
+satisfies	2.0.0-beta.2	^6.1.0	false
+satisfies	2.2.2	^6.1.0	false
+satisfies	3.2.2	^6.1.0	false
+satisfies	3.7.1	^6.1.0	false
+satisfies	4.0.0	^6.1.0	false
+satisfies	4.1.6	^6.1.0	false
+satisfies	4.7.2	^6.1.0	false
+satisfies	4.9.2	^6.1.0	false
+satisfies	5.0.1-beta.3	^6.1.0	false
+satisfies	4.11.8	^6.1.0	false
+satisfies	5.2.4	^6.1.0	false
+satisfies	6.0.1	^6.1.0	false
+satisfies	6.1.0	^6.1.0	true
+satisfies	6.5.1	^6.1.0	true
+satisfies	6.6.2	^6.1.0	true
+satisfies	6.10.0	^6.1.0	true
+satisfies	6.12.3	^6.1.0	true
+satisfies	7.0.0-rc.0	^6.1.0	false
+satisfies	7.2.0	^6.1.0	false
+satisfies	8.0.3	^6.1.0	false
+satisfies	8.7.1	^6.1.0	false
+satisfies	8.16.0	^6.1.0	false
+satisfies	0.1.0	^6.10.2	false
+satisfies	0.1.13	^6.10.2	false
+satisfies	0.2.9	^6.10.2	false
+satisfies	0.4.1	^6.10.2	false
+satisfies	0.5.0	^6.10.2	false
+satisfies	0.6.1	^6.10.2	false
+satisfies	0.6.14	^6.10.2	false
+satisfies	1.4.0	^6.10.2	false
+satisfies	2.0.0-beta.2	^6.10.2	false
+satisfies	2.2.2	^6.10.2	false
+satisfies	3.2.2	^6.10.2	false
+satisfies	3.7.1	^6.10.2	false
+satisfies	4.0.0	^6.10.2	false
+satisfies	4.1.6	^6.10.2	false
+satisfies	4.7.2	^6.10.2	false
+satisfies	4.9.2	^6.10.2	false
+satisfies	5.0.1-beta.3	^6.10.2	false
+satisfies	4.11.8	^6.10.2	false
+satisfies	5.2.4	^6.10.2	false
+satisfies	6.0.1	^6.10.2	false
+satisfies	6.6.0	^6.10.2	false
+satisfies	6.11.0	^6.10.2	true
+satisfies	7.0.0-beta.0	^6.10.2	false
+satisfies	6.12.6	^6.10.2	true
+satisfies	7.0.0-rc.3	^6.10.2	false
+satisfies	8.0.0-beta.1	^6.10.2	false
+satisfies	8.1.0	^6.10.2	false
+satisfies	8.8.2	^6.10.2	false
+satisfies	8.20.0	^6.10.2	false
+satisfies	0.1.3	^6.12.0	false
+satisfies	0.1.16	^6.12.0	false
+satisfies	0.3.2	^6.12.0	false
+satisfies	0.4.4	^6.12.0	false
+satisfies	0.5.4	^6.12.0	false
+satisfies	0.6.4	^6.12.0	false
+satisfies	0.7.1	^6.12.0	false
+satisfies	1.4.3	^6.12.0	false
+satisfies	2.0.1	^6.12.0	false
+satisfies	2.5.0	^6.12.0	false
+satisfies	3.3.1	^6.12.0	false
+satisfies	3.8.1	^6.12.0	false
+satisfies	4.0.3	^6.12.0	false
+satisfies	4.2.0	^6.12.0	false
+satisfies	4.7.5	^6.12.0	false
+satisfies	4.10.1	^6.12.0	false
+satisfies	5.0.3-beta.0	^6.12.0	false
+satisfies	5.1.1	^6.12.0	false
+satisfies	6.0.0-beta.0	^6.12.0	false
+satisfies	6.2.0	^6.12.0	false
+satisfies	6.7.0	^6.12.0	false
+satisfies	6.12.4	^6.12.0	true
+satisfies	7.0.0-beta.1	^6.12.0	false
+satisfies	7.0.0-rc.4	^6.12.0	false
+satisfies	8.0.0-beta.2	^6.12.0	false
+satisfies	8.2.0	^6.12.0	false
+satisfies	8.9.0	^6.12.0	false
+satisfies	0.0.4	^6.12.2	false
+satisfies	0.1.4	^6.12.2	false
+satisfies	0.2.0	^6.12.2	false
+satisfies	0.3.3	^6.12.2	false
+satisfies	0.4.5	^6.12.2	false
+satisfies	0.5.5	^6.12.2	false
+satisfies	0.6.5	^6.12.2	false
+satisfies	0.7.2	^6.12.2	false
+satisfies	1.4.4	^6.12.2	false
+satisfies	2.0.2	^6.12.2	false
+satisfies	3.0.0	^6.12.2	false
+satisfies	3.4.0	^6.12.2	false
+satisfies	3.8.2	^6.12.2	false
+satisfies	4.0.4	^6.12.2	false
+satisfies	4.3.0	^6.12.2	false
+satisfies	4.7.6	^6.12.2	false
+satisfies	4.10.2	^6.12.2	false
+satisfies	4.11.4	^6.12.2	false
+satisfies	5.1.2	^6.12.2	false
+satisfies	6.0.0-beta.1	^6.12.2	false
+satisfies	6.2.1	^6.12.2	false
+satisfies	6.8.0	^6.12.2	false
+satisfies	6.12.4	^6.12.2	true
+satisfies	7.0.0-beta.0	^6.12.2	false
+satisfies	7.0.0-rc.3	^6.12.2	false
+satisfies	8.0.0-beta.1	^6.12.2	false
+satisfies	8.1.0	^6.12.2	false
+satisfies	8.8.2	^6.12.2	false
+satisfies	8.20.0	^6.12.2	false
+satisfies	0.1.3	^6.12.4	false
+satisfies	0.1.16	^6.12.4	false
+satisfies	0.3.2	^6.12.4	false
+satisfies	0.4.4	^6.12.4	false
+satisfies	0.5.4	^6.12.4	false
+satisfies	0.6.4	^6.12.4	false
+satisfies	0.7.1	^6.12.4	false
+satisfies	1.4.3	^6.12.4	false
+satisfies	2.0.1	^6.12.4	false
+satisfies	2.5.0	^6.12.4	false
+satisfies	3.3.1	^6.12.4	false
+satisfies	3.8.1	^6.12.4	false
+satisfies	4.0.3	^6.12.4	false
+satisfies	4.2.0	^6.12.4	false
+satisfies	4.7.5	^6.12.4	false
+satisfies	4.10.1	^6.12.4	false
+satisfies	5.0.3-beta.0	^6.12.4	false
+satisfies	5.1.1	^6.12.4	false
+satisfies	6.0.0-beta.0	^6.12.4	false
+satisfies	6.2.0	^6.12.4	false
+satisfies	6.7.0	^6.12.4	false
+satisfies	6.12.3	^6.12.4	false
+satisfies	6.12.6	^6.12.4	true
+satisfies	7.0.0-rc.0	^6.12.4	false
+satisfies	7.2.0	^6.12.4	false
+satisfies	8.0.3	^6.12.4	false
+satisfies	8.7.1	^6.12.4	false
+satisfies	8.16.0	^6.12.4	false
+satisfies	0.1.0	^8.8.0	false
+satisfies	0.1.13	^8.8.0	false
+satisfies	0.2.9	^8.8.0	false
+satisfies	0.4.1	^8.8.0	false
+satisfies	0.5.0	^8.8.0	false
+satisfies	0.6.1	^8.8.0	false
+satisfies	0.6.14	^8.8.0	false
+satisfies	1.4.0	^8.8.0	false
+satisfies	2.0.0-beta.2	^8.8.0	false
+satisfies	2.2.2	^8.8.0	false
+satisfies	3.2.2	^8.8.0	false
+satisfies	3.7.1	^8.8.0	false
+satisfies	4.0.0	^8.8.0	false
+satisfies	4.1.6	^8.8.0	false
+satisfies	4.7.2	^8.8.0	false
+satisfies	4.9.2	^8.8.0	false
+satisfies	5.0.1-beta.3	^8.8.0	false
+satisfies	4.11.8	^8.8.0	false
+satisfies	5.2.4	^8.8.0	false
+satisfies	6.0.1	^8.8.0	false
+satisfies	6.6.0	^8.8.0	false
+satisfies	6.12.0	^8.8.0	false
+satisfies	7.0.0-beta.4	^8.8.0	false
+satisfies	7.0.1	^8.8.0	false
+satisfies	8.0.0-beta.3	^8.8.0	false
+satisfies	8.5.0	^8.8.0	false
+satisfies	8.10.0	^8.8.0	true
+satisfies	8.15.0	^8.8.0	true
+satisfies	0.0.8	^8.9.0	false
+satisfies	0.1.8	^8.9.0	false
+satisfies	0.2.4	^8.9.0	false
+satisfies	0.3.7	^8.9.0	false
+satisfies	0.4.9	^8.9.0	false
+satisfies	0.5.9	^8.9.0	false
+satisfies	0.6.9	^8.9.0	false
+satisfies	1.2.0	^8.9.0	false
+satisfies	1.4.8	^8.9.0	false
+satisfies	2.1.2	^8.9.0	false
+satisfies	3.0.4	^8.9.0	false
+satisfies	3.5.3	^8.9.0	false
+satisfies	3.8.6	^8.9.0	false
+satisfies	4.1.1	^8.9.0	false
+satisfies	4.5.0	^8.9.0	false
+satisfies	4.8.2	^8.9.0	false
+satisfies	5.0.1-beta.1	^8.9.0	false
+satisfies	5.0.4-beta.2	^8.9.0	false
+satisfies	5.1.6	^8.9.0	false
+satisfies	6.0.0-rc.0	^8.9.0	false
+satisfies	6.5.1	^8.9.0	false
+satisfies	6.9.2	^8.9.0	false
+satisfies	7.0.0-beta.0	^8.9.0	false
+satisfies	7.0.0-rc.2	^8.9.0	false
+satisfies	8.0.0-beta.0	^8.9.0	false
+satisfies	8.0.5	^8.9.0	false
+satisfies	8.8.1	^8.9.0	false
+satisfies	8.11.0	^8.9.0	true
+satisfies	8.16.0	^8.9.0	true
+satisfies	0.1.0	^8.20.0	false
+satisfies	0.1.13	^8.20.0	false
+satisfies	0.2.9	^8.20.0	false
+satisfies	0.4.1	^8.20.0	false
+satisfies	0.5.0	^8.20.0	false
+satisfies	0.6.1	^8.20.0	false
+satisfies	0.6.14	^8.20.0	false
+satisfies	1.4.0	^8.20.0	false
+satisfies	2.0.0-beta.2	^8.20.0	false
+satisfies	2.2.2	^8.20.0	false
+satisfies	3.2.2	^8.20.0	false
+satisfies	3.7.1	^8.20.0	false
+satisfies	4.0.0	^8.20.0	false
+satisfies	4.1.6	^8.20.0	false
+satisfies	4.7.2	^8.20.0	false
+satisfies	4.9.2	^8.20.0	false
+satisfies	5.0.1-beta.3	^8.20.0	false
+satisfies	4.11.8	^8.20.0	false
+satisfies	5.2.4	^8.20.0	false
+satisfies	6.0.1	^8.20.0	false
+satisfies	6.6.0	^8.20.0	false
+satisfies	6.12.0	^8.20.0	false
+satisfies	7.0.0-beta.4	^8.20.0	false
+satisfies	7.0.1	^8.20.0	false
+satisfies	8.0.0-beta.3	^8.20.0	false
+satisfies	8.5.0	^8.20.0	false
+satisfies	8.11.1	^8.20.0	false
+satisfies	0.2.0	3.5.2	false
+satisfies	2.0.0-beta.2	3.5.2	false
+satisfies	3.4.1	3.5.2	false
+satisfies	5.1.0	3.5.2	false
+satisfies	2.0.0-beta.0	5.1.0	false
+satisfies	3.2.0	5.1.0	false
+satisfies	5.0.0-beta.0	5.1.0	false
+satisfies	1.4.0	^3.5.2	false
+satisfies	3.0.0-beta.0	^3.5.2	false
+satisfies	3.5.2	^3.5.2	true
+satisfies	4.0.0-rc.0	^3.5.2	false
+satisfies	1.2.0	^5.1.0	false
+satisfies	2.0.0	^5.1.0	false
+satisfies	4.0.0-beta.0	^5.1.0	false
+satisfies	1.2.1	^2.1.0	false
+satisfies	3.4.1	^2.1.0	false
+satisfies	5.0.0	^2.1.0	false
+satisfies	1.5.0	^3.1.0	false
+satisfies	3.4.1	^3.1.0	true
+satisfies	4.0.0-beta.0	^3.1.0	false
+satisfies	0.2.0	^3.4.1	false
+satisfies	2.0.0-beta.2	^3.4.1	false
+satisfies	3.5.2	^3.4.1	true
+satisfies	4.0.0-beta.0	^3.4.1	false
+satisfies	1.5.1	^5.0.0	false
+satisfies	0.1.0	^3.1.1	false
+satisfies	3.0.0-beta.1	^3.1.3	false
+satisfies	3.0.0-beta.2	^0.1.0	false
+satisfies	3.0.0	^1.0.0	false
+satisfies	3.0.0	^2.0.1	false
+satisfies	1.0.0	^0.4.1	false
+satisfies	0.3.0	^0.3.0	true
+satisfies	0.4.0	^0.5.0	false
+satisfies	2.1.1	^4.2.2	false
+satisfies	3.0.2	^3.0.2	true
+satisfies	4.2.0	^3.0.2	false
+satisfies	3.0.2	^4.2.1	false
+satisfies	4.3.0	^4.4.1	false
+satisfies	2.2.2	^2.1.0	true
+satisfies	0.0.1	^2.1.1	false
+satisfies	1.2.4	^2.1.1	false
+satisfies	3.0.0	^2.3.0	false
+satisfies	4.1.0	^2.3.0	false
+satisfies	2.4.3	^2.3.0	true
+satisfies	0.0.1	^3.0.1	false
+satisfies	3.0.3	^3.0.1	true
+satisfies	3.1.3	^3.0.1	true
+satisfies	4.1.0	^3.0.1	false
+satisfies	4.2.0	^3.0.1	false
+satisfies	0.7.3	2.6.9	false
+satisfies	2.1.3	2.6.9	false
+satisfies	2.5.1	2.6.9	false
+satisfies	3.0.1	2.6.9	false
+satisfies	4.2.0	2.6.9	false
+satisfies	0.0.1	3.2.7	false
+satisfies	0.8.0	3.2.7	false
+satisfies	2.3.0	3.2.7	false
+satisfies	2.6.0	3.2.7	false
+satisfies	3.1.0	3.2.7	false
+satisfies	4.3.0	3.2.7	false
+satisfies	3.2.7	3.2.7	true
+satisfies	0.2.0	4.2.0	false
+satisfies	1.0.0	4.2.0	false
+satisfies	2.3.2	4.2.0	false
+satisfies	2.6.2	4.2.0	false
+satisfies	3.2.1	4.2.0	false
+satisfies	4.3.2	4.2.0	false
+satisfies	0.4.0	4.4.3	false
+satisfies	1.0.2	4.4.3	false
+satisfies	2.4.0	4.4.3	false
+satisfies	2.6.4	4.4.3	false
+satisfies	3.2.3	4.4.3	false
+satisfies	4.3.3	4.4.3	false
+satisfies	0.5.0	^2.2.0	false
+satisfies	1.0.4	^2.2.0	false
+satisfies	2.3.3	^2.2.0	true
+satisfies	2.5.0	^2.2.0	true
+satisfies	2.6.4	^2.2.0	true
+satisfies	3.2.3	^2.2.0	false
+satisfies	4.3.3	^2.2.0	false
+satisfies	0.4.1	^2.1.2	false
+satisfies	1.0.3	^2.1.2	false
+satisfies	2.1.3	^2.1.2	true
+satisfies	2.4.1	^2.1.2	true
+satisfies	2.5.2	^2.1.2	true
+satisfies	2.6.6	^2.1.2	true
+satisfies	4.0.0	^2.1.2	false
+satisfies	4.3.4	^2.1.2	false
+satisfies	1.0.2	^2.1.3	false
+satisfies	2.3.2	^2.1.3	true
+satisfies	2.4.5	^2.1.3	true
+satisfies	2.6.3	^2.1.3	true
+satisfies	3.2.5	^2.1.3	false
+satisfies	4.3.6	^2.1.3	false
+satisfies	0.7.0	4.3.4	false
+satisfies	2.1.0	4.3.4	false
+satisfies	2.4.4	4.3.4	false
+satisfies	2.6.8	4.3.4	false
+satisfies	4.0.1	4.3.4	false
+satisfies	4.3.4	4.3.4	true
+satisfies	4.4.0	4.3.4	false
+satisfies	3.0.0	7.0.0	false
+satisfies	2.1.0	4.0.0	false
+satisfies	2.0.1	^1.1.0	false
+satisfies	1.1.2	^3.0.0	false
+satisfies	2.1.0	^4.0.0	false
+satisfies	0.1.0	6.0.0	false
+satisfies	7.0.0	6.0.0	false
+satisfies	5.0.0	>=7.0.0 <8.0.0-0	false
+satisfies	7.0.0	>=7.0.0 <8.0.0-0	true
+satisfies	0.1.0	^0.1.1	false
+satisfies	7.0.0	^0.1.1	false
+satisfies	6.0.0	^1.1.2	false
+satisfies	1.1.1	github:jonschlinkert/is-number#7.0.0	true
+satisfies	4.0.0	github:jonschlinkert/is-number#7.0.0	true
+satisfies	5.0.2	^1.1.0	false
+satisfies	3.2.0	^3.0.2	true
+satisfies	5.0.0	^3.0.2	false
+satisfies	1.1.0	^6.0.2	false
+satisfies	5.0.0	^6.0.2	false
+satisfies	3.2.1	^2.0.1	false
+satisfies	0.1.2	^3.0.3	false
+satisfies	3.1.0	^3.0.3	true
+satisfies	5.1.0	^3.0.3	false
+satisfies	5.0.2	^3.1.0	false
+satisfies	5.0.1	^4.0.0	false
+satisfies	2.0.1	^5.0.2	false
+satisfies	5.1.0	^5.0.2	true
+satisfies	6.0.0	^5.0.2	false
+satisfies	1.0.0	^0.1.2	false
+satisfies	0.1.1	>=0.1.0	true
+satisfies	1.0.0	5.0.1	false
+satisfies	0.1.1	^5.0.1	false
+satisfies	4.0.2	^5.0.1	false
+satisfies	5.0.1	^5.0.1	true
+satisfies	3.0.0	^0.2.0	false
+satisfies	2.1.0	^1.0.2	false
+satisfies	4.0.3	^2.1.0	false
+satisfies	0.1.1	^4.0.1	false
+satisfies	5.0.1	^4.0.1	false
+satisfies	2.0.1	^1.1.5	false
+satisfies	1.1.0	^1.0.2	true
+satisfies	1.1.0	2.0.5	false
+satisfies	2.0.5	2.0.5	true
+satisfies	0.0.1	2.0.5	false
+satisfies	2.0.2	2.x	true
+satisfies	0.0.3	1.3.10	false
+satisfies	0.5.0	1.3.10	false
+satisfies	0.5.5	1.3.10	false
+satisfies	0.5.7-canary.20230213.1	1.3.10	false
+satisfies	0.5.8-canary.20230225.1	1.3.10	false
+satisfies	0.5.8-canary.20230310.1	1.3.10	false
+satisfies	0.5.9-canary.20230322.1	1.3.10	false
+satisfies	0.5.9-canary.20230402.1	1.3.10	false
+satisfies	0.6.0-canary.20230414.1	1.3.10	false
+satisfies	0.6.0-canary.20230427.1	1.3.10	false
+satisfies	0.6.0-canary.20230510.1	1.3.10	false
+satisfies	0.6.3-canary.20230520.1	1.3.10	false
+satisfies	0.6.6-canary.20230530.1	1.3.10	false
+satisfies	0.6.8	1.3.10	false
+satisfies	0.6.11	1.3.10	false
+satisfies	0.6.14-canary.20230711.1	1.3.10	false
+satisfies	0.7.0-canary.20230722.1	1.3.10	false
+satisfies	0.7.2-canary.20230803.1	1.3.10	false
+satisfies	0.7.4-canary.20230818.1	1.3.10	false
+satisfies	0.8.2-canary.20230829.1	1.3.10	false
+satisfies	1.0.0-canary.20230911.1	1.3.10	false
+satisfies	1.0.3-canary.20231001.1	1.3.10	false
+satisfies	1.0.6	1.3.10	false
+satisfies	1.0.7-canary.20231023.1	1.3.10	false
+satisfies	1.0.8-canary.20231104.1	1.3.10	false
+satisfies	1.0.11-canary.20231114.1	1.3.10	false
+satisfies	1.0.14-canary.20231124.1	1.3.10	false
+satisfies	1.0.15-canary.20231206.1	1.3.10	false
+satisfies	1.0.18-canary.20231216.1	1.3.10	false
+satisfies	1.0.20-canary.20231227.1	1.3.10	false
+satisfies	1.0.21-canary.20240108.1	1.3.10	false
+satisfies	1.0.21-canary.20240119.1	1.3.10	false
+satisfies	1.0.21-canary.20240130.1	1.3.10	false
+satisfies	1.0.21-canary.20240211.1	1.3.10	false
+satisfies	1.0.21-canary.20240222.1	1.3.10	false
+satisfies	1.0.21-canary.20240304.1	1.3.10	false
+satisfies	1.0.21-canary.20240316.1	1.3.10	false
+satisfies	1.0.21-canary.20240325.1	1.3.10	false
+satisfies	1.1.1	1.3.10	false
+satisfies	1.0.21-canary.20240416.1	1.3.10	false
+satisfies	1.0.21-canary.20240427.1	1.3.10	false
+satisfies	1.0.21-canary.20240508.1	1.3.10	false
+satisfies	1.0.21-canary.20240521.1	1.3.10	false
+satisfies	1.1.11	1.3.10	false
+satisfies	1.1.13	1.3.10	false
+satisfies	1.0.21-canary.20240622.1	1.3.10	false
+satisfies	1.0.21-canary.20240703.1	1.3.10	false
+satisfies	1.0.21-canary.20240713.1	1.3.10	false
+satisfies	1.1.20-canary.20240726.1	1.3.10	false
+satisfies	1.1.22	1.3.10	false
+satisfies	1.1.20-canary.20240819.1	1.3.10	false
+satisfies	1.1.20-canary.20240830.1	1.3.10	false
+satisfies	1.1.20-canary.20240911.1	1.3.10	false
+satisfies	1.1.20-canary.20240922.1	1.3.10	false
+satisfies	1.1.20-canary.20241005.1	1.3.10	false
+satisfies	1.1.20-canary.20241017.1	1.3.10	false
+satisfies	1.1.20-canary.20241027.1	1.3.10	false
+satisfies	1.1.20-canary.20241108.1	1.3.10	false
+satisfies	1.1.36	1.3.10	false
+satisfies	1.1.20-canary.20241130.1	1.3.10	false
+satisfies	1.1.38-canary.20241212.1	1.3.10	false
+satisfies	1.1.42-canary.20241221.1	1.3.10	false
+satisfies	1.1.42-canary.20250103.1	1.3.10	false
+satisfies	1.1.43-canary.20250115.1	1.3.10	false
+satisfies	1.2.0-canary.20250125.1	1.3.10	false
+satisfies	1.2.2-canary.20250205.1	1.3.10	false
+satisfies	1.2.2-canary.20250218.1	1.3.10	false
+satisfies	1.2.4-canary.20250301.1	1.3.10	false
+satisfies	1.2.5-canary.20250313.1	1.3.10	false
+satisfies	1.2.6-canary.20250326.1	1.3.10	false
+satisfies	1.2.8-canary.20250406.1	1.3.10	false
+satisfies	1.2.10-canary.20250417.1	1.3.10	false
+satisfies	1.2.11-canary.20250429.1	1.3.10	false
+satisfies	1.2.13-canary.20250510.1	1.3.10	false
+satisfies	1.2.14-canary.20250522.1	1.3.10	false
+satisfies	1.2.15-canary.20250603.1	1.3.10	false
+satisfies	1.2.16-canary.20250616.1	1.3.10	false
+satisfies	1.2.17-canary.20250629.1	1.3.10	false
+satisfies	1.2.18-canary.20250711.1	1.3.10	false
+satisfies	1.2.19-canary.20250723.1	1.3.10	false
+satisfies	1.2.19-canary.20250805.1	1.3.10	false
+satisfies	1.2.20-canary.20250817.1	1.3.10	false
+satisfies	1.2.21-canary.20250830.1	1.3.10	false
+satisfies	1.2.21-canary.20250912.1	1.3.10	false
+satisfies	1.2.22-canary.20250924.1	1.3.10	false
+satisfies	1.2.23-canary.20251007.1	1.3.10	false
+satisfies	1.3.0-canary.20251019.1	1.3.10	false
+satisfies	1.3.1-canary.20251031.1	1.3.10	false
+satisfies	1.3.2-canary.20251113.1	1.3.10	false
+satisfies	1.3.3-canary.20251126.1	1.3.10	false
+satisfies	1.3.4-canary.20251208.1	1.3.10	false
+satisfies	1.3.5-canary.20251228.1	1.3.10	false
+satisfies	1.3.5-canary.20260110.1	1.3.10	false
+satisfies	1.3.6-canary.20260122.1	1.3.10	false
+satisfies	1.3.9	1.3.10	false
+satisfies	1.3.10-canary.20260227.1	1.3.10	false
+satisfies	1.3.10-canary.20260312.1	1.3.10	false
+satisfies	1.3.11-canary.20260325.1	1.3.10	false
+satisfies	1.3.11-canary.20260407.1	1.3.10	false
+satisfies	1.3.12-canary.20260419.1	1.3.10	false
+satisfies	1.4.0-canary.20260823.1	1.3.10	false
+satisfies	1.4.1-canary.20260904.1	1.3.10	false
+satisfies	1.4.2-canary.20260918.1	1.3.10	false
+satisfies	1.4.2-canary.20261002.1	1.3.10	false
+satisfies	2.0.1	~2.0.0	true
+satisfies	1.0.2	~2.0.0	false
+satisfies	3.1.1	3.1.1	true
+satisfies	3.0.0	=3.1.1	false
+satisfies	2.0.1	2.0.1	true
+satisfies	4.0.3	>=1.0.0	true
+satisfies	0.0.0	>= 1.0.0	false
+satisfies	4.0.2	>= 1.0.0	true
+satisfies	0.2.1	1.0.2	false
+satisfies	1.0.2	^6.0.0	false
+satisfies	2.1.1	^6	false
+satisfies	6.2.1	^6	true
+satisfies	1.0.0	6.3.0	false
+satisfies	5.0.0	6.3.0	false
+satisfies	5.0.1	4.0.0	false
+satisfies	0.1.1	0.2.14	false
+satisfies	0.2.11	0.2.14	false
+satisfies	2.0.0	^3 || ^4	false
+satisfies	2.2.3	^3 || ^4	false
+satisfies	3.0.1	^3 || ^4	true
+satisfies	4.0.5	^3 || ^4	true
+satisfies	2.0.2	^4.0.2	false
+satisfies	2.3.1	^4.0.2	false
+satisfies	4.0.6	^4.0.2	true
+satisfies	1.2.0	^2.3.1	false
+satisfies	2.2.2	^2.3.1	false
+satisfies	4.0.7	^2.3.1	false
+satisfies	2.2.3	2.x	true
+satisfies	3.0.2	2.x	false
+satisfies	2.0.1	3.x	false
+satisfies	2.3.0	3.x	false
+satisfies	1.0.2	^2.0.3	false
+satisfies	2.0.4	^2.0.3	true
+satisfies	2.2.1	^2.0.3	true
+satisfies	4.0.3	^2.0.3	false
+satisfies	2.0.0	^2.0.5	false
+satisfies	2.0.6	^2.0.5	true
+satisfies	2.2.3	^2.0.5	true
+satisfies	4.0.5	^2.0.5	false
+satisfies	2.0.3	^2.2.1	false
+satisfies	2.3.0	^2.2.1	true
+satisfies	4.0.3	^2.2.1	false
+satisfies	2.0.0	^2.2.3	false
+satisfies	3.0.0	^2.2.3	false
+satisfies	1.0.2	^4.0.3	false
+satisfies	2.1.0	^4.0.3	false
+satisfies	4.0.3	^4.0.3	true
+satisfies	2.3.2	^4.0.3	false
+satisfies	2.0.4	^4.0.4	false
+satisfies	3.0.1	^4.0.4	false
+satisfies	4.0.6	^4.0.4	true
+satisfies	1.2.0	^2.0.4	false
+satisfies	2.1.1	^2.0.4	true
+satisfies	2.3.2	^2.0.4	true
+satisfies	4.0.5	^2.0.4	false
+satisfies	2.0.3	^6.4.4	false
+satisfies	4.0.0	^6.4.4	false
+satisfies	6.3.0	^6.4.4	false
+satisfies	2.0.1	^6.2.0	false
+satisfies	3.4.2	^6.2.0	false
+satisfies	6.1.1	^6.2.0	false
+satisfies	6.4.0	^6.2.0	true
+satisfies	6.5.0	^6.2.0	true
+satisfies	2.1.1	^6.3.0	false
+satisfies	5.0.0	^6.3.0	false
+satisfies	6.4.5	^6.3.0	true
+satisfies	1.0.2	^6.4.0	false
+satisfies	3.1.1	^6.4.0	false
+satisfies	5.2.1	^6.4.0	false
+satisfies	6.4.4	^6.4.0	true
+satisfies	1.1.0	^6.4.2	false
+satisfies	3.2.1	^6.4.2	false
+satisfies	6.0.0	^6.4.2	false
+satisfies	6.4.5	^6.4.2	true
+satisfies	1.1.0	^6.4.3	false
+satisfies	3.2.1	^6.4.3	false
+satisfies	6.0.0	^6.4.3	false
+satisfies	6.5.0	^6.4.3	true
+satisfies	1.0.3	^6.5.0	false
+satisfies	3.2.0	^6.5.0	false
+satisfies	5.3.0	^6.5.0	false
+satisfies	6.4.5	^6.5.0	false
+satisfies	1.3.3	4.0.8	false
+satisfies	2.1.1	4.0.8	false
+satisfies	2.3.6	4.0.8	false
+satisfies	3.1.1	4.0.8	false
+satisfies	4.0.3	4.0.8	false
+satisfies	2.1.6	^2.1.0	true
+satisfies	3.1.1	^2.1.0	false
+satisfies	4.0.7	^2.1.0	false
+satisfies	1.3.3	^2.1.5	false
+satisfies	2.1.1	^2.1.5	false
+satisfies	2.1.5	^2.1.5	true
+satisfies	2.3.4	^2.1.5	true
+satisfies	2.3.11	^2.1.5	true
+satisfies	3.1.3	^2.1.5	false
+satisfies	4.0.5	^2.1.5	false
+satisfies	1.3.1	^3.1.4	false
+satisfies	2.0.0	^3.1.4	false
+satisfies	2.3.4	^3.1.4	false
+satisfies	3.0.5	^3.1.4	false
+satisfies	3.1.10	^3.1.4	true
+satisfies	4.0.8	^3.1.4	false
+satisfies	1.8.0	^7.1.1	false
+satisfies	3.1.1	^7.1.1	false
+satisfies	1.7.0	^3.0.3	false
+satisfies	0.1.1	^3.1.1	false
+satisfies	2.2.1	^3.1.1	false
+satisfies	1.3.0	^4.0.0	false
+satisfies	7.0.1	^4.0.0	false
+satisfies	1.7.1	^7.0.1	false
+satisfies	3.1.0	^7.0.1	false
+satisfies	1.8.4	^3.0.3	false
+satisfies	1.0.0	^0.1.5	false
+satisfies	1.8.4	^0.1.5	false
+satisfies	2.3.1	^0.1.5	false
+satisfies	1.3.0	^1.0.0	true
+satisfies	1.8.1	^1.0.0	true
+satisfies	2.1.0	^1.0.0	false
+satisfies	0.1.4	^1.4.0	false
+satisfies	1.5.1	^1.4.0	true
+satisfies	1.8.4	^1.4.0	true
+satisfies	2.2.0	^1.4.0	false
+satisfies	0.1.4	^1.6.0	false
+satisfies	1.8.3	^1.6.0	true
+satisfies	2.0.4	^1.6.0	false
+satisfies	0.1.0	^1.7.0	false
+satisfies	1.8.3	^1.7.0	true
+satisfies	2.0.0	^1.7.0	false
+satisfies	3.0.0	^1.7.0	false
+satisfies	3.0.2	^1.8.0	false
+satisfies	1.5.1	^1.8.1	false
+satisfies	1.8.4	^1.8.1	true
+satisfies	2.2.2	^1.8.1	false
+satisfies	1.0.0	^1.8.2	false
+satisfies	2.0.2	^1.8.2	false
+satisfies	3.0.2	^1.8.2	false
+satisfies	1.5.1	^1.8.4	false
+satisfies	1.8.5	^1.8.4	true
+satisfies	2.1.1	^1.8.4	false
+satisfies	0.1.2	^2.0.3	false
+satisfies	1.8.4	^2.0.3	false
+satisfies	1.5.0	^2.2.2	false
+satisfies	2.0.3	^2.2.2	false
+satisfies	0.1.4	^2.3.0	false
+satisfies	1.5.1	^2.3.1	false
+satisfies	0.1.4	^3.0.1	false
+satisfies	1.8.3	^3.0.1	false
+satisfies	1.2.0	^3.0.2	false
+satisfies	2.0.3	^3.0.2	false
+satisfies	0.2.0	^3.0.0	false
+satisfies	1.5.0	^2.1.1	false
+satisfies	1.4.1	^3.0.1	false
+satisfies	2.0.0-beta.2	^3.0.1	false
+satisfies	0.4.6	3.3.0	false
+satisfies	2.6.2	3.3.0	false
+satisfies	4.1.0	3.3.0	false
+satisfies	3.3.0	3.3.0	true
+satisfies	1.3.2	1.4.0	false
+satisfies	1.1.1	1.1.1	true
+satisfies	1.0.1	1.0.6	false
+satisfies	1.0.6	1.0.6	true
+satisfies	3.0.0	1.1.1	false
+satisfies	3.0.1	6.0.0	false
+satisfies	0.0.2	^3.1.1	false
+satisfies	3.1.3	^2.0.3	false
+satisfies	3.1.2	^2.0.5	false
+satisfies	0.1.4	0.1.0	false
+satisfies	1.0.0	^5.3.0	false
+satisfies	5.1.0	^5.3.0	false
+satisfies	5.4.0	^5.3.0	true
+satisfies	3.0.2	^5.4.0	false
+satisfies	0.1.0	3.1.3	false
+satisfies	3.0.3	3.1.3	false
+order	1.0.0	1.0.1	-1
+order	2.0.0	3.0.0	-1
+order	3.1.3	3.1.4	-1
+order	0.3.0	0.4.0	-1
+order	0.6.1	0.6.2	-1
+order	0.7.3	1.0.0	-1
+order	2.1.2	2.1.3	-1
+order	3.0.0-canary.0	3.0.0-canary.1	-1
+order	3.0.0-canary.202508261745	3.0.0-canary.202508261828	-1
+order	1.0.2	1.0.3	-1
+order	1.0.8	1.0.9	-1
+order	1.2.4	1.2.5	-1
+order	1.2.9	1.2.10	-1
+order	1.2.14	1.3.0	-1
+order	2.0.2	3.0.0	-1
+order	6.0.0	6.0.1	-1
+order	0.3.0	0.3.1	-1
+order	0.3.4-2	0.3.5	-1
+order	0.3.6	0.3.7	-1
+order	0.4.1	0.4.2	-1
+order	0.4.7	0.4.8	-1
+order	0.4.12	0.4.13	-1
+order	0.4.17	0.4.18	-1
+order	0.4.22	0.4.23	-1
+order	0.4.28	0.4.29	-1
+order	0.5.0	0.6.0	-1
+order	0.7.2	0.8.0	-1
+order	2.0.0-beta.1	2.0.0-beta.2	-1
+order	2.1.0	2.2.0	-1
+order	2.2.2	2.2.3	-1
+order	3.2.0	3.3.0	-1
+order	3.3.3	4.0.0	-1
+order	5.1.1	5.2.0	-1
+order	6.1.0	6.1.1	-1
+order	6.2.0	6.2.1	-1
+order	7.1.1	7.1.2	-1
+order	7.2.3	7.2.5	-1
+order	7.4.1	7.4.2	-1
+order	7.4.6	6.2.2	1
+order	7.5.2	7.5.3	-1
+order	7.5.4	8.2.1	-1
+order	8.3.0	7.5.6	1
+order	7.5.7	8.5.0	-1
+order	8.8.0	7.5.9	1
+order	8.11.0	8.12.0	-1
+order	8.14.1	8.14.2	-1
+order	8.17.0	5.2.4	1
+order	8.18.0	8.18.1	-1
+order	8.20.0	8.20.1	-1
+order	8.21.0	5.2.6	1
+order	5.2.7	6.2.6	-1
+order	0.1.8	0.1.9	-1
+order	0.1.10	0.1.3	1
+order	0.1.2	0.1.11	-1
+order	0.2.3	0.2.4	-1
+order	0.0.4	0.0.5	-1
+order	0.0.9	0.0.10	-1
+order	0.4.4	0.5.0	-1
+order	0.8.0	1.0.0	-1
+order	1.4.1	1.5.0	-1
+order	1.5.2	1.6.0	-1
+order	1.7.0	1.8.0	-1
+order	1.8.4	1.9.0	-1
+order	2.0.6	2.0.7	-1
+order	2.2.1	2.3.0	-1
+order	2.3.5	2.4.0	-1
+order	2.6.1	2.6.2	-1
+order	2.9.2	2.10.0	-1
+order	2.12.1	2.13.0	-1
+order	2.14.1	2.14.2	-1
+order	2.18.0	2.19.0	-1
+order	2.22.1	2.22.2	-1
+order	2.25.0	2.26.0	-1
+order	2.28.0	2.29.0	-1
+order	0.1.7	0.1.8	-1
+order	0.1.13	0.2.0	-1
+order	0.2.9	0.2.10	-1
+order	0.2.14	0.2.15	-1
+order	0.2.19	0.2.20	-1
+order	0.2.24	0.2.25	-1
+order	0.4.4	0.4.5	-1
+order	0.5.5	0.6.0	-1
+order	0.8.5	0.8.6	-1
+order	1.1.0	1.2.0	-1
+order	1.9.0	1.10.0	-1
+order	1.14.0	1.15.0	-1
+order	0.10.0	0.10.1	-1
+order	0.12.0	0.12.1	-1
+order	0.13.2	0.13.3	-1
+order	0.14.3	0.14.4	-1
+order	0.1.6	0.2.0	-1
+order	1.0.10	1.0.11	-1
+order	1.0.17	1.0.18-0	-1
+order	1.2.2	1.2.3	-1
+order	1.2.7	2.0.3	-1
+order	2.0.7	2.1.0	-1
+order	2.2.2	2.3.0	-1
+order	0.0.12	0.1.0	-1
+order	0.3.8	0.3.11	-1
+order	0.5.0	0.5.2	-1
+order	0.5.9	0.5.10	-1
+order	0.6.6	0.6.7	-1
+order	0.6.11	0.6.12	-1
+order	0.7.2	1.0.0	-1
+order	1.3.2	1.4.0	-1
+order	1.4.6	1.4.7	-1
+order	1.4.10	2.0.0-beta.2	-1
+order	2.1.3	2.1.4	-1
+order	3.0.2	3.0.3	-1
+order	3.2.1	3.2.2	-1
+order	3.4.0	3.5.0	-1
+order	3.6.0	3.6.1	-1
+order	3.7.2	3.8.0	-1
+order	3.8.4	3.8.5	-1
+order	3.8.9	3.8.10	-1
+order	4.0.3	4.0.4	-1
+order	4.1.1	4.1.2	-1
+order	4.1.6	4.1.7	-1
+order	4.3.1	4.4.0	-1
+order	4.6.1	4.7.0	-1
+order	4.7.4	4.7.5	-1
+order	4.8.1	4.8.2	-1
+order	4.9.1	4.9.2	-1
+order	4.10.2	4.10.3	-1
+order	4.11.0	4.11.1	-1
+order	4.11.3	5.0.2-beta.0	-1
+order	5.0.4-beta.0	5.0.4-beta.1	-1
+order	4.11.7	5.0.0	-1
+order	5.1.2	5.1.3	-1
+order	5.2.2	5.2.3	-1
+order	6.0.0-beta.0	6.0.0-beta.1	-1
+order	6.0.0-rc.0	5.5.1	1
+order	6.1.1	6.2.0	-1
+order	6.5.1	6.5.2	-1
+order	6.6.0	6.6.1	-1
+order	6.8.1	6.9.0	-1
+order	6.10.1	6.10.2	-1
+order	6.12.2	6.12.3	-1
+order	7.0.0-alpha.1	7.0.0-beta.0	-1
+order	7.0.0-beta.3	7.0.0-beta.4	-1
+order	7.0.0-beta.8	7.0.0-beta.9	-1
+order	7.0.0-rc.3	7.0.0-rc.4	-1
+order	7.0.3	7.0.4	-1
+order	8.0.0-beta.1	8.0.0-beta.2	-1
+order	7.2.4	8.0.0	-1
+order	8.0.4	8.0.5	-1
+order	8.6.0	8.6.1	-1
+order	8.7.1	8.8.0	-1
+order	8.11.1	8.11.2	-1
+order	8.16.0	8.17.1	-1
+order	0.2.0	1.0.0	-1
+order	2.0.1-beta.0	2.0.1-beta.1	-1
+order	3.3.0	3.4.0	-1
+order	4.0.0-beta.1	4.0.0-beta.2	-1
+order	5.0.0-beta.0	5.0.0-beta.1	-1
+order	1.1.0	2.0.0	-1
+order	1.0.2	2.0.0	-1
+order	0.0.1337	0.1.0	-1
+order	1.2.4	1.3.0	-1
+order	1.4.0	1.4.2	-1
+order	4.2.1	4.2.2	-1
+order	1.0.4	2.0.0	-1
+order	2.4.1	2.4.2	-1
+order	2.5.1	2.5.2	-1
+order	2.6.5	2.6.6	-1
+order	3.0.1	2.6.9	1
+order	3.2.5	4.0.1	-1
+order	4.3.1	3.2.7	1
+order	4.3.5	4.3.6	-1
+order	2.1.0	3.0.0	-1
+order	4.0.3	5.0.0	-1
+order	1.1.6	2.0.0	-1
+order	5.1.0	6.0.0	-1
+order	0.5.1-canary	0.5.1-canary.ff6fb58	-1
+order	0.5.2-canary.20230126.1	0.5.2-canary.20230128.1	-1
+order	0.5.2-canary.20230201.1	0.5.2-canary.20230201.2	-1
+order	0.5.5-canary.20230204.1	0.5.5-canary.20230205.1	-1
+order	0.5.5-canary.20230208.1	0.5.6	-1
+order	0.5.7-canary.20230212.1	0.5.7-canary.20230213.1	-1
+order	0.5.7-canary.20230217.1	0.5.7-canary.20230218.1	-1
+order	0.5.7-canary.20230222.1	0.5.7-canary.20230223.1	-1
+order	0.5.8-canary.20230226.1	0.5.8-canary.20230227.1	-1
+order	0.5.8-canary.20230303.1	0.5.8-canary.20230304.1	-1
+order	0.5.8-canary.20230308.1	0.5.8-canary.20230309.1	-1
+order	0.5.8-canary.20230313.1	0.5.8-canary.20230314.1	-1
+order	0.5.8-canary.20230318.1	0.5.8-canary.20230319.1	-1
+order	0.5.9-canary.20230322.1	0.5.9-canary.20230323.1	-1
+order	0.5.9-canary.20230327.1	0.5.9-canary.20230328.1	-1
+order	0.5.9-canary.20230330.1	0.5.9-canary.20230331.1	-1
+order	0.5.9	0.5.9-canary.20230404.1	1
+order	0.5.10-canary.20230407.2	0.6.0-canary.20230408.1	-1
+order	0.6.0-canary.20230413.1	0.6.0-canary.20230414.1	-1
+order	0.6.0-canary.20230418.1	0.6.0-canary.20230419.1	-1
+order	0.6.0-canary.20230423.1	0.6.0-canary.20230424.1	-1
+order	0.6.0-canary.20230428.1	0.6.0-canary.20230429.1	-1
+order	0.6.0-canary.20230503.1	0.6.0-canary.20230504.1	-1
+order	0.6.0-canary.20230508.1	0.6.0-canary.20230509.1	-1
+order	0.6.0-canary.20230513.1	0.6.0-canary.20230514.1	-1
+order	0.6.1-canary.20230517.1	0.6.2	-1
+order	0.6.3-canary.20230521.1	0.6.3-canary.20230522.1	-1
+order	0.6.4-canary.20230525.1	0.6.4-canary.20230526.1	-1
+order	0.6.5-canary.20230529.1	0.6.5	-1
+order	0.6.6-canary.20230601.1	0.6.7-canary.20230602.1	-1
+order	0.6.8-canary.20230605.1	0.6.8-canary.20230606.1	-1
+order	0.6.8	0.6.8-canary.20230610.1	1
+order	0.6.9	0.6.9-canary.20230614.1	1
+order	0.6.10-canary.20230626.1	0.6.10	-1
+order	0.6.12	0.6.13-canary.20230702.1	-1
+order	0.6.14-canary.20230705.1	0.6.14-canary.20230706.1	-1
+order	0.6.14-canary.20230710.1	0.6.14-canary.20230711.1	-1
+order	0.6.15-canary.20230714.1	0.6.15-canary.20230715.1	-1
+order	0.6.15-canary.20230719.1	0.6.15-canary.20230720.1	-1
+order	0.7.1-canary.20230723.1	0.7.1-canary.20230724.1	-1
+order	0.7.1-canary.20230728.1	0.7.1	-1
+order	0.7.2-canary.20230801.1	0.7.2-canary.20230802.1	-1
+order	0.7.3-canary.20230805.1	0.7.3-canary.20230806.1	-1
+order	0.7.4-canary.20230813.1	0.7.4-canary.20230814.1	-1
+order	0.7.4-canary.20230818.1	0.7.4-canary.20230819.1	-1
+order	0.8.0-canary.20230823.1	0.8.0	-1
+order	0.8.2-canary.20230826.1	0.8.2-canary.20230827.1	-1
+order	0.8.2-canary.20230831.1	0.8.2-canary.20230901.1	-1
+order	0.8.2-canary.20230906.1	0.8.2-canary.20230907.1	-1
+order	1.0.0-canary.20230910.1	1.0.0-canary.20230911.1	-1
+order	1.0.1-canary.20230914.1	1.0.2	-1
+order	1.0.3-canary.20230928.1	1.0.3-canary.20230929.1	-1
+order	1.0.4	1.0.4-canary.20231003.1	1
+order	1.0.4-canary.20231007.1	1.0.4-canary.20231008.1	-1
+order	1.0.5-canary.20231011.1	1.0.6	-1
+order	1.0.6-canary.20231015.1	1.0.6-canary.20231016.1	-1
+order	1.0.6-canary.20231020.1	1.0.7	-1
+order	1.0.7-canary.20231024.1	1.0.7-canary.20231025.1	-1
+order	1.0.7-canary.20231029.1	1.0.7-canary.20231030.1	-1
+order	1.0.8	1.0.8-canary.20231103.1	1
+order	1.0.9-canary.20231106.1	1.0.10	-1
+order	1.0.11-canary.20231109.1	1.0.11-canary.20231110.1	-1
+order	1.0.11-canary.20231114.1	1.0.11-canary.20231115.1	-1
+order	1.0.12-canary.20231118.1	1.0.13	-1
+order	1.0.13-canary.20231122.1	1.0.14	-1
+order	1.0.14-canary.20231126.1	1.0.14-canary.20231127.1	-1
+order	1.0.14-canary.20231201.1	1.0.14-canary.20231202.1	-1
+order	1.0.15-canary.20231205.1	1.0.15-canary.20231206.1	-1
+order	1.0.15-canary.20231210.1	1.0.16	-1
+order	1.0.17-canary.20231213.1	1.0.18	-1
+order	1.0.18-canary.20231217.1	1.0.18-canary.20231218.1	-1
+order	1.0.19	1.0.19-canary.20231222.1	1
+order	1.0.20-canary.20231225.1	1.0.20-canary.20231226.1	-1
+order	1.0.20-canary.20231230.1	1.0.20-canary.20231231.1	-1
+order	1.0.21-canary.20240103.1	1.0.21-canary.20240104.1	-1
+order	1.0.21-canary.20240108.1	1.0.21-canary.20240109.1	-1
+order	1.0.21-canary.20240112.1	1.0.21-canary.20240113.1	-1
+order	1.0.21-canary.20240116.1	1.0.21-canary.20240117.1	-1
+order	1.0.21-canary.20240120.1	1.0.21-canary.20240121.1	-1
+order	1.0.21-canary.20240124.1	1.0.21-canary.20240125.1	-1
+order	1.0.21-canary.20240129.1	1.0.21-canary.20240130.1	-1
+order	1.0.21-canary.20240203.1	1.0.26	-1
+order	1.0.21-canary.20240207.1	1.0.21-canary.20240208.1	-1
+order	1.0.21-canary.20240212.1	1.0.21-canary.20240213.1	-1
+order	1.0.27	1.0.21-canary.20240217.1	1
+order	1.0.21-canary.20240220.1	1.0.21-canary.20240221.1	-1
+order	1.0.21-canary.20240224.1	1.0.21-canary.20240225.1	-1
+order	1.0.21-canary.20240229.1	1.0.21-canary.20240301.1	-1
+order	1.0.21-canary.20240304.1	1.0.21-canary.20240305.1	-1
+order	1.0.21-canary.20240309.1	1.0.21-canary.20240310.1	-1
+order	1.0.21-canary.20240314.1	1.0.31	-1
+order	1.0.32	1.0.33	-1
+order	1.0.21-canary.20240321.1	1.0.34	-1
+order	1.0.21-canary.20240324.1	1.0.21-canary.20240325.1	-1
+order	1.0.36	1.0.21-canary.20240329.1	1
+order	1.1.0	1.0.21-canary.20240402.1	1
+order	1.0.21-canary.20240406.1	1.0.21-canary.20240407.1	-1
+order	1.0.21-canary.20240410.1	1.0.21-canary.20240411.1	-1
+order	1.0.21-canary.20240415.1	1.0.21-canary.20240416.1	-1
+order	1.0.21-canary.20240419.1	1.0.21-canary.20240420.1	-1
+order	1.0.21-canary.20240424.1	1.0.21-canary.20240425.1	-1
+order	1.1.6	1.0.21-canary.20240428.1	1
+order	1.0.21-canary.20240502.1	1.0.21-canary.20240503.1	-1
+order	1.0.21-canary.20240506.1	1.0.21-canary.20240507.1	-1
+order	1.0.21-canary.20240511.1	1.0.21-canary.20240512.1	-1
+order	1.0.21-canary.20240516.1	1.0.21-canary.20240517.1	-1
+order	1.0.21-canary.20240521.1	1.1.9	-1
+order	1.1.10	1.0.21-canary.20240525.1	1
+order	1.0.21-canary.20240529.1	1.0.21-canary.20240530.1	-1
+order	1.0.21-canary.20240601.1	1.0.21-canary.20240602.1	-1
+order	1.0.21-canary.20240606.1	1.0.21-canary.20240607.1	-1
+order	1.0.21-canary.20240611.1	1.1.13	-1
+order	1.0.21-canary.20240615.1	1.0.21-canary.20240616.1	-1
+order	1.0.21-canary.20240619.1	1.1.15	-1
+order	1.1.16	1.0.21-canary.20240623.1	1
+order	1.0.21-canary.20240626.1	1.0.21-canary.20240627.1	-1
+order	1.0.21-canary.20240701.1	1.0.21-canary.20240702.1	-1
+order	1.0.21-canary.20240705.1	1.0.21-canary.20240706.1	-1
+order	1.0.21-canary.20240710.1	1.0.21-canary.20240711.1	-1
+order	1.0.21-canary.20240713.1	1.0.21-canary.20240714.1	-1
+order	1.1.20-canary.20240718.1	1.1.20-canary.20240719.1	-1
+order	1.1.20-canary.20240723.1	1.1.20-canary.20240724.1	-1
+order	1.1.20-canary.20240727.1	1.1.20-canary.20240728.1	-1
+order	1.1.20-canary.20240802.1	1.1.20-canary.20240803.1	-1
+order	1.1.20-canary.20240807.1	1.1.22	-1
+order	1.1.20-canary.20240811.1	1.1.20-canary.20240812.1	-1
+order	1.1.20-canary.20240815.1	1.1.20-canary.20240816.1	-1
+order	1.1.20-canary.20240820.1	1.1.25	-1
+order	1.1.26	1.1.20-canary.20240824.1	1
+order	1.1.20-canary.20240828.1	1.1.20-canary.20240829.1	-1
+order	1.1.20-canary.20240902.1	1.1.20-canary.20240903.1	-1
+order	1.1.27	1.1.20-canary.20240907.1	1
+order	1.1.20-canary.20240911.1	1.1.20-canary.20240912.1	-1
+order	1.1.20-canary.20240916.1	1.1.20-canary.20240917.1	-1
+order	1.1.29	1.1.20-canary.20240920.1	1
+order	1.1.20-canary.20240924.1	1.1.20-canary.20240925.1	-1
+order	1.1.20-canary.20240929.1	1.1.20-canary.20240930.1	-1
+order	1.1.20-canary.20241004.1	1.1.20-canary.20241005.1	-1
+order	1.1.20-canary.20241008.1	1.1.20-canary.20241009.1	-1
+order	1.1.20-canary.20241013.1	1.1.20-canary.20241014.1	-1
+order	1.1.31	1.1.20-canary.20241018.1	1
+order	1.1.32	1.1.20-canary.20241022.1	1
+order	1.1.20-canary.20241025.1	1.1.20-canary.20241026.1	-1
+order	1.1.20-canary.20241030.1	1.1.20-canary.20241031.1	-1
+order	1.1.20-canary.20241103.1	1.1.20-canary.20241104.1	-1
+order	1.1.20-canary.20241108.1	1.1.20-canary.20241109.1	-1
+order	1.1.20-canary.20241113.1	1.1.20-canary.20241114.1	-1
+order	1.1.20-canary.20241118.1	1.1.20-canary.20241119.1	-1
+order	1.1.20-canary.20241121.1	1.1.20-canary.20241122.1	-1
+order	1.1.37	1.1.20-canary.20241126.1	1
+order	1.1.20-canary.20241129.1	1.1.20-canary.20241130.1	-1
+order	1.1.20-canary.20241204.1	1.1.38-canary.20241204.2	-1
+order	1.1.38-canary.20241208.1	1.1.38-canary.20241209.1	-1
+order	1.1.38-canary.20241213.1	1.1.38-canary.20241214.1	-1
+order	1.1.39-canary.20241217.1	1.1.40	-1
+order	1.1.41	1.1.42	-1
+order	1.1.42-canary.20241224.1	1.1.42-canary.20241225.1	-1
+order	1.1.42-canary.20241229.1	1.1.42-canary.20241230.1	-1
+order	1.1.42-canary.20250103.1	1.1.42-canary.20250104.1	-1
+order	1.1.42-canary.20250108.1	1.1.43	-1
+order	1.1.43-canary.20250112.1	1.1.43-canary.20250113.1	-1
+order	1.1.44	1.1.44-canary.20250117.1	1
+order	1.1.45-canary.20250120.1	1.1.45-canary.20250121.1	-1
+order	1.2.0-canary.20250124.1	1.2.0-canary.20250125.1	-1
+order	1.2.1-canary.20250128.1	1.2.1-canary.20250129.1	-1
+order	1.2.2-canary.20250201.1	1.2.2-canary.20250202.1	-1
+order	1.2.2-canary.20250206.1	1.2.2-canary.20250207.1	-1
+order	1.2.2-canary.20250211.1	1.2.2-canary.20250212.1	-1
+order	1.2.2-canary.20250216.1	1.2.2-canary.20250217.1	-1
+order	1.2.2-canary.20250221.1	1.2.3	-1
+order	1.2.3-canary.20250225.1	1.2.4	-1
+order	1.2.4-canary.20250301.1	1.2.4-canary.20250302.1	-1
+order	1.2.4-canary.20250306.1	1.2.4-canary.20250307.1	-1
+order	1.2.5	1.2.5-canary.20250311.1	1
+order	1.2.5-canary.20250316.1	1.2.5-canary.20250317.1	-1
+order	1.2.5-canary.20250321.1	1.2.5-canary.20250322.1	-1
+order	1.2.6-canary.20250325.1	1.2.6-canary.20250326.1	-1
+order	1.2.7-canary.20250329.1	1.2.7-canary.20250330.1	-1
+order	1.2.8-canary.20250402.1	1.2.8-canary.20250403.1	-1
+order	1.2.8-canary.20250407.1	1.2.8-canary.20250408.1	-1
+order	1.2.9-canary.20250411.1	1.2.9-canary.20250412.1	-1
+order	1.2.9-canary.20250416.1	1.2.10	-1
+order	1.2.10-canary.20250420.1	1.2.10-canary.20250421.1	-1
+order	1.2.10-canary.20250425.1	1.2.10-canary.20250426.1	-1
+order	1.2.11-canary.20250429.1	1.2.11-canary.20250430.1	-1
+order	1.2.12	1.2.12-canary.20250504.1	1
+order	1.2.12-canary.20250508.1	1.2.12-canary.20250509.1	-1
+order	1.2.13-canary.20250512.1	1.2.13-canary.20250513.1	-1
+order	1.2.13-canary.20250517.1	1.2.13-canary.20250518.1	-1
+order	1.2.14	1.2.14-canary.20250522.1	1
+order	1.2.14-canary.20250526.1	1.2.14-canary.20250527.1	-1
+order	1.2.15-canary.20250530.1	1.2.15-canary.20250531.1	-1
+order	1.2.15-canary.20250604.1	1.2.15-canary.20250605.1	-1
+order	1.2.15-canary.20250610.1	1.2.15-canary.20250611.1	-1
+order	1.2.16-canary.20250614.1	1.2.16-canary.20250615.1	-1
+order	1.2.16-canary.20250619.1	1.2.16-canary.20250620.1	-1
+order	1.2.17-canary.20250624.1	1.2.17-canary.20250625.1	-1
+order	1.2.17-canary.20250629.1	1.2.17-canary.20250630.1	-1
+order	1.2.18-canary.20250703.1	1.2.18-canary.20250704.1	-1
+order	1.2.18-canary.20250708.1	1.2.18-canary.20250709.1	-1
+order	1.2.18-canary.20250713.1	1.2.18-canary.20250714.1	-1
+order	1.2.18-canary.20250718.1	1.2.19	-1
+order	1.2.19-canary.20250722.1	1.2.19-canary.20250723.1	-1
+order	1.2.19-canary.20250727.1	1.2.19-canary.20250728.1	-1
+order	1.2.19-canary.20250801.1	1.2.19-canary.20250802.1	-1
+order	1.2.19-canary.20250806.1	1.2.19-canary.20250807.1	-1
+order	1.2.20-canary.20250810.1	1.2.20-canary.20250811.1	-1
+order	1.2.20-canary.20250815.1	1.2.20-canary.20250816.1	-1
+order	1.2.20-canary.20250820.1	1.2.20-canary.20250821.1	-1
+order	1.2.21	1.2.21-canary.20250825.1	1
+order	1.2.21-canary.20250830.1	1.2.21-canary.20250831.1	-1
+order	1.2.21-canary.20250904.1	1.2.21-canary.20250905.1	-1
+order	1.2.21-canary.20250909.1	1.2.21-canary.20250910.1	-1
+order	1.2.22	1.2.22-canary.20250914.1	1
+order	1.2.22-canary.20250918.1	1.2.22-canary.20250919.1	-1
+order	1.2.22-canary.20250923.1	1.2.22-canary.20250924.1	-1
+order	1.2.22-canary.20250928.1	1.2.23	-1
+order	1.2.23-canary.20251003.1	1.2.23-canary.20251004.1	-1
+order	1.2.23-canary.20251008.1	1.2.23-canary.20251009.1	-1
+order	1.3.0-canary.20251012.1	1.3.0-canary.20251013.1	-1
+order	1.3.0-canary.20251017.1	1.3.0-canary.20251018.1	-1
+order	1.3.1	1.3.1-canary.20251022.1	1
+order	1.3.1-canary.20251026.1	1.3.1-canary.20251027.1	-1
+order	1.3.1-canary.20251031.1	1.3.1-canary.20251101.1	-1
+order	1.3.1-canary.20251105.1	1.3.1-canary.20251106.1	-1
+order	1.3.2-canary.20251110.1	1.3.2-canary.20251111.1	-1
+order	1.3.2-canary.20251115.1	1.3.2-canary.20251116.1	-1
+order	1.3.2-canary.20251120.1	1.3.2-canary.20251121.1	-1
+order	1.3.3-canary.20251125.1	1.3.3-canary.20251126.1	-1
+order	1.3.3-canary.20251130.1	1.3.3-canary.20251201.1	-1
+order	1.3.3-canary.20251205.1	1.3.3-canary.20251206.1	-1
+order	1.3.4-canary.20251209.1	1.3.5	-1
+order	1.3.5-canary.20251221.1	1.3.5-canary.20251222.1	-1
+order	1.3.5-canary.20251226.1	1.3.5-canary.20251227.1	-1
+order	1.3.5-canary.20251231.1	1.3.5-canary.20260101.1	-1
+order	1.3.5-canary.20260105.1	1.3.5-canary.20260106.1	-1
+order	1.3.5-canary.20260110.1	1.3.5-canary.20260111.1	-1
+order	1.3.6-canary.20260114.1	1.3.6-canary.20260115.1	-1
+order	1.3.6-canary.20260119.1	1.3.6-canary.20260120.1	-1
+order	1.3.6-canary.20260124.1	1.3.6-canary.20260125.1	-1
+order	1.3.7-canary.20260128.1	1.3.8	-1
+order	1.3.8-canary.20260202.1	1.3.9	-1
+order	1.3.9-canary.20260211.1	1.3.9-canary.20260212.1	-1
+order	1.3.9-canary.20260216.1	1.3.9-canary.20260217.1	-1
+order	1.3.10-canary.20260227.1	1.3.10-canary.20260228.1	-1
+order	1.3.10-canary.20260304.1	1.3.10-canary.20260305.1	-1
+order	1.3.10-canary.20260309.1	1.3.10-canary.20260310.1	-1
+order	1.3.10-canary.20260315.1	1.3.10-canary.20260316.1	-1
+order	1.3.11-canary.20260319.1	1.3.11-canary.20260320.1	-1
+order	1.3.11-canary.20260324.1	1.3.11-canary.20260325.1	-1
+order	1.3.11-canary.20260329.1	1.3.11-canary.20260330.1	-1
+order	1.3.11-canary.20260403.1	1.3.11-canary.20260404.1	-1
+order	1.3.11-canary.20260408.1	1.3.11-canary.20260409.1	-1
+order	1.3.12-canary.20260412.1	1.3.12-canary.20260413.1	-1
+order	1.3.12-canary.20260417.1	1.3.12-canary.20260418.1	-1
+order	1.3.13-canary.20260421.1	1.3.13-canary.20260422.1	-1
+order	1.3.14	1.4.0	-1
+order	1.4.0-canary.20260823.1	1.4.0-canary.20260824.1	-1
+order	1.4.0-canary.20260828.1	1.4.0-canary.20260829.1	-1
+order	1.4.0-canary.20260902.1	1.4.0-canary.20260903.1	-1
+order	1.4.2-canary.20260905.1	1.4.2-canary.20260906.1	-1
+order	1.4.2-canary.20260912.1	1.4.2-canary.20260913.1	-1
+order	1.4.2-canary.20260917.1	1.4.2-canary.20260918.1	-1
+order	1.4.2-canary.20260923.1	1.4.2-canary.20260924.1	-1
+order	1.4.2-canary.20260928.1	1.4.2-canary.20260929.1	-1
+order	1.4.2-canary.20261003.1	1.4.2-canary.20261004.1	-1
+order	3.1.1	4.0.0	-1
+order	5.1.0	5.2.0	-1
+order	6.3.0	7.0.0	-1
+order	2.3.1	2.4.0	-1
+order	3.1.2	4.0.0	-1
+order	4.1.1	2.4.3	1
+order	2.4.4	4.1.3	-1
+order	2.4.6	4.1.4	-1
+order	0.1.5	1.0.0	-1
+order	2.3.2	3.0.0	-1
+order	3.4.1	3.4.2	-1
+order	6.0.2	6.1.0	-1
+order	6.4.3	6.4.4	-1
+order	1.7.1	1.8.0	-1
+order	7.0.1	7.1.1	-1
+order	1.3.3	1.4.0	-1
+order	2.1.5	2.1.6	-1
+order	2.3.8	2.3.9	-1
+order	3.1.5	3.1.6	-1
+order	3.1.10	4.0.0	-1
+order	3.0.2	4.0.4	-1
+order	1.5.1	2.0.0-beta.0	-1
+order	2.1.1	3.0.0-rc.0	-1
+order	2.5.0	2.6.0	-1
+order	3.1.2	4.1.0	-1
+order	4.3.1	4.3.2	-1
+order	1.1.1	2.0.0	-1
+order	1.0.0-alpha3	1.0.0-alpha4	-1
+order	3.1.4	4.0.0	-1
+order	0.1.4	1.0.0-rc.1	-1
+order	5.3.0	5.4.0	-1

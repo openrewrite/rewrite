@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java;
 
-import io.github.classgraph.ClassGraph;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -29,9 +30,13 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -43,6 +48,8 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.synchronizedMap;
+import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -53,6 +60,13 @@ public interface JavaParser extends Parser {
      * type attribution from the class in {@link JavaSourceSet} marker.
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
+
+    /**
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to list the jars at the end of the
+     * classpath from an index that every parser in the JVM shares. Tests set it, since they build a parser per test.
+     * The index outlives the parsers and holds what it read until memory runs short.
+     */
+    String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
 
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
@@ -129,6 +143,7 @@ public interface JavaParser extends Parser {
         }
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
+        List<String> availableArtifacts = new ArrayList<>();
 
         TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
         if (typeTable != null) {
@@ -139,6 +154,9 @@ public interface JavaParser extends Parser {
                     artifacts.add(located);
                     it.remove();
                 }
+            }
+            if (!missingArtifactNames.isEmpty()) {
+                availableArtifacts.addAll(typeTable.availableArtifacts());
             }
         }
 
@@ -151,12 +169,20 @@ public interface JavaParser extends Parser {
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
+                if (!missingArtifactNames.isEmpty()) {
+                    availableArtifacts.addAll(classpathLoader.availableArtifacts());
+                }
             }
         }
 
         if (!missingArtifactNames.isEmpty()) {
             String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-            throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+            StringBuilder message = new StringBuilder();
+            message.append("Unable to find classpath resource dependencies beginning with: ").append(missing);
+            if (!availableArtifacts.isEmpty()) {
+                message.append(" in [").append(String.join(", ", availableArtifacts)).append(']');
+            }
+            throw new IllegalArgumentException(message.toString());
         }
 
         return artifacts;
@@ -217,13 +243,18 @@ public interface JavaParser extends Parser {
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
+
+        @Nullable
+        protected JavaTypeFactory javaTypeFactory;
 
         @Nullable
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
-        protected final List<NamedStyles> styles = new ArrayList<>();
+        protected boolean typeAttribution = true;
+        protected List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
             super(J.CompilationUnit.class);
@@ -234,8 +265,31 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * When false, javac stops after entering symbols: declarations are typed, but expressions are not.
+         * Attributing code whose dependencies are missing can take hours in javac's error recovery.
+         */
+        public B typeAttribution(boolean typeAttribution) {
+            this.typeAttribution = typeAttribution;
+            return (B) this;
+        }
+
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation detail of the default
+         * {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}. For now, calls
+         * are still honored and the cache is wrapped into the default factory when no
+         * explicit factory is configured.
+         */
+        @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            this.typeCacheConfigured = true;
+            return (B) this;
+        }
+
+        public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
+            this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }
 
@@ -333,6 +387,20 @@ public interface JavaParser extends Parser {
             return classpath;
         }
 
+        /**
+         * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
+         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
+         * the caller falls back to a default factory.
+         */
+        protected @Nullable JavaTypeFactory resolvedTypeFactory() {
+            return javaTypeFactory;
+        }
+
+        protected JavaTypeCache resolvedTypeCache() {
+            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            return javaTypeCache;
+        }
+
         @Override
         public abstract P build();
 
@@ -345,6 +413,7 @@ public interface JavaParser extends Parser {
         public Builder<P, B> clone() {
             Builder<P, B> clone = (Builder<P, B>) super.clone();
             clone.javaTypeCache = this.javaTypeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }
@@ -380,25 +449,66 @@ public interface JavaParser extends Parser {
 
 @UtilityClass
 class RuntimeClasspathCache {
-    @Nullable
-    private static volatile List<Path> runtimeClasspath = null;
+    private static final Map<ClassLoader, List<Path>> runtimeClasspaths = synchronizedMap(new WeakHashMap<>());
 
     static List<Path> getRuntimeClasspath() {
-        List<Path> paths = runtimeClasspath;
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader key = contextClassLoader == null ?
+                RuntimeClasspathCache.class.getClassLoader() : contextClassLoader;
+        List<Path> paths = runtimeClasspaths.get(key);
         if (paths == null) {
-            synchronized (RuntimeClasspathCache.class) {
-                paths = runtimeClasspath;
-                if (paths == null) {
-                    runtimeClasspath = paths = new ClassGraph()
-                            .disableNestedJarScanning()
-                            .getClasspathURIs().stream()
-                            .filter(uri -> "file".equals(uri.getScheme()))
-                            .map(Paths::get)
-                            .collect(toList());
-                }
+            paths = discover(contextClassLoader);
+            List<Path> raced = runtimeClasspaths.putIfAbsent(key, paths);
+            if (raced != null) {
+                paths = raced;
             }
         }
         return paths;
+    }
+
+    private static List<Path> discover(@Nullable ClassLoader contextClassLoader) {
+        Set<Path> paths = new LinkedHashSet<>();
+
+        // On Java 9+ the application class loader is not a URLClassLoader, so its entries are
+        // only reachable through this system property.
+        String cp = System.getProperty("java.class.path");
+        if (cp != null) {
+            for (String entry : cp.split(File.pathSeparator)) {
+                addIfExists(paths, Paths.get(entry));
+            }
+        }
+
+        // Build tools load their plugins, and any recipe artifacts those plugins resolve, into
+        // isolated class loaders whose entries never appear on `java.class.path`.
+        addClassLoaderEntries(paths, contextClassLoader);
+        addClassLoaderEntries(paths, RuntimeClasspathCache.class.getClassLoader());
+
+        return unmodifiableList(new ArrayList<>(paths));
+    }
+
+    private static void addClassLoaderEntries(Set<Path> paths, @Nullable ClassLoader classLoader) {
+        Deque<ClassLoader> hierarchy = new ArrayDeque<>();
+        for (ClassLoader cl = classLoader; cl != null; cl = cl.getParent()) {
+            hierarchy.addFirst(cl);
+        }
+        for (ClassLoader cl : hierarchy) {
+            if (cl instanceof URLClassLoader) {
+                for (URL url : ((URLClassLoader) cl).getURLs()) {
+                    if ("file".equals(url.getProtocol())) {
+                        try {
+                            addIfExists(paths, Paths.get(url.toURI()));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static void addIfExists(Set<Path> paths, Path path) {
+        if (Files.exists(path)) {
+            paths.add(path);
+        }
     }
 }
 
@@ -429,21 +539,24 @@ class JdkParserBuilderCache {
 
             // Try to find and cache appropriate parser
 
-            // Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
-            // That means Java 23 and above need the Java 25 parser, whereas Java 22 and below need the Java 21 parser
-            if (version > 22) {
+            // Parsers are compiled only for their matching Java version, given their use of internal/unstable APIs.
+            // Language features introduced in non-LTS versions are only supported from the next LTS version onwards.
+            // We recommend running on LTS versions wherever possible; non-LTS versions may struggle given the above.
+            // e.g.: Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
+
+            if (version >= 25) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
             }
 
-            if (version > 17 && supplier == null) {
+            if (supplier == null && version >= 21) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java21Parser");
             }
 
-            if (version > 11 && supplier == null) {
+            if (supplier == null && version >= 17) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java17Parser");
             }
 
-            if (version > 8 && supplier == null) {
+            if (supplier == null && version >= 11) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java11Parser");
             }
 

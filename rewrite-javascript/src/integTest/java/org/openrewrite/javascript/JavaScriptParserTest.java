@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
@@ -183,6 +184,54 @@ class JavaScriptParserTest {
         JavaScriptRewriteRpc.shutdownCurrent();
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.printAll()).isEqualTo(script));
+    }
+
+    @Test
+    void unicodeEscapes() {
+        @Language("js")
+        String script = """
+          const greeting = "\\u0048\\u0065\\u006C\\u006C\\u006F";
+          console.log(greeting);
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("unicode.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(javascript.get().printAll()).isEqualTo(script);
+    }
+
+    @Test
+    void surrogatePairUnicodeEscapes() {
+        @Language("js")
+        String script = """
+          const emoji = "\\uD83D\\uDE00";
+          console.log(emoji);
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("unicode-surrogate.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        JS.CompilationUnit cu = (JS.CompilationUnit) javascript.get();
+        J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+        J.Literal literal = (J.Literal) varDecl.getVariables().get(0).getInitializer();
+        assertThat(literal.getUnicodeEscapes()).satisfiesExactly(
+          esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
+          esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")
+        );
+        assertThat(cu.printAll()).isEqualTo(script);
+    }
+
+    @Test
+    void stringLiteralModuleExportNames() {
+        @Language("js")
+        String script = """
+          import { "a-b" as ab, "\\0 add" as add } from "./x";
+          export { ab as "c-d", "e f" as "g h" } from "./y";
+          export { "link-a-class" as linkAClass } from "./z.module.css";
+          export { "a-b" } from "./w";
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("module-export-names.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(javascript.get().printAll()).isEqualTo(script);
     }
 
     @Test

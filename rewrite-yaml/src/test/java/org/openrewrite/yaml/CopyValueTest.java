@@ -124,6 +124,45 @@ class CopyValueTest implements RewriteTest {
     }
 
     @Test
+    void copyValueInMultipleFiles() {
+        rewriteRun(
+          spec -> spec.recipe(new CopyValue("$.source.token-relay", null, "$.dest.token-relay", null, null)),
+          yaml(
+            """
+              source:
+                token-relay: true
+              dest:
+                other: value
+              """,
+            """
+              source:
+                token-relay: true
+              dest:
+                other: value
+                token-relay: true
+              """,
+            spec -> spec.path("application.yml")
+          ),
+          yaml(
+            """
+              source:
+                token-relay: false
+              dest:
+                other: value
+              """,
+            """
+              source:
+                token-relay: false
+              dest:
+                other: value
+                token-relay: false
+              """,
+            spec -> spec.path("application-dev.yml")
+          )
+        );
+    }
+
+    @Test
     void mergeNewKeys() {
         rewriteRun(
           spec -> spec.recipe(new CopyValue("$.a.b", null, "$.c.e", null, null)),

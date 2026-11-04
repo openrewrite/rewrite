@@ -124,6 +124,60 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8723")
+    @Test
+    void namedAttributeAnnotationOnComponent() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              @Target({ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+              @interface A {
+                  String value();
+              }
+              """
+          ),
+          java(
+            """
+              public record MyRecord(@A(value = "a") String name) {
+              }
+              """
+          ),
+          java(
+            """
+              public record MyRecordWithBlanks( @A( /* don't trip */ value = "a" ) String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8723")
+    @Test
+    void namedAttributeAnnotationOnComponentFollowedByAdditionalSource() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              @Target({ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+              @interface A {
+                  String value();
+              }
+              """
+          ),
+          java(
+            """
+              public record MyRecord(@A(value = "a") String name, int age) {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6401")
     @Test
     void annotationsAndRecords() {

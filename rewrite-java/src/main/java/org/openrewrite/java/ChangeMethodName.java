@@ -23,6 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import java.util.List;
 import java.util.function.Predicate;
 
 @Value
@@ -33,6 +34,8 @@ public class ChangeMethodName extends Recipe {
     private static final Predicate<String> IS_NOT_RESERVED_KEYWORD = s -> !JavaKeywordUtils.isReservedKeyword(s);
     private static final Predicate<String> IS_NOT_RESERVED_LITERAL = s -> !JavaKeywordUtils.isReservedLiteral(s);
     private static final Predicate<String> IS_VALID_METHOD_PATTERN = s -> s.matches(VALID_JAVA_METHOD_PATTERN);
+    private static final Predicate<String> LOOKS_LIKE_METHOD_PATTERN =
+          s -> s != null && (s.indexOf('(') >= 0 || s.indexOf('.') >= 0 || s.indexOf(' ') >= 0);
     private static final Predicate<String> IS_VALID_METHOD_NAME = IS_NOT_RESERVED_KEYWORD
           .and(IS_NOT_RESERVED_LITERAL)
           .and(IS_VALID_METHOD_PATTERN);
@@ -74,15 +77,17 @@ public class ChangeMethodName extends Recipe {
         return super.validate()
               .and(MethodMatcher.validate(methodPattern))
               .and(Validated.test("newMethodName",
-                    "should not be a Java Reserved Keyword.",
+                    "should not be a reserved keyword.",
                     newMethodName,
                     IS_NOT_RESERVED_KEYWORD))
               .and(Validated.test("newMethodName",
-                    "should not be a Java Reserved Literal.",
+                    "should not be a reserved literal.",
                     newMethodName,
                     IS_NOT_RESERVED_LITERAL))
               .and(Validated.test("newMethodName",
-                    "should be a valid Java method name.",
+                    LOOKS_LIKE_METHOD_PATTERN.test(newMethodName) ?
+                          "should be just the new name of the method, not a method pattern." :
+                          "should be a valid method name.",
                     newMethodName,
                     IS_VALID_METHOD_PATTERN));
     }
@@ -130,7 +135,7 @@ public class ChangeMethodName extends Recipe {
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
                                         classDecl != null && methodMatcher.matches(method, classDecl);
-                if (methodMatches) {
+                if (methodMatches && !declaresSiblingWithNewName(method)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
                         type = type.withName(newMethodName);
@@ -139,6 +144,46 @@ public class ChangeMethodName extends Recipe {
                             .withMethodType(type);
                 }
                 return m;
+            }
+
+            /**
+             * A declaration should not be renamed when the enclosing type already declares a method
+             * with the new name and the same parameter types, as that would produce a duplicate method.
+             */
+            private boolean declaresSiblingWithNewName(J.MethodDeclaration method) {
+                J.Block body = getCursor().firstEnclosing(J.Block.class);
+                if (body == null) {
+                    return false;
+                }
+                for (Statement statement : body.getStatements()) {
+                    if (statement != method && statement instanceof J.MethodDeclaration) {
+                        J.MethodDeclaration sibling = (J.MethodDeclaration) statement;
+                        if (sibling.getSimpleName().equals(newMethodName) && sameParameterTypes(method, sibling)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private boolean sameParameterTypes(J.MethodDeclaration m1, J.MethodDeclaration m2) {
+                JavaType.Method t1 = m1.getMethodType();
+                JavaType.Method t2 = m2.getMethodType();
+                if (t1 == null || t2 == null) {
+                    // Without type attribution, assume a clash when the arity matches
+                    return m1.getParameters().size() == m2.getParameters().size();
+                }
+                List<JavaType> p1 = t1.getParameterTypes();
+                List<JavaType> p2 = t2.getParameterTypes();
+                if (p1.size() != p2.size()) {
+                    return false;
+                }
+                for (int i = 0; i < p1.size(); i++) {
+                    if (!TypeUtils.isOfType(p1.get(i), p2.get(i))) {
+                        return false;
+                    }
+                }
+                return true;
             }
 
             @Override

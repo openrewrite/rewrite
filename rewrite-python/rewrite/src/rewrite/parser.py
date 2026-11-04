@@ -10,7 +10,7 @@ from .execution import ExecutionContext, InMemoryExecutionContext
 from .markers import Markers, ParseExceptionResult
 from .result import Result
 from .tree import SourceFile, Tree, PrintOutputCapture, PrinterFactory, FileAttributes, Checksum
-from .utils import random_id
+from .utils import random_id, replace_if_changed
 from .visitor import TreeVisitor, Cursor
 
 
@@ -58,14 +58,10 @@ class ParseError(SourceFile):
                    input.source().read(),
                    erroneous)
 
-    _id: UUID
+    _id: int | UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
-    def with_id(self, id: UUID) -> 'ParseError':
-        return self if id is self._id else replace(self, _id=id)
+    def with_id(self, id: int | UUID) -> 'ParseError':
+        return replace_if_changed(self, _id=id)
 
     _markers: Markers
 
@@ -141,10 +137,10 @@ class ParseError(SourceFile):
         return self if erroneous is self._erroneous else replace(self, _erroneous=erroneous)
 
     def printer(self, cursor: Cursor) -> TreeVisitor[Tree, PrintOutputCapture[P]]:
-        return PrinterFactory.current().create_printer(cursor)
+        return PrinterFactory.current().create_printer(cursor)  # ty: ignore[unresolved-attribute]  # guarded: PrinterFactory.current() always set here
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
-        return isinstance(v, ParseErrorVisitor)
+        return v.is_adaptable_to(ParseErrorVisitor)
 
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
         return cast(ParseErrorVisitor, v).visit_parse_error(self, p)

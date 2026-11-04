@@ -1,0 +1,1621 @@
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for ChangeImport recipe."""
+
+from pathlib import Path
+
+from rewrite.python.recipes.change_import import ChangeImport
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
+
+
+class TestChangeImport:
+    """Tests for the ChangeImport recipe."""
+
+    def test_change_from_import_module_and_name(self):
+        """Change: from collections import Mapping -> from collections.abc import Mapping"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Mapping',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from collections import Mapping
+                x: Mapping = {}
+                """,
+                """
+                from collections.abc import Mapping
+                x: Mapping = {}
+                """,
+            )
+        )
+
+    def test_change_import_only_statement(self):
+        """Import is the only statement in the file — no leading newline in output."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Callable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "from typing import Callable\n",
+                "from collections.abc import Callable\n",
+            )
+        )
+
+    def test_crlf_line_breaks(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "import os\r\nfrom typing import Mapping\r\n\r\nx: Mapping = {}\r\n",
+                "import os\r\nfrom collections.abc import Mapping\r\n\r\nx: Mapping = {}\r\n",
+            )
+        )
+
+    def test_moved_member_joins_its_section(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Iterable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import logging
+
+                import random
+                from typing import Iterable
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                """
+                import logging
+                from collections.abc import Iterable
+
+                import random
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                path=Path('training/dataset/transforms.py'),
+            )
+        )
+
+    def test_change_direct_import(self):
+        """Change: import os -> import pathlib"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='os',
+            new_module='pathlib',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import os
+                x = 1
+                """,
+                """
+                import pathlib
+                x = 1
+                """,
+            )
+        )
+
+    def test_no_change_when_import_not_present(self):
+        """No change when the old import doesn't exist."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Mapping',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import sys
+                x = 1
+                """,
+            )
+        )
+
+    def test_change_from_import_different_name(self):
+        """Change: from os.path import join -> from pathlib import PurePath"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='os.path',
+            old_name='join',
+            new_module='pathlib',
+            new_name='PurePath',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = 1
+                """,
+                """
+                from pathlib import PurePath
+                x = 1
+                """,
+            )
+        )
+
+    def test_change_removes_one_name_from_multi_import(self):
+        """Change one name from 'from os.path import join, exists' leaves exists."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='os.path',
+            old_name='join',
+            new_module='pathlib',
+            new_name='PurePath',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from os.path import join, exists
+                x = 1
+                """,
+                """
+                from os.path import exists
+                from pathlib import PurePath
+                x = 1
+                """,
+            )
+        )
+
+    def test_change_qualified_method_call(self):
+        """Change: import fractions / fractions.gcd() -> import math / math.gcd()"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import fractions
+                result = fractions.gcd(12, 8)
+                """,
+                """
+                import math
+                result = math.gcd(12, 8)
+                """,
+            )
+        )
+
+    def test_change_aliased_qualified_method_call(self):
+        """Change: import fractions as f / f.gcd() -> import math / math.gcd()"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import fractions as f
+                result = f.gcd(12, 8)
+                """,
+                """
+                import math
+                result = math.gcd(12, 8)
+                """,
+            )
+        )
+
+    def test_change_qualified_ref_keeps_import_when_other_usages(self):
+        """import fractions stays when fractions.Fraction is still used."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import fractions
+                result = fractions.gcd(12, 8)
+                f = fractions.Fraction(1, 3)
+                """,
+                """
+                import fractions
+                import math
+                result = math.gcd(12, 8)
+                f = fractions.Fraction(1, 3)
+                """,
+            )
+        )
+
+    def test_change_qualified_field_access(self):
+        """Change: import fractions / fn = fractions.gcd -> import math / fn = math.gcd"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import fractions
+                fn = fractions.gcd
+                """,
+                """
+                import math
+                fn = math.gcd
+                """,
+            )
+        )
+
+    def test_change_qualified_ref_into_submodule_drops_parent_import(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d: collections.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+    def test_change_aliased_qualified_ref_into_submodule(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                d: c.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                from collections import OrderedDict
+                d: c.Mapping = c.Counter(OrderedDict())
+                """,
+                """
+                import collections as c
+                from collections import OrderedDict
+                import collections.abc
+                d: collections.abc.Mapping = c.Counter(OrderedDict())
+                """,
+            )
+        )
+
+    def test_change_qualified_ref_with_different_new_name(self):
+        """Qualified ref rewrite when new_name differs from old_name."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+            new_name='greatest_common_divisor',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import fractions
+                result = fractions.gcd(12, 8)
+                fn = fractions.gcd
+                """,
+                """
+                import math
+                result = math.greatest_common_divisor(12, 8)
+                fn = math.greatest_common_divisor
+                """,
+            )
+        )
+
+    def test_type_attribution_on_a_rewritten_construction(self):
+        errors = []
+
+        def check_types(source_file):
+            class TypeChecker(PythonVisitor):
+                def visit_method_invocation(self, method, p):
+                    mt = method.method_type
+                    if mt is None:
+                        errors.append("method_type is None")
+                    elif not mt.is_constructor:
+                        errors.append(f"method_type.name is '{mt.name}', expected '<constructor>'")
+                    elif mt.declaring_type._fully_qualified_name != 'typing.OrderedDict':
+                        errors.append(f"declaring_type is '{mt.declaring_type._fully_qualified_name}', "
+                                      f"expected 'typing.OrderedDict', the class it now builds")
+                    return method
+
+            TypeChecker().visit(source_file, None)
+
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='OrderedDict',
+            new_module='typing',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d = collections.OrderedDict()
+                """,
+                """
+                import typing
+                d = typing.OrderedDict()
+                """,
+                after_recipe=check_types,
+            )
+        )
+        assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+    def test_change_from_import_renames_bare_references(self):
+        """Change: from time import clock / clock() -> from time import perf_counter / perf_counter()"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                """,
+            )
+        )
+
+    def test_change_from_import_renames_bare_reference_with_args(self):
+        """Bare reference with arguments: encodestring(data) -> encodebytes(data)"""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='base64',
+            old_name='encodestring',
+            new_module='base64',
+            new_name='encodebytes',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from base64 import encodestring
+                encodestring(data)
+                """,
+                """
+                from base64 import encodebytes
+                encodebytes(data)
+                """,
+            )
+        )
+
+    def test_no_rename_when_name_unchanged(self):
+        """No bare reference rename when only the module changes."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                gcd(12, 8)
+                """,
+                """
+                from math import gcd
+                gcd(12, 8)
+                """,
+            )
+        )
+
+    def test_no_rename_bare_ref_in_unrelated_code(self):
+        """Only rename bare references that match old_name, not other identifiers."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                clock()
+                x = 1
+                """,
+                """
+                from time import perf_counter
+                perf_counter()
+                x = 1
+                """,
+            )
+        )
+
+    def test_no_rename_shadowed_in_function_scope(self):
+        """Don't rename a local variable in function scope that shadows the imported name."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                clock()
+                """,
+                """
+                from time import perf_counter
+
+                def foo():
+                    clock = 42
+                    return clock
+
+                perf_counter()
+                """,
+            )
+        )
+
+    def test_rename_bare_ref_at_module_level_even_if_typed(self):
+        """Module-level bare references to an imported name should be renamed
+        even when ty populates field_type (which indicates a variable)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='time',
+            old_name='clock',
+            new_module='time',
+            new_name='perf_counter',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from time import clock
+                result = clock()
+                ref = clock
+                """,
+                """
+                from time import perf_counter
+                result = perf_counter()
+                ref = perf_counter
+                """,
+            )
+        )
+
+    def test_pep585_typing_to_builtin_adds_no_builtins_import(self):
+        """PEP 585: 'from typing import List' -> 'list[...]' must NOT add
+        'from builtins import list' (builtins are always available)."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='List',
+            new_module='builtins',
+            new_name='list',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import List, Dict
+
+                x: List[str] = []
+                y: Dict[str, int] = {}
+                """,
+                """
+                from typing import Dict
+
+                x: list[str] = []
+                y: Dict[str, int] = {}
+                """,
+            )
+        )
+
+    def test_emptied_first_import_no_leading_blank_line(self):
+        """Emptying the file's first import must not leave a leading blank line."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from collections import Mapping
+                from collections.abc import Callable
+                d: Mapping = {}
+                """,
+                """
+                from collections.abc import Callable, Mapping
+                d: Mapping = {}
+                """,
+            )
+        )
+
+    def test_incrementally_emptied_import_no_leading_blank_line(self):
+        """Successive ChangeImports that empty a multi-name import one name at a
+        time must not leave a leading blank line."""
+        spec = RecipeSpec().with_recipes(
+            ChangeImport(old_module='collections', old_name='Callable', new_module='collections.abc'),
+            ChangeImport(old_module='collections', old_name='Mapping', new_module='collections.abc'),
+            ChangeImport(old_module='collections', old_name='Sequence', new_module='collections.abc'),
+        )
+        spec.rewrite_run(
+            python(
+                """
+                from collections import Callable, Mapping, Sequence
+                d: Mapping = {}
+                """,
+                """
+                from collections.abc import Callable, Mapping, Sequence
+                d: Mapping = {}
+                """,
+            )
+        )
+
+    def test_emptied_import_preserves_leading_comment(self):
+        """A comment in the removed import's prefix moves to the next statement."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                # comment
+                from collections import Mapping
+                from collections.abc import Callable
+                d: Mapping = {}
+                """,
+                """
+                # comment
+                from collections.abc import Callable, Mapping
+                d: Mapping = {}
+                """,
+            )
+        )
+
+    def test_both_from_import_and_direct_import(self):
+        """When a file has both 'from X import name' and 'import X', handle without duplicates."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='fractions',
+            old_name='gcd',
+            new_module='math',
+            new_name='gcd',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from fractions import gcd
+                import fractions
+
+                result = gcd(12, 8)
+                """,
+                # The old from-import is removed and new one added after
+                # existing imports; import fractions is preserved.
+                """
+                import fractions
+                from math import gcd
+
+                result = gcd(12, 8)
+                """,
+            )
+        )
+
+
+class TestChangeImportLeavesUnrelatedImports:
+    """ChangeImport schedules a whole-module RemoveImport for the old module,
+    which must not reach imports the recipe was never asked about."""
+
+    def test_unrelated_canonically_related_import_survives(self):
+        """`Iterable` is canonically typing.Iterable, but the file imports it
+        from collections.abc and the recipe only concerns typing.List."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='List',
+            new_module='mytypes',
+            new_name='List',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from collections.abc import Iterable
+                import typing
+
+                def f(x: Iterable) -> typing.List:
+                    return []
+                """,
+                """
+                from collections.abc import Iterable
+                import mytypes
+
+                def f(x: Iterable) -> mytypes.List:
+                    return []
+                """,
+            )
+        )
+
+
+class TestChangeImportFunctionScopedReferences:
+    """References inside a function body are renamed unless the enclosing scope
+    binds the name itself."""
+
+    def test_rename_annotation_references_in_function(self):
+        """Annotations are references to the imported name, not bindings of it,
+        so they are renamed along with the import."""
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='typing',
+                old_name='Deque',
+                new_module='collections',
+                new_name='deque',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from typing import Deque
+
+
+                    def f(q: Deque[int]) -> Deque[int]:
+                        local: Deque[int] = q
+                        return local
+                    """,
+                    """\
+                    from collections import deque
+
+
+                    def f(q: deque[int]) -> deque[int]:
+                        local: deque[int] = q
+                        return local
+                    """,
+                )
+            )
+
+    def test_rename_plain_references_in_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def f():
+                        return clock()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def f():
+                        return perf_counter()
+                    """,
+                )
+            )
+
+    def test_no_rename_of_names_bound_in_the_same_function(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def assigned():
+                        clock = 1
+                        return clock
+
+
+                    def parameter(clock):
+                        return clock
+
+
+                    def loop_target():
+                        for clock in range(3):
+                            print(clock)
+
+
+                    def as_clause():
+                        with open("f") as clock:
+                            return clock
+
+
+                    def nested_def():
+                        def clock():
+                            pass
+                        return clock
+
+
+                    def uses_import():
+                        return clock()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def assigned():
+                        clock = 1
+                        return clock
+
+
+                    def parameter(clock):
+                        return clock
+
+
+                    def loop_target():
+                        for clock in range(3):
+                            print(clock)
+
+
+                    def as_clause():
+                        with open("f") as clock:
+                            return clock
+
+
+                    def nested_def():
+                        def clock():
+                            pass
+                        return clock
+
+
+                    def uses_import():
+                        return perf_counter()
+                    """,
+                )
+            )
+
+    def test_nested_function_shadowing_does_not_leak_outward(self):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(
+                python(
+                    """\
+                    from time import clock
+
+
+                    def outer():
+                        def inner():
+                            clock = 1
+                            return clock
+                        return clock() + inner()
+                    """,
+                    """\
+                    from time import perf_counter
+
+
+                    def outer():
+                        def inner():
+                            clock = 1
+                            return clock
+                        return perf_counter() + inner()
+                    """,
+                )
+            )
+
+
+class TestChangeImportPythonScopeRules:
+    """Renaming follows Python's own scoping: a name is a local only where the
+    interpreter would resolve it to one."""
+
+    @staticmethod
+    def _run(before, after=None):
+        for type_attribution in (False, True):
+            spec = RecipeSpec(recipe=ChangeImport(
+                old_module='time',
+                old_name='clock',
+                new_module='time',
+                new_name='perf_counter',
+            ), type_attribution=type_attribution)
+            spec.rewrite_run(python(before, after) if after else python(before))
+
+    def test_class_attribute_does_not_shadow_inside_methods(self):
+        """A class body is not part of the scope chain of its methods."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = 1
+
+                def m(self):
+                    return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = 1
+
+                def m(self):
+                    return perf_counter()
+            """,
+        )
+
+    def test_class_attribute_shadows_within_the_class_body(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = 1
+                alias = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = 1
+                alias = clock
+            """,
+        )
+
+    def test_a_class_attribute_re_exporting_the_import_reads_it_on_the_right(self):
+        """`clock = clock` binds `C.clock` from the module's `clock`."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                clock = clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                clock = perf_counter
+            """,
+        )
+
+    def test_member_and_keyword_positions_name_something_else(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(resp, item):
+                resp.clock()
+                poll(clock=1)
+                return item.payload.clock, perf_counter()
+            """,
+        )
+
+    def test_a_match_class_keyword_pattern_names_an_attribute(self):
+        """``Point(clock=v)`` matches ``Point``'s attribute and binds only ``v``."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return clock(), v
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(p):
+                match p:
+                    case Point(clock=v):
+                        return perf_counter(), v
+            """,
+        )
+
+    def test_attribute_and_subscript_targets_do_not_bind(self):
+        """``self.clock = 1`` and ``d[clock] = 1`` assign through an object."""
+        self._run(
+            """\
+            from time import clock
+
+
+            class C:
+                def m(self, d):
+                    self.clock = 1
+                    d[clock] = 2
+                    return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            class C:
+                def m(self, d):
+                    self.clock = 1
+                    d[perf_counter] = 2
+                    return perf_counter()
+            """,
+        )
+
+    def test_tuple_unpacking_binds(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(pair):
+                clock, other = pair
+                return clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(pair):
+                clock, other = pair
+                return clock
+            """,
+        )
+
+    def test_function_local_import_shadows(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f():
+                from mymod import clock
+                return clock()
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f():
+                from mymod import clock
+                return clock()
+            """,
+        )
+
+    def test_decorator_resolves_in_the_enclosing_scope(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            @clock
+            def f():
+                clock = 1
+                return clock
+            """,
+            """\
+            from time import perf_counter
+
+
+            @perf_counter
+            def f():
+                clock = 1
+                return clock
+            """,
+        )
+
+    def test_parameter_default_resolves_in_the_enclosing_scope(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(x=clock):
+                clock = 1
+                return clock, x
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(x=perf_counter):
+                clock = 1
+                return clock, x
+            """,
+        )
+
+    def test_a_module_level_def_moves_with_the_binding_it_rebinds(self):
+        """A `def` at module level rebinds the name the import bound, so the two move
+        together or the calls below it silently retarget the import."""
+        self._run(
+            """\
+            from time import clock
+
+
+            def clock():
+                return 1
+
+
+            print(clock())
+            """,
+            """\
+            from time import perf_counter
+
+
+            def perf_counter():
+                return 1
+
+
+            print(perf_counter())
+            """,
+        )
+
+    def test_a_quoted_annotation_renames_the_names_it_contains(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f(x: 'clock', y: 'List[clock]'):
+                pass
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f(x: 'perf_counter', y: 'List[perf_counter]'):
+                pass
+            """,
+        )
+
+    def test_global_declaration_is_not_a_local_binding(self):
+        self._run(
+            """\
+            from time import clock
+
+
+            def f():
+                global clock
+                clock = 1
+            """,
+            """\
+            from time import perf_counter
+
+
+            def f():
+                global perf_counter
+                perf_counter = 1
+            """,
+        )
+
+
+class TestImportsInBlocks:
+    """Imports nested in a block, such as a function body or an `if TYPE_CHECKING:` body."""
+
+    @staticmethod
+    def _callable_to_abc() -> RecipeSpec:
+        return RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Callable',
+            new_module='collections.abc',
+        ))
+
+    def test_sole_member_is_rewritten_in_place(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+            new_name='Map',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections import Mapping
+
+                def f(x: Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Map
+
+                def f(x: Map) -> None: ...
+                """,
+            )
+        )
+
+    def test_split_leaves_the_new_import_in_the_block(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable, Optional
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Optional
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_merges_into_an_existing_import_in_the_same_block(self):
+        """What keeps a sequence of alias moves from emitting one line per alias."""
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable, Optional
+                    from collections.abc import Sequence
+
+                def f(x: Callable[[int], str], y: Optional[Sequence[str]]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Optional
+                    from collections.abc import Callable, Sequence
+
+                def f(x: Callable[[int], str], y: Optional[Sequence[str]]) -> None: ...
+                """,
+            )
+        )
+
+    def test_nested_direct_import_is_rewritten_in_place(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='urllib2',
+            new_module='urllib.request',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import urllib2
+
+                x = 1
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import urllib.request
+
+                x = 1
+                """,
+            )
+        )
+
+    def test_a_match_in_any_block_is_rewritten_where_it_stands(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                import sys
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from typing import Callable
+
+                try:
+                    from typing import Callable
+                except ImportError:
+                    Callable = None
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+                """
+                import sys
+
+                if sys.version_info >= (3, 10):
+                    pass
+                else:
+                    from collections.abc import Callable
+
+                try:
+                    from collections.abc import Callable
+                except ImportError:
+                    Callable = None
+
+                def f(x: Callable[[int], str]) -> None: ...
+                """,
+            ),
+            python(
+                """
+                def g():
+                    from typing import Callable
+                    return Callable
+                """,
+                """
+                def g():
+                    from collections.abc import Callable
+                    return Callable
+                """,
+            ),
+        )
+
+    def test_a_rename_follows_the_function_holding_the_import(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='typing', old_name='Deque', new_module='collections', new_name='deque',
+        )).rewrite_run(
+            python(
+                """
+                def f():
+                    from typing import Deque
+                    return Deque[int]
+
+                def g(Deque):
+                    return Deque
+                """,
+                """
+                def f():
+                    from collections import deque
+                    return deque[int]
+
+                def g(Deque):
+                    return Deque
+                """,
+            )
+        )
+
+    def test_a_read_through_a_function_local_import_binds_the_new_module_there(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='tarfile', old_name='filemode', new_module='stat',
+        )).rewrite_run(
+            python(
+                """
+                def mode(m):
+                    import tarfile
+                    return tarfile.filemode(m)
+
+                def listing(path, m):
+                    import tarfile
+                    return tarfile.open(path), tarfile.filemode(m)
+
+                def aliased(m):
+                    import tarfile
+                    import stat as st
+                    return tarfile.filemode(m)
+                """,
+                """
+                def mode(m):
+                    import stat
+                    return stat.filemode(m)
+
+                def listing(path, m):
+                    import tarfile
+                    import stat
+                    return tarfile.open(path), stat.filemode(m)
+
+                def aliased(m):
+                    import stat
+                    import stat as st
+                    return stat.filemode(m)
+                """,
+            )
+        )
+
+    def test_qualified_reference_binds_the_new_module_in_the_block(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import typing
+
+                def f(x: typing.Callable[[int], str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_into_a_submodule_drops_the_parent_import_in_the_block(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections', old_name='Mapping', new_module='collections.abc',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Mapping) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_does_not_duplicate_an_existing_import(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import typing
+                    import collections.abc
+
+                def f(x: typing.Callable[[int], str], y: collections.abc.Sequence) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Callable[[int], str], y: collections.abc.Sequence) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_function_keeps_its_read_through_where_it_spells_the_new_module_name(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='tarfile', old_name='filemode', new_module='stat',
+        )).rewrite_run(
+            python(
+                """
+                import stat
+
+                def mode(m):
+                    s = stat.S_IFDIR
+                    import tarfile
+                    return tarfile.filemode(m), s
+                """
+            ),
+            python(
+                """
+                import os
+
+                def mode(path):
+                    import tarfile
+                    stat = os.stat(path)
+                    return tarfile.filemode(stat.st_mode)
+                """
+            )
+        )
+
+    def test_a_rename_keeps_the_old_name_where_a_reference_would_read_something_else(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='typing', old_name='Deque', new_module='collections', new_name='deque',
+        )).rewrite_run(
+            python(
+                """
+                try:
+                    from typing import Deque
+                except ImportError:
+                    from typing_extensions import Deque
+
+                x: Deque[int]
+                """,
+                """
+                try:
+                    from collections import deque as Deque
+                except ImportError:
+                    from typing_extensions import Deque
+
+                x: Deque[int]
+                """,
+            ),
+            python(
+                """
+                class C:
+                    from typing import Deque
+
+                x = C.Deque
+                """,
+                """
+                class C:
+                    from collections import deque as Deque
+
+                x = C.Deque
+                """,
+            ),
+            python(
+                """
+                from collections import deque
+
+                def f():
+                    d = deque()
+                    from typing import Deque
+                    return Deque, d
+                """,
+                """
+                from collections import deque
+
+                def f():
+                    d = deque()
+                    from collections import deque as Deque
+                    return Deque, d
+                """,
+            ),
+        )
+
+    def test_both_import_forms_in_one_block_are_rewritten(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from typing import Callable
+                    import typing
+
+                def f(x: Callable[[int], str], y: typing.Callable[[int], int]) -> None: ...
+                """,
+                """
+                from __future__ import annotations
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Callable
+                    import collections.abc
+
+                def f(x: Callable[[int], str], y: collections.abc.Callable[[int], int]) -> None: ...
+                """,
+            )
+        )
+
+    def test_a_comment_on_the_replaced_statement_keeps_it_out_of_a_merge(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from typing import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    from collections.abc import Sequence
+                    # only needed for annotations
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Sequence) -> None: ...
+                """,
+            )
+        )
+
+    def test_split_leaves_the_comment_on_the_statement_it_describes(self):
+        self._callable_to_abc().rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import Callable, Optional
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    # only needed for annotations
+                    from typing import Optional
+                    from collections.abc import Callable
+
+                def f(x: Callable[[int], str], y: Optional[str]) -> None: ...
+                """,
+            )
+        )

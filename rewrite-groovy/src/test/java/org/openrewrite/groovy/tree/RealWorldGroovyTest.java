@@ -160,6 +160,9 @@ class RealWorldGroovyTest implements RewriteTest {
     @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
     @Test
     void springLdapTheTest() {
+        // spock-core is on the test classpath, so Spock's global SpockTransform would normally run during
+        // parsing and corrupt this Specification. GroovyParser disables all global AST transformations, so
+        // this parses cleanly without any per-test or environment-specific configuration.
         rewriteRun(
           groovy(
             """

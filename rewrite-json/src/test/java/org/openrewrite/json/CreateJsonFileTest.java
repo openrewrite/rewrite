@@ -140,8 +140,8 @@ class CreateJsonFileTest implements RewriteTest {
             }
           }
           """;
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
-        MockHttpSender httpSender = new MockHttpSender(() -> new ByteArrayInputStream(jsonContent.getBytes()));
+        var ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        var httpSender = new MockHttpSender(() -> new ByteArrayInputStream(jsonContent.getBytes()));
         HttpSenderExecutionContextView.view(ctx)
           .setHttpSender(httpSender)
           .setLargeFileHttpSender(httpSender);

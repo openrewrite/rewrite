@@ -20,16 +20,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -230,6 +234,82 @@ class YamlParserTest implements RewriteTest {
                 specifier: npm:@testing-library/vue@5.0.4
                 date: @build.timestamp@
                 version: @project.version@
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholders() {
+        rewriteRun(
+          yaml(
+            """
+              database:
+                password: *** REMOVED ***
+                apiKey: **REDACTED**
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1463")
+    @Test
+    void asteriskPlaceholdersWithAnchors() {
+        // Ensure real anchors/aliases still work alongside asterisk placeholders
+        rewriteRun(
+          yaml(
+            """
+              defaults: &defaults
+                timeout: 30
+              production:
+                <<: *defaults
+                password: *** REMOVED ***
+              """
+          )
+        );
+    }
+
+    @Test
+    void asteriskPatternInsideQuotedScalar() {
+        rewriteRun(
+          yaml(
+            """
+              msg: "user.info: *** could not be installed ***"
+              single: 'user.info: *** could not be installed ***'
+              escaped: "say \\"hi\\": *** done ***"
+              foo: bar
+              """
+          )
+        );
+    }
+
+    @Test
+    void asteriskPlaceholderAfterApostropheInPlainScalar() {
+        rewriteRun(
+          yaml(
+            """
+              it's: *** REMOVED ***
+              foo: bar
+              """
+          )
+        );
+    }
+
+    @Test
+    void asteriskPatternInsideBlockScalar() {
+        // Markdown bold text inside a literal block scalar must not be mangled
+        // by the asterisk placeholder preprocessing.
+        rewriteRun(
+          yaml(
+            """
+              jobs:
+                alert:
+                  steps:
+                    - name: Post alert
+                      run: |
+                        echo ":rotating_light: **CI Alert**: repo has been failing for **5 days**"
+                        echo "- **Branch:** main"
               """
           )
         );
@@ -615,6 +695,346 @@ class YamlParserTest implements RewriteTest {
                 - *defaults
                 - {"type": "custom"}
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void anchorInSequencePreservesDash() {
+        rewriteRun(
+          yaml(
+            """
+              generalTasks:
+              - &createTask
+                name: createTask
+                type: manipulator
+                stereoType: creater
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void anchorInSequenceAtRootLevel() {
+        // The issue shows:
+        // generalTasks:
+        // - &createTask   <- dash being removed
+        // This tests anchor on a sequence entry at root level
+        rewriteRun(
+          yaml(
+            """
+              generalTasks:
+              - &createTask
+                name: createTask
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void emptyYamlFileWithNewline() {
+        // File containing just a single newline should preserve it
+        rewriteRun(
+          yaml(
+            "\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void emptyYamlFileWithMultipleNewlines() {
+        // File containing multiple newlines should preserve them
+        rewriteRun(
+          yaml(
+            "\n\n\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void flowStyleJsonLikeSequence() {
+        // Issue: Colons being added out of the blue in JSON-like flow content
+        // application/json:
+        //   {
+        //     "MV7",    <- becomes "MV7":,
+        //     "7J04"    <- becomes "7J04":
+        //   }
+        rewriteRun(
+          yaml(
+            """
+              example:
+                application/json:
+                  {
+                    "MV7",
+                    "7J04"
+                  }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void singleBraceTemplateSyntaxQuoted() {
+        // Single-brace placeholders like {C App} look like flow mapping start
+        // When quoted, it's valid YAML
+        rewriteRun(
+          yaml(
+            """
+              swagger: '2.0'
+              host: "{C App}.colruyt.int/{C App}"
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/850")
+    @Test
+    void singleBraceTemplateSyntaxUnquoted() {
+        // Unquoted {C App} looks like flow mapping start but should be handled
+        // as a placeholder template, similar to Helm templates
+        rewriteRun(
+          yaml(
+            """
+              swagger: '2.0'
+              host: {C App}.colruyt.int/{C App}
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleBraceTemplateGluedToTextIsStillAPlaceholder() {
+        rewriteRun(
+          yaml("host: {C App *v2}.example.int/y\n")
+        );
+    }
+
+    @Test
+    void flowMappingWithoutAnchorRemainsAPlaceholder() {
+        rewriteRun(
+          yaml("resolution: {integrity: sha512-abc}\n",
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Scalar.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void anchorInsideFlowMappingIsResolvable() {
+        rewriteRun(
+          yaml(
+            """
+              a: {b: &x v}
+              c: *x
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Mapping.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void aliasWithoutAnchorDegradesToParseError() {
+        List<SourceFile> sources = YamlParser.builder().build().parse("a: *x\n").toList();
+        assertThat(sources).singleElement().isInstanceOf(ParseError.class);
+        assertThat(((ParseError) sources.getFirst()).getMarkers().findFirst(ParseExceptionResult.class))
+          .get()
+          .extracting(ParseExceptionResult::getMessage, as(STRING))
+          .contains("found undefined alias x")
+          .contains("line 1, column 4");
+    }
+
+    @Test
+    void anchorOnMappingInSequenceEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - k: v
+              - &b
+                k2: v2
+              """
+          )
+        );
+    }
+
+    @Test
+    void literalScalarTrailingNewlineInValue() {
+        // Literal (|) and folded (>) scalars should keep trailing newlines in their value
+        // The next entry's prefix should be just indentation, not include the newline
+        rewriteRun(
+          yaml(
+            """
+              parent:
+                message: |
+                  line1
+                  line2
+                next: value
+              """,
+            spec -> spec.afterRecipe(docs -> new YamlIsoVisitor<Integer>() {
+                @Override
+                public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer ctx) {
+                    if (scalar.getStyle() == Yaml.Scalar.Style.LITERAL) {
+                        // Literal scalar value should end with newline
+                        assertThat(scalar.getValue()).endsWith("\n");
+                    }
+                    return super.visitScalar(scalar, ctx);
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer ctx) {
+                    if ("next".equals(entry.getKey().getValue())) {
+                        // Entry following literal scalar has prefix with just indentation (no leading newline)
+                        assertThat(entry.getPrefix()).isEqualTo("  ");
+                    }
+                    return super.visitMappingEntry(entry, ctx);
+                }
+            }.visit(docs, 0))
+          )
+        );
+    }
+
+    @Test
+    void foldedScalarTrailingNewlineInValue() {
+        // Folded (>) scalars should also keep trailing newlines in their value
+        rewriteRun(
+          yaml(
+            """
+              parent:
+                description: >
+                  This is a folded
+                  multiline string.
+                status: active
+              """,
+            spec -> spec.afterRecipe(docs -> new YamlIsoVisitor<Integer>() {
+                @Override
+                public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer ctx) {
+                    if (scalar.getStyle() == Yaml.Scalar.Style.FOLDED) {
+                        // Folded scalar value should end with newline
+                        assertThat(scalar.getValue()).endsWith("\n");
+                    }
+                    return super.visitScalar(scalar, ctx);
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer ctx) {
+                    if ("status".equals(entry.getKey().getValue())) {
+                        // Entry following folded scalar has prefix with just indentation (no leading newline)
+                        assertThat(entry.getPrefix()).isEqualTo("  ");
+                    }
+                    return super.visitMappingEntry(entry, ctx);
+                }
+            }.visit(docs, 0))
+          )
+        );
+    }
+
+    @Test
+    void tagOnItsOwnLineBeforeSequence() {
+        rewriteRun(
+          yaml(
+            """
+              Resources:
+                Parameters:
+                  PrivateSubnets:
+                    !Join
+                      - ','
+                      - - a
+                        - b
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnItsOwnLineBeforeSequenceWithSameIndentation() {
+        rewriteRun(
+          yaml(
+            """
+              PrivateSubnets:
+                !Join
+                - ','
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagBeforeSequenceWithDashesAtColumnZero() {
+        rewriteRun(
+          yaml(
+            """
+              PrivateSubnets: !Join
+              - ','
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnRootSequence() {
+        rewriteRun(
+          yaml(
+            """
+              !!seq
+              - Alice
+              - Bob
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {".github/workflows/actions.lock", "module/.github/workflows/actions.lock"})
+    void acceptsGitHubActionsLockfile(String path) {
+        assertThat(YamlParser.builder().build().accept(Path.of(path))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"actions.lock", ".github/actions.lock", "workflows/actions.lock", "Pipfile.lock"})
+    void rejectsOtherLockfiles(String path) {
+        assertThat(YamlParser.builder().build().accept(Path.of(path))).isFalse();
+    }
+
+    @Test
+    void gitHubActionsLockfile() {
+        rewriteRun(
+          yaml(
+            """
+              # This file is machine-generated by `gh actions-lock`.
+              # Do not edit by hand; run `gh actions-lock` to update.
+              # Docs: https://gh.io/actions-lockfile
+              version: 'v0.0.2'
+              workflows:
+                  '.github/workflows/release.yml':
+                      - 'actions/attest-build-provenance@v1'
+                      - 'actions/checkout@v6.0.2'
+              dependencies:
+                  'actions/attest-build-provenance@v1':
+                      ref: 'v1'
+                      commit: 'sha1-ef244123eb79f2f7a7e75d99086184180e6d0018'
+                      owner_id: 44036562
+                      repo_id: 760702757
+                      uses:
+                          - 'actions/attest@67422f5511b7ff725f4dbd6fb9bd2cd925c65a8d'
+                  'actions/checkout@v6.0.2':
+                      ref: 'v6.0.2'
+                      commit: 'sha1-de0fac2e4500dabe0009e67214ff5f5447ce83dd'
+                      owner_id: 44036562
+                      repo_id: 197814629
+              """,
+            spec -> spec.path(".github/workflows/actions.lock")
           )
         );
     }

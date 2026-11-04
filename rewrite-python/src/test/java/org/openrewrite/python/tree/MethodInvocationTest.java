@@ -16,7 +16,6 @@
 package org.openrewrite.python.tree;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,23 +26,6 @@ import static org.openrewrite.python.Assertions.python;
 
 @SuppressWarnings("PyUnresolvedReferences")
 class MethodInvocationTest implements RewriteTest {
-
-    @Disabled
-//    @ParameterizedTest
-    // language=py
-    @ValueSource(strings = {
-      "print", "print ",
-      "print 42", "print 42 ", "print 1, 2, 3, 4",
-      "print 1, 2, 3, 4 ", "print 1 , 2 , 3 , 4",
-      "print 1, 2, 3, 4",
-      """
-        for x in range(1,11):
-            print '{0:2d} {1:3d} {2:4d}'.format(x, x*x, x*x*x)
-        """,
-    })
-    void python2Print(@Language("py") String print) {
-        rewriteRun(python(print));
-    }
 
     @ParameterizedTest
     //language=py

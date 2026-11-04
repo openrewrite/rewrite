@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.KtRealPsiSourceElement
+import org.jetbrains.kotlin.builtins.StandardNames
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.fir.FirElement
@@ -32,13 +33,14 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
-import org.jetbrains.kotlin.fir.resolve.dfa.symbol
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
@@ -77,12 +79,12 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             ) {
                 super.visitResolvedTypeRef(resolvedTypeRef, data)
                 if (resolvedTypeRef.psi is KtTypeReference) {
-                    if (resolvedTypeRef.type is ConeClassLikeType) {
-                        if (resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
-                            visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
+                    if (resolvedTypeRef.coneType is ConeClassLikeType) {
+                        if (resolvedTypeRef.coneType.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
+                            visitType(resolvedTypeRef.coneType, resolvedTypeRef.psi as KtTypeReference, data)
                         }
-                    } else if (resolvedTypeRef.type is ConeTypeParameterType) {
-                        visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
+                    } else if (resolvedTypeRef.coneType is ConeTypeParameterType) {
+                        visitType(resolvedTypeRef.coneType, resolvedTypeRef.psi as KtTypeReference, data)
                     }
                 }
             }
@@ -90,9 +92,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference,
                                   data: MutableMap<PsiElement, MutableList<FirInfo>>) {
                 if (firType is ConeClassLikeType) {
-                    if (firType.classId != null) {
-                        mapParents(firType.classId!!, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
-                    }
+                    mapParents(firType.classId, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
                     for (s in firType.attributes) {
                         if (s is CustomAnnotationTypeAttribute && s.annotations.isNotEmpty()) {
                             for (ann in s.annotations) {
@@ -150,25 +150,37 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return typeMapping.type(typeMap[parent], owner)
         }
         val fir = primary(psiElement)
-        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            if (fir.symbol is FirRegularClassSymbol) {
-                val classId = (fir.symbol as FirRegularClassSymbol).classId
-                return if (isPackage(psiElement, classId)) {
-                    null
-                } else {
-                    val found = matchClassId(psiElement, classId)
-                    typeMapping.type(found, owner)
-                }
+        if (fir is FirVariable && psiElement is KtSimpleNameExpression &&
+            fir.name.asString() != psiElement.getReferencedName()) {
+            // `primary` walked up to an enclosing declaration, whose type describes a different name
+            return null
+        }
+        val qualifier = (fir as? FirResolvedQualifier)?.source?.psi
+        if (psiElement != null && fir is FirResolvedQualifier && (qualifier is KtDotQualifiedExpression || qualifier is KtNameReferenceExpression)) {
+            val symbol = fir.qualifierSymbol
+            if (symbol != null && isPackage(psiElement, qualifier, symbol.classId)) {
+                return null
+            }
+            if (symbol is FirRegularClassSymbol) {
+                return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    private fun isPackage(psi: PsiElement, classId: ClassId): Boolean {
-        return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
+    private fun isPackage(psi: PsiElement, qualifier: PsiElement, classId: ClassId): Boolean {
+        val packageDepth = classId.packageFqName.pathSegments().size
+        val fullyQualified = segmentCount(qualifier) == packageDepth + classId.relativeClassName.pathSegments().size
+        val parent = psi.parent
+        val throughPsi = if (parent is KtDotQualifiedExpression && parent.selectorExpression == psi) parent else psi
+        return packageDepth > 0 && fullyQualified && segmentCount(throughPsi) <= packageDepth
     }
 
-    private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
+    private fun segmentCount(psi: PsiElement): Int = withoutTypeArguments(psi).split('.').size
+
+    private fun matchClassId(name: PsiElement, classId: ClassId): ClassId {
+        // `Outer.Nested<Int>` nests the name in a call carrying the type arguments
+        val psi = (name.parent as? KtCallExpression)?.takeIf { it.calleeExpression == name } ?: name
         if (psi.parent is KtDotQualifiedExpression) {
             val parent: KtDotQualifiedExpression = psi.parent as KtDotQualifiedExpression
             if (classId.packageFqName.isRoot && psi !is KtDotQualifiedExpression && psi == parent.receiverExpression) {
@@ -182,7 +194,25 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     }
 
     private fun matchClassId0(psi: PsiElement, classId: ClassId): ClassId {
-        if (psi.text == classId.asFqNameString()) {
+        // A reference to a (possibly nested) type can be written several ways, and each must resolve to
+        // its own class id rather than collapsing to the outer class id via the `outerClassId` walk below:
+        //   - fully qualified:               `foo.bar.A.B`     -> matches the fully-qualified name
+        //   - relative to an imported outer: `A.B`             -> matches the package-relative name
+        //   - through an import alias:        `Alias.B`         -> same nesting depth and same leaf name
+        //   - relative to an imported nested: `B.A` for `A.B.A` -> a trailing run of the nested names
+        // The two multi-segment fallbacks require at least two segments so a single receiver name (e.g.
+        // the outer `A` of `A.B.A.C`, whose leaf coincidentally repeats deeper) is not matched too deep.
+        val text = withoutTypeArguments(psi)
+        if (text == classId.asFqNameString() || text == classId.relativeClassName.asString()) {
+            return classId
+        }
+        val segments = text.split('.')
+        val relSegments = classId.relativeClassName.pathSegments().map { it.asString() }
+        if (segments.size >= 2 && segments.size == relSegments.size && segments.last() == relSegments.last()) {
+            return classId
+        }
+        if (segments.size in 2..relSegments.size &&
+            relSegments.subList(relSegments.size - segments.size, relSegments.size) == segments) {
             return classId
         }
 
@@ -191,6 +221,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }
 
         return classId
+    }
+
+    private fun withoutTypeArguments(psi: PsiElement): String = when (psi) {
+        is KtDotQualifiedExpression -> withoutTypeArguments(psi.receiverExpression) + "." +
+                (psi.selectorExpression?.let { withoutTypeArguments(it) } ?: "")
+        is KtCallExpression -> psi.calleeExpression?.text ?: psi.text
+        else -> psi.text
     }
 
     fun primary(psiElement: PsiElement?) =
@@ -244,16 +281,30 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     }
 
                     else -> {
-                        null
+                        if (psi is KtCallExpression) resolvedAwayCallType(psi) else null
                     }
                 }
             }
         }
     }
 
+    @OptIn(SymbolInternals::class)
+    private fun resolvedAwayCallType(psi: KtCallExpression): JavaType.Method? {
+        // Since Kotlin 2.3 `suspend { }` resolves to a suspending lambda, leaving no FIR for the call itself
+        val name = (psi.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()
+        if (elementMap.containsKey(psi) || name != "suspend" ||
+            psi.valueArgumentList != null || psi.lambdaArguments.size != 1) {
+            return null
+        }
+        val symbol = typeMapping.firSession.symbolProvider
+            .getTopLevelFunctionSymbols(StandardNames.BUILT_INS_PACKAGE_FQ_NAME, Name.identifier(name))
+            .firstOrNull() ?: return null
+        return typeMapping.methodDeclarationType(symbol.fir, null)
+    }
+
     fun primitiveType(psi: PsiElement): JavaType.Primitive {
         return when (val fir = primary(psi)) {
-            is FirConstExpression<*> -> {
+            is FirLiteralExpression -> {
                 typeMapping.primitive(fir)
             }
             else -> JavaType.Primitive.None
@@ -289,15 +340,15 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
             // It might be more reliable to have explicit mappings in case something changes.
-            return when {
+            when {
                 directFirInfos.size == 1 -> directFirInfos[0].fir
                 else -> {
-                    return when (p) {
+                    when (p) {
                         is KtConstantExpression -> {
-                            directFirInfos.firstOrNull { it.fir is FirConstExpression<*> }?.fir
+                            directFirInfos.firstOrNull { it.fir is FirLiteralExpression }?.fir
                         }
                         is KtImportDirective -> {
-                            directFirInfos.firstOrNull { it.fir is FirImport && it.fir !is FirErrorImport }?.fir
+                            directFirInfos.firstOrNull { it.fir is FirImport }?.fir
                         }
                         is KtNamedFunction -> {
                             val found = directFirInfos.firstOrNull { it.fir is FirFunction }?.fir
@@ -327,7 +378,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 }
             }
         else if (allFirInfos.isNotEmpty()) {
-            return when {
+            when {
                 allFirInfos.size == 1 -> allFirInfos[0].fir
                 // There isn't a RealPsiElement associated to the KT, so, we find the associated FIR element.
                 p is KtArrayAccessExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference && (it.fir.name.asString() == "get" || it.fir.name.asString() == "set") }?.fir
@@ -335,7 +386,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 p is KtPostfixExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef || it.fir is FirFunctionCall }?.fir
                 p is KtTypeReference -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef }?.fir
                 p is KtWhenConditionInRange || p is KtBinaryExpression -> allFirInfos.firstOrNull { it.fir is FirFunctionCall }?.fir
-                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirClass }?.fir
+                // In K2, FIR elements for identifiers in desugared expressions (unary, augmented assignments,
+                // named arguments) may only have KtFakePsiSourceElement, so fall back to these types
+                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirPropertyAccessExpression }?.fir
+                    ?: allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference }?.fir
+                    ?: allFirInfos.firstOrNull { it.fir is FirClass }?.fir
                 else -> {
                     throw IllegalStateException("Unable to determine the FIR element associated to the PSI." + if (psi == null) "null element" else "original PSI: ${psi.javaClass.name}, mapped PSI: ${p.javaClass.name}")
                 }
@@ -355,7 +410,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val fir = primary(psi) ?: return null
         return when (fir) {
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
-            is FirArrayLiteral -> ExpressionType.METHOD_INVOCATION
+            is FirCollectionLiteral -> ExpressionType.METHOD_INVOCATION
             is FirFunctionCall -> {
                 if (fir.calleeReference is FirErrorNamedReference)
                     return null
@@ -368,9 +423,20 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> throw UnsupportedOperationException("Unsupported resolved symbol: ${fir.calleeReference.resolved?.resolvedSymbol?.javaClass}")
                 }
             }
+            is FirPropertyAccessExpression -> {
+                // `X<T>.m()` is not valid Kotlin, so FIR resolves the qualifier as a property access; the
+                // type arguments still describe the parameterized type the author wrote.
+                if (psi is KtCallExpression && psi.valueArgumentList == null && psi.lambdaArguments.isEmpty() && psi.typeArgumentList != null)
+                    ExpressionType.QUALIFIER
+                else if (fir.source?.psi !== psi)
+                    null
+                else
+                    throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
             is FirSafeCallExpression -> {
-                return when (fir.selector) {
-                    is FirFunctionCall -> when (fir.selector.calleeReference?.resolved?.resolvedSymbol) {
+                val selector = fir.selector
+                when (selector) {
+                    is FirFunctionCall -> when (selector.calleeReference.resolved?.resolvedSymbol) {
                         is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
                         is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
                         else -> null
@@ -379,7 +445,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> null
                 }
             }
-            else -> throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            else -> {
+                // `primary` walked up to an enclosing element, so the compiler resolved this call away
+                if (fir.source?.psi !== psi) null
+                else throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
+            }
         }
     }
 

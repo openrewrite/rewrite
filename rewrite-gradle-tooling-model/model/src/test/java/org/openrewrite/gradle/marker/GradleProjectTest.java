@@ -15,6 +15,8 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.gradle.util.GradleVersion;
@@ -28,7 +30,9 @@ import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModel;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -66,13 +70,11 @@ class GradleProjectTest {
         return buffer.toByteArray();
     }
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
     @Nested
     class gradle4Compatibility {
         @TempDir
         static Path dir;
 
-        @SuppressWarnings("NotNullFieldNotInitialized")
         static GradleProject gradleProject;
 
         //language=groovy
@@ -119,7 +121,7 @@ class GradleProjectTest {
         }
 
         @Test
-        void serializable() throws IOException {
+        void serializable() throws Exception {
             ObjectMapper m = new RecipeSerializer().getMapper();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             m.writeValue(baos, gradleProject);
@@ -131,7 +133,6 @@ class GradleProjectTest {
     }
 
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
     @Nested
     @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
     class singleProject {
@@ -236,13 +237,51 @@ class GradleProjectTest {
         }
 
         @Test
-        void serializable() throws IOException {
+        void serializable() throws Exception {
             ObjectMapper m = new RecipeSerializer().getMapper();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             m.writeValue(baos, gradleProject);
             ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
             GradleProject roundTripped = m.readValue(bais, GradleProject.class);
             assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+
+        /**
+         * {@link GroupArtifactVersion} and {@link org.openrewrite.maven.tree.ResolvedGroupArtifactVersion} carry
+         * {@code @JsonIdentityInfo(generator = IntSequenceGenerator.class, property = "@ref")} so that an instance
+         * shared by reference across this {@code singleProject} fixture's {@code extendsFrom} chain is written once and
+         * referenced by a {@code @ref} integer thereafter — a real size win on large reactors. We keep that
+         * optimization, but a newer consumer must still be able to read representations produced by an
+         * <em>older</em> writer that predates the annotation, i.e. payloads with no {@code @ref} property and full
+         * objects at every position.
+         * <p>
+         * The older writer is simulated here with a mix-in that turns object-id handling off, producing the
+         * pre-annotation "full objects everywhere" wire format. The newer (annotated) consumer must deserialize it
+         * cleanly: when no {@code @ref} property is present Jackson simply reads each object normally and registers no
+         * id, and there are no back-references to resolve. This locks in that upgrading a consumer does not break
+         * reading already-persisted, pre-annotation artifacts.
+         */
+        @Test
+        void newerConsumerReadsOlderRepresentation() throws Exception {
+            // Older writer: predates @JsonIdentityInfo, so it emits full objects with no "@ref" property.
+            ObjectMapper olderWriter = new RecipeSerializer().getMapper();
+            olderWriter.addMixIn(GroupArtifactVersion.class, NoObjectIdMixin.class);
+            olderWriter.addMixIn(ResolvedGroupArtifactVersion.class, NoObjectIdMixin.class);
+
+            // Newer reader: the current build, with the annotation present on the real classes.
+            ObjectMapper newerReader = new RecipeSerializer().getMapper();
+
+            byte[] olderRepresentation = olderWriter.writeValueAsBytes(gradleProject);
+            GradleProject roundTripped = newerReader.readValue(olderRepresentation, GradleProject.class);
+            assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+
+        /**
+         * Mix-in modeling a class from before {@code @JsonIdentityInfo} was added to it. Overriding the generator with
+         * {@link ObjectIdGenerators.None} turns object-id handling off, producing the older "full objects" wire format.
+         */
+        @JsonIdentityInfo(generator = ObjectIdGenerators.None.class)
+        private interface NoObjectIdMixin {
         }
 
         @Test
@@ -281,7 +320,6 @@ class GradleProjectTest {
         }
     }
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
     @Nested
     class multiProject {
         @TempDir
@@ -365,6 +403,139 @@ class GradleProjectTest {
         void projectDependencyHasAttribute() {
             assertThat(requireNonNull(bGradleProject.getConfiguration("compileClasspath")).getRequested())
               .anyMatch(dep -> dep.findAttribute(ProjectAttribute.class).isPresent() && "a".equals(dep.getGav().getArtifactId()));
+        }
+    }
+
+    /**
+     * Configurations are read in name order, so c's annotationProcessor reaches a through b, with no attribute
+     * to say a is a project, before c's compileClasspath declares a.
+     */
+    @Nested
+    class projectReachedTransitivelyFirst {
+        @TempDir
+        static Path dir;
+
+        static GradleProject cGradleProject;
+
+        //language=groovy
+        static String bBuildGradle = """
+          plugins{
+              id 'java'
+          }
+
+          dependencies{
+              implementation project(":a")
+          }
+          """;
+
+        //language=groovy
+        static String cBuildGradle = """
+          plugins{
+              id 'java'
+          }
+
+          dependencies{
+              annotationProcessor project(":b")
+              implementation project(":a")
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "reached-transitively-first"
+          include("a")
+          include("b")
+          include("c")
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            Files.write(dir.resolve("build.gradle"), "\n".getBytes(StandardCharsets.UTF_8));
+            Files.write(dir.resolve("settings.gradle"), settingsGradle.getBytes(StandardCharsets.UTF_8));
+            Files.createDirectory(dir.resolve("a"));
+            Files.write(dir.resolve("a/build.gradle"), "plugins { id 'java' }\n".getBytes(StandardCharsets.UTF_8));
+            Files.createDirectory(dir.resolve("b"));
+            Files.write(dir.resolve("b/build.gradle"), bBuildGradle.getBytes(StandardCharsets.UTF_8));
+            Path cDir = dir.resolve("c");
+            Files.createDirectory(cDir);
+            Files.write(cDir.resolve("build.gradle"), cBuildGradle.getBytes(StandardCharsets.UTF_8));
+
+            cGradleProject = OpenRewriteModelBuilder.forProjectDirectory(cDir.toFile(), cDir.resolve("build.gradle").toFile())
+              .getGradleProject();
+        }
+
+        @Test
+        void projectDependencyKeepsItsAttribute() {
+            assertThat(requireNonNull(cGradleProject.getConfiguration("compileClasspath")).getRequested())
+              .anyMatch(dep -> dep.findAttribute(ProjectAttribute.class).isPresent() && "a".equals(dep.getGav().getArtifactId()));
+        }
+    }
+
+    @Nested
+    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
+    class SpringDependencyManagement {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins{
+              id 'java'
+              id 'org.springframework.boot' version '3.3.5'
+              id 'io.spring.dependency-management' version '1.1.7'
+          }
+
+          repositories{
+              mavenCentral()
+          }
+
+          dependencies{
+              implementation 'org.yaml:snakeyaml'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void capturesBomImportedByBootPlugin() {
+            SpringDependencyManagementPlugin dependencyManagement = requireNonNull(gradleProject.getSpringDependencyManagementPlugin());
+            assertThat(dependencyManagement.getImportedBoms())
+              .anyMatch(bom -> "org.springframework.boot".equals(bom.getGroupId()) &&
+                               "spring-boot-dependencies".equals(bom.getArtifactId()) &&
+                               "3.3.5".equals(bom.getVersion()));
+            assertThat(dependencyManagement.getImportedProperties())
+              .containsKey("snakeyaml.version");
+            assertThat(dependencyManagement.getManagedVersions())
+              .containsEntry("org.yaml:snakeyaml", dependencyManagement.getImportedProperties().get("snakeyaml.version"));
+        }
+
+        @Test
+        void serializable() throws Exception {
+            ObjectMapper m = new RecipeSerializer().getMapper();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            m.writeValue(baos, gradleProject);
+            ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+            GradleProject roundTripped = m.readValue(bais, GradleProject.class);
+            assertThat(roundTripped).isEqualTo(gradleProject);
         }
     }
 }

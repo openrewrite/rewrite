@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -188,6 +186,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(annotatedType.getTypeExpression(), p);
         afterSyntax(annotatedType, p);
         return annotatedType;
+    }
+
+    @Override
+    public J visitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        visit(arrayAccess.getDimension(), p);
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
     }
 
     @Override
@@ -381,10 +388,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
-        p.append('{');
+        boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+        if (!omitBraces) {
+            p.append("{");
+        }
         visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
         visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-        p.append('}');
+        if (!omitBraces) {
+            p.append("}");
+        }
         afterSyntax(block, p);
         return block;
     }
@@ -539,6 +551,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 break;
         }
 
+        if (classDecl.getMarkers().findFirst(CompactSourceFile.class).isPresent()) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visit(classDecl.getBody(), p);
+            afterSyntax(classDecl, p);
+            return classDecl;
+        }
+
         beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(classDecl.getLeadingAnnotations(), p);
@@ -623,15 +642,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(enum_, Space.Location.ENUM_VALUE_PREFIX, p);
         visit(enum_.getAnnotations(), p);
         visit(enum_.getName(), p);
-        NewClass initializer = enum_.getInitializer();
-        if (enum_.getInitializer() != null) {
-            visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
-            visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
-            if (!initializer.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
-                visitContainer("(", initializer.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
-            }
-            visit(initializer.getBody(), p);
-        }
+        visit(enum_.getInitializer(), p);
         afterSyntax(enum_, p);
         return enum_;
     }
@@ -838,6 +849,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
             visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
         }
+        // Older LSTs may not have this field
+        //noinspection ConstantValue
+        if (method.getDimensionsAfterName() != null) {
+            for (JLeftPadded<Space> dimension : method.getDimensionsAfterName()) {
+                visitSpace(dimension.getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                p.append('[');
+                visitSpace(dimension.getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
+        }
         visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
         visit(method.getBody(), p);
         visitLeftPadded("default", method.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p);
@@ -900,7 +921,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
         visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
-        p.append("new");
+        // An enum constant's initializer is written as just its arguments and body
+        if (!(getCursor().getParentTreeCursor().getValue() instanceof EnumValue)) {
+            p.append("new");
+        }
         visit(newClass.getClazz(), p);
         if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);

@@ -38,11 +38,38 @@ class LatestPatchTest {
         assertThat(latestPatch.isValid("1.0", "1.0.1")).isTrue();
         assertThat(latestPatch.isValid("1.0.0", "1.1.0")).isFalse();
         assertThat(latestPatch.isValid("1.0.0", "2.0.0")).isFalse();
+        assertThat(latestPatch.isValid("1.0.x", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1.0.x", "1.1.0")).isFalse();
     }
 
     @Test
     void noSnapshots() {
         assertThat(latestPatch.isValid("1.0.0", "1.0.1-SNAPSHOT")).isFalse();
+    }
+
+    @Test
+    void staysWithinPatchRangeWhenMinorIsAbsentOrNonNumeric() {
+        // Bare major.
+        assertThat(latestPatch.isValid("1", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1", "1.1.0")).isFalse();
+        assertThat(latestPatch.isValid("1", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1", List.of("1.0.5", "1.1.0", "2.0.0"))).contains("1.0.5");
+
+        // Qualifier in the minor position.
+        assertThat(latestPatch.isValid("1.Final", "1.0.1")).isTrue();
+        assertThat(latestPatch.isValid("1.Final", "1.9.9")).isFalse();
+        assertThat(latestPatch.isValid("1.Final", "2.0.0")).isFalse();
+        assertThat(latestPatch.upgrade("1.Final", List.of("1.0.5", "1.9.9", "2.0.0"))).contains("1.0.5");
+    }
+
+    @Test
+    void xRangeWildcardMinorAllowsAnyMinorWithinTheMajor() {
+        for (String current : List.of("2.x", "2.X", "2.+", "2.*")) {
+            assertThat(latestPatch.isValid(current, "2.1.0")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "2.9.9")).as(current).isTrue();
+            assertThat(latestPatch.isValid(current, "3.0.0")).as(current).isFalse();
+            assertThat(latestPatch.upgrade(current, List.of("2.1.0", "2.9.9", "3.0.0"))).contains("2.9.9");
+        }
     }
 
     @Test
@@ -68,6 +95,14 @@ class LatestPatchTest {
         upgrade = latestPatch.upgrade("2.10.10.3.24", List.of("2.10.10.3.25"));
         assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25");
+
+        assertThat(latestPatch.upgrade("1.0.x", List.of("1.0.1"))).isPresent();
+        assertThat(latestPatch.upgrade("1.0.x", List.of("1.1.0"))).isNotPresent();
+
+        // X-range versions without numeric minor - should not throw ValidationException
+        assertThat(latestPatch.upgrade("2.+", List.of("2.1"))).isPresent();
+        assertThat(latestPatch.upgrade("2.x", List.of("2.1"))).isPresent();
+        assertThat(latestPatch.upgrade("2.+", List.of("3.0"))).isNotPresent();
     }
 
     @Test
@@ -76,6 +111,17 @@ class LatestPatchTest {
         assertThat(latestPatch.compare("1.0", "1.0.0.1", "1.0.1")).isLessThan(0);
         assertThat(latestPatch.compare(null, "1.0", "latest.patch")).isNegative();
         assertThat(latestPatch.compare(null, "latest.patch", "1.0")).isPositive();
+        // Test X-range versions without numeric minor - these should not throw ValidationException
+        assertThat(latestPatch.compare("2.+", "2.0", "2.1")).isNegative();
+        assertThat(latestPatch.compare("2.x", "2.0", "2.1")).isNegative();
+    }
+
+    @Test
+    void overflowingVersionSegment() {
+        // Version numbers that exceed Integer.MAX_VALUE should not throw NumberFormatException
+        assertThat(latestPatch.isValid("1.202302104298", "1.202302104298")).isTrue();
+        assertThat(latestPatch.isValid("1.202302104298", "1.202302104298.1")).isTrue();
+        assertThat(latestPatch.isValid("1.202302104298", "1.202302104299")).isFalse();
     }
 
     @Test
@@ -108,6 +154,17 @@ class LatestPatchTest {
         upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", List.of("2.10.10.3.25-fred"));
         assertThat(upgrade).isPresent();
         assertThat(upgrade.get()).isEqualTo("2.10.10.3.25-fred");
+    }
+
+    @Test
+    void upgradeToBackpatch() {
+        assertThat(latestPatch.upgrade("2.14.1", List.of("2.14.1", "2.14.1.1-osera-00001", "2.14.1.1-osera-00002", "2.15.0")))
+          .contains("2.14.1.1-osera-00002");
+        assertThat(latestPatch.upgrade("5.2.19.RELEASE", List.of("5.2.19.RELEASE", "5.2.19.RELEASE-backpatch-00002", "5.2.19.RELEASE-backpatch-00001")))
+          .contains("5.2.19.RELEASE-backpatch-00002");
+        assertThat(latestPatch.upgrade("2.14.1.1-osera-00001", List.of("2.14.1.1-osera-00001", "2.14.1.1-osera-00002")))
+          .contains("2.14.1.1-osera-00002");
+        assertThat(latestPatch.upgrade("2.14.1", List.of("2.14.1.1-osera-00001", "2.14.2"))).contains("2.14.2");
     }
 
 }

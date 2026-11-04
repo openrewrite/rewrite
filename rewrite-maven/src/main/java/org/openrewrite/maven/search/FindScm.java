@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -23,15 +24,11 @@ import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class FindScm extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find SCM tag";
-    }
+    @Getter
+    final String displayName = "Find SCM tag";
 
-    @Override
-    public String getDescription() {
-        return "Finds any `<scm>` tag directly inside the `<project>` root of a Maven pom.xml file.";
-    }
+    @Getter
+    final String description = "Finds any `<scm>` tag directly inside the `<project>` root of a Maven pom.xml file.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

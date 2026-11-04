@@ -63,9 +63,22 @@ public class MavenDependency implements Trait<Xml.Tag> {
         String finalVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
         // in the case of "latest.patch", a new version can only be derived if the
-        // current version is a semantic version
-        if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
+        // current version is a semantic version. The metadata pattern is intentionally
+        // omitted here — it filters candidate target versions, not the source version
+        // (e.g. upgrading 1.2.3 to 1.2.3+backpatch.001 is valid even though the source
+        // doesn't carry the metadata suffix).
+        if (versionComparator instanceof LatestPatch && !new LatestPatch(null).isValid(finalVersion, finalVersion)) {
             return null;
+        }
+
+        // For exact version, check upfront whether the target version is actually an
+        // upgrade from the current version before downloading metadata
+        if (versionComparator instanceof ExactVersion) {
+            String exactVersion = ((ExactVersion) versionComparator).getVersion();
+            if (exactVersion.equals(finalVersion) ||
+                versionComparator.compare(finalVersion, finalVersion, exactVersion) > 0) {
+                return null;
+            }
         }
 
         try {
@@ -103,9 +116,11 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         // fact that it's not in the metadata. Usually it won't be, only in situations like the
                         // MapR repository mentioned in the comment above will it be.
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
-                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
+                                settings, mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
-                        if (pom.getGav().getVersion().equals(exactVersion)) {
+                        if (pom.getGav().getVersion().equals(exactVersion) &&
+                            !exactVersion.equals(finalVersion) &&
+                            versionComparator.compare(finalVersion, finalVersion, exactVersion) <= 0) {
                             return exactVersion;
                         }
                     } catch (MavenDownloadingException e) {
@@ -156,30 +171,18 @@ public class MavenDependency implements Trait<Xml.Tag> {
                     return null;
                 }
 
-                Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult(cursor).getDependencies();
+                MavenResolutionResult resolutionResult = getResolutionResult(cursor);
+                Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult.getDependencies();
                 for (Scope scope : Scope.values()) {
                     if (dependencies.containsKey(scope)) {
                         for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                             if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
                                 (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
-                                String scopeName = tag.getChildValue("scope").orElse(null);
-                                Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
-                                if (tagScope == null && artifactId != null) {
-                                    tagScope = getResolutionResult(cursor).getPom().getManagedScope(
-                                            groupId,
-                                            artifactId,
-                                            tag.getChildValue("type").orElse(null),
-                                            tag.getChildValue("classifier").orElse(null)
-                                    );
-                                }
-                                if (tagScope == null) {
-                                    tagScope = Scope.Compile;
-                                }
                                 Dependency req = resolvedDependency.getRequested();
                                 String reqGroup = req.getGroupId();
                                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                                     req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                                    scope == tagScope) {
+                                    scope == effectiveScope(tag, resolvedDependency, resolutionResult.getPom())) {
                                     return new MavenDependency(cursor, resolvedDependency);
                                 }
                             }
@@ -189,6 +192,17 @@ public class MavenDependency implements Trait<Xml.Tag> {
             }
 
             return null;
+        }
+
+        private static Scope effectiveScope(Xml.Tag tag, ResolvedDependency resolvedDependency, ResolvedPom pom) {
+            String scopeName = tag.getChildValue("scope").orElse(null);
+            Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : pom.getManagedScope(
+                    resolvedDependency.getGroupId(),
+                    resolvedDependency.getArtifactId(),
+                    pom.getValue(tag.getChildValue("type").orElse(null)),
+                    pom.getValue(tag.getChildValue("classifier").orElse(null))
+            );
+            return tagScope != null ? tagScope : Scope.Compile;
         }
     }
 }

@@ -1,0 +1,9 @@
+module example.com/multi
+
+go 1.22
+
+require (
+	github.com/x/y v1.2.3
+	github.com/z/w v0.5.0 // indirect
+	github.com/a/b/v2 v2.0.0
+)

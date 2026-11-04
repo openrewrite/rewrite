@@ -18,6 +18,7 @@ package org.openrewrite.gradle.toolingapi;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
+import org.gradle.tooling.model.UnsupportedMethodException;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.RecipeSerializer;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -28,6 +29,7 @@ import org.openrewrite.internal.ListUtils;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +40,12 @@ public class OpenRewriteModel {
 
     GradleProject gradleProject;
 
+    /**
+     * The {@link GradleProject} for every project in the build, keyed by its Gradle path (e.g. {@code ":"},
+     * {@code ":sub"}). Empty when produced by an older version of the tooling plugin that did not provide it.
+     */
+    Map<String, GradleProject> gradleProjectsByPath;
+
 
     org.openrewrite.gradle.marker. @Nullable GradleSettings gradleSettings;
 
@@ -46,7 +54,22 @@ public class OpenRewriteModel {
             GradleProject project = mapper.readValue(proxy.getGradleProjectBytes(), GradleProject.class);
             GradleSettings settings = proxy.getGradleSettingsBytes() == null ? null : mapper.readValue(proxy.getGradleSettingsBytes(), GradleSettings.class);
             deduplicate(project, settings);
-            return new OpenRewriteModel(project, settings);
+
+            Map<String, GradleProject> projectsByPath = new LinkedHashMap<>();
+            Map<String, byte[]> projectsByPathBytes;
+            try {
+                projectsByPathBytes = proxy.getGradleProjectsByPathBytes();
+            } catch (UnsupportedMethodException e) {
+                projectsByPathBytes = null;
+            }
+            if (projectsByPathBytes != null) {
+                for (Map.Entry<String, byte[]> entry : projectsByPathBytes.entrySet()) {
+                    GradleProject gp = mapper.readValue(entry.getValue(), GradleProject.class);
+                    deduplicate(gp, settings);
+                    projectsByPath.put(entry.getKey(), gp);
+                }
+            }
+            return new OpenRewriteModel(project, projectsByPath, settings);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {

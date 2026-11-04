@@ -18,6 +18,7 @@ package org.openrewrite.table;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 public class SourcesFileErrors extends DataTable<SourcesFileErrors.Row> {
@@ -40,5 +41,10 @@ public class SourcesFileErrors extends DataTable<SourcesFileErrors.Row> {
         @Column(displayName = "Stack trace",
                 description = "The stack trace of the failure.")
         String stackTrace;
+    }
+
+    @Override
+    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
+        return true;
     }
 }

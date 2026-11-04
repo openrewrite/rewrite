@@ -5,7 +5,7 @@ plugins {
     id("org.openrewrite.build.shadow")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 
@@ -36,7 +36,7 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
 
-    api("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:latest.release")
     api("org.jetbrains:annotations:latest.release")
 
     antlrGeneration("org.antlr:antlr4:4.13.2") {
@@ -49,9 +49,7 @@ dependencies {
     }
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
-    compileOnly("org.assertj:assertj-core:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
-    implementation("io.github.classgraph:classgraph:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
@@ -68,10 +66,10 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-21"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation("io.moderne:jsonrpc:latest.integration")
 
-    // For use in ClassGraphTypeMappingTest
+    // Types referenced only from test source text, so they need to be resolvable at test runtime
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
     testRuntimeOnly("jakarta.validation:jakarta.validation-api:3.1.1")
@@ -94,11 +92,15 @@ tasks.withType<Javadoc>().configureEach {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java")
+    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java", "**/ImportLayoutStyle**")
 }
 
 tasks.named<ShadowJar>("shadowJar").configure {
     dependsOn(checkstyle)
     configurations = listOf(checkstyle)
     relocate("com.puppycrawl.tools.checkstyle", "org.openrewrite.tools.checkstyle")
+    // Avoid leaking the bundled checkstyle's META-INF/maven/com.puppycrawl.tools/checkstyle/
+    // metadata, which would otherwise cause tools that read pom.properties to misidentify
+    // this jar as com.puppycrawl.tools:checkstyle.
+    exclude("META-INF/maven/**")
 }

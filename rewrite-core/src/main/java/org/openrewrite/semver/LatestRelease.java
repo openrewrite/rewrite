@@ -18,8 +18,6 @@ package org.openrewrite.semver;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 
-import java.util.regex.Matcher;
-
 public class LatestRelease implements VersionComparator {
 
     @Nullable
@@ -42,7 +40,9 @@ public class LatestRelease implements VersionComparator {
         int lastDotIdx = version.lastIndexOf('.');
         for (String suffix : RELEASE_SUFFIXES) {
             if (version.regionMatches(true, lastDotIdx, suffix, 0, suffix.length())) {
-                version = version.substring(0, lastDotIdx);
+                String patchedVersion = ParsedVersion.parse(version).patchedVersion();
+                version = version.substring(0, lastDotIdx) +
+                        (patchedVersion == null ? "" : version.substring(patchedVersion.length()));
                 break;
             }
         }
@@ -50,7 +50,7 @@ public class LatestRelease implements VersionComparator {
         int versionParts = countVersionParts(version);
 
         if (versionParts <= 2) {
-            String[] versionAndMetadata = version.split("(?=[-+])");
+            String[] versionAndMetadata = version.split("(?=[-+])", 2);
             for (; versionParts <= 2; versionParts++) {
                 versionAndMetadata[0] += ".0";
             }
@@ -132,45 +132,163 @@ public class LatestRelease implements VersionComparator {
         String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
 
-        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized1);
-        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized2);
+        int maxParts = Math.max(vp1, vp2);
+        long[] parts1 = extractVersionParts(normalized1, maxParts);
+        long[] parts2 = extractVersionParts(normalized2, maxParts);
 
-        v1Gav.find();
-        v2Gav.find();
-
-        try {
-            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
-                String v1Part = v1Gav.group(i);
-                String v2Part = v2Gav.group(i);
-                if (v1Part == null) {
-                    return v2Part == null ? normalized1.compareTo(normalized2) : -1;
-                } else if (v2Part == null) {
-                    return 1;
-                }
-
-                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
-                if (diff != 0) {
-                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
-                    return (int) (diff / Math.abs(diff));
-                }
+        for (int i = 0; i < maxParts; i++) {
+            long diff = parts1[i] - parts2[i];
+            if (diff != 0) {
+                // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                return (int) (diff / Math.abs(diff));
             }
-        } catch (IllegalStateException exception) {
-            // Provide a better error message if an error is thrown while getting groups from the regular expression.
-            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
         }
 
         // When all numeric parts are equal, we need to handle pre-release versions properly
         // A pre-release version should be considered less than a release version
         // e.g., "3.5.0-RC1" < "3.5.0"
-        int v1Prio = qualifierPriority(v1Gav.group(6));
-        int v2Prio = qualifierPriority(v2Gav.group(6));
+        int v1Prio = qualifierPriority(extractQualifierSuffix(normalized1));
+        int v2Prio = qualifierPriority(extractQualifierSuffix(normalized2));
 
         if (v1Prio != v2Prio) {
             return Integer.compare(v1Prio, v2Prio);
         }
 
-        // Both are either pre-release or release versions, do string comparison
-        return normalized1.compareTo(normalized2);
+        int identifierCompare = compareNaturally(normalized1, normalized2);
+        if (identifierCompare != 0) {
+            return identifierCompare;
+        }
+        int normalizedCompare = normalized1.compareTo(normalized2);
+        if (normalizedCompare != 0) {
+            return normalizedCompare;
+        }
+        // When the metadata-stripped versions are equal, fall back to comparing the
+        // un-normalized versions lexicographically — but only when BOTH originals match
+        // the metadata pattern, so that build-metadata-only differences within a matching
+        // family (e.g. 1.2.3+backpatch.001 vs 1.2.3+backpatch.002) are ordered
+        // deterministically while heterogeneous metadata (e.g. 29.0-jre vs 29, under
+        // pattern `-jre`) continues to compare equal as a HyphenRange would expect.
+        if (metadataPattern != null && bothMatchMetadata(nv1, nv2, metadataPattern)) {
+            return nv1.compareTo(nv2);
+        }
+        return 0;
+    }
+
+    private static int compareNaturally(String v1, String v2) {
+        int i1 = 0;
+        int i2 = 0;
+        while (i1 < v1.length() && i2 < v2.length()) {
+            int c;
+            if (isAsciiDigit(v1.charAt(i1)) && isAsciiDigit(v2.charAt(i2))) {
+                int end1 = digitRunEnd(v1, i1);
+                int end2 = digitRunEnd(v2, i2);
+                c = compareDigitRuns(v1, i1, end1, v2, i2, end2);
+                i1 = end1;
+                i2 = end2;
+            } else {
+                c = Character.compare(Character.toLowerCase(v1.charAt(i1++)), Character.toLowerCase(v2.charAt(i2++)));
+            }
+            if (c != 0) {
+                return c;
+            }
+        }
+        return Integer.compare(v1.length() - i1, v2.length() - i2);
+    }
+
+    private static int compareDigitRuns(String v1, int start1, int end1, String v2, int start2, int end2) {
+        while (start1 < end1 - 1 && v1.charAt(start1) == '0') {
+            start1++;
+        }
+        while (start2 < end2 - 1 && v2.charAt(start2) == '0') {
+            start2++;
+        }
+        if (end1 - start1 != end2 - start2) {
+            return Integer.compare(end1 - start1, end2 - start2);
+        }
+        while (start1 < end1) {
+            int c = Character.compare(v1.charAt(start1++), v2.charAt(start2++));
+            if (c != 0) {
+                return c;
+            }
+        }
+        return 0;
+    }
+
+    private static int digitRunEnd(String v, int start) {
+        int i = start;
+        while (i < v.length() && isAsciiDigit(v.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    // Not Character.isDigit: it accepts non-ASCII digits, whose code points sit above the letters
+    // that compareNaturally compares them against, which would make the order intransitive.
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private static boolean bothMatchMetadata(String nv1, String nv2, String metadataPattern) {
+        return matchesMetadata(nv1, metadataPattern) && matchesMetadata(nv2, metadataPattern);
+    }
+
+    private static boolean matchesMetadata(String version, String metadataPattern) {
+        ParsedVersion parsed = ParsedVersion.parse(version);
+        if (!parsed.matches()) {
+            return false;
+        }
+        String qualifier = parsed.qualifier();
+        return qualifier != null && qualifier.matches(metadataPattern);
+    }
+
+    /**
+     * Extract numeric version parts from a version string by parsing consecutive
+     * digit groups separated by dots. Missing parts are filled with 0.
+     */
+    static long[] extractVersionParts(String version, int count) {
+        long[] parts = new long[count];
+        int partIndex = 0;
+        int i = 0;
+        int len = version.length();
+        while (i < len && partIndex < count) {
+            if (!Character.isDigit(version.charAt(i))) {
+                break;
+            }
+            int start = i;
+            while (i < len && Character.isDigit(version.charAt(i))) {
+                i++;
+            }
+            parts[partIndex++] = Long.parseLong(version.substring(start, i));
+            if (i < len && version.charAt(i) == '.' && i + 1 < len && Character.isDigit(version.charAt(i + 1))) {
+                i++;
+            } else {
+                break;
+            }
+        }
+        return parts;
+    }
+
+    /**
+     * Extract the qualifier suffix from a version string (everything after the numeric parts).
+     * Returns the suffix including its leading separator, e.g. "-RC1" or ".Final", or null if none.
+     */
+    static @Nullable String extractQualifierSuffix(String version) {
+        int i = 0;
+        int len = version.length();
+        while (i < len) {
+            if (!Character.isDigit(version.charAt(i))) {
+                break;
+            }
+            while (i < len && Character.isDigit(version.charAt(i))) {
+                i++;
+            }
+            if (i < len && version.charAt(i) == '.' && i + 1 < len && Character.isDigit(version.charAt(i + 1))) {
+                i++;
+            } else {
+                break;
+            }
+        }
+        return i < len ? version.substring(i) : null;
     }
 
     private static int qualifierPriority(@Nullable String suffix) {

@@ -119,6 +119,21 @@ class FindEmptyMethodsTest implements RewriteTest {
     }
 
     @Test
+    void singleNoArgConstructorNotEmpty() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  public Test() {
+                      System.out.println("Hello");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void singleNoArgConstructor() {
         rewriteRun(
           java(
@@ -152,6 +167,19 @@ class FindEmptyMethodsTest implements RewriteTest {
               class Test {
                   /*~~>*/void method() {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationInterfaceMethods() {
+        rewriteRun(
+          java(
+            """
+              public @interface Requirement {
+                  String[] value();
               }
               """
           )

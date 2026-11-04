@@ -25,8 +25,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.Optional;
-
 import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
@@ -97,7 +95,7 @@ public class MergeYaml extends Recipe {
         this.createNewKeys = createNewKeys;
     }
 
-    public enum InsertMode { Before, After, Last }
+    public enum InsertMode {Before, After, Last}
 
     @Nullable
     @NonFinal
@@ -105,19 +103,22 @@ public class MergeYaml extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate()
-                .and(Validated.test("yaml", "Must be valid YAML",
-                        yaml, y -> {
-                            if (yaml == null) {
-                                return false;
-                            }
-                            MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
-                            return incoming != null;
-                        }))
+        Validated<Object> validated = super.validate();
+        if (yaml != null) {
+            Validated<Yaml> parsed = validateParseable(yaml);
+            if (parsed.isValid()) {
+                incoming = parsed.getValue();
+            }
+            validated = validated.and(parsed);
+        } else {
+            validated = validated.and(Validated.invalid("yaml", null, "Must be valid YAML"));
+        }
+        return validated
                 .and(Validated.required("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
+
     String displayName = "Merge YAML snippet";
 
     @Override
@@ -129,6 +130,7 @@ public class MergeYaml extends Recipe {
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
     final static String REMOVE_PREFIX = "REMOVE_PREFIX";
+    final static String REMOVE_DOCUMENT_PREFIX = "REMOVE_DOCUMENT_PREFIX";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -142,46 +144,48 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                if ("$".equals(key)) {
-                    Yaml.Document d = document.withBlock((Yaml.Block)
+                Yaml.Document d;
+                if ("$".equals(key) || "$.".equals(key)) {
+                    d = document.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(document.getBlock(), incoming, accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
-                    if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                        if (insertMode == Before) {
-                            d = d.withPrefix("");
-                        } else {
-                            // Preserve newline before document separator in multi-document YAML
-                            d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
+                } else {
+                    d = super.visitDocument(document, ctx);
+                    if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                        // No matching element found, but check if the key maybe exists in the json path.
+                        String valueKey = maybeKeyFromJsonPath(key);
+                        if (valueKey != null) {
+                            // No matching element already exists, so it must be constructed.
+                            @Language("yml") String snippet;
+                            boolean blockSequence = incoming instanceof Yaml.Sequence &&
+                                                    ((Yaml.Sequence) incoming).getOpeningBracketPrefix() == null;
+                            if (incoming instanceof Yaml.Mapping || blockSequence) {
+                                // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
+                                snippet = valueKey + ":\n  " + yaml.replace("\n", "\n  ");
+                            } else {
+                                // If there is no space between the colon and the value it will not be interpreted as a mapping
+                                snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
+                            }
+                            d = d.withBlock((Yaml.Block)
+                                    new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
+                                            .visitNonNull(d.getBlock(), ctx, getCursor()));
                         }
                     }
-                    return d;
                 }
-                Yaml.Document d = super.visitDocument(document, ctx);
-                if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
-                    // No matching element found, but check if the key maybe exists in the json path.
-                    String valueKey = maybeKeyFromJsonPath(key);
-                    if (valueKey == null) {
-                        return d;
-                    }
-                    // No matching element already exists, so it must be constructed.
-                    @Language("yml") String snippet;
-                    if (incoming instanceof Yaml.Mapping) {
-                        // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
-                        snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
-                    } else {
-                        // If there is no space between the colon and the value it will not be interpreted as a mapping
-                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
-                    }
-                    return d.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
-                                    .visitNonNull(d.getBlock(), ctx, getCursor()));
+                if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
+                    d = d.withPrefix("");
                 }
                 if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                    // Preserve newline before document separator in multi-document YAML
-                    d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
+                    d = removeInlineCommentFromEnd(d);
                 }
                 return d;
+            }
+
+            private Yaml.Document removeInlineCommentFromEnd(Yaml.Document document) {
+                Yaml.Document d = MergeYamlVisitor.removeInlineCommentFromEnd(document);
+                // Preserve newline before document separator in multi-document YAML
+                return d.getEnd().getPrefix().isEmpty() ? d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d))) : d;
             }
 
             private String preserveDocumentSeparator(Yaml.Document document) {
@@ -225,7 +229,10 @@ public class MergeYaml extends Recipe {
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, accptTheirs,
                             objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
-                return m;
+                if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                    m = MergeYamlVisitor.removeInlineCommentFromLastEntry(m);
+                }
+                return MergeYamlVisitor.removeCopiedEntryComments(m, getCursor());
             }
 
             @Override
@@ -257,27 +264,41 @@ public class MergeYaml extends Recipe {
         });
     }
 
-    private static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
-        return new YamlParser().parse(yaml)
+    private static Validated<Yaml> validateParseable(@Language("yml") String yaml) {
+        SourceFile sourceFile = new YamlParser().parse(yaml)
                 .findFirst()
-                .filter(Yaml.Documents.class::isInstance)
-                .map(Yaml.Documents.class::cast)
-                .map(docs -> {
-                    // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                    Yaml.Document doc = docs.getDocuments().get(0);
-                    if (doc.getBlock() instanceof Yaml.Mapping) {
-                        Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                        return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                        Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                        return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    }
-                    return doc.getBlock().withPrefix(doc.getPrefix());
-                });
+                .orElse(null);
+        if (sourceFile instanceof Yaml.Documents) {
+            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+            Yaml.Document doc = ((Yaml.Documents) sourceFile).getDocuments().get(0);
+            if (doc.getBlock() instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                return Validated.valid("yaml", m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix()))));
+            } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                return Validated.valid("yaml", s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix()))));
+            }
+            return Validated.valid("yaml", doc.getBlock().withPrefix(doc.getPrefix()));
+        }
+        if (sourceFile != null) {
+            String message = sourceFile.getMarkers()
+                    .findFirst(ParseExceptionResult.class)
+                    .map(ParseExceptionResult::getMessage)
+                    .orElse("unknown error");
+            return Validated.invalid("yaml", yaml, "Could not parse as YAML: " + message);
+        }
+        return Validated.invalid("yaml", yaml, "Could not parse as YAML");
     }
 
     static Yaml parse(@Language("yml") String yaml) {
-        return maybeParse(yaml)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
+        Validated<Yaml> result = validateParseable(yaml);
+        if (result.isValid()) {
+            return result.getValue();
+        }
+        String message = result.failures().stream()
+                .map(Validated.Invalid::getMessage)
+                .findFirst()
+                .orElse("Could not parse as YAML");
+        throw new IllegalArgumentException(message + "\n" + yaml);
     }
 }

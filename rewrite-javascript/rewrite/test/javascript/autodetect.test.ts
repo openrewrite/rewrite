@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, WrappingAndBracesStyle, JavaScriptParser} from "../../src/javascript";
+import {Autodetect, StyleKind, TabsAndIndentsStyle, SpacesStyle, WrappingAndBracesStyle, JavaScriptParser, sourceFileCache} from "../../src/javascript";
 import {dedent} from "../../src/test";
 
 describe('Autodetect', () => {
-    const parser = new JavaScriptParser();
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseAndDetect(...sources: string[]): Promise<Autodetect> {
         const detector = Autodetect.detector();
@@ -62,6 +62,44 @@ describe('Autodetect', () => {
             expect(tabsAndIndents).toBeDefined();
             expect(tabsAndIndents!.useTabCharacter).toBe(false);
             expect(tabsAndIndents!.indentSize).toBe(2);
+        });
+
+        test('a misindented line does not outvote the rest of the file', async () => {
+            const autodetect = await parseAndDetect(`
+                class Api {
+                  get() {
+                    return 1;
+                  }
+
+                  fail() {
+                     return 2;
+                  }
+
+                  put() {
+                    if (ready) {
+                      return 3;
+                    }
+                  }
+                }
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(2);
+        });
+
+        test('an unindented wrapper does not halve the detected width', async () => {
+            const autodetect = await parseAndDetect(`
+                (function () {
+                function f() {
+                    if (x) {
+                        y();
+                    }
+                }
+                })();
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(4);
         });
 
         test('detects tab indentation', async () => {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -25,16 +26,12 @@ import static java.util.Objects.requireNonNull;
 
 public class RemoveByteOrderMark extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove byte order mark (BOM)";
-    }
+    @Getter
+    final String displayName = "Remove byte order mark (BOM)";
 
-    @Override
-    public String getDescription() {
-        return "Removes UTF-8 byte order marks from the beginning of files.\n\n" +
-                "The BOM character (U+FEFF) is generally unnecessary in UTF-8 files and can cause issues with some tools.";
-    }
+    @Getter
+    final String description = "Removes UTF-8 byte order marks from the beginning of files.\n\n" +
+        "The BOM character (U+FEFF) is generally unnecessary in UTF-8 files and can cause issues with some tools.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

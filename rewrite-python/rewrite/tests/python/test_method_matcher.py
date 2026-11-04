@@ -1,0 +1,403 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for the MethodMatcher utility."""
+
+from typing import List
+
+import pytest
+
+from rewrite.java import JavaType
+from rewrite.java.tree import MethodInvocation
+from rewrite.python import MethodMatcher
+from rewrite.python.method_matcher import (
+    PatternTypeMatcher,
+    WildcardTypeMatcher,
+    ExactMethodNameMatcher,
+    PatternMethodNameMatcher,
+    WildcardMethodNameMatcher,
+)
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
+
+
+class TestMethodMatcherPatternParsing:
+    """Test pattern parsing and validation."""
+
+    def test_simple_pattern(self):
+        m = MethodMatcher.create("datetime.datetime utcnow()")
+        assert m._original_pattern == "datetime.datetime utcnow()"
+        assert isinstance(m._type_matcher, PatternTypeMatcher)
+        assert isinstance(m._method_matcher, ExactMethodNameMatcher)
+
+    def test_pattern_with_hash_separator(self):
+        m = MethodMatcher.create("datetime.datetime#utcnow()")
+        assert m._original_pattern == "datetime.datetime#utcnow()"
+        assert isinstance(m._method_matcher, ExactMethodNameMatcher)
+
+    def test_pattern_with_varargs(self):
+        m = MethodMatcher.create("datetime.datetime fromtimestamp(..)")
+        assert m._varargs_position == 0
+
+    def test_pattern_with_empty_args(self):
+        m = MethodMatcher.create("datetime.datetime now()")
+        assert len(m._argument_matchers) == 0
+        assert m._varargs_position == -1
+
+    def test_wildcard_type_pattern(self):
+        m = MethodMatcher.create("* utcnow()")
+        assert isinstance(m._type_matcher, WildcardTypeMatcher)
+
+    def test_wildcard_method_pattern(self):
+        m = MethodMatcher.create("datetime.datetime *()")
+        assert isinstance(m._method_matcher, WildcardMethodNameMatcher)
+
+    def test_invalid_pattern_no_parens(self):
+        with pytest.raises(ValueError, match="Invalid method pattern"):
+            MethodMatcher.create("datetime.datetime utcnow")
+
+    def test_invalid_pattern_empty(self):
+        with pytest.raises(ValueError, match="Invalid method pattern"):
+            MethodMatcher.create("")
+
+    def test_invalid_pattern_no_separator(self):
+        with pytest.raises(ValueError, match="Invalid method pattern"):
+            MethodMatcher.create("datetime.datetime.utcnow()")
+
+
+class TestTypePatternMatching:
+    """Test type pattern matching."""
+
+    def test_exact_type_match(self):
+        m = PatternTypeMatcher.create("datetime.datetime")
+        assert m.matches_name("datetime.datetime")
+        assert not m.matches_name("other.datetime")
+        assert not m.matches_name("datetime.datetime.extra")
+
+    def test_single_wildcard_match(self):
+        m = PatternTypeMatcher.create("*.datetime")
+        assert m.matches_name("foo.datetime")
+        assert m.matches_name("datetime.datetime")
+        assert not m.matches_name("foo.bar.datetime")
+
+    def test_double_wildcard_suffix(self):
+        """Test datetime..* matches datetime and submodules."""
+        m = PatternTypeMatcher.create("datetime..*")
+        assert m.matches_name("datetime.datetime")
+        assert m.matches_name("datetime.timezone")
+        assert m.matches_name("datetime.date")
+        assert m.matches_name("datetime.foo.bar")
+        assert not m.matches_name("other.datetime")
+
+    def test_double_wildcard_prefix(self):
+        """Test ..datetime matches any path ending in datetime."""
+        m = PatternTypeMatcher.create("..datetime")
+        assert m.matches_name("datetime")
+        assert m.matches_name("foo.datetime")
+        assert m.matches_name("foo.bar.datetime")
+        assert not m.matches_name("datetime.foo")
+
+    def test_double_wildcard_middle(self):
+        """Test foo..bar matches foo.*.bar patterns."""
+        m = PatternTypeMatcher.create("foo..bar")
+        assert m.matches_name("foo.bar")
+        assert m.matches_name("foo.x.bar")
+        assert m.matches_name("foo.x.y.z.bar")
+        assert not m.matches_name("other.bar")
+
+    def test_universal_wildcard(self):
+        """Test *..*  matches everything."""
+        m = MethodMatcher.create("*..* *(..)")
+        assert isinstance(m._type_matcher, WildcardTypeMatcher)
+
+
+class TestMethodNameMatching:
+    """Test method name pattern matching."""
+
+    def test_exact_method_match(self):
+        m = ExactMethodNameMatcher("utcnow")
+        assert m.matches("utcnow")
+        assert not m.matches("utcfromtimestamp")
+
+    def test_wildcard_method_match(self):
+        m = WildcardMethodNameMatcher()
+        assert m.matches("utcnow")
+        assert m.matches("now")
+        assert m.matches("fromtimestamp")
+
+    def test_prefix_wildcard_match(self):
+        m = PatternMethodNameMatcher("utc*")
+        assert m.matches("utcnow")
+        assert m.matches("utcfromtimestamp")
+        assert not m.matches("now")
+
+    def test_suffix_wildcard_match(self):
+        m = PatternMethodNameMatcher("*now")
+        assert m.matches("utcnow")
+        assert m.matches("now")
+        assert not m.matches("utcfromtimestamp")
+
+
+class TestArgumentMatching:
+    """Test argument pattern matching."""
+
+    def test_no_args_pattern(self):
+        m = MethodMatcher.create("foo.Bar baz()")
+        assert len(m._argument_matchers) == 0
+        assert m._varargs_position == -1
+
+    def test_varargs_pattern(self):
+        m = MethodMatcher.create("foo.Bar baz(..)")
+        assert m._varargs_position == 0
+
+    def test_single_wildcard_arg(self):
+        m = MethodMatcher.create("foo.Bar baz(*)")
+        assert len(m._argument_matchers) == 1
+        assert m._varargs_position == -1
+
+    def test_typed_arg(self):
+        m = MethodMatcher.create("foo.Bar baz(str)")
+        assert len(m._argument_matchers) == 1
+        assert m._varargs_position == -1
+
+    def test_mixed_args(self):
+        m = MethodMatcher.create("foo.Bar baz(str, .., int)")
+        assert len(m._argument_matchers) == 3
+        assert m._varargs_position == 1
+
+    def test_multiple_varargs_rejected(self):
+        with pytest.raises(ValueError, match="Only one"):
+            MethodMatcher.create("foo.Bar baz(.., ..)")
+
+    def test_typed_arg_matches_a_union_whose_members_besides_none_all_match(self):
+        str_arg = MethodMatcher.create("foo.Bar baz(str)")._argument_matchers[0]
+        string, null = JavaType.Primitive.String, JavaType.Primitive.Null
+        assert str_arg.matches(JavaType.Union(_bounds=[string, null]))
+
+        assert not str_arg.matches(JavaType.Union(_bounds=[JavaType.Primitive.Int, string]))
+
+    def test_unknown_member_of_an_optional_argument_is_excused_like_an_unknown_argument(self):
+        str_arg = MethodMatcher.create("foo.Bar baz(str)")._argument_matchers[0]
+        optional_unknown = JavaType.Union(_bounds=[JavaType.Unknown(), JavaType.Primitive.Null])
+        assert str_arg.matches_unknown(optional_unknown)
+
+
+class TestMethodMatcherRepr:
+    """Test string representation."""
+
+    def test_repr(self):
+        m = MethodMatcher.create("datetime.datetime utcnow()")
+        assert repr(m) == "MethodMatcher('datetime.datetime utcnow()')"
+
+
+WORKER_SOURCE = (
+    "import threading\n"
+    "\n"
+    "\n"
+    "class Worker(threading.Thread):\n"
+    "    def run(self):\n"
+    "        pass\n"
+    "\n"
+    "\n"
+    "w = Worker()\n"
+    "w.getName()\n"
+    "w.run()\n"
+)
+
+
+@pytest.fixture(scope="module")
+def worker_cu():
+    """Parse a ``threading.Thread`` subclass with real type attribution."""
+    import ast
+    import os
+    import shutil
+    import tempfile
+
+    from rewrite.python._parser_visitor import ParserVisitor
+    from rewrite.python.ty_client import TyTypesClient
+
+    if shutil.which("ty-types") is None:
+        pytest.skip("ty-types CLI is not installed (ensure ty-types binary is on PATH)")
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        path = os.path.join(tmpdir, "m.py")
+        with open(path, "w") as f:
+            f.write(WORKER_SOURCE)
+        with TyTypesClient() as client:
+            if not client.initialize(tmpdir):
+                pytest.skip("ty-types did not initialize, so there is no attribution to match")
+            return ParserVisitor(WORKER_SOURCE, path, client).visit_Module(
+                ast.parse(WORKER_SOURCE)
+            )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _worker_invocation(cu, name):
+    from rewrite.python.visitor import PythonVisitor
+
+    found = []
+
+    class _Collector(PythonVisitor):
+        def visit_method_invocation(self, mi, p):
+            if mi.name.simple_name == name:
+                found.append(mi)
+            return super().visit_method_invocation(mi, p)
+
+    _Collector().visit(cu, None)
+    assert len(found) == 1
+    return found[0]
+
+
+class TestMatchOverrides:
+    """Matching a method declared on a supertype of the call's declaring type."""
+
+    def test_the_flag_is_needed_only_for_a_real_override(self, worker_cu):
+        overridden = _worker_invocation(worker_cu, "run")
+        assert overridden.method_type.declaring_type.fully_qualified_name == "m.Worker"
+        assert not MethodMatcher.create("threading.Thread run(..)").matches(overridden)
+        assert MethodMatcher.create(
+            "threading.Thread run(..)", match_overrides=True
+        ).matches(overridden)
+
+        # Inherited without an override, so the base type is already the declaring one.
+        inherited = _worker_invocation(worker_cu, "getName")
+        assert MethodMatcher.create("threading.Thread getName(..)").matches(inherited)
+
+    def test_unrelated_supertype_still_rejected(self, worker_cu):
+        assert not MethodMatcher.create(
+            "queue.Queue run(..)", match_overrides=True
+        ).matches(_worker_invocation(worker_cu, "run"))
+
+    def test_preconditions_forward_the_flag(self, worker_cu):
+        from rewrite import InMemoryExecutionContext
+        from rewrite.markers import SearchResult
+        from rewrite.python.preconditions import find_methods, uses_method
+
+        def selects(recipe_ref) -> bool:
+            visited = recipe_ref.local_visitor.visit(worker_cu, InMemoryExecutionContext())
+            return visited.markers.find_first(SearchResult) is not None
+
+        pattern = "threading.Thread run(..)"
+        assert not selects(uses_method(pattern))
+        assert selects(uses_method(pattern, match_overrides=True))
+        assert selects(find_methods(pattern, match_overrides=True))
+
+
+def _invocation(source: str, name: str, type_attribution: bool = False) -> MethodInvocation:
+    """The single call named ``name`` in ``source``."""
+    found: List[MethodInvocation] = []
+
+    class Finder(PythonVisitor):
+        def visit_method_invocation(self, method: MethodInvocation, p):
+            if method.name.simple_name == name:
+                found.append(method)
+            return super().visit_method_invocation(method, p)
+
+    RecipeSpec(type_attribution=type_attribution).rewrite_run(
+        python(source, after_recipe=lambda sf: Finder().visit(sf, None)))
+    assert len(found) == 1
+    return found[0]
+
+
+class TestMatchUnknownTypes:
+    """Structural fallback for calls whose declaring type is ``JavaType.Unknown``."""
+
+    def test_wildcard_receiver_matches_an_unknown_declaring_type_by_default(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert MethodMatcher.create("* *(..)").matches(mi)
+        assert MethodMatcher.create("*..* assertTrue(..)").matches(mi)
+
+    def test_concrete_receiver_needs_match_unknown_types(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        m = MethodMatcher.create("org.junit.Assert assertTrue(..)")
+        assert not m.matches(mi)
+        assert m.matches(mi, match_unknown_types=True)
+
+    def test_receiver_identifier_is_matched_against_the_pattern_tail(self):
+        mi = _invocation("MyHelper.do_something(True)", "do_something")
+
+        def matches(type_pattern: str) -> bool:
+            return MethodMatcher.create(f"{type_pattern} do_something(..)").matches(
+                mi, match_unknown_types=True)
+
+        assert matches("com.foo.MyHelper")
+        assert matches("com.foo.*")
+        assert matches("com..MyHelper")
+        assert matches("com.foo.My*Helper")
+        assert not matches("com.foo.OtherHelper")
+        assert not matches("com.foo.Your*Helper")
+
+    def test_a_receiver_that_is_not_an_identifier_is_not_checked(self):
+        mi = _invocation("array.array('b').tostring()", "tostring")
+        # Matching an unrelated receiver here is the false positive `matches`
+        # warns about; Java leaves a non-identifier receiver unchecked too.
+        assert MethodMatcher.create("nowhere.At.All tostring(..)").matches(
+            mi, match_unknown_types=True)
+
+    def test_a_mismatched_method_name_is_rejected(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert not MethodMatcher.create("org.junit.Assert assertFalse(..)").matches(
+            mi, match_unknown_types=True)
+
+    def test_argument_count_must_still_match(self):
+        mi = _invocation("Assert.assertTrue(foo.bar(), 'message')", "assertTrue")
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*)").matches(
+            mi, match_unknown_types=True)
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*, *, *)").matches(
+            mi, match_unknown_types=True)
+
+    def test_an_unattributed_argument_satisfies_a_typed_argument_matcher(self):
+        mi = _invocation("Assert.assertTrue(foo.bar())", "assertTrue")
+        assert MethodMatcher.create("org.junit.Assert assertTrue(bool)").matches(
+            mi, match_unknown_types=True)
+
+    def test_a_known_argument_type_is_still_checked(self):
+        mi = _invocation("Assert.assertTrue(foo.bar(), 'message')", "assertTrue")
+        assert MethodMatcher.create("org.junit.Assert assertTrue(*, str)").matches(
+            mi, match_unknown_types=True)
+
+        assert not MethodMatcher.create("org.junit.Assert assertTrue(*, int)").matches(
+            mi, match_unknown_types=True)
+
+class TestArgumentTypeMatching:
+    """Argument matching against a parsed call."""
+
+    def test_a_zero_argument_call_matches_an_empty_argument_pattern(self):
+        mi = _invocation("import m\nm.g()\n", "g")
+        assert MethodMatcher.create("m g()").matches(mi)
+        assert not MethodMatcher.create("m g(*)").matches(mi)
+        # The Java host matches the same call through JavaType.Method, counting
+        # parameter types; both peers have to see zero for one pattern to serve both.
+        assert not mi.method_type.parameter_types
+
+    def test_a_primitive_argument_matches_its_python_spelling(self):
+        mi = _invocation("import m\nm.f('s', 1, 1.5, True, None)\n", "f")
+        assert MethodMatcher.create("m f(str, int, float, bool, None)").matches(mi)
+        assert not MethodMatcher.create("m f(str, int, float, bool, str)").matches(mi)
+
+    def test_a_wildcard_argument_accepts_an_argument_with_no_type(self):
+        mi = _invocation("import m\nm.f(g(), 'message')\n", "f")
+        assert MethodMatcher.create("m f(*, str)").matches(mi)
+
+    def test_a_typed_pattern_matches_a_keyword_argument(self):
+        mi = _invocation("import m\nm.f(x=1)\n", "f")
+        assert MethodMatcher.create("m f(int)").matches(mi)
+
+    def test_an_argument_type_pattern_may_contain_wildcards(self):
+        mi = _invocation("import datetime\nimport m\nm.f(datetime.datetime.now())\n",
+                         "f", type_attribution=True)
+        assert MethodMatcher.create("m f(datetime.*)").matches(mi)
+        assert not MethodMatcher.create("m f(json.*)").matches(mi)

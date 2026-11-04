@@ -34,7 +34,10 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import {isDeepStrictEqual} from "util";
 import * as YAML from "yaml";
+import * as semver from "semver";
+import picomatch from "picomatch";
 
 /**
  * Configuration for each package manager.
@@ -51,6 +54,9 @@ interface PackageManagerConfig {
 
     /** Command to list dependencies in JSON format (if supported) */
     listCommand?: string[];
+
+    /** Command that prints the release of the package manager that runs where it is run */
+    versionCommand: string[];
 }
 
 /**
@@ -59,10 +65,16 @@ interface PackageManagerConfig {
 const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
     [PackageManager.Npm]: {
         lockFile: 'package-lock.json',
-        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory
-        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts'],
-        installCommand: ['npm', 'install', '--ignore-scripts'],
+        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory.
+        // --legacy-peer-deps disables npm 7+'s strict peer-dep enforcement. The install here is
+        // purely a validity check on the bumped package.json; the resulting node_modules is not
+        // shipped to the user. Strict peer enforcement creates false negatives in common
+        // ecosystem upgrades (e.g. Angular major bumps where third-party libs lag), which would
+        // otherwise prevent the bump from being written even when it is correct.
+        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts', '--legacy-peer-deps'],
+        installCommand: ['npm', 'install', '--ignore-scripts', '--legacy-peer-deps'],
         listCommand: ['npm', 'list', '--json', '--all'],
+        versionCommand: ['npm', '--version'],
     },
     [PackageManager.YarnClassic]: {
         lockFile: 'yarn.lock',
@@ -70,6 +82,7 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['yarn', 'install', '--ignore-scripts'],
         installCommand: ['yarn', 'install', '--ignore-scripts'],
         listCommand: ['yarn', 'list', '--json'],
+        versionCommand: ['yarn', '--version'],
     },
     [PackageManager.YarnBerry]: {
         lockFile: 'yarn.lock',
@@ -77,19 +90,24 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['yarn', 'install', '--mode', 'skip-build'],
         installCommand: ['yarn', 'install', '--mode', 'skip-build'],
         listCommand: ['yarn', 'info', '--all', '--json'],
+        versionCommand: ['yarn', '--version'],
     },
     [PackageManager.Pnpm]: {
         lockFile: 'pnpm-lock.yaml',
-        // --ignore-scripts prevents lifecycle scripts from running in temp directory
-        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts'],
-        installCommand: ['pnpm', 'install', '--ignore-scripts'],
+        // --ignore-scripts prevents lifecycle scripts from running in temp directory.
+        // --no-strict-peer-dependencies disables pnpm's strict peer-dep enforcement (see the
+        // `npm` entry above for rationale).
+        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-strict-peer-dependencies'],
+        installCommand: ['pnpm', 'install', '--ignore-scripts', '--no-strict-peer-dependencies'],
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
+        versionCommand: ['pnpm', '--version'],
     },
     [PackageManager.Bun]: {
         lockFile: 'bun.lock',
         // Bun doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['bun', 'install', '--ignore-scripts'],
         installCommand: ['bun', 'install', '--ignore-scripts'],
+        versionCommand: ['bun', '--version'],
     },
 };
 
@@ -177,28 +195,132 @@ interface InstallOptions {
     env?: Record<string, string>;
 }
 
+/** A conflicting declaration must not produce a resolution graph from another manager's lock. */
+export class PackageManagerSelectionError extends Error {
+}
+
+export interface PackageManagerSelection {
+    readonly packageManager: PackageManager;
+    readonly root: string;
+    readonly lockFile?: string;
+}
+
+function declaredPackageManager(manifest: unknown): PackageManager | undefined {
+    if (!manifest || typeof manifest !== "object") return undefined;
+    const value = (manifest as {packageManager?: unknown}).packageManager;
+    if (typeof value !== "string") return undefined;
+    const match = /^(npm|pnpm|bun|yarn)@(.+)$/.exec(value);
+    const version = match && semver.valid(match[2].split("+", 1)[0]);
+    if (!match || !version) return undefined;
+    switch (match[1]) {
+        case "npm": return PackageManager.Npm;
+        case "pnpm": return PackageManager.Pnpm;
+        case "bun": return PackageManager.Bun;
+        case "yarn": return semver.major(version) === 1 ? PackageManager.YarnClassic : PackageManager.YarnBerry;
+        default: return undefined;
+    }
+}
+
+function isWorkspaceMember(root: string, member: string, manifest: unknown): boolean {
+    let patterns: unknown = manifest && typeof manifest === "object" ?
+        (manifest as {workspaces?: unknown}).workspaces : undefined;
+    if (patterns && !Array.isArray(patterns) && typeof patterns === "object") {
+        patterns = (patterns as {packages?: unknown}).packages;
+    }
+    if (!Array.isArray(patterns)) {
+        try { patterns = YAML.parse(fs.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8"))?.packages; }
+        catch { return false; }
+    }
+    if (!Array.isArray(patterns) || !patterns.every(p => typeof p === "string")) return false;
+    const relative = path.relative(root, member).split(path.sep).join("/");
+    const include = patterns.filter(p => !p.startsWith("!"));
+    const exclude = patterns.filter(p => p.startsWith("!")).map(p => p.slice(1));
+    return include.length > 0 && picomatch(include)(relative) &&
+        (exclude.length === 0 || !picomatch(exclude)(relative));
+}
+
 /**
- * Detects the package manager used in a directory by checking for lock files.
- *
- * @param dir The directory to check
- * @returns The detected package manager, or undefined if none found
+ * Select a lock and its manager together. The nearest supported pinned declaration takes precedence over lock
+ * filename order, including when a workspace member inherits it. An explicit parser boundary limits the walk.
+ * The supplied manifest is the parser input at startDir, which may differ from the file on disk.
  */
-export function detectPackageManager(dir: string): PackageManager | undefined {
-    for (const config of LOCK_FILE_DETECTION) {
-        const lockPath = path.join(dir, config.filename);
-        if (fs.existsSync(lockPath)) {
-            if (typeof config.packageManager === 'function') {
-                try {
-                    const content = fs.readFileSync(lockPath, 'utf-8');
-                    return config.packageManager(content);
-                } catch {
-                    continue;
+export function selectPackageManager(startDir: string, rootDir?: string, manifest?: unknown): PackageManagerSelection | undefined {
+    const dirs: string[] = [];
+    const stop = rootDir === undefined ? undefined : path.resolve(rootDir);
+    for (let dir = path.resolve(startDir); ; dir = path.dirname(dir)) {
+        dirs.push(dir);
+        if (dir === stop || path.dirname(dir) === dir) break;
+    }
+    const manifests = new Map<string, unknown>();
+    for (const dir of dirs) {
+        if (dir === dirs[0] && manifest !== undefined) manifests.set(dir, manifest);
+        else {
+            try { manifests.set(dir, JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"))); }
+            catch { /* A lock can still identify a project without a readable manifest. */ }
+        }
+    }
+    let declared: {manager: PackageManager, root: string} | undefined;
+    for (const dir of dirs) {
+        const pkg = manifests.get(dir);
+        const manager = declaredPackageManager(pkg);
+        if (manager !== undefined && (dir === dirs[0] || isWorkspaceMember(dir, dirs[0], pkg))) {
+            declared = {manager, root: dir};
+            break;
+        }
+    }
+    if (declared) {
+        // A nested declaration defines its own project unless a compatible workspace actually contains it.
+        let boundary = dirs.indexOf(declared.root);
+        for (let i = boundary + 1; i < dirs.length; i++) {
+            const pkg = manifests.get(dirs[i]);
+            const manager = declaredPackageManager(pkg);
+            if (manager !== undefined && manager !== declared.manager) break;
+            if (isWorkspaceMember(dirs[i], declared.root, pkg)) boundary = i;
+        }
+        const projectDirs = dirs.slice(0, boundary + 1);
+        const filename = getLockFileName(declared.manager);
+        for (const dir of projectDirs) {
+            const lockFile = path.join(dir, filename);
+            if (!fs.existsSync(lockFile)) continue;
+            if (filename === "yarn.lock") {
+                const actual = isYarnBerryLockFile(fs.readFileSync(lockFile, "utf8")) ?
+                    PackageManager.YarnBerry : PackageManager.YarnClassic;
+                if (actual !== declared.manager) {
+                    throw new PackageManagerSelectionError(
+                        `packageManager selects ${declared.manager}, but ${lockFile} contains ${actual}`);
                 }
             }
-            return config.packageManager;
+            return {packageManager: declared.manager, root: dir, lockFile};
+        }
+        const foreign = projectDirs.flatMap(dir => LOCK_FILE_DETECTION
+            .map(config => path.join(dir, config.filename)).filter(file => fs.existsSync(file)));
+        if (foreign.length) {
+            throw new PackageManagerSelectionError(
+                `packageManager selects ${declared.manager}, but ${filename} is missing; other lock files: ${foreign.join(", ")}`);
+        }
+        return {packageManager: declared.manager, root: declared.root};
+    }
+    // Without a recognized declaration, retain the existing nearest-lock/filename precedence.
+    for (const dir of dirs) {
+        for (const config of LOCK_FILE_DETECTION) {
+            const lockFile = path.join(dir, config.filename);
+            if (!fs.existsSync(lockFile)) continue;
+            if (typeof config.packageManager !== "function") {
+                return {packageManager: config.packageManager, root: dir, lockFile};
+            }
+            try {
+                return {packageManager: config.packageManager(fs.readFileSync(lockFile, "utf8")), root: dir, lockFile};
+            } catch {
+                return {packageManager: PackageManager.YarnClassic, root: dir, lockFile};
+            }
         }
     }
     return undefined;
+}
+
+/** Detect the manager selected by the declaration and locks in this directory. */
+export function detectPackageManager(dir: string): PackageManager | undefined {
+    return selectPackageManager(dir, dir)?.packageManager;
 }
 
 /**
@@ -238,6 +360,7 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: options.timeout ?? 120000,
             env: options.env ? {...process.env, ...options.env} : process.env,
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (result.error) {
@@ -291,6 +414,7 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout,
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error || result.status !== 0) {
@@ -298,6 +422,46 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
     }
 
     return result.stdout;
+}
+
+/**
+ * A release as a package manager's `--version` prints it: `major.minor.patch`, with a prerelease or build or both.
+ */
+const RELEASE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+/**
+ * What the package manager's `--version` answers, run in `cwd`: in the project's root directory, the release that
+ * would install the project on this machine, since Yarn and pnpm decide there which release runs (`yarnPath`,
+ * corepack, pnpm's own switching).
+ *
+ * It runs as the parser's other package manager commands do, with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`, no input and
+ * a short timeout, so it never prompts and never throws.
+ *
+ * @param pm The package manager to ask
+ * @param cwd The project's root directory
+ * @param timeout Timeout in milliseconds
+ * @returns The trimmed answer, or undefined when the package manager is not installed, fails, or answers something
+ *          that is no version
+ */
+export function runVersion(pm: PackageManager, cwd: string, timeout: number = 10000): string | undefined {
+    const [cmd, ...args] = PACKAGE_MANAGER_CONFIGS[pm].versionCommand;
+    try {
+        const result = spawnSync(getPlatformCommand(cmd), args, {
+            cwd,
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout,
+            env: {...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'},
+            ...(os.platform() === 'win32' ? { shell: true } : {})
+        });
+        if (result.error || result.status !== 0 || typeof result.stdout !== 'string') {
+            return undefined;
+        }
+        const answer = result.stdout.trim();
+        return RELEASE.test(answer) ? answer : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -569,6 +733,16 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         existingMarker.packageManager,
         existingMarker.npmrcConfigs
     );
+
+    // If the new marker is structurally identical to the existing one (ignoring the
+    // auto-generated id), return doc unchanged to avoid minting a fresh AST identity
+    // for a no-op marker update. This prevents the empty-diff guard from firing on
+    // recipes that don't modify package.json (e.g. lock-file-only fix strategies).
+    const {id: _existingId, ...existingRest} = existingMarker;
+    const {id: _newId, ...newRest} = newMarker;
+    if (isDeepStrictEqual(existingRest, newRest)) {
+        return doc;
+    }
 
     // Replace the marker in the document
     return {

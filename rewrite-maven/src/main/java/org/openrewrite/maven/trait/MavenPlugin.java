@@ -28,6 +28,8 @@ import java.util.Optional;
 @Value
 public class MavenPlugin implements Trait<Xml.Tag> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher BUILD_PLUGIN_MATCHER = new XPathMatcher("//build/plugins/plugin");
+    static final XPathMatcher MANGED_PLUGIN_MATCHER = new XPathMatcher("//build/pluginManagement/plugins/plugin");
 
     Cursor cursor;
 
@@ -38,6 +40,23 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
     public static class Matcher extends MavenTraitMatcher<MavenPlugin> {
 
+        @Nullable
+        Boolean isManaged;
+        @Nullable
+        String groupId;
+        @Nullable
+        String artifactId;
+
+        public Matcher() {
+            this(null,  null, null);
+        }
+
+        public Matcher(@Nullable Boolean isManaged,  @Nullable String groupId, @Nullable String artifactId) {
+            this.isManaged = isManaged;
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+        }
+
         @Override
         protected @Nullable MavenPlugin test(Cursor cursor) {
             Object value = cursor.getValue();
@@ -46,15 +65,23 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
                 // `XPathMatcher` is still a bit expensive
                 if (!"plugin".equals(tag.getName()) ||
-                    (!PLUGIN_MATCHER.matches(cursor))) {
+                        (isManaged == null && !PLUGIN_MATCHER.matches(cursor)) ||
+                        (Boolean.FALSE.equals(isManaged) && !BUILD_PLUGIN_MATCHER.matches(cursor)) ||
+                        (Boolean.TRUE.equals(isManaged) && !MANGED_PLUGIN_MATCHER.matches(cursor))) {
                     return null;
                 }
 
-                return new MavenPlugin(
-                        cursor,
-                        getProperty(cursor, "groupId").orElse("org.apache.maven.plugins"),
-                        getProperty(cursor, "artifactId").orElse(null)
-                );
+                String currentGroupId = getProperty(cursor, "groupId").orElse("org.apache.maven.plugins");
+                if (groupId != null && !groupId.equals(currentGroupId)) {
+                    return null;
+                }
+
+                String currentArtifactId = getProperty(cursor, "artifactId").orElse(null);
+                if (artifactId != null &&  currentArtifactId != null && !artifactId.equals(currentArtifactId)) {
+                    return null;
+                }
+
+                return new MavenPlugin(cursor, currentGroupId, currentArtifactId);
             }
             return null;
         }

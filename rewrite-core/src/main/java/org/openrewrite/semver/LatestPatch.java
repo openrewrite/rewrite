@@ -18,6 +18,7 @@ package org.openrewrite.semver;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 
 @Value
 public class LatestPatch implements VersionComparator {
@@ -28,7 +29,7 @@ public class LatestPatch implements VersionComparator {
     public boolean isValid(@Nullable String currentVersion, String version) {
         Validated<? extends VersionComparator> validated = currentVersion == null ?
                 LatestRelease.buildLatestRelease("latest.release", metadataPattern) :
-                TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern, true);
+                TildeRange.build(buildTildeRange(currentVersion), metadataPattern, true);
 
         if (validated.isValid()) {
             VersionComparator comparator = validated.getValue();
@@ -47,9 +48,23 @@ public class LatestPatch implements VersionComparator {
         }
 
         //noinspection ConstantConditions
-        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
+        return TildeRange.build(buildTildeRange(currentVersion), metadataPattern)
                 .getValue()
                 .compare(currentVersion, v1, v2);
+    }
+
+    private static String buildTildeRange(String currentVersion) {
+        String major = Semver.majorVersion(currentVersion);
+        String minor = Semver.versionSegment(currentVersion, 1);
+        if (StringUtils.isNumeric(minor)) {
+            return "~" + major + "." + minor;
+        }
+        if (minor != null && XRange.isWildcard(minor)) {
+            // A wildcard minor (e.g. "2.x", "2.+") allows any minor within the major.
+            return "~" + major;
+        }
+        // An absent or non-numeric minor (e.g. "1", "1.Final") stays within the patch range.
+        return "~" + major + ".0";
     }
 
     public static Validated<LatestPatch> build(String toVersion, @Nullable String metadataPattern) {

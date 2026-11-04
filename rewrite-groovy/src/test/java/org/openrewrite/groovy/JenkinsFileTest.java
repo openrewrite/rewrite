@@ -23,6 +23,36 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class JenkinsFileTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6243")
+    @Test
+    void annotatedScriptFieldsWithListInitializer() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+
+              @Field def foo
+
+              // list of pull requests created
+              @Field List<String> newPullRequests = []
+
+              pipeline {
+                  stages {
+                      stage('Setup') {
+                          steps {
+                              script {
+                                  // empty
+                              }
+                          }
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("Jenkinsfile")
+          )
+        );
+    }
+
     @Test
     void jenkinsfile() {
         // the Jenkinsfile from spring-projects/spring-data-release
@@ -111,6 +141,32 @@ class JenkinsFileTest implements RewriteTest {
                           mimeType: 'text/html',
                           recipientProviders: [[$class: 'CulpritsRecipientProvider'], [$class: 'RequesterRecipientProvider']],
                           body: "<a href=\\"${env.BUILD_URL}\\">${currentBuild.fullDisplayName} is reported as ${currentBuild.currentResult}</a>")
+                    }
+                  }
+                }
+              }
+              """,
+            spec -> spec.path("Jenkinsfile")
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void jenkinsfileWithDestructuringAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              pipeline {
+                agent any
+                stages {
+                  stage('Build') {
+                    steps {
+                      script {
+                        def tag = '1.2.3'
+                        def (major, minor, patch) = tag.tokenize('.')
+                        echo "Major: ${major}, Minor: ${minor}, Patch: ${patch}"
+                      }
                     }
                   }
                 }

@@ -15,12 +15,12 @@
  */
 package org.openrewrite.config;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,10 +36,8 @@ public class CompositeRecipe extends Recipe {
         return getName();
     }
 
-    @Override
-    public String getDescription() {
-        return "A recipe that consists of a list of other recipes.";
-    }
+    @Getter
+    final String description = "A recipe that consists of a list of other recipes.";
 
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
@@ -49,24 +47,5 @@ public class CompositeRecipe extends Recipe {
     @Override
     public List<Recipe> getRecipeList() {
         return recipeList;
-    }
-
-    @Override
-    public List<DataTableDescriptor> getDataTableDescriptors() {
-        List<DataTableDescriptor> dataTableDescriptors = null;
-        for (Recipe recipe : getRecipeList()) {
-            List<DataTableDescriptor> dtds = recipe.getDataTableDescriptors();
-            if (!dtds.isEmpty()) {
-                if (dataTableDescriptors == null) {
-                    dataTableDescriptors = new ArrayList<>();
-                }
-                for (DataTableDescriptor dtd : dtds) {
-                    if (!dataTableDescriptors.contains(dtd)) {
-                        dataTableDescriptors.add(dtd);
-                    }
-                }
-            }
-        }
-        return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;
     }
 }

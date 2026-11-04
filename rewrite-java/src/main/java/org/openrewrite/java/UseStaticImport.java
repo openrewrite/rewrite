@@ -23,6 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
 
@@ -42,15 +43,11 @@ public class UseStaticImport extends Recipe {
             example = "java.util.Collections emptyList()")
     String methodPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Use static import";
-    }
+    @Getter
+    final String displayName = "Use static import";
 
-    @Override
-    public String getDescription() {
-        return "Removes unnecessary receiver types from static method invocations. For example, `Collections.emptyList()` becomes `emptyList()`.";
-    }
+    @Getter
+    final String description = "Removes unnecessary receiver types from static method invocations. For example, `Collections.emptyList()` becomes `emptyList()`.";
 
     @Override
     public Validated<Object> validate() {
@@ -114,7 +111,7 @@ public class UseStaticImport extends Recipe {
     }
 
     private static boolean hasConflictingImport(String typeName, String methodName, Cursor cursor) {
-        J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
+        JavaSourceFile cu = cursor.firstEnclosing(JavaSourceFile.class);
         if (cu != null) {
             for (J.Import imp : cu.getImports()) {
                 if (imp.isStatic() &&

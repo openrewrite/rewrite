@@ -16,7 +16,7 @@
 import {JS} from '../tree';
 import {J, Statement} from '../../java';
 import {Cursor, Tree} from '../../tree';
-import {TreePrinters} from '../../print';
+import {MarkerPrinter, PrintOutputCapture, TreePrinters} from '../../print';
 import {JavaScriptParser} from '../parser';
 import {WhitespaceReconciler} from './whitespace-reconciler';
 import {randomId} from '../../uuid';
@@ -108,7 +108,8 @@ export interface PrettierFormatOptions {
  * 4. Reconciles the whitespace from the formatted AST back into the original AST
  *
  * The result preserves the original AST's structure, types, and markers while
- * applying Prettier's formatting rules for whitespace.
+ * applying Prettier's formatting rules for whitespace. Where Prettier changes more than
+ * whitespace, such as removing redundant parentheses, the original is returned unchanged.
  *
  * @param sourceFile The source file to format
  * @param options Prettier formatting options
@@ -121,6 +122,26 @@ export async function prettierFormat(
     options: PrettierFormatOptions = {},
     stopAfter?: J
 ): Promise<JS.CompilationUnit> {
+    const formattedCu = await parsePrettierFormatted(sourceFile, options);
+    if (!formattedCu) {
+        return sourceFile;
+    }
+
+    const reconciler = new WhitespaceReconciler();
+    const result = reconciler.reconcile(sourceFile, formattedCu, undefined, stopAfter);
+    return reconciler.isCompatible() ? result as JS.CompilationUnit : sourceFile;
+}
+
+/**
+ * Formats the printed source file with Prettier and parses the result, which has neither the
+ * original's type attribution, ids nor markers.
+ *
+ * @returns The parsed Prettier output, or `undefined` where it does not parse
+ */
+async function parsePrettierFormatted(
+    sourceFile: JS.CompilationUnit,
+    options: PrettierFormatOptions
+): Promise<JS.CompilationUnit | undefined> {
     // Load Prettier - either specific version or bundled
     let prettier: typeof import('prettier');
 
@@ -133,8 +154,8 @@ export async function prettierFormat(
         );
     }
 
-    // Step 1: Print the AST to string
-    const originalSource = await TreePrinters.print(sourceFile);
+    // Step 1: Print the AST to string, leaving out what markers would print, such as search results
+    const originalSource = await TreePrinters.print(sourceFile, new PrintOutputCapture(MarkerPrinter.SANITIZED));
 
     // Step 2: Determine parser based on source path
     const parser = getParserForPath(sourceFile.sourcePath);
@@ -161,23 +182,11 @@ export async function prettierFormat(
         text: formattedSource
     });
 
-    if (!formattedAst) {
+    if (formattedAst?.kind !== JS.Kind.CompilationUnit) {
         console.warn('Prettier formatting: Failed to parse formatted output, returning original');
-        return sourceFile;
+        return undefined;
     }
-
-    // Step 5: Reconcile whitespace from formatted AST to original AST
-    // Note: For subtree formatting with pruned trees, the structure may differ
-    // (e.g., Prettier removes empty placeholder statements). In such cases,
-    // we return the formatted AST directly and let the caller handle
-    // subtree-level reconciliation.
-    const reconciler = new WhitespaceReconciler();
-    const formattedCu = formattedAst as JS.CompilationUnit;
-    const result = reconciler.reconcile(sourceFile, formattedCu, undefined, stopAfter);
-
-    // If reconciliation succeeded, return the reconciled original with updated whitespace
-    // If it failed (structure mismatch), return the formatted AST for subtree reconciliation
-    return reconciler.isCompatible() ? result as JS.CompilationUnit : formattedCu;
+    return formattedAst as JS.CompilationUnit;
 }
 
 /**
@@ -357,6 +366,15 @@ function pruneNode(node: any, path: PathSegment[], pathIndex: number, target: an
         return node;
     }
 
+    // A compilation unit's statements are laid out at column 0, so nothing beside the target bears
+    // on how Prettier lays it out and the printed program can be the target alone.
+    if (node.kind === JS.Kind.CompilationUnit && segment.property === 'statements' && segment.index !== undefined) {
+        const statements = value as J.RightPadded<Statement>[];
+        return updateIfChanged(node, {
+            statements: [pruneNode(statements[segment.index], path, pathIndex + 1, target)]
+        });
+    }
+
     // Handle J.Block#statements specially - prune siblings
     if (node.kind === J.Kind.Block && segment.property === 'statements' && segment.index !== undefined) {
         const statements = value as J.RightPadded<Statement>[];
@@ -430,10 +448,10 @@ function findByPath(tree: any, path: PathSegment[]): any {
         if (value == null) return undefined;
 
         if (Array.isArray(value) && segment.index !== undefined) {
-            // For block statements, target is always at the last index
-            // since following siblings are omitted during pruning
-            const isBlockStatements = current.kind === J.Kind.Block && segment.property === 'statements';
-            const index = isBlockStatements ? value.length - 1 : segment.index;
+            // In pruned statement lists the target is last, following siblings having been omitted
+            const isPrunedStatements = segment.property === 'statements' &&
+                (current.kind === J.Kind.Block || current.kind === JS.Kind.CompilationUnit);
+            const index = isPrunedStatements ? value.length - 1 : segment.index;
             const item = value[index];
             if (item == null) return undefined;
             current = item;
@@ -474,13 +492,23 @@ export async function prettierFormatSubtree<T extends J>(
         return undefined;
     }
 
+    // Whatever stands between a statement and the top of its file is the file's business, so a whole
+    // statement keeps the prefix it came with. Prettier sees it, for the directives — a leading
+    // `prettier-ignore` — that a statement's own layout answers to.
+    const wholeStatement = path.length === 2 && path[0].property === 'statements' &&
+        path[0].index !== undefined && path[1].property === 'element';
+
     // Prune the tree for efficient formatting and substitute the (potentially modified) target.
     // This ensures that if the visitor modified the target before calling autoFormat,
     // we format the modified content, not the original from the cursor.
     const prunedCu = pruneTreeForSubtree(cu, path, target);
 
-    // Format the pruned compilation unit with Prettier
-    const formattedPrunedCu = await prettierFormat(prunedCu, options);
+    // Format the pruned compilation unit with Prettier. Only the target's own subtree is reconciled,
+    // so Prettier may change the code around it, the placeholders standing in for its siblings say.
+    const formattedPrunedCu = await parsePrettierFormatted(prunedCu, options);
+    if (!formattedPrunedCu) {
+        return undefined;
+    }
 
     // Find the target node in the formatted tree using the path
     const formattedTarget = findByPath(formattedPrunedCu, path);
@@ -492,7 +520,12 @@ export async function prettierFormatSubtree<T extends J>(
     const reconciler = new WhitespaceReconciler();
     const reconciled = reconciler.reconcile(target as J, formattedTarget as J, undefined, stopAfter);
 
-    return reconciled as T;
+    // The walk that carries whitespace back pairs the two trees node for node, which a change to
+    // the code itself — Prettier dropping redundant parentheses, say — makes impossible
+    if (!reconciler.isCompatible()) {
+        return undefined;
+    }
+    return (wholeStatement ? {...reconciled as T, prefix: target.prefix} : reconciled as T);
 }
 
 /**
@@ -554,7 +587,8 @@ export function getPrettierStyle(
  * @param p The visitor parameter
  * @param cursor Optional cursor for subtree formatting
  * @param stopAfter Optional tree to stop after
- * @returns The formatted tree
+ * @returns The formatted tree, or `undefined` where Prettier's result cannot be carried back,
+ *          leaving the caller to lay the tree out itself
  */
 export async function applyPrettierFormatting<R extends J, P>(
     tree: R,
@@ -589,31 +623,20 @@ export async function applyPrettierFormatting<R extends J, P>(
         prettierVersion: prettierStyle.prettierVersion,
     };
 
+    const wholeFile = t.kind === JS.Kind.CompilationUnit;
     try {
-        if (t.kind === JS.Kind.CompilationUnit) {
+        if (wholeFile) {
             // Format and reconcile the entire compilation unit
             const formatted = await prettierFormat(t as unknown as JS.CompilationUnit, prettierOpts, stopAfter as J | undefined);
             return formatted as unknown as R;
         }
 
-        if (!cursor) {
-            // No cursor provided - can't use subtree formatting, return with essential formatting
-            console.warn('Prettier formatting: No cursor provided for subtree, returning with essential formatting only');
-            return t;
-        }
-
-        // Use prettierFormatSubtree for subtree formatting
-        const formatted = await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined);
-        if (formatted) {
-            return formatted as R;
-        }
-
-        // Subtree formatting failed, return with essential formatting applied
-        console.warn('Prettier formatting: Subtree formatting failed, returning with essential formatting only');
-        return t;
+        // Pruning and reconciling a subtree both go by where it sits in its file
+        return cursor && await prettierFormatSubtree(t, cursor, prettierOpts, stopAfter as J | undefined) as R | undefined;
     } catch (e) {
-        // If Prettier fails, return tree with essential formatting applied
-        console.warn('Prettier formatting failed, returning with essential formatting only:', e);
-        return t;
+        console.warn('Prettier formatting failed:', e);
+        // The built-in visitors lay out every line they are given, so a whole file — the author's
+        // layout rather than a recipe's — keeps the one it came with; a subtree is handed on.
+        return wholeFile ? t : undefined;
     }
 }

@@ -12,6 +12,11 @@ repositories {
             excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
         }
     }
+    google {
+        content {
+            includeGroup("com.android.tools.build")
+        }
+    }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
         content {
@@ -32,8 +37,11 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-resources:latest.release")
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
-    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
-    parserClasspath("com.gradle:develocity-gradle-plugin:3.+")
+    // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
+    // 4.x removed the latter, which settings scripts still awaiting MigrateGradleEnterpriseToDevelocity rely on
+    parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
+
+    testParserClasspath("com.android.tools.build:gradle-api:9.4.1")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
@@ -51,21 +59,24 @@ dependencies {
     api(project(":rewrite-kotlin"))
     api(project(":rewrite-maven"))
     api("org.jetbrains:annotations:latest.release")
-    compileOnly(project(":rewrite-test"))
-    implementation(project(":rewrite-properties"))
-    implementation(project(":rewrite-toml"))
+    api(project(":rewrite-toml"))
 
-    compileOnly("org.codehaus.groovy:groovy:latest.release")
+    implementation(project(":rewrite-properties"))
+
+    compileOnly(project(":rewrite-test"))
+    compileOnly("org.apache.groovy:groovy:4.+")
     compileOnly(gradleApi())
-    // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
-    compileOnly("com.gradle:develocity-gradle-plugin:3.+")
+    compileOnly("com.gradle:develocity-gradle-plugin:3.19.2")
+
+    // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
+    // (mockwebserver 4.x would otherwise pin them to 1.9.10 transitively).
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.20"))
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
         exclude("org.slf4j", "slf4j-nop")
     }
-    testImplementation(project(":rewrite-toml"))
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
@@ -88,7 +99,23 @@ java {
 
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
-    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
+    val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
+        // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
+        @get:Classpath
+        val pluginClasspath: FileCollection = pluginLocalTestClasspath.filter { it.name != "test-manifest.txt" }
+
+        // The manifest file contains absolute paths, so exclude it from cache key;
+        // the classpath property above already tracks the actual content
+        @get:Internal
+        val manifest: File = manifestFile
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}"
+        )
+    })
+    maxHeapSize = "2g"
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode

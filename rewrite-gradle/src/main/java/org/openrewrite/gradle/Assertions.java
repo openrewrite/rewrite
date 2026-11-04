@@ -29,10 +29,12 @@ import org.openrewrite.test.UncheckedConsumer;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.function.Consumer;
 
+@CheckReturnValue
 public class Assertions {
 
     private Assertions() {

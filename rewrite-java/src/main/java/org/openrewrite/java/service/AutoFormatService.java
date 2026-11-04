@@ -17,14 +17,57 @@ package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.format.BlankLinesVisitor;
+import org.openrewrite.java.format.NormalizeFormatVisitor;
+import org.openrewrite.java.format.SpacesVisitor;
+import org.openrewrite.java.format.TabsAndIndentsVisitor;
+import org.openrewrite.java.style.SpacesStyle;
 
 @Incubating(since = "8.2.0")
 public class AutoFormatService {
 
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
         return new AutoFormatVisitor<>(stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link NormalizeFormatVisitor}. Edit
+     * recipes that mutate an LST node — e.g. by removing a leading annotation
+     * — can leave whitespace stranded on inner elements (modifier/kind
+     * prefixes), violating the "whitespace lives on the outermost element"
+     * convention. Running this visitor on the result moves the whitespace
+     * back to the outermost element so downstream passes ({@link BlankLinesVisitor}
+     * in particular) can normalize it.
+     */
+    public <P> JavaVisitor<P> normalizeFormatVisitor(@Nullable Tree stopAfter) {
+        return new NormalizeFormatVisitor<>(stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link BlankLinesVisitor}.
+     */
+    public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        return new BlankLinesVisitor<>(sourceFile, stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link SpacesVisitor}. The {@code spacesStyle}
+     * carries Java-specific tuning (e.g. typecast parenthesis padding) that only applies
+     * to languages with C-style casts; languages that reuse {@code J.TypeCast} for other
+     * syntax resolve their own style from {@code sourceFile} instead.
+     */
+    public <P> JavaVisitor<P> spacesVisitor(SourceFile sourceFile, SpacesStyle spacesStyle, @Nullable Tree stopAfter) {
+        return new SpacesVisitor<>(spacesStyle, stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link TabsAndIndentsVisitor}.
+     */
+    public <P> JavaVisitor<P> tabsAndIndentsVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        return new TabsAndIndentsVisitor<>(sourceFile, stopAfter);
     }
 }

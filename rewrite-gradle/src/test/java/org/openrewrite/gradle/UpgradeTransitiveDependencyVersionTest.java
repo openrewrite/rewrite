@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -75,6 +76,44 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
 
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addConstraintWithApplyFrom() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
               }
               """
           )
@@ -692,8 +731,52 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
     @Test
-    void removeOtherVersionConstraint() {
+    void updateStrictlyVersionConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              strictly('2.12.0')
+                          }
+                          because 'security'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              strictly('2.12.5')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
+    @Test
+    void updateStrictlyVersionConstraintWithoutVersionInString() {
         rewriteRun(
           buildGradle(
             """
@@ -722,6 +805,91 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                          version {
+                              strictly('2.12.5')
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateStrictlyVersionConstraintAddingBecause() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              strictly('2.12.0')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              strictly('2.12.5')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintAddingBecauseKeepsRejectedVersions() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              reject('2.11.0')
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              reject('2.11.0')
+                          }
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -838,77 +1006,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void includedConfigurationsReceiveOnlyConfiguredConstraints() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
-          buildGradle(
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """,
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  constraints {
-                      pitest('org.apache.commons:commons-lang3:3.14.0')
-                  }
-
-                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void noIncludedConfigurationsReceiveAllConstraints() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
-          buildGradle(
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """,
-            """
-              plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
-                  id 'java'
-              }
-              repositories { mavenCentral() }
-              dependencies {
-                  constraints {
-                      pitest('org.apache.commons:commons-lang3:3.14.0')
-                      testImplementation('org.apache.commons:commons-lang3:3.14.0')
-                  }
-
-                  testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void useResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
           buildGradle(
@@ -948,6 +1045,253 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * spring-boot-dependencies imports the log4j BOM at {@code ${log4j2.version}}, so overriding that project
+     * property is how Spring documents moving every log4j artifact, and no resolution rule is needed.
+     */
+    @Test
+    void overrideBomPropertyWhenSpringDependencyManagementPluginImportsBom() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['log4j2.version'] = '2.17.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolutionRuleOverridesBomManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "org.springframework.boot", "spring-boot-autoconfigure", "2.5.8", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+
+                  implementation 'org.springframework.boot:spring-boot-starter:2.5.6'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'org.springframework.boot' && details.requested.name == 'spring-boot-autoconfigure') {
+                          details.useVersion('2.5.8')
+                      }
+                  }
+              }
+
+              dependencies {
+
+                  implementation 'org.springframework.boot:spring-boot-starter:2.5.6'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesSharingABomPropertyDeclareItOnceAtTheHigherVersion() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null),
+            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-api", "2.17.0", null, null, null)
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['log4j2.version'] = '2.17.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addConstraintForTransitiveDependencyManagedByPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "com.fasterxml*", "jackson-core", "2.13.0", null, "CVE-2024-BAD", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.13.0') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void noChangesIfDependencyIsAlsoPresentOnProject() {
         rewriteRun(
@@ -961,97 +1305,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation('com.fasterxml.jackson.core:jackson-core:2.12.0')
                   implementation('com.fasterxml.jackson.core:jackson-databind:2.12.0')
-              }
-              """
-          )
-        );
-    }
-
-    /**
-     * Makes no changes when a Gradle plugin (like the Kotlin JVM plugin) provides a direct dependency.
-     */
-    @Test
-    void doesNotAddConstraintForPluginProvidedDirectDependency() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", null)),
-          buildGradle(
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-              """
-          )
-        );
-    }
-
-    /**
-     * When a Gradle plugin (like the Kotlin JVM plugin) provides transitive dependencies directly without user declaration,
-     * we can still add constraints for those dependencies.
-     */
-    @Test
-    void groovyDslAddConstraintForPluginProvidedTransitiveDependency() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
-          buildGradle(
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-              """,
-            """
-              plugins {
-                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
-              }
-              repositories { mavenCentral() }
-
-              dependencies {
-                  constraints {
-                      implementation('org.jetbrains.kotlin:kotlin-stdlib:2.1.0') {
-                          because 'CVE-2022-24329'
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    /**
-     * When a Gradle plugin (like the Kotlin JVM plugin) provides dependencies directly without user declaration,
-     * we can still add constraints for those dependencies.
-     */
-    @Test
-    void kotlinDslAddConstraintForPluginProvidedDependency() {
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
-          buildGradleKts(
-            """
-              plugins {
-                  kotlin("jvm") version "1.7.21"
-              }
-              repositories { mavenCentral() }
-              """,
-            """
-              plugins {
-                  kotlin("jvm") version "1.7.21"
-              }
-              repositories { mavenCentral() }
-
-              dependencies {
-
-                  constraints {
-                      implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0") {
-                          because("CVE-2022-24329")
-                      }
-                  }
               }
               """
           )
@@ -1129,6 +1382,87 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void kotlinDslUpdateConstraintAddingBecause() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("org.openrewrite:rewrite-core:7.0.0")
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.0")
+                      implementation("org.openrewrite:rewrite-xml:7.0.0")
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("org.openrewrite:rewrite-core:7.0.0")
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          because("CVE-2024-BAD")
+                      }
+                      implementation("org.openrewrite:rewrite-xml:7.0.0")
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUpdateRequireVersionConstraintAddingBecause() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.0") {
+                          version {
+                              require("2.12.0")
+                              reject("2.11.0")
+                          }
+                      }
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
+                          version {
+                              require("2.12.5")
+                              reject("2.11.0")
+                          }
+                          because("CVE-2024-BAD")
+                      }
+                  }
+
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinDslUseResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
           buildGradleKts(
@@ -1170,8 +1504,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Test
     void canHandleNullScannedAccumulator() {
-        UpgradeTransitiveDependencyVersion updateClassgraph = new UpgradeTransitiveDependencyVersion("io.github.classgraph", "classgraph", "4.8.112", null, null, null);
-        UpgradeTransitiveDependencyVersion updateJackson = new UpgradeTransitiveDependencyVersion("com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null);
+        var updateClassgraph = new UpgradeTransitiveDependencyVersion("io.github.classgraph", "classgraph", "4.8.112", null, null, null);
+        var updateJackson = new UpgradeTransitiveDependencyVersion("com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null);
         rewriteRun(
           spec -> spec.recipe(new ScanningAccumulatedUpgradeRecipe(updateClassgraph, updateJackson)),
           buildGradle(
@@ -1392,13 +1726,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       // A recipe that updates an existing dependency in the Gradle build file.
                       // That dependency itself declares the one targeted by UpgradeTransitiveDependencyVersion as a transitive dependency.
                       // In this case, "org.openrewrite:rewrite-java" has "com.fasterxml.jackson.core:jackson-databind" as a transitive dependency.
-                      UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
+                      var upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
                       UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
                       upgrade.getScanner(acc).visit(tree, ctx);
                       tree = upgrade.getVisitor(acc).visit(tree, ctx);
 
                       // Use the changed tree as input for a UpgradeTransitiveDependencyVersion run
-                      UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
+                      var upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
                       UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive.getInitialValue(ctx);
                       upgradeTransitive.getScanner(accTransitive2).visit(tree, ctx);
                       tree = upgradeTransitive.getVisitor(accTransitive2).visit(tree, ctx);
@@ -1499,6 +1833,181 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(UpgradeTransitiveDependencyVersion.DependencyVersionState acc) {
             return upgradeDependency.getVisitor(acc);
+        }
+    }
+
+    @Nested
+    class OnGradle8 implements RewriteTest {
+
+        // Kotlin 1.7's Gradle plugin, the last to add kotlin-stdlib-jdk8, uses SelfResolvingDependency, which Gradle 9 removed
+        // gradle-pitest-plugin 1.15 reads ReportingExtension#baseDir, which Gradle 9 removed
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec
+              .beforeRecipe(withToolingApi("8.14.5"))
+              .recipe(new UpgradeTransitiveDependencyVersion(
+                "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
+        }
+
+        /**
+         * When a Gradle plugin (like the Kotlin JVM plugin) provides dependencies directly without user declaration,
+         * we can still add constraints for those dependencies.
+         */
+        @Test
+        void kotlinDslAddConstraintForPluginProvidedDependency() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                  "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+              buildGradleKts(
+                """
+                  plugins {
+                      kotlin("jvm") version "1.7.21"
+                  }
+                  repositories { mavenCentral() }
+                  """,
+                """
+                  plugins {
+                      kotlin("jvm") version "1.7.21"
+                  }
+                  repositories { mavenCentral() }
+
+                  dependencies {
+                      constraints {
+                          implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.0") {
+                              because("CVE-2022-24329")
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * When a Gradle plugin (like the Kotlin JVM plugin) provides transitive dependencies directly without user declaration,
+         * we can still add constraints for those dependencies.
+         */
+        @Test
+        void groovyDslAddConstraintForPluginProvidedTransitiveDependency() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                  "org.jetbrains.kotlin", "kotlin-stdlib", "2.1.0", null, "CVE-2022-24329", List.of("implementation"))),
+              buildGradle(
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+                  """,
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+
+                  dependencies {
+                      constraints {
+                          implementation('org.jetbrains.kotlin:kotlin-stdlib:2.1.0') {
+                              because 'CVE-2022-24329'
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * Makes no changes when a Gradle plugin (like the Kotlin JVM plugin) provides a direct dependency.
+         */
+        @Test
+        void doesNotAddConstraintForPluginProvidedDirectDependency() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                  "org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null, "CVE-2022-24329", null)),
+              buildGradle(
+                """
+                  plugins {
+                      id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+                  }
+                  repositories { mavenCentral() }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void noIncludedConfigurationsReceiveAllConstraints() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                  "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
+              buildGradle(
+                """
+                  plugins {
+                      id 'info.solidsoft.pitest' version '1.15.0'
+                      id 'java'
+                  }
+                  repositories { mavenCentral() }
+                  dependencies {
+                      testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'info.solidsoft.pitest' version '1.15.0'
+                      id 'java'
+                  }
+                  repositories { mavenCentral() }
+                  dependencies {
+                      constraints {
+                          pitest('org.apache.commons:commons-lang3:3.14.0')
+                          testImplementation('org.apache.commons:commons-lang3:3.14.0')
+                      }
+
+                      testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void includedConfigurationsReceiveOnlyConfiguredConstraints() {
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                  "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
+              buildGradle(
+                """
+                  plugins {
+                      id 'info.solidsoft.pitest' version '1.15.0'
+                      id 'java'
+                  }
+                  repositories { mavenCentral() }
+                  dependencies {
+                      testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'info.solidsoft.pitest' version '1.15.0'
+                      id 'java'
+                  }
+                  repositories { mavenCentral() }
+                  dependencies {
+                      constraints {
+                          pitest('org.apache.commons:commons-lang3:3.14.0')
+                      }
+
+                      testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+                  }
+                  """
+              )
+            );
         }
     }
 }

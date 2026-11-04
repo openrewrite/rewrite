@@ -17,8 +17,10 @@ package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -36,8 +38,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
         J j2 = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
-        j2 = j2.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        return j2.withMarkers(q.receive(j.getMarkers()));
+        j2 = j2.withPrefix(orEmpty(q.receive(j.getPrefix(), space -> visitSpace(space, q))));
+        return j2.withMarkers(orEmpty(q.receive(j.getMarkers())));
     }
 
     @Override
@@ -115,7 +117,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withStatic(q.receive(block.getPadding().getStatic(), s -> visitRightPadded(s, q)));
         return block1
                 .getPadding().withStatements(q.receiveList(block.getPadding().getStatements(), s -> visitRightPadded(s, q)))
-                .withEnd(q.receive(block.getEnd(), e -> visitSpace(e, q)));
+                .withEnd(orEmpty(q.receive(block.getEnd(), e -> visitSpace(e, q))));
     }
 
     @Override
@@ -146,7 +148,17 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withExtends(q.receive(classDecl.getPadding().getExtends(), e -> visitLeftPadded(e, q)))
                 .getPadding().withImplements(q.receive(classDecl.getPadding().getImplements(), i -> visitContainer(i, q)))
                 .getPadding().withPermits(q.receive(classDecl.getPadding().getPermits(), p -> visitContainer(p, q)))
-                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)));
+                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)))
+                .withType(q.receive(classDecl.getType(), t -> (JavaType.FullyQualified) visitType(t, q)));
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue q) {
+        // a class kind has no visit method to be dispatched to when it is sent on its own
+        if (tree instanceof J.ClassDeclaration.Kind) {
+            return visitClassDeclarationKind((J.ClassDeclaration.Kind) tree, q);
+        }
+        return super.visit(tree, q);
     }
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
@@ -166,7 +178,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withPackageDeclaration(q.receive(cu.getPadding().getPackageDeclaration(), p -> visitRightPadded(p, q)))
                 .getPadding().withImports(q.receiveList(cu.getPadding().getImports(), i -> visitRightPadded(i, q)))
                 .withClasses(q.receiveList(cu.getClasses(), c -> (J.ClassDeclaration) visitNonNull(c, q)))
-                .withEof(q.receive(cu.getEof(), e -> visitSpace(e, q)));
+                .withEof(orEmpty(q.receive(cu.getEof(), e -> visitSpace(e, q))));
     }
 
     @Override
@@ -318,7 +330,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitLambda(J.Lambda lambda, RpcReceiveQueue q) {
         return lambda
                 .withParameters(q.receive(lambda.getParameters(), p -> (J.Lambda.Parameters) visitNonNull(p, q)))
-                .withArrow(q.receive(lambda.getArrow(), a -> visitSpace(a, q)))
+                .withArrow(orEmpty(q.receive(lambda.getArrow(), a -> visitSpace(a, q))))
                 .withBody(q.receive(lambda.getBody(), b -> visitNonNull(b, q)))
                 .withType(q.receive(lambda.getType(), t -> visitType(t, q)));
     }
@@ -335,8 +347,12 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return literal
                 .withValue(q.receive(literal.getValue()))
                 .withValueSource(q.receive(literal.getValueSource()))
-                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> s))
-                .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
+                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> {
+                    int valueSourceIndex = q.receive(s != null ? s.getValueSourceIndex() : 0);
+                    String codePoint = q.receive(s != null ? s.getCodePoint() : null);
+                    return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
+                }))
+                .withType(q.receive((JavaType) literal.getType(), t -> visitType(t, q)));
     }
 
     @Override
@@ -366,6 +382,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getAnnotations().withName(method.getAnnotations().getName().withAnnotations(q.receiveList(method.getAnnotations().getName().getAnnotations(), a -> (J.Annotation) visitNonNull(a, q))))
                 .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
                 .getPadding().withParameters(q.receive(method.getPadding().getParameters(), p -> visitContainer(p, q)))
+                .withDimensionsAfterName(q.receiveList(method.getDimensionsAfterName(), d -> visitLeftPadded(d, q)))
                 .getPadding().withThrows(q.receive(method.getPadding().getThrows(), t -> visitContainer(t, q)))
                 .withBody(q.receive(method.getBody(), b -> (J.Block) visitNonNull(b, q)))
                 .getPadding().withDefaultValue(q.receive(method.getPadding().getDefaultValue(), d -> visitLeftPadded(d, q)))
@@ -374,12 +391,17 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, RpcReceiveQueue q) {
-        return method
+        method = method
                 .getPadding().withSelect(q.receive(method.getPadding().getSelect(), s -> visitRightPadded(s, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
-                .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)));
+        J.Identifier name = q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q));
+        method = method
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
                 .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+        // The received method type stands as sent. withName would re-derive it from the name.
+        return method.getName() == name ? method : new J.MethodInvocation(method.getId(), method.getPrefix(),
+                method.getMarkers(), method.getPadding().getSelect(), method.getPadding().getTypeParameters(),
+                name, method.getPadding().getArguments(), method.getMethodType());
     }
 
     @Override
@@ -409,7 +431,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitNewClass(J.NewClass newClass, RpcReceiveQueue q) {
         return newClass
                 .getPadding().withEnclosing(q.receive(newClass.getPadding().getEnclosing(), e -> visitRightPadded(e, q)))
-                .withNew(q.receive(newClass.getNew(), n -> visitSpace(n, q)))
+                .withNew(orEmpty(q.receive(newClass.getNew(), n -> visitSpace(n, q))))
                 .withClazz(q.receive(newClass.getClazz(), c -> (TypeTree) visitNonNull(c, q)))
                 .getPadding().withArguments(q.receive(newClass.getPadding().getArguments(), a -> visitContainer(a, q)))
                 .withBody(q.receive(newClass.getBody(), b -> (J.Block) visitNonNull(b, q)))
@@ -455,7 +477,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPrimitive(J.Primitive primitive, RpcReceiveQueue q) {
         return primitive
-                .withType(q.receive(primitive.getType()));
+                .withType(q.receive(primitive.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
     @Override
@@ -561,6 +583,16 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitUnknown(J.Unknown unknown, RpcReceiveQueue q) {
+        return unknown.withSource(q.receive(unknown.getSource(), s -> (J.Unknown.Source) visitNonNull(s, q)));
+    }
+
+    @Override
+    public J visitUnknownSource(J.Unknown.Source source, RpcReceiveQueue q) {
+        return source.withText(q.receive(source.getText()));
+    }
+
+    @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, RpcReceiveQueue q) {
         return variable
                 .withDeclarator(q.receive(variable.getDeclarator(), decl -> (VariableDeclarator) visitNonNull(decl, q)))
@@ -608,58 +640,66 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                         return ((TextComment) c).withMultiline(q.receive(c.isMultiline()))
                                 .withText(q.receive(((TextComment) c).getText()))
                                 .withSuffix(q.receive(c.getSuffix()))
-                                .withMarkers(q.receive(c.getMarkers()));
+                                .withMarkers(orEmpty(q.receive(c.getMarkers())));
                     }
                     return c;
                 }))
                 .withWhitespace(q.receive(space.getWhitespace()));
     }
 
+    private static Space orEmpty(@Nullable Space space) {
+        return space == null ? Space.EMPTY : space;
+    }
+
+    private static Markers orEmpty(@Nullable Markers markers) {
+        return markers == null ? Markers.EMPTY : markers;
+    }
+
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {
         return container
-                .withBefore(q.receive(container.getBefore(), space -> visitSpace(space, q)))
+                .withBefore(orEmpty(q.receive(container.getBefore(), space -> visitSpace(space, q))))
                 .getPadding().withElements(q.receiveList(container.getPadding().getElements(),
                         e -> visitRightPadded(e, q)))
-                .withMarkers(q.receive(container.getMarkers()));
+                .withMarkers(orEmpty(q.receive(container.getMarkers())));
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return left
-                .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
-                .withElement(q.receive(left.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
-                .withMarkers(q.receive(left.getMarkers()));
+                .withBefore(orEmpty(q.receive(left.getBefore(), s -> visitSpace(s, q))))
+                .withElement(receivePaddedElement(left.getElement(), q))
+                .withMarkers(orEmpty(q.receive(left.getMarkers())));
     }
 
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, Function<Object, T> elementMapping) {
         return left
-                .withBefore(q.receive(left.getBefore(), s -> visitSpace(s, q)))
+                .withBefore(orEmpty(q.receive(left.getBefore(), s -> visitSpace(s, q))))
                 .withElement(requireNonNull(q.receiveAndGet(left.getElement(), elementMapping)))
-                .withMarkers(q.receive(left.getMarkers()));
+                .withMarkers(orEmpty(q.receive(left.getMarkers())));
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
         return right
-                .withElement(q.receive(right.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
-                .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
-                .withMarkers(q.receive(right.getMarkers()));
+                .withElement(receivePaddedElement(right.getElement(), q))
+                .withAfter(orEmpty(q.receive(right.getAfter(), s -> visitSpace(s, q))))
+                .withMarkers(orEmpty(q.receive(right.getMarkers())));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> T receivePaddedElement(@Nullable T before, RpcReceiveQueue q) {
+        if (before instanceof Enum) {
+            return (T) q.receiveAndGet(before, toEnum(((Enum) before).getDeclaringClass()));
+        } else if (before != null && !(before instanceof J) && !(before instanceof Space)) {
+            // a scalar's new value is inlined in the message, which an onChange callback is never shown
+            return q.receive(before);
+        }
+        return q.receive(before, t -> {
+            if (t instanceof J) {
+                return (T) visitNonNull((J) t, q);
+            } else if (t instanceof Space) {
+                return (T) visitSpace((Space) t, q);
+            }
+            return t;
+        });
     }
 
     private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
@@ -674,4 +714,3 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return javaTypeReceiver.visit(javaType, q);
     }
 }
-

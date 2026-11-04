@@ -34,10 +34,38 @@ public class DependencyMatcher {
     @Nullable
     private final VersionComparator versionComparator;
 
+    /**
+     * Whether the corresponding pattern matches every coordinate ({@code null} or {@code "*"}), in which case the
+     * coordinate need not be inspected at all. The {@code $} prefix makes Lombok skip these derived fields when
+     * generating {@code @With}/{@code @Getter} members.
+     */
+    private final transient boolean $groupMatchesAll;
+    private final transient boolean $artifactMatchesAll;
+
+    /**
+     * Whether the corresponding pattern contains no glob metacharacter and so can be compared with the much cheaper
+     * case-insensitive {@link String#equalsIgnoreCase} rather than {@link StringUtils#matchesGlob}. The decision is made
+     * once here, at construction, rather than on every {@link #matches} call.
+     */
+    private final transient boolean $groupExact;
+    private final transient boolean $artifactExact;
+
     public DependencyMatcher(@Nullable String groupPattern, @Nullable String artifactPattern, @Nullable VersionComparator versionComparator) {
         this.groupPattern = groupPattern;
         this.artifactPattern = artifactPattern;
         this.versionComparator = versionComparator;
+        this.$groupMatchesAll = matchesAll(groupPattern);
+        this.$artifactMatchesAll = matchesAll(artifactPattern);
+        this.$groupExact = isExact(groupPattern);
+        this.$artifactExact = isExact(artifactPattern);
+    }
+
+    private static boolean matchesAll(@Nullable String pattern) {
+        return pattern == null || "*".equals(pattern);
+    }
+
+    private static boolean isExact(@Nullable String pattern) {
+        return pattern != null && pattern.indexOf('*') < 0 && pattern.indexOf('?') < 0;
     }
 
     public static Validated<DependencyMatcher> build(String pattern) {
@@ -68,13 +96,26 @@ public class DependencyMatcher {
     }
 
     public boolean matches(@Nullable String groupId, @Nullable String artifactId, String version) {
-        return StringUtils.matchesGlob(groupId, groupPattern) &&
-                StringUtils.matchesGlob(artifactId, artifactPattern) &&
+        return matchesGroup(groupId) && matchesArtifact(artifactId) &&
                 (versionComparator == null || versionComparator.isValid(null, version));
     }
 
     public boolean matches(@Nullable String groupId, @Nullable String artifactId) {
-        return StringUtils.matchesGlob(groupId, groupPattern) && StringUtils.matchesGlob(artifactId, artifactPattern);
+        return matchesGroup(groupId) && matchesArtifact(artifactId);
+    }
+
+    private boolean matchesGroup(@Nullable String groupId) {
+        if ($groupMatchesAll) {
+            return true;
+        }
+        return $groupExact ? groupPattern.equalsIgnoreCase(groupId) : StringUtils.matchesGlob(groupId, groupPattern);
+    }
+
+    private boolean matchesArtifact(@Nullable String artifactId) {
+        if ($artifactMatchesAll) {
+            return true;
+        }
+        return $artifactExact ? artifactPattern.equalsIgnoreCase(artifactId) : StringUtils.matchesGlob(artifactId, artifactPattern);
     }
 
     public boolean isValidVersion(@Nullable String currentVersion, String newVersion) {

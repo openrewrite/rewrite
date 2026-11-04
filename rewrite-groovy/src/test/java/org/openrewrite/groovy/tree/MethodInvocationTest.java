@@ -68,6 +68,13 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void closureArgumentOnNumericLiteralReceiver() {
+        rewriteRun(
+          groovy("50.times { 1 }")
+        );
+    }
+
+    @Test
     void noParentheses() {
         rewriteRun(
           groovy(
@@ -212,11 +219,33 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void staticMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              Integer.&parseInt
+              """
+          )
+        );
+    }
+
+    @Test
     void staticMethodReference() {
         rewriteRun(
           groovy(
             """
               Integer::parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out.&println)
               """
           )
         );
@@ -234,11 +263,33 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void constructorMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList.&new
+              """
+          )
+        );
+    }
+
+    @Test
     void constructorMethodReference() {
         rewriteRun(
           groovy(
             """
               ArrayList::new
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayConstructorMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              [1, 2, 3].stream().toArray(Integer[]::new)
               """
           )
         );
@@ -705,6 +756,29 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               Util.<String>compare("A", "B")
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodNameStartingWithClassKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              Object.className("foo")
+              """
+          )
+        );
+    }
+
+    @Test
+    void commandExpressionWithParenthesizedArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def x
+              x foo(c)
               """
           )
         );

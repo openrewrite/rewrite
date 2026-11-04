@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.format;
 
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
@@ -22,15 +23,11 @@ import org.openrewrite.style.Style;
 
 public class BlankLines extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Blank lines";
-    }
+    @Getter
+    final String displayName = "Blank lines";
 
-    @Override
-    public String getDescription() {
-        return "Add and/or remove blank lines.";
-    }
+    @Getter
+    final String description = "Add and/or remove blank lines.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

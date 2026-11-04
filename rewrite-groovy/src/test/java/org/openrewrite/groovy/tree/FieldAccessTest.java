@@ -34,6 +34,17 @@ class FieldAccessTest implements RewriteTest {
     }
 
     @Test
+    void starAccessInsideParenthesesFollowedByMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              def updates = (push*.remoteUpdates).flatten()
+              """
+          )
+        );
+    }
+
+    @Test
     void fieldAccess() {
         rewriteRun(
           groovy(
@@ -57,6 +68,19 @@ class FieldAccessTest implements RewriteTest {
               }
               Test t = new Test()
               t?.n
+              """
+          )
+        );
+    }
+
+    @Test
+    void dynamicPropertyNameWithGString() {
+        rewriteRun(
+          groovy(
+            """
+              def f(node, key) {
+                  node."@$key"
+              }
               """
           )
         );

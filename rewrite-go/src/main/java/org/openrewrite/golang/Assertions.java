@@ -1,0 +1,287 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.golang;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.golang.internal.ModuleCache;
+import org.openrewrite.golang.marker.GoProject;
+import org.openrewrite.golang.marker.GoResolutionResult;
+import org.openrewrite.golang.tree.Go;
+import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.golang.tree.GoSum;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+
+import javax.annotation.CheckReturnValue;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.function.Consumer;
+
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
+
+@CheckReturnValue
+public final class Assertions {
+    private Assertions() {
+    }
+
+    public static SourceSpecs go(@Nullable String before) {
+        return go(before, s -> {
+        });
+    }
+
+    public static SourceSpecs go(@Nullable String before, Consumer<SourceSpec<Go.CompilationUnit>> spec) {
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, null);
+        spec.accept(go);
+        return go;
+    }
+
+    public static SourceSpecs go(@Nullable String before, @Nullable String after) {
+        return go(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs go(@Nullable String before, @Nullable String after,
+                                       Consumer<SourceSpec<Go.CompilationUnit>> spec) {
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
+        spec.accept(go);
+        return go;
+    }
+
+    public static SourceSpecs goMod(@Nullable String before) {
+        return goMod(before, s -> {
+        });
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, Consumer<SourceSpec<GoMod>> spec) {
+        SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, null);
+        goMod.path("go.mod");
+        spec.accept(goMod);
+        return goMod;
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after) {
+        return goMod(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after,
+                                    Consumer<SourceSpec<GoMod>> spec) {
+        SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, s -> after);
+        goMod.path("go.mod");
+        spec.accept(goMod);
+        return goMod;
+    }
+
+    public static SourceSpecs goSum(@Nullable String before) {
+        return goSum(before, s -> {
+        });
+    }
+
+    public static SourceSpecs goSum(@Nullable String before, Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, null);
+        goSum.path("go.sum");
+        spec.accept(goSum);
+        return goSum;
+    }
+
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after) {
+        return goSum(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after,
+                                    Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, s -> after);
+        goSum.path("go.sum");
+        spec.accept(goSum);
+        return goSum;
+    }
+
+    /**
+     * Wrap sibling sources in a Go project directory and tag each with a
+     * {@link GoProject} marker. Mirrors {@code mavenProject(name, sources...)}:
+     * the {@code go.mod} (via {@link #goMod(String)}) and {@code .go} files
+     * (via {@link #go(String)}) are SIBLINGS inside the project directory,
+     * not nested inside one another. Recipes that need module-level
+     * dependency information look up the sibling go.mod's
+     * {@link org.openrewrite.golang.marker.GoResolutionResult}.
+     * <p>
+     * A sibling {@code go.mod} also gives the {@code .go} sources their module
+     * context, so imports of the modules it requires carry real types.
+     */
+    public static SourceSpecs goProject(String project, SourceSpecs... sources) {
+        return goProject(project, spec -> spec.markers(new GoProject(Tree.randomId(), project, null)), sources);
+    }
+
+    public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+        moduleContext(sources);
+        return SourceSpecs.dir(project, spec, sources);
+    }
+
+    /**
+     * The module path and go.mod content of the sibling go.mod, onto the parser of every {@code .go} spec.
+     */
+    private static void moduleContext(SourceSpecs... sources) {
+        String goModContent = null;
+        // Iterating a nested SourceSpecs is what applies its directory prefix, and that is not
+        // idempotent, so only direct children are examined.
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec) {
+                Path sourcePath = ((SourceSpec<?>) multiSpec).getSourcePath();
+                if (sourcePath != null && "go.mod".equals(sourcePath.getFileName().toString())) {
+                    goModContent = trimIndentPreserveCRLF(((SourceSpec<?>) multiSpec).getBefore());
+                    break;
+                }
+            }
+        }
+        if (goModContent == null) {
+            return;
+        }
+        GoResolutionResult resolution = GoModParser.parseMarker(goModContent, Paths.get("go.mod"));
+        if (resolution == null) {
+            return;
+        }
+        ModuleCache.download(goModContent, resolution.getRequires());
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec && ((SourceSpec<?>) multiSpec).getParser() instanceof GolangParser.Builder) {
+                ((GolangParser.Builder) ((SourceSpec<?>) multiSpec).getParser())
+                        .module(resolution.getModulePath())
+                        .goMod(goModContent);
+            }
+        }
+    }
+
+    /**
+     * Tag a single SourceSpec with a {@link GoProject} marker. Used by the
+     * {@code goProject(name, ...)} consumer to apply the marker to every
+     * child source.
+     */
+    public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
+        return sourceSpec.markers(new GoProject(Tree.randomId(), projectName, null));
+    }
+
+    /**
+     * Walk {@code root} and assert that the first {@link J.Identifier} whose
+     * {@code simpleName} equals {@code name} carries a non-null
+     * {@link JavaType.FullyQualified} type whose fully-qualified name equals
+     * {@code expectedFqn}. Go's basic types are attributed under their own Go
+     * names, so this covers them too: {@code "int32"}, {@code "string"}.
+     *
+     * @throws AssertionError when no such identifier exists, its type is
+     *                       null, or the type is not fully qualified.
+     */
+    public static void expectType(Tree root, String name, String expectedFqn) {
+        IdentifierTypeFinder finder = new IdentifierTypeFinder(name);
+        finder.visit(root, 0);
+        if (!finder.found) {
+            throw new AssertionError("expectType(\"" + name + "\"): no identifier with that name in tree");
+        }
+        if (finder.type == null) {
+            throw new AssertionError("expectType(\"" + name + "\"): identifier has null type");
+        }
+        if (!(finder.type instanceof JavaType.FullyQualified)) {
+            throw new AssertionError("expectType(\"" + name + "\"): identifier type is " +
+                    finder.type.getClass().getSimpleName() + ", want FullyQualified");
+        }
+        String got = ((JavaType.FullyQualified) finder.type).getFullyQualifiedName();
+        if (!got.equals(expectedFqn)) {
+            throw new AssertionError("expectType(\"" + name + "\"): FQN = \"" + got + "\", want \"" + expectedFqn + "\"");
+        }
+    }
+
+    /**
+     * Walk {@code root} and assert that the first
+     * {@link J.MethodInvocation} or {@link J.MethodDeclaration} whose name
+     * equals {@code name} carries a non-null {@link JavaType.Method} whose
+     * {@code declaringType} fully-qualified name equals
+     * {@code expectedDeclaringFqn}.
+     *
+     * <p>For invocations across packages, {@code expectedDeclaringFqn} is the
+     * import path of the owning package (e.g. {@code "fmt"} for
+     * {@code fmt.Println}). For methods declared in the file under test it is
+     * the package's full path (e.g. {@code "main.Point"}).
+     */
+    public static void expectMethodType(Tree root, String name, String expectedDeclaringFqn) {
+        MethodTypeFinder finder = new MethodTypeFinder(name);
+        finder.visit(root, 0);
+        if (!finder.found) {
+            throw new AssertionError("expectMethodType(\"" + name + "\"): no method with that name in tree");
+        }
+        if (finder.methodType == null) {
+            throw new AssertionError("expectMethodType(\"" + name + "\"): method has null methodType");
+        }
+        if (finder.methodType.getDeclaringType() == null) {
+            throw new AssertionError("expectMethodType(\"" + name + "\"): method has null declaringType");
+        }
+        String got = finder.methodType.getDeclaringType().getFullyQualifiedName();
+        if (!got.equals(expectedDeclaringFqn)) {
+            throw new AssertionError("expectMethodType(\"" + name + "\"): declaring FQN = \"" + got +
+                    "\", want \"" + expectedDeclaringFqn + "\"");
+        }
+    }
+
+    private static final class IdentifierTypeFinder extends JavaIsoVisitor<Integer> {
+        private final String name;
+        boolean found;
+        @Nullable JavaType type;
+
+        IdentifierTypeFinder(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+            if (!found && name.equals(identifier.getSimpleName())) {
+                found = true;
+                type = identifier.getType();
+            }
+            return identifier;
+        }
+    }
+
+    private static final class MethodTypeFinder extends JavaIsoVisitor<Integer> {
+        private final String name;
+        boolean found;
+        JavaType.@Nullable Method methodType;
+
+        MethodTypeFinder(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+            if (!found && name.equals(method.getSimpleName())) {
+                found = true;
+                methodType = method.getMethodType();
+            }
+            return super.visitMethodInvocation(method, p);
+        }
+
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+            if (!found && name.equals(method.getSimpleName())) {
+                found = true;
+                methodType = method.getMethodType();
+            }
+            return super.visitMethodDeclaration(method, p);
+        }
+    }
+}

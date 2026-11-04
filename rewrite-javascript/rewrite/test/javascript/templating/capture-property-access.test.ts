@@ -51,9 +51,7 @@ describe('forwardRef pattern with replacement', () => {
                 `
                     const forwardRef = (x: any) => x;
                     type ComponentType = any;
-                    const MyComponent: ComponentType = () => {
-                        return null;
-                    };
+                    const MyComponent: ComponentType = () => { return null; };
                 `
             )
         );

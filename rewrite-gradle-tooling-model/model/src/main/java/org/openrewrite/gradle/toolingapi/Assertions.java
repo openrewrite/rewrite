@@ -31,6 +31,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 import org.opentest4j.TestAbortedException;
 
+import javax.annotation.CheckReturnValue;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
+@CheckReturnValue
 public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(URI distributionUrl) {
@@ -64,17 +66,28 @@ public class Assertions {
         return sourceFiles -> {
             try {
                 Path tempDirectory = Files.createTempDirectory("project");
-                // Usage of Assertions.mavenProject() might result in gradle files inside a subdirectory
+                // Usage of Assertions.mavenProject() might result in gradle files inside a subdirectory.
+                // Determine the build root from the shallowest build/settings file so that, in a
+                // multi-module build, the wrapper lands at the root rather than the last-iterated subproject.
                 Path projectDir = tempDirectory;
+                int shallowest = Integer.MAX_VALUE;
+                for (SourceFile sourceFile : sourceFiles) {
+                    String path = sourceFile.getSourcePath().toString();
+                    if (path.endsWith("settings.gradle") || path.endsWith("settings.gradle.kts") ||
+                            path.endsWith("build.gradle") || path.endsWith("build.gradle.kts")) {
+                        int depth = sourceFile.getSourcePath().getNameCount();
+                        if (depth < shallowest) {
+                            shallowest = depth;
+                            projectDir = tempDirectory.resolve(sourceFile.getSourcePath()).getParent();
+                        }
+                    }
+                }
                 try {
                     for (SourceFile sourceFile : sourceFiles) {
                         if (sourceFile instanceof K.CompilationUnit) {
                             K.CompilationUnit k = (K.CompilationUnit) sourceFile;
                             if (k.getSourcePath().toString().endsWith(".gradle.kts")) {
                                 Path kotlinGradle = tempDirectory.resolve(k.getSourcePath());
-                                if (!tempDirectory.equals(kotlinGradle.getParent()) && tempDirectory.equals(kotlinGradle.getParent().getParent())) {
-                                    projectDir = kotlinGradle.getParent();
-                                }
                                 Files.createDirectories(kotlinGradle.getParent());
                                 Files.write(kotlinGradle, k.printAllAsBytes());
                             }
@@ -82,9 +95,6 @@ public class Assertions {
                             G.CompilationUnit g = (G.CompilationUnit) sourceFile;
                             if (g.getSourcePath().toString().endsWith(".gradle")) {
                                 Path groovyGradle = tempDirectory.resolve(g.getSourcePath());
-                                if (!tempDirectory.equals(groovyGradle.getParent()) && tempDirectory.equals(groovyGradle.getParent().getParent())) {
-                                    projectDir = groovyGradle.getParent();
-                                }
                                 Files.createDirectories(groovyGradle.getParent());
                                 Files.write(groovyGradle, g.printAllAsBytes());
                             }
@@ -92,9 +102,6 @@ public class Assertions {
                             Properties.File f = (Properties.File) sourceFile;
                             if (f.getSourcePath().endsWith("gradle.properties")) {
                                 Path gradleProperties = tempDirectory.resolve(f.getSourcePath());
-                                if (!tempDirectory.equals(gradleProperties.getParent()) && tempDirectory.equals(gradleProperties.getParent().getParent())) {
-                                    projectDir = gradleProperties.getParent();
-                                }
                                 Files.createDirectories(gradleProperties.getParent());
                                 Files.write(gradleProperties, f.printAllAsBytes());
                             }
@@ -102,9 +109,6 @@ public class Assertions {
                             Toml.Document d = (Toml.Document) sourceFile;
                             if (d.getSourcePath().startsWith("gradle/") && d.getSourcePath().toString().endsWith(".versions.toml")) {
                                 Path versionCatalog = tempDirectory.resolve(d.getSourcePath());
-                                if (!tempDirectory.equals(versionCatalog.getParent()) && tempDirectory.equals(versionCatalog.getParent().getParent())) {
-                                    projectDir = versionCatalog.getParent();
-                                }
                                 Files.createDirectories(versionCatalog.getParent());
                                 Files.write(versionCatalog, d.printAllAsBytes());
                             }
@@ -112,9 +116,6 @@ public class Assertions {
                             PlainText plainText = (PlainText) sourceFile;
                             if (plainText.getSourcePath().endsWith("gradle.lockfile") || plainText.getSourcePath().endsWith("buildscript-gradle.lockfile")) {
                                 Path lockfile = tempDirectory.resolve(plainText.getSourcePath());
-                                if (!tempDirectory.equals(lockfile.getParent()) && tempDirectory.equals(lockfile.getParent().getParent())) {
-                                    projectDir = lockfile.getParent();
-                                }
                                 Files.createDirectories(lockfile.getParent());
                                 Files.write(lockfile, plainText.printAllAsBytes());
                             }
@@ -130,7 +131,8 @@ public class Assertions {
                                  ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                                  "zipStoreBase=GRADLE_USER_HOME\n" +
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        // No gradle-wrapper.jar: the tooling API reads only the properties, and the jar would have to be
+                        // extracted from a download of most of the distribution
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
                         Files.copy(gradleWrapper.gradlew().getInputStream(), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
@@ -146,21 +148,43 @@ public class Assertions {
                     Set<org.openrewrite.maven.tree.MavenRepository> allBuildscriptRepositories = new LinkedHashSet<>();
                     boolean freestandingScriptFound = false;
                     Map<String, GradleProject> gradleProjects = new HashMap<>();
+                    OpenRewriteModel rootModel = null;
                     for (int i = 0; i < sourceFiles.size(); i++) {
                         SourceFile sourceFile = sourceFiles.get(i);
                         if (sourceFile.getSourcePath().endsWith("settings.gradle") || sourceFile.getSourcePath().endsWith("settings.gradle.kts")) {
-                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(tempDirectory.resolve(sourceFile.getSourcePath()).getParent().toFile(), null, initScriptContents);
+                            Path settingsDir = tempDirectory.resolve(sourceFile.getSourcePath()).getParent();
+                            OpenRewriteModel model;
+                            if (settingsDir.equals(projectDir)) {
+                                if (rootModel == null) {
+                                    rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents);
+                                }
+                                model = rootModel;
+                            } else {
+                                model = OpenRewriteModelBuilder.forProjectDirectory(settingsDir.toFile(), null, initScriptContents);
+                            }
                             GradleSettings gradleSettings = model.getGradleSettings();
                             if(gradleSettings != null) {
                                 sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().setByType(gradleSettings)));
                             }
                         } else if (sourceFile.getSourcePath().endsWith("build.gradle") || sourceFile.getSourcePath().endsWith("build.gradle.kts")) {
-                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile(), initScriptContents);
-                            GradleProject gradleProject = model.getGradleProject();
+                            // Every tooling API build reports all projects in the build, so one build of the root
+                            // serves each build file it includes; only files outside that build need their own.
+                            if (rootModel == null) {
+                                rootModel = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), null, initScriptContents);
+                            }
+                            GradleProject gradleProject = rootModel.getGradleProjectsByPath().get(gradlePathFor(tempDirectory, projectDir, sourceFile));
+                            if (gradleProject == null) {
+                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile(), initScriptContents);
+                                gradleProject = model.getGradleProject();
+                                GradleProject projectForPath = model.getGradleProjectsByPath().get(gradlePathFor(tempDirectory, projectDir, sourceFile));
+                                if (projectForPath != null) {
+                                    gradleProject = projectForPath;
+                                }
+                            }
                             allRepositories.addAll(gradleProject.getMavenRepositories());
                             allBuildscriptRepositories.addAll(gradleProject.getBuildscript().getMavenRepositories());
                             sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().setByType(gradleProject)));
-                            gradleProjects.put(getDirectory(sourceFile), model.getGradleProject());
+                            gradleProjects.put(getDirectory(sourceFile), gradleProject);
                         } else if (sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) {
                             freestandingScriptFound = true;
                         }
@@ -179,7 +203,7 @@ public class Assertions {
                         // Construct a synthetic marker to apply to freestanding Gradle scripts to aid recipes in resolving dependencies
                         GradleProject freestandingScriptMarker = new GradleProject(
                                 randomId(), "", "", "", "", emptyList(), new ArrayList<>(allRepositories),
-                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()));
+                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null);
                         for (int i = 0; i < sourceFiles.size(); i++) {
                             SourceFile sourceFile = sourceFiles.get(i);
                             if ((sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) &&
@@ -232,5 +256,17 @@ public class Assertions {
             return parent.toString();
         }
         return "";
+    }
+
+    private static String gradlePathFor(Path tempDirectory, Path projectDir, SourceFile sourceFile) {
+        Path buildFileDir = tempDirectory.resolve(sourceFile.getSourcePath()).getParent();
+        if (buildFileDir == null) {
+            return ":";
+        }
+        String relative = projectDir.relativize(buildFileDir).toString();
+        if (relative.isEmpty()) {
+            return ":";
+        }
+        return ":" + relative.replace(File.separatorChar, ':').replace('/', ':');
     }
 }

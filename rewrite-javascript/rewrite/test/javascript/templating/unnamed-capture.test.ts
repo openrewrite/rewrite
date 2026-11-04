@@ -35,14 +35,15 @@ describe('unnamed capture', () => {
                 return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
             typescript(`
                 const a = 2 * 2 + 3;
             `, `
-                const a = 3 + 2 + 2;
-            `),
+                const a = 3 + (2 + 2);
+            `)
         );
     });
 

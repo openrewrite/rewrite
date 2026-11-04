@@ -17,6 +17,7 @@ package org.openrewrite.javascript.style;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -25,6 +26,7 @@ import org.openrewrite.style.Style;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
@@ -57,7 +59,7 @@ public class PrettierStyle extends NamedStyles implements RpcCodec<PrettierStyle
      * At formatting time, this version of Prettier will be loaded dynamically
      * (similar to npx) to ensure consistent formatting.
      */
-    private final String prettierVersion;
+    private final @Nullable String prettierVersion;
 
     /**
      * Whether this file is ignored by .prettierignore.
@@ -65,7 +67,7 @@ public class PrettierStyle extends NamedStyles implements RpcCodec<PrettierStyle
      */
     private final boolean ignored;
 
-    public PrettierStyle(UUID id, Map<String, Object> config, String prettierVersion, boolean ignored) {
+    public PrettierStyle(UUID id, Map<String, Object> config, @Nullable String prettierVersion, boolean ignored) {
         super(id, NAME, DISPLAY_NAME, DESCRIPTION, emptySet(), emptyList());
         this.config = config;
         this.prettierVersion = prettierVersion;
@@ -81,8 +83,8 @@ public class PrettierStyle extends NamedStyles implements RpcCodec<PrettierStyle
         return config == this.config ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
     }
 
-    public PrettierStyle withPrettierVersion(String prettierVersion) {
-        return prettierVersion.equals(this.prettierVersion) ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
+    public PrettierStyle withPrettierVersion(@Nullable String prettierVersion) {
+        return Objects.equals(prettierVersion, this.prettierVersion) ? this : new PrettierStyle(getId(), config, prettierVersion, ignored);
     }
 
     public PrettierStyle withIgnored(boolean ignored) {

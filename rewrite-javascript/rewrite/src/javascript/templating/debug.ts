@@ -494,26 +494,27 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
-        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
-        if (captureMarker) {
+        const capture = this.captureAt(j, p);
+        if (capture) {
+            const {marker: captureMarker, target} = capture;
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
-                ? new Cursor(p, this.targetCursor)
-                : new Cursor(p);
+                ? new Cursor(target, this.targetCursor)
+                : new Cursor(target);
             this.targetCursor = cursorAtCapturedNode;
             try {
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     this.debug.log('debug', 'constraint', `Evaluating constraint for capture: ${captureMarker.captureName}`);
-                    const constraintResult = captureMarker.constraint(p, this.buildConstraintContext(cursorAtCapturedNode));
+                    const constraintResult = captureMarker.constraint(target, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for capture: ${captureMarker.captureName}`);
-                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(p as JTree).kind}`, `Constraint evaluation returned false`);
+                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(target as JTree).kind}`, `Constraint evaluation returned false`);
                         return this.abort(j) as R;
                     }
                     this.debug.log('debug', 'constraint', `Constraint passed for capture: ${captureMarker.captureName}`);
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     return this.abort(j) as R;
                 }
@@ -595,7 +596,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     this.debug.log('debug', 'constraint', `Constraint passed for wrapped capture: ${captureMarker.captureName}`);
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
                     return this.abort(right);
                 }
@@ -855,7 +856,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
                 const savedState = this.matcher.saveState();
 
-                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
+                const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     this.matcher.restoreState(savedState);
                     continue;

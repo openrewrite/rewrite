@@ -15,33 +15,45 @@
  */
 package org.openrewrite.java.marker;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfo;
-import io.github.classgraph.ClassInfoList;
-import io.github.classgraph.ScanResult;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Opcodes;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.PathUtils;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SourceSet;
 
+import java.beans.ConstructorProperties;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class JavaSourceSet implements SourceSet {
+public class JavaSourceSet implements SourceSet, Heavyweight {
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -56,13 +68,245 @@ public class JavaSourceSet implements SourceSet {
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
 
     /**
-     * Extract type information from the provided classpath.
-     * Uses ClassGraph to compute the classpath.
+     * Factory used to parse {@link org.openrewrite.java.JavaTemplate} snippets applied
+     * inside source files in this source set. When attached, the factory's type
+     * resolution shares canonical {@link JavaType.Class} instances with the surrounding
+     * source file's parser rather than minting duplicates.
      * <p>
-     * Does not support gavToTypes or typeToGav mapping
+     * Transient and never serialized; consumers fall back to a fresh factory when null.
+     */
+    @NonFinal
+    @Setter
+    @With(AccessLevel.NONE)
+    @JsonIgnore
+    @ToString.Exclude
+    transient @Nullable JavaTypeFactory typeFactory;
+
+    public JavaSourceSet(UUID id, String name,
+                         List<JavaType.FullyQualified> classpath,
+                         Map<String, List<JavaType.FullyQualified>> gavToTypes) {
+        this(id, name, classpath, gavToTypes, null);
+    }
+
+    @ConstructorProperties({"id", "name", "classpath", "gavToTypes", "typeFactory"})
+    public JavaSourceSet(UUID id, String name,
+                         List<JavaType.FullyQualified> classpath,
+                         Map<String, List<JavaType.FullyQualified>> gavToTypes,
+                         @Nullable JavaTypeFactory typeFactory) {
+        this.id = id;
+        this.name = name;
+        this.classpath = classpath;
+        this.gavToTypes = gavToTypes;
+        this.typeFactory = typeFactory;
+    }
+
+    /**
+     * Registry of project names whose dependencies have been mutated by an earlier recipe in
+     * the current run, leaving their {@link #getClasspath() classpath} potentially stale. The
+     * {@code org.openrewrite.maven.*} prefix is required by
+     * {@link org.openrewrite.CursorValidatingExecutionContextView}'s allowlist for cross-recipe
+     * ExecutionContext mutation; the registry itself is not Maven-specific.
+     */
+    private static final String DIRTY_CTX_KEY = "org.openrewrite.maven.dirtyJavaProjects";
+
+    /**
+     * @return the set of project names that have been marked dirty in the current recipe run,
+     * or {@code null} when no project has been marked dirty. Returned set is the internal
+     * registry; callers must not mutate it.
+     */
+    public static @Nullable Set<String> dirtyProjects(ExecutionContext ctx) {
+        return ctx.getMessage(DIRTY_CTX_KEY);
+    }
+
+    /**
+     * Whether a source file's classpath may be stale because a dependency-mutating recipe ran
+     * earlier in this recipe run. When {@code sourceFile} carries a {@link ProjectIdentity}
+     * marker the check is project-scoped; otherwise it falls back to "any project in the run is
+     * dirty" so ambiguity-sensitive decisions still take the safe path conservatively.
+     * <p>
+     * This is a static accessor (not an instance method) so that callers which can't find a
+     * {@link JavaSourceSet} on the source file can still consult the registry — the dirty signal
+     * is project-scoped, not source-set-scoped.
+     */
+    public static boolean isDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        Set<String> dirty = ctx.getMessage(DIRTY_CTX_KEY);
+        if (dirty == null || dirty.isEmpty()) {
+            return false;
+        }
+        if (sourceFile == null) {
+            return true;
+        }
+        return sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .map(p -> dirty.contains(p.getProjectName()))
+                .orElse(true);
+    }
+
+    /**
+     * Producer-side: mark {@code projectName} as having had its classpath invalidated by a
+     * dependency mutation earlier in this recipe run. Ambiguity-sensitive consumer recipes read
+     * the registry via {@link #isDirty(ExecutionContext, SourceFile)} and take the safe path
+     * when the project is dirty.
+     */
+    public static void markDirty(ExecutionContext ctx, String projectName) {
+        ctx.putMessageInSet(DIRTY_CTX_KEY, projectName);
+    }
+
+    /**
+     * Producer-side: mark the project identified by {@code sourceFile}'s {@link ProjectIdentity}
+     * marker as dirty. No-op when {@code sourceFile} is {@code null} or has no project marker.
+     */
+    public static void markDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        if (sourceFile == null) {
+            return;
+        }
+        sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .ifPresent(p -> markDirty(ctx, p.getProjectName()));
+    }
+
+    /**
+     * Add types for the given GAV key to this source set's classpath and gavToTypes mapping.
      *
-     * @param fullTypeInformation Not used, does not do anything, to be deleted
+     * @param gavKey a "group:artifact:version" string
+     * @param types  the types provided by the artifact
+     * @return a new JavaSourceSet with the types added
+     */
+    public JavaSourceSet addTypesForGav(String gavKey, List<JavaType.FullyQualified> types) {
+        List<JavaType.FullyQualified> existing = gavToTypes.get(gavKey);
+        if (existing != null && existing.equals(types)) {
+            return this;
+        }
+
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath);
+        newClasspath.addAll(types);
+
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        newGavToTypes.put(gavKey, types);
+
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Remove all types associated with the given GAV key from this source set's classpath and gavToTypes mapping.
+     *
+     * @param gavKey a "group:artifact:version" string
+     * @return a new JavaSourceSet with the types removed, or this instance if the key is not present
+     */
+    public JavaSourceSet removeTypesForGav(String gavKey) {
+        if (gavToTypes.isEmpty() || !gavToTypes.containsKey(gavKey)) {
+            return this;
+        }
+        Set<JavaType.FullyQualified> oldTypesSet = new HashSet<>(gavToTypes.get(gavKey));
+
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath.size());
+        for (JavaType.FullyQualified type : classpath) {
+            if (!oldTypesSet.contains(type)) {
+                newClasspath.add(type);
+            }
+        }
+
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        newGavToTypes.remove(gavKey);
+
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Remove types from this source set whose GAV keys match the given groupId and artifactId glob patterns.
+     *
+     * @param groupIdPattern    glob pattern for groupId matching
+     * @param artifactIdPattern glob pattern for artifactId matching
+     * @return a new JavaSourceSet with matching types removed, or this instance if no keys match
+     */
+    public JavaSourceSet removeTypesMatching(String groupIdPattern, String artifactIdPattern) {
+        if (gavToTypes.isEmpty()) {
+            return this;
+        }
+        Set<String> keysToRemove = new HashSet<>();
+        for (String key : gavToTypes.keySet()) {
+            String[] parts = key.split(":");
+            if (parts.length >= 2 &&
+                matchesGlob(parts[0], groupIdPattern) &&
+                matchesGlob(parts[1], artifactIdPattern)) {
+                keysToRemove.add(key);
+            }
+        }
+        if (keysToRemove.isEmpty()) {
+            return this;
+        }
+        Set<JavaType.FullyQualified> typesToRemove = new HashSet<>();
+        for (String key : keysToRemove) {
+            typesToRemove.addAll(gavToTypes.get(key));
+        }
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath.size());
+        for (JavaType.FullyQualified type : classpath) {
+            if (!typesToRemove.contains(type)) {
+                newClasspath.add(type);
+            }
+        }
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        for (String key : keysToRemove) {
+            newGavToTypes.remove(key);
+        }
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Apply a transformation to the {@link JavaSourceSet} marker on a source file and replace it if changed.
+     *
+     * @param sf        the source file to update
+     * @param transform a function that takes the current JavaSourceSet and returns an updated one
+     * @return the source file with the updated marker, or unchanged if no JavaSourceSet is present or the transform is a no-op
+     */
+    public static SourceFile updateOnSourceFile(SourceFile sf, Function<JavaSourceSet, JavaSourceSet> transform) {
+        Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+        if (!maybeSourceSet.isPresent()) {
+            return sf;
+        }
+        JavaSourceSet updated = transform.apply(maybeSourceSet.get());
+        if (updated != maybeSourceSet.get()) {
+            return sf.withMarkers(sf.getMarkers().setByType(updated));
+        }
+        return sf;
+    }
+
+    /**
+     * Apply a transformation to the {@link JavaSourceSet} marker on a source file, using a cache keyed by
+     * {@link JavaProject} ID and source set name to avoid redundant recomputation across files in the same source set.
+     *
+     * @param sf        the source file to update
+     * @param cache     a mutable map used to cache updated JavaSourceSets across calls
+     * @param transform a function that takes the current JavaSourceSet and returns an updated one
+     * @return the source file with the updated marker, or unchanged if no JavaSourceSet/JavaProject is present
+     */
+    public static SourceFile updateOnSourceFile(SourceFile sf, Map<String, JavaSourceSet> cache,
+                                                Function<JavaSourceSet, JavaSourceSet> transform) {
+        Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+        Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+        if (!maybeJp.isPresent() || !maybeSourceSet.isPresent()) {
+            return sf;
+        }
+        String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
+        JavaSourceSet cached = cache.get(cacheKey);
+        if (cached != null) {
+            if (cached == maybeSourceSet.get()) {
+                return sf;
+            }
+            return sf.withMarkers(sf.getMarkers().setByType(cached));
+        }
+        JavaSourceSet updated = transform.apply(maybeSourceSet.get());
+        if (updated != maybeSourceSet.get()) {
+            cache.put(cacheKey, updated);
+            return sf.withMarkers(sf.getMarkers().setByType(updated));
+        }
+        return sf;
+    }
+
+    /**
+     * Extract type information from the provided classpath.
+     *
      * @param ignore              Not used, does not do anything, to be deleted
+     * @param fullTypeInformation Not used, does not do anything, to be deleted
+     * @deprecated Use {@link #build(String, Collection)} instead.
      */
     @Deprecated
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
@@ -70,133 +314,11 @@ public class JavaSourceSet implements SourceSet {
         if (fullTypeInformation) {
             throw new UnsupportedOperationException();
         }
-
-        List<String> typeNames;
-        if (!classpath.iterator().hasNext()) {
-            // Only load JRE-provided types
-            try (ScanResult scanResult = new ClassGraph()
-                    .enableClassInfo()
-                    .enableSystemJarsAndModules()
-                    .acceptPackages("java")
-                    .ignoreClassVisibility()
-                    .scan()) {
-                typeNames = packagesToTypeDeclarations(scanResult);
-            }
-        } else {
-            // Load types from the classpath
-            try (ScanResult scanResult = new ClassGraph()
-                    .overrideClasspath(classpath)
-                    .enableSystemJarsAndModules()
-                    .enableClassInfo()
-                    .ignoreClassVisibility()
-                    .scan()) {
-                typeNames = packagesToTypeDeclarations(scanResult);
-            }
-        }
-
-        // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
-        typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap());
+        return build(sourceSetName, classpath);
     }
-
-
-    /*
-     * Create a map of package names to types contained within that package. Type names are not fully qualified, except for type parameter bounds.
-     * e.g.: "java.util" -> [List, Date]
-     */
-    private static List<String> packagesToTypeDeclarations(ScanResult scanResult) {
-        List<String> result = new ArrayList<>();
-        for (ClassInfo classInfo : scanResult.getAllClasses()) {
-            // Skip private classes, allowing package-private
-            if (classInfo.isAnonymousInnerClass() || classInfo.isPrivate() || classInfo.isSynthetic() || classInfo.getName().contains(".enum.")) {
-                continue;
-            }
-            if (classInfo.isStandardClass() && !classInfo.getName().startsWith("java.")) {
-                continue;
-            }
-            // Although the classfile says its bytecode version is 50 (within the range Java 8 supports),
-            // the Java 8 compiler says these class files from kotlin-reflect are invalid
-            // The error is severe enough that all subsequent stubs have missing type information, so exclude that package
-            if (classInfo.getPackageName().startsWith("kotlin.reflect.jvm.internal.impl.resolve.jvm")) {
-                continue;
-            }
-            String typeDeclaration = declarableFullyQualifiedName(classInfo);
-            if (typeDeclaration == null) {
-                continue;
-            }
-            result.add(typeDeclaration);
-        }
-        return result;
-    }
-
-    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
-        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
-        for (String typeName : typeNames) {
-            types.add(JavaType.ShallowClass.build(typeName));
-        }
-        return types;
-    }
-
-    /**
-     * Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
-     * So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
-     * The declarable name of "class A$B {}" is "A$B"
-     * The declarable name of class B in "class A { class B {}}" is "A.B"
-     * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
-     * <p>
-     * This method takes all of these considerations into account and returns a fully qualified name which replaces
-     * inner-class signifying "$" with ".", while preserving
-     */
-    private static @Nullable String declarableFullyQualifiedName(ClassInfo classInfo) {
-        String name;
-        if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
-            // Because we put java-supplied types into another package, we cannot access package-private types
-            return null;
-        }
-        if (classInfo.isInnerClass()) {
-            StringBuilder sb = new StringBuilder();
-            ClassInfoList outerClasses = classInfo.getOuterClasses();
-            // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
-            for (int i = outerClasses.size() - 1; i >= 0; i--) {
-                ClassInfo outerClass = outerClasses.get(i);
-                if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic() || outerClass.isExternalClass()) {
-                    return null;
-                }
-                if (i == outerClasses.size() - 1) {
-                    sb.append(outerClass.getName()).append(".");
-                } else if (!outerClass.getName().startsWith(sb.toString())) {
-                    // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
-                    return classInfo.getName();
-                } else {
-                    sb.append(outerClass.getName().substring(sb.length())).append(".");
-                }
-            }
-            if (!classInfo.getName().startsWith(sb.toString())) {
-                // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
-                return classInfo.getName();
-            }
-            String nameFragment = classInfo.getName().substring(sb.length());
-
-            if (!isDeclarable(nameFragment)) {
-                return null;
-            }
-            sb.append(nameFragment);
-            name = sb.toString();
-        } else {
-            name = classInfo.getName();
-        }
-        if (!isDeclarable(name)) {
-            return null;
-        }
-        return name;
-    }
-
-
-    // Purely IO-based classpath scanning below this point
 
     /**
      * Extract type information from the provided classpath.
-     * Uses file I/O to compute the classpath.
      */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath) {
         List<JavaType.FullyQualified> types = getJavaStandardLibraryTypes();
@@ -235,10 +357,15 @@ public class JavaSourceSet implements SourceSet {
                 version = pathParts.get(pathParts.size() - 3);
             } else if (pathParts.contains(".tt")) {
                 int ttIndex = pathParts.indexOf(".tt");
-                if (pathParts.size() - ttIndex > 3) {
-                    groupId = String.join(".", pathParts.subList(ttIndex + 1, pathParts.size() - 2));
-                    artifactId = pathParts.get(pathParts.size() - 2);
-                    version = pathParts.get(pathParts.size() - 1);
+                int last = pathParts.size() - 1;
+                // Legacy layout ends at the version directory; post-#7528 layout adds
+                // a trailing <artifact>-<version>.jar file inside the version directory.
+                int versionIndex = pathParts.get(last).endsWith(".jar") ? last - 1 : last;
+                int artifactIndex = versionIndex - 1;
+                if (artifactIndex - (ttIndex + 1) >= 1) {
+                    groupId = String.join(".", pathParts.subList(ttIndex + 1, artifactIndex));
+                    artifactId = pathParts.get(artifactIndex);
+                    version = pathParts.get(versionIndex);
                 }
             } else if (pathParts.size() >= 4) {
                 version = pathParts.get(pathParts.size() - 2);
@@ -269,61 +396,158 @@ public class JavaSourceSet implements SourceSet {
 
     // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
     // Even a single module project will typically have at least two source sets, main and test
-    private static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
+    public static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
         try {
-            // Paths will be to either directories of class files or jar files
-            if (Files.isRegularFile(path)) {
-                try (JarFile jarFile = new JarFile(path.toFile())) {
-                    Enumeration<JarEntry> entries = jarFile.entries();
-                    while (entries.hasMoreElements()) {
-                        String entryName = entries.nextElement().getName();
-                        if (entryName.endsWith(".class")) {
-                            String s = entryNameToClassName(entryName);
-                            if (isDeclarable(s)) {
-                                types.add(JavaType.ShallowClass.build(s));
-                            }
-                        }
-                    }
-                }
-            } else {
-                Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-                    @Override
-                    public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                        if (file.getFileName().toString().endsWith(".class")) {
-                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
-                            String s = entryNameToClassName(pathStr);
-                            if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
-                                types.add(JavaType.ShallowClass.build(s));
-                            }
-                        }
-                        return java.nio.file.FileVisitResult.CONTINUE;
-                    }
-                });
-            }
+            forEachClass(path, acceptPackage, (className, classFile) -> types.add(JavaType.ShallowClass.build(className)));
         } catch (IOException e) {
             // Partial results better than no results
         }
         return types;
     }
 
-    private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
-        List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
-        Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
-        if (Files.exists(toolsJar)) {
-            javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
-        } else {
-            javaStandardLibraryTypes.addAll(typesFromPath(
-                    FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
-                    "java"));
-        }
-        return javaStandardLibraryTypes;
+    private interface ClassFileVisitor {
+        void visit(String className, ClassFileOpener classFile) throws IOException;
     }
 
-    private static String entryNameToClassName(String entryName) {
-        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
-        return entryName.substring(start, entryName.length() - ".class".length())
-                .replace('/', '.');
+    private interface ClassFileOpener {
+        InputStream open() throws IOException;
+    }
+
+    private static void forEachClass(Path path, @Nullable String acceptPackage, ClassFileVisitor visitor) throws IOException {
+        // Paths will be to either directories of class files or jar files
+        if (Files.isRegularFile(path)) {
+            try (JarFile jarFile = new JarFile(path.toFile())) {
+                Enumeration<JarEntry> entries = jarFile.entries();
+                while (entries.hasMoreElements()) {
+                    JarEntry entry = entries.nextElement();
+                    String className = classNameOf(entry.getName(), acceptPackage);
+                    if (className != null) {
+                        visitor.visit(className, () -> jarFile.getInputStream(entry));
+                    }
+                }
+            }
+        } else {
+            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String className = classNameOf(path.relativize(file).toString(), acceptPackage);
+                    if (className != null) {
+                        visitor.visit(className, () -> Files.newInputStream(file));
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+    }
+
+    private static @Nullable String classNameOf(String entryName, @Nullable String acceptPackage) {
+        if (!entryName.endsWith(".class") || isMetaInfEntry(entryName)) {
+            return null;
+        }
+        String className = entryName.substring(0, entryName.length() - ".class".length()).replace('/', '.');
+        boolean inPackage = acceptPackage == null || className.startsWith(acceptPackage + ".");
+        return inPackage && isDeclarable(className) ? className : null;
+    }
+
+    /**
+     * Per the JAR specification {@code META-INF/} is reserved for metadata (manifests, services, multi-release
+     * versioned entries, etc.) and never contains application classes. Any {@code .class} file under this directory
+     * would otherwise yield an FQN like {@code META-INF.versions.9.foo.Bar} that collides with the base-path entry in
+     * downstream consumers that dedupe by FQN.
+     */
+    static boolean isMetaInfEntry(String entryName) {
+        String normalized = entryName.replace('\\', '/');
+        return normalized.startsWith("META-INF/");
+    }
+
+    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
+        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
+        for (String typeName : typeNames) {
+            types.add(JavaType.ShallowClass.build(typeName));
+        }
+        return types;
+    }
+
+    private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
+        return typesFrom(JavaStandardLibrary.TYPE_NAMES);
+    }
+
+    private static class JavaStandardLibrary {
+        // Only the field lives here: JDK 8 runs every call into a class still being initialized on a slow path
+        static final List<String> TYPE_NAMES = scanJavaStandardLibrary();
+    }
+
+    /**
+     * The public {@code java.*} types of the running JDK, from {@code rt.jar} on Java 8 and every {@code jrt:/} module on 9+.
+     */
+    private static List<String> scanJavaStandardLibrary() {
+        Set<String> publicTypes = new LinkedHashSet<>();
+        ClassFileVisitor collectPublic = (className, classFile) -> {
+            try (InputStream is = classFile.open()) {
+                if (isPublic(className, is)) {
+                    publicTypes.add(className);
+                }
+            }
+        };
+        try {
+            Path rtJar = Paths.get(System.getProperty("java.home"), "lib", "rt.jar");
+            if (Files.isRegularFile(rtJar)) {
+                forEachClass(rtJar, "java", collectPublic);
+            } else {
+                try (DirectoryStream<Path> modules = Files.newDirectoryStream(
+                        FileSystems.getFileSystem(URI.create("jrt:/")).getPath("/modules"))) {
+                    for (Path module : modules) {
+                        forEachClass(module, "java", collectPublic);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // Partial results better than no results
+        }
+
+        List<String> typeNames = new ArrayList<>(publicTypes.size());
+        for (String typeName : publicTypes) {
+            if (isEnclosedByPublicTypes(typeName, publicTypes)) {
+                typeNames.add(typeName);
+            }
+        }
+        return typeNames;
+    }
+
+    /**
+     * A nested class's declared visibility is only recorded in its InnerClasses entry, not its own access flags.
+     */
+    private static boolean isPublic(String className, InputStream classFile) throws IOException {
+        ClassReader classReader;
+        try {
+            classReader = new ClassReader(classFile);
+        } catch (IllegalArgumentException e) {
+            // Class file version newer than this ASM supports; keeping the type beats failing the whole scan
+            return true;
+        }
+        int[] access = {classReader.getAccess()};
+        if (className.indexOf('$') != -1) {
+            String internalName = classReader.getClassName();
+            classReader.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitInnerClass(String name, @Nullable String outerName, @Nullable String innerName, int innerAccess) {
+                    if (name.equals(internalName)) {
+                        access[0] = innerAccess;
+                    }
+                }
+            }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG);
+        }
+        return (access[0] & Opcodes.ACC_PUBLIC) != 0 && (access[0] & Opcodes.ACC_SYNTHETIC) == 0;
+    }
+
+    private static boolean isEnclosedByPublicTypes(String className, Set<String> publicTypes) {
+        for (int i = className.indexOf('$'); i != -1; i = className.indexOf('$', i + 1)) {
+            if (!publicTypes.contains(className.substring(0, i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static boolean isDeclarable(String className) {

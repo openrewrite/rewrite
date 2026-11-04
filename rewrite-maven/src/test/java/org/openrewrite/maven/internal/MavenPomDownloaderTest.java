@@ -21,7 +21,10 @@ import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -39,12 +42,19 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -53,98 +63,75 @@ import java.util.stream.StreamSupport;
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8682")
     @Test
-    void ossSonatype() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        MavenRepository ossSonatype = MavenRepository.builder()
-          .id("oss")
-          .uri("https://central.sonatype.com/repository/maven-snapshots/")
-          .snapshots(true)
-          .build();
-        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
-          MavenExecutionContextView.view(ctx), null);
-        assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
-    }
-
-    @CsvSource(textBlock = """
-      https://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-      https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
-      http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-
-      https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
-      https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
-      https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
-      https://jitpack.io/, https://jitpack.io/
-      """)
-    @ParameterizedTest
-    void normalizeRepository(String originalUrl, String expectedUrl) throws Throwable {
-        MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
-        MavenRepository repository = new MavenRepository("id", originalUrl, null, null, null, null, null);
-        MavenRepository normalized = downloader.normalizeRepository(repository);
-        assertThat(normalized).isNotNull();
-        assertThat(normalized.getUri()).isEqualTo(expectedUrl);
-    }
-
-    /**
-     * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
-     * Effective Maven settings take precedence over the local effective build POM.
-     */
-    @Test
-    void repositoryOrder() {
+    void repositoriesDeclaredUnderDifferentIdsForTheSameUriAreAskedOnce() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
-          //language=xml
-          """
-            <settings>
-              <profiles>
-                <profile>
-                    <id>customize-repos</id>
-                    <repositories>
-                        <repository>
-                            <id>settings-provided</id>
-                            <url>https://repo.clojars.org</url>
-                        </repository>
-                    </repositories>
-                </profile>
-              </profiles>
-              <activeProfiles>
-                <activeProfile>customize-repos</activeProfile>
-              </activeProfiles>
-            </settings>
-            """
-        ), ctx));
-
-        rewriteRun(
-          pomXml(
-            //language=xml
-            """
-              <project>
-                  <groupId>org.openrewrite.test</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>0.1.0-SNAPSHOT</version>
-                  <repositories>
-                      <repository>
-                          <id>local-provided</id>
-                          <url>https://oss.sonatype.org/content/repositories/releases</url>
-                      </repository>
-                  </repositories>
-              </project>
-              """,
-            spec -> spec.beforeRecipe(pom -> {
-                MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
-                  .map(MavenRepository::getId))
-                  .containsExactly("settings-provided", "local-provided");
-            }))
+        var repositories = List.of(
+          MavenRepository.builder().id("first").uri("https://repo.example.com/maven").knownToExist(true).build(),
+          MavenRepository.builder().id("second").uri("https://REPO.example.com/maven/").knownToExist(true).build(),
+          MavenRepository.builder().id("third").uri("https://repo.example.com/other/").knownToExist(true).build()
         );
+
+        assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(repositories, null, null))
+          .extracting(MavenRepository::getId)
+          .containsExactly("first", "third");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9226")
+    @ParameterizedTest
+    @ValueSource(strings = {"artifactregistry://example.com/maven", "s3://example-bucket/maven"})
+    void nonHttpRepositoryWarnedOnce(String repositoryUri) {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        List<String> failed = new ArrayList<>();
+        List<String> failedPreviously = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable t) {
+                failed.add(uri);
+            }
+
+            @Override
+            public void repositoryAccessFailedPreviously(String uri) {
+                failedPreviously.add(uri);
+            }
+        });
+        var repository = MavenRepository.builder().id("wagon").uri(repositoryUri).build();
+        var downloader = new MavenPomDownloader(ctx);
+
+        assertThat(downloader.normalizeRepository(repository, ctx, null)).isNull();
+        assertThat(downloader.normalizeRepository(repository, ctx, null)).isNull();
+        assertThat(new MavenPomDownloader(ctx).normalizeRepository(repository, ctx, null)).isNull();
+
+        assertThat(failed).containsExactly(repositoryUri);
+        assertThat(failedPreviously).containsExactly(repositoryUri, repositoryUri);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9226")
+    @Test
+    void nonHttpRepositoryWarningsAreScopedToRepository() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        List<String> failed = new ArrayList<>();
+        ctx.setResolutionListener(new ResolutionEventListener() {
+            @Override
+            public void repositoryAccessFailed(String uri, Throwable t) {
+                failed.add(uri);
+            }
+        });
+        var first = MavenRepository.builder().id("wagon").uri("s3://first-bucket/maven").build();
+        var second = MavenRepository.builder().id("wagon").uri("s3://second-bucket/maven").build();
+        var downloader = new MavenPomDownloader(ctx);
+
+        assertThat(downloader.normalizeRepository(first, ctx, null)).isNull();
+        assertThat(downloader.normalizeRepository(second, ctx, null)).isNull();
+        assertThat(failed).containsExactly(first.getUri(), second.getUri());
     }
 
     @Nested
@@ -152,17 +139,61 @@ class MavenPomDownloaderTest implements RewriteTest {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
           .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
 
+        WithNativeHttpURLConnectionAndTLS() {
+            // Each test is about the repositories it sets up, which MavenPomDownloader would otherwise follow with
+            // Maven Central
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
+        }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/3908")
         @Test
         void centralIdOverridesDefaultRepository() {
-            var ctx = MavenExecutionContextView.view(this.ctx);
-            var centralOverride = new MavenRepository("repo", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
+            var ctx = MavenExecutionContextView.view(this.ctx).setAddCentralRepository(true);
+            List<String> asked = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repository(MavenRepository mavenRepository, @Nullable ResolvedPom containing) {
+                    asked.add(mavenRepository.getUri());
+                }
+            });
+            var centralOverride = new MavenRepository("central", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try {
                 downloader.download(new GroupArtifactVersion("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
-                Assertions.fail();
+                fail();
             } catch (MavenDownloadingException ignore) {
             }
+            // A repository with Central's id takes Maven Central's place
+            assertThat(asked).contains(centralOverride.getUri()).doesNotContain(MAVEN_CENTRAL.getUri());
+        }
+
+        @Test
+        void unreachableHostProbedOncePerRun() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            // Nothing listens on port 1, so connections are refused immediately.
+            String deadUri = "http://localhost:1/repo/";
+
+            List<String> probed = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable t) {
+                    probed.add(uri);
+                }
+            });
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            // The same dead host declared under two different repository ids — as happens when
+            // several transitive POMs each declare the same (dead) repository. The per-repository
+            // normalization cache does not dedupe these by host, so without a host-level circuit
+            // breaker each one is re-probed (here, ~once; in a real run, once per artifact).
+            var repoA = MavenRepository.builder().id("a").uri(deadUri).build();
+            var repoB = MavenRepository.builder().id("b").uri(deadUri).build();
+
+            assertThat(downloader.normalizeRepository(repoA, ctx, null)).isNull();
+            assertThat(downloader.normalizeRepository(repoB, ctx, null)).isNull();
+
+            // The unreachable host must be probed only once; the second repository is skipped.
+            assertThat(probed).containsExactly(deadUri);
         }
 
         @Test
@@ -173,7 +204,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                 repository.setKnownToExist(true);
             }
 
-            MavenRepository nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null);
+            var nonexistentRepo = new MavenRepository("repo", "http://internalartifactrepository.yourorg.com", null, null, true, null, null, null, null);
             List<String> attemptedUris = new ArrayList<>();
             List<MavenRepository> discoveredRepositories = new ArrayList<>();
             ctx.setResolutionListener(new ResolutionEventListener() {
@@ -203,12 +234,13 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void onlyAccessRequiredRepositories() throws Exception {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
             // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
             for (MavenRepository repository : ctx.getRepositories()) {
                 repository.setKnownToExist(true);
             }
 
-            MavenRepository nonExistentRepo = new MavenRepository("repo", "https://definitelydoesnotexist2.xyz/", null, null, false, null, null, null, null);
+            var nonExistentRepo = new MavenRepository("repo", "https://definitelydoesnotexist2.xyz/", null, null, false, null, null, null, null);
             List<String> attemptedUris = new ArrayList<>();
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
@@ -227,7 +259,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
             // Avoid actually trying to reach a made-up URL
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+            var nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
             Map<String, Throwable> attemptedUris = new HashMap<>();
             List<MavenRepository> discoveredRepositories = new ArrayList<>();
             ctx.setResolutionListener(new ResolutionEventListener() {
@@ -251,6 +283,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void mirrorsOverrideRepositoriesInPom() {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            // normalizeRepository probes the mirror over HTTP; the class-level 250ms timeout
+            // is too aggressive under suite load and causes the probe to return null.
+            HttpSenderExecutionContextView.view(this.ctx).setHttpSender(new HttpUrlConnectionSender());
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
@@ -283,7 +318,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             Map<Path, Pom> pomsByPath = new HashMap<>();
             pomsByPath.put(pomPath, pom);
 
-            MavenPomDownloader mpd = new MavenPomDownloader(pomsByPath, ctx);
+            var mpd = new MavenPomDownloader(pomsByPath, ctx);
             MavenRepository normalized = mpd.normalizeRepository(
               MavenRepository.builder().id("whatever").uri("${REPO_URL}").build(),
               ctx,
@@ -321,10 +356,10 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void retryConnectException() throws Exception {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            try (MockWebServer server = new MockWebServer()) {
+            try (var server = new MockWebServer()) {
                 server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
                 server.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
-                String body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of(), null, null)));
+                var body = new String(downloader.sendRequest(new HttpSender.Request(server.url("/test").url(), "request".getBytes(), HttpSender.Method.GET, Map.of(), null, null)));
                 assertThat(body).isEqualTo("body");
                 assertThat(server.getRequestCount()).isEqualTo(2);
                 server.shutdown();
@@ -343,8 +378,17 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void useHttpWhenHttpsFails() throws Exception {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            try (MockWebServer mockRepo = new MockWebServer()) {
-                mockRepo.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
+            try (var mockRepo = new MockWebServer()) {
+                // Use a Dispatcher instead of enqueue to avoid flakiness: normalizeRepository()
+                // probes HTTPS first, and TLS bytes sent to this HTTP-only server can sometimes
+                // parse as valid HTTP, consuming an enqueued response before the real HTTP request.
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode(200).setBody("body");
+                    }
+                });
+                mockRepo.start();
                 var httpRepo = MavenRepository.builder()
                   .id("id")
                   .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
@@ -356,240 +400,33 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Disabled
         @Test
-        void dontFetchSnapshotsFromReleaseRepos() throws Exception {
-            try (MockWebServer snapshotRepo = new MockWebServer();
-                 MockWebServer releaseRepo = new MockWebServer()) {
-                snapshotRepo.setDispatcher(new Dispatcher() {
-                    @Override
-                    public MockResponse dispatch(RecordedRequest request) {
-                        MockResponse response = new MockResponse().setResponseCode(200);
-                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
-                            //language=xml
-                            response.setBody(
-                              """
-                                <metadata modelVersion="1.1.0">
-                                  <groupId>org.springframework.cloud</groupId>
-                                  <artifactId>spring-cloud-dataflow-build</artifactId>
-                                  <version>2.10.0-SNAPSHOT</version>
-                                  <versioning>
-                                    <snapshot>
-                                      <timestamp>20220201.001946</timestamp>
-                                      <buildNumber>85</buildNumber>
-                                    </snapshot>
-                                    <lastUpdated>20220201001950</lastUpdated>
-                                    <snapshotVersions>
-                                      <snapshotVersion>
-                                        <extension>pom</extension>
-                                        <value>2.10.0-20220201.001946-85</value>
-                                        <updated>20220201001946</updated>
-                                      </snapshotVersion>
-                                    </snapshotVersions>
-                                  </versioning>
-                                </metadata>
-                                """
-                            );
-                        } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
-                            //language=xml
-                            response.setBody(
-                              """
-                                <project>
-                                    <groupId>org.springframework.cloud</groupId>
-                                    <artifactId>spring-cloud-dataflow-build</artifactId>
-                                    <version>2.10.0-SNAPSHOT</version>
-                                </project>
-                                """
-                            );
-                        }
-                        return response;
+        void unresponsiveRepositoryRetriesEachProbeOnce() throws Exception {
+            List<String> timedOut = new ArrayList<>();
+            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+                try {
+                    return httpSender.send(request);
+                } catch (UncheckedIOException e) {
+                    if (e.getCause() instanceof SocketTimeoutException) {
+                        timedOut.add(request.getMethod() + " " + request.getUrl());
                     }
-                });
+                    throw e;
+                }
+            });
+            // Connections to this socket are established but never answered, as by a hung server, or by a plain HTTP
+            // server reading the https probe's TLS handshake as the start of a request
+            try (var server = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))) {
+                String http = "http://127.0.0.1:%d/maven/".formatted(server.getLocalPort());
+                String https = "https://127.0.0.1:%d/maven/".formatted(server.getLocalPort());
+                var repository = MavenRepository.builder().id("unresponsive").uri(http).build();
 
-                var metadataPaths = new AtomicInteger(0);
-                releaseRepo.setDispatcher(new Dispatcher() {
-                    @Override
-                    public MockResponse dispatch(RecordedRequest request) {
-                        MockResponse response = new MockResponse().setResponseCode(404);
-                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
-                            metadataPaths.incrementAndGet();
-                        }
-                        return response;
-                    }
-                });
-
-                releaseRepo.start();
-                snapshotRepo.start();
-
-                MavenParser.builder().build().parse(ctx,
-                  //language=xml
-                  """
-                    <project>
-                        <modelVersion>4.0.0</modelVersion>
-
-                        <groupId>org.openrewrite.test</groupId>
-                        <artifactId>foo</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-
-                        <repositories>
-                          <repository>
-                            <id>snapshot</id>
-                            <snapshots>
-                              <enabled>true</enabled>
-                            </snapshots>
-                            <url>http://%s:%d</url>
-                          </repository>
-                          <repository>
-                            <id>release</id>
-                            <snapshots>
-                              <enabled>false</enabled>
-                            </snapshots>
-                            <url>http://%s:%d</url>
-                          </repository>
-                        </repositories>
-
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.cloud</groupId>
-                                <artifactId>spring-cloud-dataflow-build</artifactId>
-                                <version>2.10.0-SNAPSHOT</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                    """.formatted(snapshotRepo.getHostName(), snapshotRepo.getPort(), releaseRepo.getHostName(), releaseRepo.getPort())
-                );
-
-                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
-                assertThat(metadataPaths.get()).isEqualTo(0);
-            }
-        }
-
-        @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
-        @Test
-        void fetchSnapshotWithCorrectClassifier() throws Exception {
-            try (MockWebServer snapshotServer = new MockWebServer()) {
-                snapshotServer.setDispatcher(new Dispatcher() {
-                    @Override
-                    public MockResponse dispatch(RecordedRequest request) {
-                        MockResponse response = new MockResponse().setResponseCode(200);
-                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
-                            //language=xml
-                            response.setBody(
-                              """
-                                <metadata modelVersion="1.1.0">
-                                  <groupId>com.some</groupId>
-                                  <artifactId>an-artifact</artifactId>
-                                  <version>10.5.0-SNAPSHOT</version>
-                                  <versioning>
-                                    <snapshot>
-                                      <timestamp>20250113.114247</timestamp>
-                                      <buildNumber>36</buildNumber>
-                                    </snapshot>
-                                    <lastUpdated>20250113114247</lastUpdated>
-                                    <snapshotVersions>
-                                      <snapshotVersion>
-                                        <classifier>javadoc</classifier>
-                                        <extension>jar</extension>
-                                        <value>10.5.0-20250113.114247-36</value>
-                                        <updated>20250113114247</updated>
-                                      </snapshotVersion>
-                                      <snapshotVersion>
-                                        <classifier>tests</classifier>
-                                        <extension>jar</extension>
-                                        <value>10.5.0-20250113.114244-35</value>
-                                        <updated>20250113114244</updated>
-                                      </snapshotVersion>
-                                      <snapshotVersion>
-                                        <classifier>sources</classifier>
-                                        <extension>jar</extension>
-                                        <value>10.5.0-20250113.114242-34</value>
-                                        <updated>20250113114242</updated>
-                                      </snapshotVersion>
-                                      <snapshotVersion>
-                                        <extension>jar</extension>
-                                        <value>10.5.0-20250113.114227-33</value>
-                                        <updated>20250113114227</updated>
-                                      </snapshotVersion>
-                                      <snapshotVersion>
-                                        <extension>pom</extension>
-                                        <value>10.5.0-20250113.114227-33</value>
-                                        <updated>20250113114227</updated>
-                                      </snapshotVersion>
-                                    </snapshotVersions>
-                                  </versioning>
-                                </metadata>
-                                """
-                            );
-                        } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
-                            //language=xml
-                            response.setBody(
-                              """
-                                <project>
-                                     <groupId>com.some</groupId>
-                                     <artifactId>an-artifact</artifactId>
-                                     <version>10.5.0-SNAPSHOT</version>
-                                </project>
-                                """
-                            );
-                        }
-                        return response;
-                    }
-                });
-
-                snapshotServer.start();
-
-                //language=xml
-                MavenParser.builder().build().parse(ctx,
-                  """
-                    <project>
-                        <modelVersion>4.0.0</modelVersion>
-                        <groupId>org.openrewrite.test</groupId>
-                        <artifactId>foo</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                        <repositories>
-                          <repository>
-                            <id>snapshot</id>
-                            <snapshots>
-                              <enabled>true</enabled>
-                            </snapshots>
-                            <url>http://%s:%d</url>
-                          </repository>
-                        </repositories>
-                        <dependencies>
-                            <dependency>
-                                 <groupId>com.some</groupId>
-                                 <artifactId>an-artifact</artifactId>
-                                 <version>10.5.0-SNAPSHOT</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                    """.formatted(snapshotServer.getHostName(), snapshotServer.getPort())
-                );
-
-                MavenRepository snapshotRepo = MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
-                  .build();
-
-                var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
-                var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
-
-                var pomPath = Path.of("pom.xml");
-                var pom = Pom.builder()
-                  .sourcePath(pomPath)
-                  .repository(snapshotRepo)
-                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                  .gav(gav.asResolved().withRepository("${REPO_URL}"))
-                  .build();
-                var resolvedPom = ResolvedPom.builder()
-                  .requested(pom)
-                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                  .repositories(singletonList(snapshotRepo))
-                  .build();
-
-                // Ensure that classifier 'javadoc', 'tests' and 'sources' are not used
-                var downloadedPom = mavenPomDownloader.download(gav, null, resolvedPom, List.of(snapshotRepo));
-                assertThat(downloadedPom).returns("10.5.0-20250113.114227-33", Pom::getDatedSnapshotVersion);
+                assertThat(new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null)).isNull();
+                // Each probe is retried once rather than five times, and https is still tried before http
+                assertThat(timedOut).containsExactly(
+                  "OPTIONS " + https, "OPTIONS " + https, "HEAD " + https, "HEAD " + https,
+                  "OPTIONS " + http, "OPTIONS " + http, "HEAD " + http, "HEAD " + http);
             }
         }
 
@@ -615,15 +452,193 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
-        void deriveMetaDataFromHtmlBasedRepository() {
+        void downloadMetadataFromFileRepoWithNonAsciiPath(@TempDir Path repoPath) throws Exception {
+            // Reproduce "Bad escape" error when file:// repo path contains non-ASCII chars
+            // like German umlauts (e.g. a username like "müller")
+            Path repoWithUmlaut = repoPath.resolve("m\u00fcller/.m2/repository");
+            Path artifactDir = repoWithUmlaut.resolve("com/example/my-lib");
+            for (String version : List.of("1.0.0", "2.0.0")) {
+                Path versionPath = artifactDir.resolve(version);
+                Files.createDirectories(versionPath);
+                Files.writeString(versionPath.resolve("my-lib-" + version + ".pom"),
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.example</groupId>
+                      <artifactId>my-lib</artifactId>
+                      <version>%s</version>
+                    </project>
+                    """.formatted(version));
+            }
+            Files.writeString(artifactDir.resolve("maven-metadata-local.xml"),
+              """
+                <metadata>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-lib</artifactId>
+                  <versioning>
+                    <versions>
+                      <version>1.0.0</version>
+                      <version>2.0.0</version>
+                    </versions>
+                  </versioning>
+                </metadata>
+                """);
+
+            // Use a URI with properly encoded umlauts (as Path.toUri() produces)
             MavenRepository repository = MavenRepository.builder()
-              .id("html-based")
-              .uri("https://central.sonatype.com/repository/maven-snapshots")
+              .id("local")
+              .uri(repoWithUmlaut.toUri().toString())
               .knownToExist(true)
-              .deriveMetadataIfMissing(true)
               .build();
-            assertThrows(MavenDownloadingException.class, () ->
-              new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+            MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+              .downloadMetadata(new GroupArtifact("com.example", "my-lib"), null, List.of(repository));
+            assertThat(metaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
+
+            // Also test with raw (unencoded) umlauts in the URI, which is what happens
+            // when the repo URL comes from Maven settings XML with non-ASCII path chars
+            String absPath = repoWithUmlaut.toAbsolutePath().toString().replace('\\', '/');
+            String rawUri = "file://" + (absPath.startsWith("/") ? "" : "/") + absPath + "/";
+            MavenRepository rawRepo = MavenRepository.builder()
+              .id("local-raw")
+              .uri(rawUri)
+              .knownToExist(true)
+              .build();
+            MavenMetadata rawMetaData = new MavenPomDownloader(emptyMap(), ctx)
+              .downloadMetadata(new GroupArtifact("com.example", "my-lib"), null, List.of(rawRepo));
+            assertThat(rawMetaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
+        }
+
+        @CsvSource({
+          // Already valid — idempotent
+          "'file:///tmp/repo/',                                          'file:///tmp/repo/'",
+          "'file:///tmp/repo',                                           'file:///tmp/repo'",
+          // Already percent-encoded — idempotent
+          "'file:///tmp/m%C3%BCller/repo/',                              'file:///tmp/m%C3%BCller/repo/'",
+          // Raw non-ASCII characters get encoded
+          "'file:///tmp/müller/repo/',                                   'file:///tmp/m%C3%BCller/repo/'",
+          // Spaces get encoded
+          "'file:///tmp/has space/repo/',                                'file:///tmp/has%20space/repo/'",
+          // Backslashes normalized to forward slashes
+          "'file:///tmp/path\\with\\backslashes/repo/',                  'file:///tmp/path/with/backslashes/repo/'",
+          // Windows drive letter preserved
+          "'file:///C:/Users/test/.m2/repository/',                      'file:///C:/Users/test/.m2/repository/'",
+          // Malformed Windows URI (two slashes + backslashes) normalized
+          "'file://C:\\Users\\test\\.m2\\repository/',                   'file:///C:/Users/test/.m2/repository/'",
+          // Malformed Windows URI with non-ASCII
+          "'file://C:\\Users\\müller\\.m2\\repository/',                 'file:///C:/Users/m%C3%BCller/.m2/repository/'",
+        })
+        @ParameterizedTest
+        void normalizeFileUri(String input, String expected) {
+            String normalized = MavenPomDownloader.normalizeFileUri(input);
+            assertThat(normalized).isEqualTo(expected);
+            assertDoesNotThrow(() -> Paths.get(URI.create(normalized)));
+        }
+
+
+        @Test
+        void deriveMetaDataFromHtmlBasedRepository() throws Exception {
+            try (var server = new MockWebServer()) {
+                List<@Nullable String> paths = synchronizedList(new ArrayList<>());
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        paths.add(request.getPath());
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        // Sonatype's snapshot repository answers a directory's URL with this page, which lists no versions
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            This maven2 hosted repository is not directly browseable at this URL.
+                            Please use the <a href="../../../../../../#browse/browse:maven-snapshots">browse</a>
+                            or <a href="../../../../../../service/rest/repository/browse/maven-snapshots/">HTML index</a>
+                            views to inspect the contents of this repository.
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-based")
+                  .uri("http://%s:%d/repository/maven-snapshots".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                assertThrows(MavenDownloadingException.class, () ->
+                  new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+                // The metadata, and when there is none, the directory listing to derive it from
+                assertThat(paths).containsExactly(
+                  "/repository/maven-snapshots/does/definitely/not/exist/maven-metadata.xml",
+                  "/repository/maven-snapshots/does/definitely/not/exist/");
+            }
+        }
+
+        @Test
+        void proxiedUpstreamsReportedWithRepositoryResponse() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(404)
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://repo.example.com/maven\"; received-status=404")
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://mirror.example.com/maven\"; error=connection_timeout");
+                    }
+                });
+                server.start();
+
+                var repository = MavenRepository.builder()
+                  .id("gateway")
+                  .uri("http://%s:%d/maven/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .build();
+                assertThatThrownBy(() -> new MavenPomDownloader(emptyMap(), ctx)
+                  .download(new GroupArtifactVersion("org.example", "missing", "1.0.0"), null, null, List.of(repository)))
+                  .isInstanceOfSatisfying(MavenDownloadingException.class, e ->
+                    assertThat(e.getMessage()).contains(
+                      "Tried repositories:\n" +
+                      repository.getUri() + ": HTTP 404, proxying:\n" +
+                      "  https://repo.example.com/maven: HTTP 404\n" +
+                      "  https://mirror.example.com/maven: connection_timeout"));
+            }
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6739")
+        @Test
+        void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            <a href="../" title="../">../</a>
+                            <a href="1.0.0/" title="1.0.0/">1.0.0/</a>
+                            <a href="1.1.0/" title="1.1.0/">1.1.0/</a>
+                            <a href="2.0.0/" title="2.0.0/">2.0.0/</a>
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-with-title")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+                  .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+                assertThat(metaData.getVersioning().getVersions()).containsExactlyInAnyOrder("1.0.0", "1.1.0", "2.0.0");
+            }
         }
 
         @SuppressWarnings("ConstantConditions")
@@ -885,9 +900,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             pomsByPath.put(testPomXml, pom2);
 
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+            var nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
 
-            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+            var downloader = new MavenPomDownloader(pomsByPath, ctx);
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
@@ -939,15 +954,18 @@ class MavenPomDownloaderTest implements RewriteTest {
             pomsByPath.put(testPomXml, pom2);
 
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+            var nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
 
-            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+            var downloader = new MavenPomDownloader(pomsByPath, ctx);
 
-            assertThrows(IllegalArgumentException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+            assertThrows(MavenDownloadingException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
 
         @Test
         void canResolveDifferentVersionOfProjectPom() {
+            MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+            // 3.0.0 isn't one of the project's POMs, so it is downloaded, from Maven Central or what mirrors it
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(true);
             var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
             Path pomPath = Path.of("pom.xml");
@@ -970,12 +988,75 @@ class MavenPomDownloaderTest implements RewriteTest {
             pomsByPath.put(pomPath, pom);
 
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
-            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+            var nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
 
-            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+            var downloader = new MavenPomDownloader(pomsByPath, ctx);
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1950")
+        @Test
+        void emptyRelativePathSkipsLocalParentLookup() {
+            // Parent POM at pom.xml with a version that does NOT match the placeholder
+            // in the child's parent reference. This means the parent can only be found
+            // via relativePath-based local lookup (step 3 in download()), not by GAV match.
+            Path rootPomXml = Path.of("pom.xml");
+            Pom parentPom = Pom.builder()
+              .sourcePath(rootPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(null)
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test.notreal", "parent", "1.0.0", null))
+              .build();
+
+            // Child requests parent with a placeholder version. The placeholder can't
+            // be resolved from the parent's own properties, so GAV-based lookup (steps
+            // 1 and 2 in download()) won't find the parent. Only step 3 (relativePath-
+            // based lookup) can find it, because it relaxes the version check when the
+            // requested version contains "${".
+            var requestedGav = new GroupArtifactVersion("test.notreal", "parent", "${revision}");
+            Path childPomXml = Path.of("child/pom.xml");
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(new Parent(requestedGav, ""))
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test.notreal", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedPom = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(childPomXml, childPom);
+
+            // Disable implicit Maven Central and local repo to isolate the test
+            var mavenCtx = MavenExecutionContextView.view(ctx);
+            mavenCtx.setAddCentralRepository(false);
+            mavenCtx.setAddLocalRepository(false);
+
+            String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+            var nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+            var downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            // With null relativePath (omitted <relativePath>), step 3 resolves
+            // ../pom.xml and finds the parent because the ${revision} placeholder
+            // relaxes the version check.
+            assertDoesNotThrow(() -> downloader.download(requestedGav, null, resolvedPom, singletonList(nonexistentRepo)));
+
+            // With empty relativePath (<relativePath/>), step 3 is skipped entirely.
+            // Since the parent can't be found by GAV match either, the version still
+            // contains an unresolved placeholder, so download throws MavenDownloadingException
+            // instead of URISyntaxException from URI.create().
+            assertThrows(MavenDownloadingException.class,
+              () -> downloader.download(requestedGav, "", resolvedPom, singletonList(nonexistentRepo)));
+        }
+
     }
 
     @Nested
@@ -1002,6 +1083,9 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
             ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
               .setHttpSender(new OkHttpSender(client));
+            // This client trusts the local servers alone, so Maven Central, which MavenPomDownloader would otherwise
+            // ask after them, could not answer it anyway
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
         }
 
         private MockWebServer getMockServer() {
@@ -1048,6 +1132,357 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
         }
 
+        /**
+         * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
+         * Effective Maven settings take precedence over the local effective build POM.
+         */
+        @Test
+        void repositoryOrder() throws IOException {
+            // Local servers rather than live repositories, which normalizeRepository() would probe over the network.
+            // oss.sonatype.org, used here before, now redirects to Maven Central. They serve https because that is
+            // probed first, and a plain-http MockWebServer never answers the handshake, so each retry waits out the
+            // read timeout.
+            try (var settingsRepo = getMockServer(); var pomRepo = getMockServer()) {
+                Dispatcher ok = new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(200);
+                    }
+                };
+                settingsRepo.setDispatcher(ok);
+                pomRepo.setDispatcher(ok);
+                settingsRepo.start();
+                pomRepo.start();
+
+                var ctx = MavenExecutionContextView.view(this.ctx);
+                ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+                  //language=xml
+                  """
+                    <settings>
+                      <profiles>
+                        <profile>
+                            <id>customize-repos</id>
+                            <repositories>
+                                <repository>
+                                    <id>settings-provided</id>
+                                    <url>%s</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                      </profiles>
+                      <activeProfiles>
+                        <activeProfile>customize-repos</activeProfile>
+                      </activeProfiles>
+                    </settings>
+                    """.formatted(settingsRepo.url("/maven/"))
+                ), ctx));
+
+                rewriteRun(
+                  pomXml(
+                    //language=xml
+                    """
+                      <project>
+                          <groupId>org.openrewrite.test</groupId>
+                          <artifactId>foo</artifactId>
+                          <version>0.1.0-SNAPSHOT</version>
+                          <repositories>
+                              <repository>
+                                  <id>local-provided</id>
+                                  <url>%s</url>
+                              </repository>
+                          </repositories>
+                      </project>
+                      """.formatted(pomRepo.url("/maven/")),
+                    spec -> spec.beforeRecipe(pom -> {
+                        MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
+                          .map(MavenRepository::getId))
+                          .containsExactly("settings-provided", "local-provided");
+                    }))
+                );
+            }
+        }
+
+        @Test
+        void dontFetchSnapshotsFromReleaseRepos() throws Exception {
+            try (var snapshotRepo = getMockServer();
+                 var releaseRepo = getMockServer()) {
+                snapshotRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <metadata modelVersion="1.1.0">
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dataflow-build</artifactId>
+                                  <version>2.10.0-SNAPSHOT</version>
+                                  <versioning>
+                                    <snapshot>
+                                      <timestamp>20220201.001946</timestamp>
+                                      <buildNumber>85</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20220201001950</lastUpdated>
+                                    <snapshotVersions>
+                                      <snapshotVersion>
+                                        <extension>pom</extension>
+                                        <value>2.10.0-20220201.001946-85</value>
+                                        <updated>20220201001946</updated>
+                                      </snapshotVersion>
+                                    </snapshotVersions>
+                                  </versioning>
+                                </metadata>
+                                """
+                            );
+                        } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dataflow-build</artifactId>
+                                    <version>2.10.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                var metadataPaths = new AtomicInteger(0);
+                releaseRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(404);
+                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            metadataPaths.incrementAndGet();
+                        }
+                        return response;
+                    }
+                });
+
+                releaseRepo.start();
+                snapshotRepo.start();
+
+                MavenParser.builder().build().parse(ctx,
+                  //language=xml
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+
+                        <repositories>
+                          <repository>
+                            <id>snapshot</id>
+                            <snapshots>
+                              <enabled>true</enabled>
+                            </snapshots>
+                            <url>https://%s:%d</url>
+                          </repository>
+                          <repository>
+                            <id>release</id>
+                            <snapshots>
+                              <enabled>false</enabled>
+                            </snapshots>
+                            <url>https://%s:%d</url>
+                          </repository>
+                        </repositories>
+
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-dataflow-build</artifactId>
+                                <version>2.10.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """.formatted(snapshotRepo.getHostName(), snapshotRepo.getPort(), releaseRepo.getHostName(), releaseRepo.getPort())
+                );
+
+                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
+                assertThat(metadataPaths.get()).isEqualTo(0);
+            }
+        }
+
+        @Test
+        void datedSnapshotVersionIncludesSnapshotRepositories() throws Exception {
+            try (var snapshotRepo = getMockServer()) {
+                snapshotRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>my-lib</artifactId>
+                                    <version>3.28.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotRepo.start();
+
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var snapshotRepoModel = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("https://%s:%d".formatted(snapshotRepo.getHostName(), snapshotRepo.getPort()))
+                  .releases("false")
+                  .snapshots(true)
+                  .build();
+
+                // A dated snapshot version should be recognized as a snapshot so that
+                // snapshot-only repositories are not excluded.
+                Pom pom = downloader.download(
+                  new GroupArtifactVersion("com.example", "my-lib", "3.28.0-20260220.175218-20"),
+                  null, null, List.of(snapshotRepoModel));
+
+                assertThat(pom).isNotNull();
+                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(0);
+            }
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
+        @Test
+        void fetchSnapshotWithCorrectClassifier() throws Exception {
+            try (var snapshotServer = getMockServer()) {
+                snapshotServer.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <metadata modelVersion="1.1.0">
+                                  <groupId>com.some</groupId>
+                                  <artifactId>an-artifact</artifactId>
+                                  <version>10.5.0-SNAPSHOT</version>
+                                  <versioning>
+                                    <snapshot>
+                                      <timestamp>20250113.114247</timestamp>
+                                      <buildNumber>36</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20250113114247</lastUpdated>
+                                    <snapshotVersions>
+                                      <snapshotVersion>
+                                        <classifier>javadoc</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114247-36</value>
+                                        <updated>20250113114247</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <classifier>tests</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114244-35</value>
+                                        <updated>20250113114244</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <classifier>sources</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114242-34</value>
+                                        <updated>20250113114242</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114227-33</value>
+                                        <updated>20250113114227</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <extension>pom</extension>
+                                        <value>10.5.0-20250113.114227-33</value>
+                                        <updated>20250113114227</updated>
+                                      </snapshotVersion>
+                                    </snapshotVersions>
+                                  </versioning>
+                                </metadata>
+                                """
+                            );
+                        } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                     <groupId>com.some</groupId>
+                                     <artifactId>an-artifact</artifactId>
+                                     <version>10.5.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotServer.start();
+
+                //language=xml
+                MavenParser.builder().build().parse(ctx,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <repositories>
+                          <repository>
+                            <id>snapshot</id>
+                            <snapshots>
+                              <enabled>true</enabled>
+                            </snapshots>
+                            <url>https://%s:%d</url>
+                          </repository>
+                        </repositories>
+                        <dependencies>
+                            <dependency>
+                                 <groupId>com.some</groupId>
+                                 <artifactId>an-artifact</artifactId>
+                                 <version>10.5.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """.formatted(snapshotServer.getHostName(), snapshotServer.getPort())
+                );
+
+                MavenRepository snapshotRepo = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
+                  .build();
+
+                var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
+                var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
+
+                var pomPath = Path.of("pom.xml");
+                var pom = Pom.builder()
+                  .sourcePath(pomPath)
+                  .repository(snapshotRepo)
+                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                  .gav(gav.asResolved().withRepository("${REPO_URL}"))
+                  .build();
+                var resolvedPom = ResolvedPom.builder()
+                  .requested(pom)
+                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                  .repositories(singletonList(snapshotRepo))
+                  .build();
+
+                // Ensure that classifier 'javadoc', 'tests' and 'sources' are not used
+                var downloadedPom = mavenPomDownloader.download(gav, null, resolvedPom, List.of(snapshotRepo));
+                assertThat(downloadedPom).returns("10.5.0-20250113.114227-33", Pom::getDatedSnapshotVersion);
+            }
+        }
+
         @ParameterizedTest
         @ValueSource(ints = {500, 400})
         void normalizeAcceptErrorStatuses(Integer status) {
@@ -1060,6 +1495,148 @@ class MavenPomDownloaderTest implements RewriteTest {
                 var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
                 assertThat(normalizedRepo).isEqualTo(originalRepo);
             });
+        }
+
+        // The local server answers OPTIONS and HEAD with each row's statuses, as the repository named above the row does
+        @CsvSource(textBlock = """
+          # Maven Central
+          https://%s/maven2/, 400, 200, https://%s/maven2/
+          https://%s/maven2, 400, 200, https://%s/maven2/
+          http://%s/maven2/, 400, 200, https://%s/maven2/
+          # Sonatype's snapshot repository
+          https://%s/repository/maven-snapshots/, 405, 404, https://%s/repository/maven-snapshots/
+          # Moderne's Artifactory
+          https://%s/artifactory/moderne-public/, 200, 404, https://%s/artifactory/moderne-public/
+          # JitPack
+          https://%s/, 404, 200, https://%s/
+          """)
+        @ParameterizedTest
+        void normalizeRepository(String originalUrl, int optionsStatus, int headStatus, String expectedUrl) throws Throwable {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode("OPTIONS".equals(recordedRequest.getMethod()) ? optionsStatus : headStatus);
+                    }
+                });
+                mockRepo.start();
+                String hostAndPort = "%s:%d".formatted(mockRepo.getHostName(), mockRepo.getPort());
+                var downloader = new MavenPomDownloader(ctx);
+                var repository = new MavenRepository("id", originalUrl.formatted(hostAndPort), null, null, null, null, null);
+                MavenRepository normalized = downloader.normalizeRepository(repository);
+                assertThat(normalized).isNotNull();
+                assertThat(normalized.getUri()).isEqualTo(expectedUrl.formatted(hostAndPort));
+            }
+        }
+
+        @Test
+        void ossSonatype() throws Exception {
+            try (MockWebServer mockRepo = getMockServer()) {
+                // As Sonatype's snapshot repository answers at its root: OPTIONS is not allowed, and HEAD finds nothing
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode("OPTIONS".equals(recordedRequest.getMethod()) ? 405 : 404);
+                    }
+                });
+                mockRepo.start();
+                MavenRepository ossSonatype = MavenRepository.builder()
+                  .id("oss")
+                  .uri("https://%s:%d/repository/maven-snapshots/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .snapshots(true)
+                  .build();
+                MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+                  MavenExecutionContextView.view(ctx), null);
+                assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
+            }
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void throttledEndpointIsNotAskedAgainUntilItsCooldownElapses() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            List<String> skipped = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailedPreviously(String uri) {
+                    skipped.add(uri);
+                }
+            });
+            var downloader = new MavenPomDownloader(ctx);
+            mockServer(429, mockRepo -> {
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .knownToExist(true)
+                  .build());
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "first"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                // The maven-metadata.xml request only: a host that just answered 429 is not asked for a directory listing too
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+                assertThat(skipped).containsExactly(repositories.get(0).getUri());
+
+                ctx.getThrottledEndpoints().replaceAll((endpoint, until) -> Instant.EPOCH);
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void mirrorKeepsThePolicyOfEachRepositoryItMirrors() throws Exception {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            try (MockWebServer mirror = getMockServer()) {
+                List<String> metadataRequests = synchronizedList(new ArrayList<>());
+                mirror.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getPath() != null && recordedRequest.getPath().endsWith("maven-metadata.xml")) {
+                            metadataRequests.add(recordedRequest.getPath());
+                            return new MockResponse().setResponseCode(200).setBody(
+                              //language=xml
+                              """
+                                <metadata>
+                                  <groupId>org.example</groupId>
+                                  <artifactId>lib</artifactId>
+                                  <versioning>
+                                    <versions>
+                                      <version>1.0-SNAPSHOT</version>
+                                    </versions>
+                                  </versioning>
+                                </metadata>
+                                """);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mirror.start();
+                ctx.setMirrors(List.of(new MavenRepositoryMirror("mirror",
+                  "https://%s:%d/maven/".formatted(mirror.getHostName(), mirror.getPort()), "*", null, null, null)));
+                var downloader = new MavenPomDownloader(ctx);
+                var gav = new GroupArtifactVersion("org.example", "lib", "1.0-SNAPSHOT");
+
+                // Central does not serve snapshots, and mirroring it does not change that
+                assertThatThrownBy(() -> downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL)))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(metadataRequests).isEmpty();
+
+                // A mirrored repository that does accept snapshots brings the mirror into the lookup
+                var snapshots = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("https://snapshots.example.com/maven")
+                  .releases(false)
+                  .snapshots(true)
+                  .build();
+                MavenMetadata metadata = downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL, snapshots));
+                assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0-SNAPSHOT");
+                assertThat(metadataRequests).hasSize(1);
+            }
         }
 
         @Test
@@ -1160,6 +1737,120 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void doesNotSendCredentialsWhenRepositoryServesAnonymously() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> authorizationHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        authorizationHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Mirror Apache Maven: a repository that serves anonymously must never be sent credentials
+                assertThat(authorizationHeaders).containsOnlyNulls();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void normalizesRepositoryThatDropsAnonymousRequests() {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            // Close without a status line, as an authenticating gateway may do, so the probe
+                            // sees a connection failure rather than a 401 it could recognize as "server exists"
+                            return new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mockRepo.start();
+                MavenRepository repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build();
+
+                MavenRepository normalized = new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isNotNull();
+                assertThat(MavenExecutionContextView.view(ctx).getUnreachableEndpoints()).isEmpty();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void authenticatesPreemptivelyAfterCredentialsRequired() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestAuthHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestAuthHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        }
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "fred", "1.0.0"), null, null, repositories));
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "other", "1.0.0"), null, null, repositories));
+
+                // Only the first body GET probes anonymously; once the host is known to require credentials, later
+                // GETs authenticate preemptively instead of paying another anonymous 401 round-trip.
+                assertThat(getRequestAuthHeaders.stream().filter(Objects::isNull).count()).isEqualTo(1);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
@@ -1167,7 +1858,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
-                        MockResponse response = new MockResponse();
+                        var response = new MockResponse();
                         if (recordedRequest.getHeaders().get("Authorization") != null) {
                             response.setResponseCode(200);
                             if (!"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
@@ -1201,6 +1892,70 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
+        @Test
+        void usesHttpHeaderAuthenticationWhenServerHasNoUsernameOrPassword() {
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>id</id>
+                            <configuration>
+                                <httpHeaders>
+                                    <property>
+                                        <name>X-Auth-Token</name>
+                                        <value>token</value>
+                                    </property>
+                                </httpHeaders>
+                            </configuration>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), ctx);
+            MavenExecutionContextView.view(ctx).setMavenSettings(settings);
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestTokens = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestTokens.add(recordedRequest.getHeaders().get("X-Auth-Token"));
+                        }
+                        if (recordedRequest.getHeaders().get("X-Auth-Token") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                // No <username>/<password>: the token header is the only credential this server has.
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Anonymous first, then a retry carrying the header — as with username/password credentials.
+                assertThat(getRequestTokens).containsExactly(null, "token");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         @DisplayName("When username or password are environment properties that cannot be resolved, they should not be used")
         @Issue("https://github.com/openrewrite/rewrite/issues/3142")
         @Test
@@ -1211,7 +1966,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
-                        MockResponse response = new MockResponse();
+                        var response = new MockResponse();
                         if (recordedRequest.getHeaders().get("Authorization") != null) {
                             response.setResponseCode(401);
                         } else if (recordedRequest.getMethod() == null || !"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
@@ -1349,7 +2104,9 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -1369,7 +2126,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
@@ -1382,7 +2138,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
         // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
         // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>
@@ -1399,7 +2157,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
@@ -1412,5 +2169,98 @@ class MavenPomDownloaderTest implements RewriteTest {
           .doesNotContain("something-else")
           .contains("")
           .anyMatch(c -> !"".equals(c));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/7685")
+    @Test
+    void doesNotThrowONMissingModuleWhenNot404() throws Exception {
+        // Mimics an Artifactory virtual repository accessed anonymously: it answers 401 (not 404)
+        // for artifacts it will not serve, and 200 for the ones it does. A local mock server keeps
+        // the test hermetic instead of depending on a live repository's (drifting) contents.
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath() == null ? "" : request.getPath();
+                    // Existing group:artifact metadata
+                    if (path.endsWith("/org/springframework/integration/spring-integration-bom/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <metadata>
+                                <groupId>org.springframework.integration</groupId>
+                                <artifactId>spring-integration-bom</artifactId>
+                                <versioning>
+                                    <latest>5.5.0</latest>
+                                    <release>5.5.0</release>
+                                    <versions>
+                                        <version>5.5.0</version>
+                                    </versions>
+                                </versioning>
+                            </metadata>
+                            """);
+                    }
+                    // Existing snapshot-version metadata
+                    if (path.endsWith("/com/fasterxml/jackson/jackson-base/2.19.3-SNAPSHOT/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <metadata modelVersion="1.1.0">
+                                <groupId>com.fasterxml.jackson</groupId>
+                                <artifactId>jackson-base</artifactId>
+                                <version>2.19.3-SNAPSHOT</version>
+                                <versioning>
+                                    <snapshot>
+                                        <timestamp>20240101.000000</timestamp>
+                                        <buildNumber>1</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20240101000000</lastUpdated>
+                                </versioning>
+                            </metadata>
+                            """);
+                    }
+                    // Existing release POM, declaring Gradle module metadata so the downloader fetches the `.module` side-car
+                    if (path.endsWith("/org/springframework/integration/spring-integration-bom/5.5.0/spring-integration-bom-5.5.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <!-- do_not_remove: published-with-gradle-metadata -->
+                                <modelVersion>4.0.0</modelVersion>
+                                <groupId>org.springframework.integration</groupId>
+                                <artifactId>spring-integration-bom</artifactId>
+                                <version>5.5.0</version>
+                                <packaging>pom</packaging>
+                            </project>
+                            """);
+                    }
+                    // Everything else - missing artifacts and the Gradle `.module` side-car - answers 401, never 404.
+                    return new MockResponse().setResponseCode(401);
+                }
+            });
+            mockRepo.start();
+
+            MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
+            List<MavenRepository> repositories = singletonList(MavenRepository.builder()
+              .id("cache-3")
+              .uri(mockRepo.url("/").toString())
+              .knownToExist(true)
+              .build());
+            GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
+            GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
+
+            // Missing module: the repo answers 401 (not 404), but no metadata is retrievable -> still throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
+            // Existing group:artifact metadata (200) -> does not throw
+            assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
+            // Missing release-version metadata (401) -> throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
+            // Existing snapshot-version metadata (200) -> does not throw
+            assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
+            // Missing POM version (401) -> throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
+            // Existing POM whose Gradle `.module` side-car returns 401 (not 404) -> does not throw (PR #7685)
+            assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+        }
     }
 }

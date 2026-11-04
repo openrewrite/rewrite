@@ -319,8 +319,10 @@ describe('for mapping', () => {
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const forOfLoop = <JS.ForOfLoop>cu.statements[2].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ObjectBindingPattern);
-                const objectBinding = <JS.ObjectBindingPattern>forOfLoop.loop.control.variable.element;
+                // a loop variable is a statement, which a pattern on its own is not
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                const objectBinding = <JS.ObjectBindingPattern>(<JS.ExpressionStatement>forOfLoop.loop.control.variable.element).expression;
+                expect(objectBinding.kind).toBe(JS.Kind.ObjectBindingPattern);
                 expect(objectBinding.bindings.elements.length).toBe(3);
                 for (let i = 0; i < 3; i++) {
                     expect(objectBinding.bindings.elements[i].element.kind).toBe(JS.Kind.PropertyAssignment);

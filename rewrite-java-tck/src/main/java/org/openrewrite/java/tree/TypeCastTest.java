@@ -38,6 +38,69 @@ class TypeCastTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantCast")
+    @Test
+    void parenthesizedOperand() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  Object o = (Object) ("s");
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var o = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var cast = (J.TypeCast) o.getVariables().get(0).getInitializer();
+                assertThat(cast.getExpression()).isInstanceOf(J.Parentheses.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void annotatedArrayTypeCast() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              class Test {
+                  @Target(ElementType.TYPE_USE)
+                  @interface Nullable {}
+
+                  Object[] m(Object o) {
+                      return (@Nullable Object[]) o;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedArrayTypeCastInExpression() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              import java.lang.reflect.Array;
+
+              class Test {
+                  @Target(ElementType.TYPE_USE)
+                  @interface Nullable {}
+
+                  Object[] m(Object o) {
+                      Object[] varargs = (@Nullable Object[]) Array.newInstance(Object.class, 1);
+                      return varargs;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void intersectionCast() {
         rewriteRun(

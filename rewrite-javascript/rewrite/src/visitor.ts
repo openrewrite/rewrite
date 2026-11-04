@@ -17,6 +17,7 @@ import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {create, Draft} from "mutative";
 import {mapAsync, updateIfChanged} from "./util";
+import {registerHeavyweight} from "./heavyweight";
 
 type Objectish = Record<string, any> | Array<any>;
 
@@ -145,13 +146,18 @@ export abstract class TreeVisitor<T extends Tree, P> {
         const newMarkers = await this.visitMarkers(before.markers, p);
 
         if (recipe) {
-            // Remove markers before Mutative drafting to avoid cycles, then restore after
+            // Remove markers before Mutative drafting to avoid cycles, then restore after.
+            // The spread cost is paid unconditionally, but it enables the identity check below.
             const withoutMarkers = { ...before, markers: emptyMarkers };
             const result = await produceAsync(withoutMarkers, recipe);
             if (result === undefined) {
                 return undefined;
             }
-            // Restore markers (use newMarkers since we visited them)
+            // Mutative's produceAsync returns the same reference when no draft mutations occurred
+            // (structural sharing), so reference equality is a reliable no-change check.
+            if (result === withoutMarkers && newMarkers === before.markers) {
+                return before;
+            }
             return { ...result, markers: newMarkers } as T;
         }
 
@@ -159,6 +165,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
         return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
     }
 }
+
+registerHeavyweight(TreeVisitor);
 
 export function noopVisitor<T extends Tree, P>(): TreeVisitor<T, P> {
     return new class extends TreeVisitor<T, P> {

@@ -25,6 +25,7 @@ export namespace Yaml {
         Documents: "org.openrewrite.yaml.tree.Yaml$Documents",
         Document: "org.openrewrite.yaml.tree.Yaml$Document",
         DocumentEnd: "org.openrewrite.yaml.tree.Yaml$Document$End",
+        Directive: "org.openrewrite.yaml.tree.Yaml$Directive",
         Mapping: "org.openrewrite.yaml.tree.Yaml$Mapping",
         MappingEntry: "org.openrewrite.yaml.tree.Yaml$Mapping$Entry",
         Scalar: "org.openrewrite.yaml.tree.Yaml$Scalar",
@@ -74,6 +75,11 @@ export namespace Yaml {
     export interface Document extends Yaml {
         readonly kind: typeof Kind.Document;
         /**
+         * Optional list of directives that precede this document.
+         * Directives include %YAML and %TAG.
+         */
+        readonly directives: Directive[];
+        /**
          * True if the document explicitly starts with "---"
          */
         readonly explicit: boolean;
@@ -90,6 +96,26 @@ export namespace Yaml {
          * True if the document end is explicitly marked with "..."
          */
         readonly explicit: boolean;
+    }
+
+    /**
+     * A YAML directive, such as %YAML or %TAG.
+     *
+     * Examples:
+     * %YAML 1.2
+     * %TAG !yaml! tag:yaml.org,2002:
+     */
+    export interface Directive extends Yaml {
+        readonly kind: typeof Kind.Directive;
+        /**
+         * The content of the directive after the '%' character.
+         * For example, "YAML 1.2" or "TAG !yaml! tag:yaml.org,2002:".
+         */
+        readonly value: string;
+        /**
+         * Whitespace/content after the directive value, typically a newline.
+         */
+        readonly suffix: string;
     }
 
     /**
@@ -213,6 +239,10 @@ export function isDocument(yaml: Yaml): yaml is Yaml.Document {
 
 export function isDocumentEnd(yaml: Yaml): yaml is Yaml.DocumentEnd {
     return yaml.kind === Yaml.Kind.DocumentEnd;
+}
+
+export function isDirective(yaml: Yaml): yaml is Yaml.Directive {
+    return yaml.kind === Yaml.Kind.Directive;
 }
 
 export function isScalar(yaml: Yaml): yaml is Yaml.Scalar {

@@ -24,9 +24,22 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
 class TreeVisitorTest {
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void visitorTreeTypeThrowsWhenNoTreeTypeInHierarchy() {
+        // A raw subclass pins no concrete tree type anywhere in its type hierarchy.
+        class RawVisitor extends TreeVisitor {
+        }
+        TreeVisitor<?, ?> visitor = new RawVisitor();
+        assertThatThrownBy(() -> visitor.visitorTreeType(RawVisitor.class))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining(RawVisitor.class.getName());
+    }
 
     @Test
     void scheduleAfterOnVisitWithCursor() {

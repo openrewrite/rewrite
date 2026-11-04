@@ -1,0 +1,25 @@
+{
+  "nodes" : [ {
+    "unique-id" : "eol-image-data-generator-service",
+    "node-type" : "service",
+    "name" : "Eol Image Data Generator Service",
+    "description" : "External Java HttpClient service"
+  }, {
+    "unique-id" : "maven-parser-test-service",
+    "node-type" : "service",
+    "name" : "Maven Parser Test Service",
+    "description" : "External OkHttp service"
+  }, {
+    "unique-id" : "maven-pom-downloader-test$-with-ok-http-client-and-self-signed-t-l-s-service",
+    "node-type" : "service",
+    "name" : "Maven Pom Downloader Test$ With Ok Http Client And Self Signed T L S Service",
+    "description" : "External OkHttp service"
+  }, {
+    "unique-id" : "ok-http-sender-service",
+    "node-type" : "service",
+    "name" : "Ok Http Sender Service",
+    "description" : "External OkHttp service"
+  } ],
+  "relationships" : [ ],
+  "$schema" : "https://calm.finos.org/draft/2025-03/meta/calm.json"
+}

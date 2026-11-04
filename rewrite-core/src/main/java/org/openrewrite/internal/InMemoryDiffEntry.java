@@ -53,6 +53,8 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
     private final boolean binaryPatch;
 
+    private final Charset diffCharset;
+
     public InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
                              String newSource, Set<Recipe> recipesThatMadeChanges) {
         this(originalFilePath, filePath, relativeTo, oldSource, newSource, recipesThatMadeChanges, FileMode.REGULAR_FILE, FileMode.REGULAR_FILE);
@@ -71,6 +73,18 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
         this.recipesThatMadeChanges = recipesThatMadeChanges;
         this.binaryPatch = binaryPatch;
+
+        // Use the source file's charset for decoding the diff output. This is critical
+        // because ByteArrayOutputStream.toString() without a charset uses the platform
+        // default, which may not be UTF-8 (e.g., on Java <18 with POSIX/C locale).
+        SourceFile charsetSource = before != null ? before : after;
+        Charset detectedCharset = null;
+        try {
+            detectedCharset = charsetSource.getCharset();
+        } catch (UnsupportedOperationException ignored) {
+            // Quark files don't support getCharset()
+        }
+        this.diffCharset = detectedCharset != null ? detectedCharset : StandardCharsets.UTF_8;
 
         try {
             this.repo = new VirtualInMemoryRepository(new InMemoryRepository.Builder()
@@ -138,6 +152,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
 
         this.recipesThatMadeChanges = recipesThatMadeChanges;
         this.binaryPatch = binaryPatch;
+        this.diffCharset = StandardCharsets.UTF_8;
 
         try {
             this.repo = new VirtualInMemoryRepository(new InMemoryRepository.Builder()
@@ -204,7 +219,7 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
             throw new UncheckedIOException(e);
         }
 
-        String diff = patch.toString();
+        String diff = new String(patch.toByteArray(), diffCharset);
 
         AtomicBoolean addedComment = new AtomicBoolean(false);
         // NOTE: String.lines() would remove empty lines which we don't want

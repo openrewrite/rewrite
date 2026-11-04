@@ -21,7 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Markers;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Comment {
+    public interface Comment {
     Markers getMarkers();
     <C extends Comment> C withMarkers(Markers markers);
 

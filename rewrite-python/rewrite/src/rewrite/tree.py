@@ -3,14 +3,16 @@ from __future__ import annotations
 import os
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace as dataclass_replace
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type
+from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type, Self
 from uuid import UUID
 
+from .heavyweight import Heavyweight
 from .markers import Markers
 from .style import NamedStyles, Style
+from .utils import id_to_int, replace_if_changed
 
 if TYPE_CHECKING:
     from rewrite import TreeVisitor, ExecutionContext
@@ -21,11 +23,27 @@ if TYPE_CHECKING:
 P = TypeVar('P')
 
 
-class Tree(ABC):
+class Tree(Heavyweight, ABC):
+    __slots__ = ()
+
+    # Identity is stored on subclasses as a 128-bit int in `_id` (the UUID's own
+    # internal representation), saving the ~64-byte `uuid.UUID` wrapper per node.
+    # The public `id` property reconstructs a `UUID` lazily so the API is unchanged;
+    # equality/hashing/scope checks below compare the raw `_id` int to stay off the
+    # allocation path.
     @property
-    @abstractmethod
     def id(self) -> UUID:
-        ...
+        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id is declared on concrete subclasses
+
+    # `_id` is part of the public positional constructor surface, so callers may
+    # pass a `uuid.UUID` (e.g. `uuid4()` or another node's `.id`). The dataclass
+    # `__init__` of every concrete subclass calls this inherited hook; normalise
+    # to the internal int form here so `.id`, equality and hashing stay correct.
+    # A None id passes through untouched: the RPC receiver constructs all-None
+    # placeholders (see `make_dataclass_factory`) and fills the id in later.
+    def __post_init__(self):
+        if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+            object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     @property
     @abstractmethod
@@ -49,36 +67,19 @@ class Tree(ABC):
         return cursor.first_enclosing_or_throw(SourceFile).printer(cursor)
 
     def is_scope(self, tree: Optional[Tree]) -> bool:
-        return tree and tree.id == self.id
+        return tree is not None and tree._id == self._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Tree, other).id
+            return self._id == cast(Tree, other)._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
-    def replace(self, **kwargs) -> 'Tree':
-        """Replace fields on this tree node using dataclasses.replace.
-
-        Handles the convention where properties use public names (e.g., 'prefix')
-        but dataclass fields use private names (e.g., '_prefix').
-        """
-        # Map public property names to private field names
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            # If the key doesn't start with underscore, try the private version
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                # Check if the private field exists
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return dataclass_replace(self, **mapped_kwargs)
+    def replace(self, **kwargs) -> Self:
+        """Replace fields on this tree node, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
 
 class PrinterFactory(ABC):
@@ -99,6 +100,8 @@ class PrinterFactory(ABC):
 S = TypeVar('S', bound=Style)
 
 class SourceFile(Tree):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def charset_name(self) -> Optional[str]:
@@ -126,7 +129,7 @@ class SourceFile(Tree):
         return NamedStyles.merge(style, self.markers.find_all(NamedStyles))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileAttributes:
     creation_time: Optional[datetime]
     last_modified_time: Optional[datetime]
@@ -151,14 +154,14 @@ class FileAttributes:
                 is_executable = os.access(path, os.X_OK)
                 size = stat.st_size
 
-                return FileAttributes(creation_time, last_access_time, last_modified_time, is_readable, is_writable,
+                return FileAttributes(creation_time, last_modified_time, last_access_time, is_readable, is_writable,
                                       is_executable, size)
             except OSError:
                 pass
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Checksum:
     algorithm: str
     value: bytes
@@ -167,7 +170,11 @@ class Checksum:
 class PrintOutputCapture(Generic[P]):
     @dataclass
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar['PrintOutputCapture.MarkerPrinter'] = None  # type: ignore
+        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SEARCH_MARKERS_ONLY: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        VERBOSE: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        FENCED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SANITIZED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
 
         def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
             return ""
@@ -180,8 +187,8 @@ class PrintOutputCapture(Generic[P]):
 
     def __init__(self, p: P, marker_printer: Optional['PrintOutputCapture.MarkerPrinter'] = None):
         self._context = p
-        self._marker_printer = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
-        self._out = []
+        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT  # ty: ignore[invalid-assignment]  # DEFAULT always set at module load
+        self._out: list[str] = []
 
     def get_out(self) -> str:
         return ''.join(self._out)
@@ -211,7 +218,53 @@ class PrintOutputCapture(Generic[P]):
 @dataclass
 class _DefaultMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        return marker.print(cursor, comment_wrapper, False)
+        from .markers import Marker
+        # a marker of a type this side has no class for is held as a plain mapping
+        return marker.print(cursor, comment_wrapper, False) if isinstance(marker, Marker) else ""
+
+
+@dataclass
+class _SearchMarkersOnlyPrinter(PrintOutputCapture.MarkerPrinter):
+    """Only prints SearchResult markers, ignores all others."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult
+        if isinstance(marker, SearchResult):
+            return marker.print(cursor, comment_wrapper, False)
+        return ""
+
+
+@dataclass
+class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints all markers with verbose=True (shows detail instead of message)."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import Marker
+        return marker.print(cursor, comment_wrapper, True) if isinstance(marker, Marker) else ""
+
+
+@dataclass
+class _FencedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints SearchResult and Markup markers with fenced {{uuid}} format."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+    def after_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+
+@dataclass
+class _SanitizedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints nothing - produces clean output without any marker annotations."""
+    pass
 
 
 PrintOutputCapture.MarkerPrinter.DEFAULT = _DefaultMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY = _SearchMarkersOnlyPrinter()
+PrintOutputCapture.MarkerPrinter.VERBOSE = _VerboseMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.FENCED = _FencedMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SANITIZED = _SanitizedMarkerPrinter()

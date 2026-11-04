@@ -27,8 +27,6 @@ import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Objects;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -651,8 +649,7 @@ class VariableDeclarationTest implements RewriteTest {
                             assertThat(type).isInstanceOf(J.Identifier.class);
                             assertThat(((J.Identifier) type).getSimpleName()).isEqualTo("Int");
                             assertThat(type.getMarkers().findFirst(Implicit.class)).isEmpty();
-                            assertThat(type.getType()).isInstanceOf(JavaType.Class.class);
-                            assertThat(((JavaType.Class) Objects.requireNonNull(type.getType())).getFullyQualifiedName()).isEqualTo("kotlin.Int");
+                            assertThat(type.getType()).isEqualTo(JavaType.Primitive.Int);
                         }
                     )
                 )

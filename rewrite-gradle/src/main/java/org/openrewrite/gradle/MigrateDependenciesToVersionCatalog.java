@@ -491,13 +491,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         if (dep != null) {
                             boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
 
-                            Expression catalogRef = JavaTemplate.builder("libs.#{}")
-                                    .build()
-                                    .apply(
-                                        new Cursor(getCursor(), arg),
-                                        arg.getCoordinates().replace(),
-                                        dep.getAliasName()
-                                    );
+                            Expression catalogRef = JavaTemplate.apply("libs.#{}", new Cursor(getCursor(), arg), arg.getCoordinates().replace(), dep.getAliasName());
 
                             catalogRef = catalogRef.withPrefix(literal.getPrefix());
 
@@ -526,13 +520,7 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                 if (dep.gav.getGroupId().equals(group) && dep.gav.getArtifactId().equals(artifact)) {
                                     boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
 
-                                    Expression catalogRef = JavaTemplate.builder("libs.#{}")
-                                            .build()
-                                            .apply(
-                                                new Cursor(getCursor(), arg),
-                                                arg.getCoordinates().replace(),
-                                                dep.getAliasName()
-                                            );
+                                    Expression catalogRef = JavaTemplate.apply("libs.#{}", new Cursor(getCursor(), arg), arg.getCoordinates().replace(), dep.getAliasName());
 
                                     catalogRef = catalogRef.withPrefix(gstring.getPrefix());
 

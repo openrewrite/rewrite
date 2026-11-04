@@ -54,12 +54,27 @@ public class NamedStyles implements Marker {
     Set<String> tags;
     Collection<Style> styles;
 
+    /**
+     * Returns the effective style for a given style class.
+     * There may be multiple named styles which provide the same style class, in whole or in part.
+     * Consider the example of a formatting recipe which want so to know whether to use tabs or spaces for indentation.
+     * The build plugins will attach one or more NamedStyles which provide TabsAndIndents.
+     * Autodetect and Checkstyle may both provide some or all of TabsAndBraces.
+     * Autodetect is a weaker signal than explicit configuration so it is attached earlier in the parsing process.
+     * Therefore, this method gives precedence to non-null values from styles which appear later in the list.
+     *
+     * @param styleClass the style class whose effective value is being queried for.
+     * @param namedStyles the list of named styles to extract a specific effective style from.
+     * @return the effective style as computed from the list of named styles.
+     * @param <S> a style class.
+     */
     @SuppressWarnings("unchecked")
     public static <S extends Style> @Nullable S merge(Class<S> styleClass,
                                             Iterable<? extends NamedStyles> namedStyles) {
         S merged = null;
         for (NamedStyles namedStyle : namedStyles) {
             Collection<Style> styles = namedStyle.styles;
+            //noinspection ConstantValue
             if (styles != null) {
                 for (Style style : styles) {
                     if (styleClass.isInstance(style)) {
@@ -97,6 +112,7 @@ public class NamedStyles implements Marker {
 
         List<Style> mergedStyles = new ArrayList<>(styleClasses.size());
         for (Class<? extends Style> styleClass : styleClasses) {
+            //noinspection DataFlowIssue
             mergedStyles.add(NamedStyles.merge(styleClass, styles));
         }
 

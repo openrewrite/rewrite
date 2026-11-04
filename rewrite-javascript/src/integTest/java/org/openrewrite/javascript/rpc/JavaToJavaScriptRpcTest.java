@@ -60,7 +60,7 @@ public class JavaToJavaScriptRpcTest {
                           stopAfterPreVisit();
                           return tree;
                       } finally {
-                          client.shutdown();
+                          JavaScriptRewriteRpc.shutdownCurrent();
                       }
                   }
               };

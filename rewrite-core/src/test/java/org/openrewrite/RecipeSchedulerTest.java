@@ -17,31 +17,48 @@ package org.openrewrite;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -77,6 +94,29 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void exceptionWhileVisitingSynthesizedTreeMarksSourceFile() {
+        rewriteRun(
+          spec -> spec
+            .executionContext(new InMemoryExecutionContext())
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    // given a nested visit over a tree which is not part of the source file
+                    return (PlainText) new BoomRecipe().getVisitor().visitNonNull(text.withText("synthesized"), ctx);
+                }
+            }))
+            // the recipe throws in both cycles, and each cycle records its error once
+            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(2)),
+          // when the nested visit throws
+          // then the error is still visible on the source file
+          text(
+            "hello",
+            "~~(boom)~~>hello"
+          )
+        );
+    }
+
+    @Test
     void exceptionDuringGenerate() {
         rewriteRun(
           spec -> spec.recipe(new BoomGenerateRecipe(false))
@@ -104,9 +144,9 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void suppliedWorkingDirectoryRoot(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
-        AtomicInteger cycle = new AtomicInteger(0);
+        var cycle = new AtomicInteger(0);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
@@ -119,9 +159,8 @@ class RecipeSchedulerTest implements RewriteTest {
                   if (cycle.incrementAndGet() == 2) {
                       assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
                   }
-                  assertDoesNotThrow(() -> {
-                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
-                  });
+                  assertDoesNotThrow(() ->
+                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText()));
                   return plainText.withText("bar");
               }
           })),
@@ -132,7 +171,7 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void managedWorkingDirectoryWithRecipe(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile(0)),
@@ -143,9 +182,9 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void managedWorkingDirectoryWithMultipleRecipes(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
-        DeclarativeRecipe recipe = new DeclarativeRecipe(
+        var recipe = new DeclarativeRecipe(
           "root",
           "Root recipe",
           "Root recipe.",
@@ -164,19 +203,349 @@ class RecipeSchedulerTest implements RewriteTest {
         );
         assertThat(path).doesNotExist();
     }
+
+    @Test
+    void verifyCycleInvariantsDuringMultipleCycles() {
+        List<Integer> cyclesFromFactory = new java.util.ArrayList<>();
+        List<Integer> cyclesFromContext = new java.util.ArrayList<>();
+        var visitCount = new AtomicInteger(0);
+
+        RecipeScheduler trackingScheduler = new RecipeScheduler() {
+            @Override
+            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+                    Recipe recipe, int cycle, Cursor rootCursor,
+                    WatchableExecutionContext ctxWithWatch,
+                    RecipeRunStats recipeRunStats, SearchResults searchResults,
+                    SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+                cyclesFromFactory.add(cycle);
+                return super.createRecipeRunCycle(recipe, cycle, rootCursor, ctxWithWatch,
+                        recipeRunStats, searchResults, sourceFileResults, errorsTable);
+            }
+        };
+
+        // Recipe that causes another cycle by returning different content each time (up to 2 times)
+        Recipe multiCycleRecipe = toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                // Verify cycle is accessible from context during visitor execution
+                cyclesFromContext.add(ctx.getCycle());
+                int count = visitCount.incrementAndGet();
+                if (count <= 2) {
+                    return text.withText(text.getText() + count);
+                }
+                return text;
+            }
+        }).withCausesAnotherCycle(true);
+
+        var ctx = new InMemoryExecutionContext();
+        List<SourceFile> sources = List.of(PlainText.builder().text("v").sourcePath(Path.of("test.txt")).build());
+        trackingScheduler.scheduleRun(multiCycleRecipe, new InMemoryLargeSourceSet(sources), ctx, 5, 1);
+
+        // Verify cycle numbers increment correctly: Cycle 1, 2, 3 (stops after no change in cycle 3)
+        assertThat(cyclesFromFactory).containsExactly(1, 2, 3);
+        // Verify cycle is correctly registered in context and accessible during visitor execution
+        assertThat(cyclesFromContext).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    void compositeCausesAnotherCycleWhenChildMakesChanges() {
+        List<Integer> cycles = new java.util.ArrayList<>();
+        var composite = new DeclarativeRecipe(
+          "composite",
+          "Composite",
+          "Composite.",
+          emptySet(),
+          null,
+          URI.create("dummy:recipe.yml"),
+          true,
+          emptyList()
+        );
+        composite.addUninitialized(toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                cycles.add(ctx.getCycle());
+                return text.withText("hello");
+            }
+        }));
+        composite.initialize(List.of());
+
+        List<SourceFile> sources = List.of(PlainText.builder().text("hi").sourcePath(Path.of("test.txt")).build());
+        composite.run(new InMemoryLargeSourceSet(sources), new InMemoryExecutionContext(), 3, 1);
+
+        assertThat(cycles).containsExactly(1, 2);
+    }
+
+    @Test
+    void recordsBeforeAndAfterSourceFilesCorrectly() {
+        List<String> beforeContents = new java.util.ArrayList<>();
+        List<String> afterContents = new java.util.ArrayList<>();
+
+        RecipeScheduler trackingScheduler = new RecipeScheduler() {
+            @Override
+            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+                    Recipe recipe, int cycle, Cursor rootCursor,
+                    WatchableExecutionContext ctxWithWatch,
+                    RecipeRunStats recipeRunStats, SearchResults searchResults,
+                    SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+                return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                        recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit) {
+                    @Override
+                    protected void recordSourceFileResultAndSearchResults(
+                            @Nullable SourceFile before, @Nullable SourceFile after,
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
+                        if (before instanceof PlainText) {
+                            beforeContents.add(((PlainText) before).getText());
+                        }
+                        if (after instanceof PlainText) {
+                            afterContents.add(((PlainText) after).getText());
+                        }
+                        super.recordSourceFileResultAndSearchResults(before, after, recipeStack, ctx);
+                    }
+                };
+            }
+        };
+
+        Recipe recipe = toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText("modified:" + text.getText());
+            }
+        });
+
+        var ctx = new InMemoryExecutionContext();
+        List<SourceFile> sources = List.of(
+                PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
+                PlainText.builder().text("b").sourcePath(Path.of("b.txt")).build()
+        );
+        trackingScheduler.scheduleRun(recipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+
+        assertThat(beforeContents).containsExactlyInAnyOrder("a", "b");
+        assertThat(afterContents).containsExactlyInAnyOrder("modified:a", "modified:b");
+    }
+
+    @Test
+    void firesRecipeTimeoutWhenCycleExceedsRunTimeout() {
+        AtomicReference<Throwable> timedOut = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(
+          t -> {
+          },
+          Duration.ZERO,
+          (t, c) -> timedOut.set(t));
+        rewriteRun(
+          spec -> spec
+            .executionContext(ctx)
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.withText("changed");
+                }
+            })),
+          // No "after": a zero run timeout fires before any edit, so the file is left unchanged.
+          text("hello")
+        );
+        assertThat(timedOut.get())
+          .as("onTimeout should be invoked with a RecipeTimeoutException once the cycle exceeds the run timeout")
+          .isInstanceOf(RecipeTimeoutException.class);
+    }
+
+    @Test
+    void recordsGeneratedSourceFiles() {
+        List<String> generatedPaths = new java.util.ArrayList<>();
+
+        RecipeScheduler trackingScheduler = new RecipeScheduler() {
+            @Override
+            protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(
+                    Recipe recipe, int cycle, Cursor rootCursor,
+                    WatchableExecutionContext ctxWithWatch,
+                    RecipeRunStats recipeRunStats, SearchResults searchResults,
+                    SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+                return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                        recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit) {
+                    @Override
+                    protected void recordSourceFileResultAndSearchResults(
+                            @Nullable SourceFile before, @Nullable SourceFile after,
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
+                        // Track files that were generated (before is null)
+                        if (before == null && after != null) {
+                            generatedPaths.add(after.getSourcePath().toString());
+                        }
+                        super.recordSourceFileResultAndSearchResults(before, after, recipeStack, ctx);
+                    }
+                };
+            }
+        };
+
+        Recipe generatingRecipe = new GeneratingRecipe();
+
+        var ctx = new InMemoryExecutionContext();
+        List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
+        trackingScheduler.scheduleRun(generatingRecipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+
+        assertThat(generatedPaths).containsExactly("generated.txt");
+    }
+
+    @Test
+    void invalidGeneratedPathIsDroppedAndSurfaced() {
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(error::set);
+        List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new GeneratesInvalidPathRecipe(), new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+
+        // the invalid file is dropped, so it never enters the changeset
+        assertThat(run.getChangeset().getAllResults()).isEmpty();
+        // but the drop is surfaced for visibility rather than silently swallowed
+        assertThat(error.get())
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("generated a source file with an invalid path");
+    }
+
+    @Test
+    void markupIsAttributedToTheRecipeThatAddedIt() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarnRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isEqualTo(WarnRecipe.class.getName()));
+    }
+
+    @Test
+    void errorMarkupIsAttributedToTheFailingRecipe() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new BoomRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Error.class))
+          .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo(BoomRecipe.class.getName()));
+    }
+
+    @Test
+    void markupIsAttributedThroughNestedDeclarativeRecipesWithPreconditions() {
+        Recipe recipe = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.WarnThenChange
+            displayName: Warn then change
+            description: Warns, then changes the text.
+            preconditions:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/*.txt"
+            recipeList:
+              - org.openrewrite.WarnRecipe
+              - org.openrewrite.text.ChangeText:
+                  toText: goodbye
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.Outer
+            displayName: Outer
+            description: Nests the declarative recipe.
+            recipeList:
+              - org.openrewrite.WarnThenChange
+            """.getBytes(StandardCharsets.UTF_8)), URI.create("rewrite.yml"), new Properties()))
+          .build()
+          .activateRecipes("org.openrewrite.Outer");
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(recipe,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isEqualTo(WarnRecipe.class.getName()));
+    }
+
+    @Test
+    void scanningRecipeMarkupIsAttributedInGenerateAndEditPhases() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new ScanningWarnRecipe(), new ChangeText("goodbye"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        assertThat(run.getChangeset().getAllResults())
+          .extracting(Result::getAfter)
+          .hasSize(2)
+          .allSatisfy(after -> assertThat(after.getMarkers().findFirst(Markup.class))
+            .hasValueSatisfying(markup -> assertThat(markup.getRecipeName()).isEqualTo(ScanningWarnRecipe.class.getName())));
+    }
+
+    @Test
+    void currentContextIsSetDuringARunAndClearedAfter() {
+        AtomicReference<ExecutionContext> duringRun = new AtomicReference<>();
+        Recipe capturing = toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                duringRun.set(RecipeScheduler.currentContext());
+                return text;
+            }
+        });
+
+        new RecipeScheduler().scheduleRun(capturing,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(duringRun.get()).isNotNull();
+        assertThat(RecipeScheduler.currentContext()).isNull();
+    }
+
+    @Test
+    void instancesOfTheSameRecipeAreToldApartByInstanceName() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarnWithMessage("first"), new WarnWithMessage("second"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findAll(Markup.Warn.class))
+          .extracting(Markup::getMessage, Markup::getRecipeName, Markup::getRecipeInstanceName)
+          .containsExactlyInAnyOrder(
+            tuple("first", WarnWithMessage.class.getName(), "Warn with message `first`"),
+            tuple("second", WarnWithMessage.class.getName(), "Warn with message `second`"));
+    }
+
+    @Test
+    void markupOutsideARecipeRunIsUnattributed() {
+        PlainText text = Markup.warn(PlainText.builder().text("hello").build(), new IllegalStateException("careful"));
+        assertThat(text.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(warn -> assertThat(warn.getRecipeName()).isNull());
+    }
+}
+
+class WarnRecipe extends Recipe {
+    @Getter
+    final String displayName = "Warn";
+
+    @Getter
+    final String description = "Adds a warning to every text file.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return Markup.warn(text, new IllegalStateException("careful"));
+            }
+        };
+    }
 }
 
 @AllArgsConstructor
 class BoomRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "We go boom";
-    }
+    @Getter
+    final String displayName = "We go boom";
 
-    @Override
-    public String getDescription() {
-        return "Test recipe.";
-    }
+    @Getter
+    final String description = "Test recipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -231,20 +600,77 @@ class BoomException extends RuntimeException {
     }
 }
 
+class GeneratingRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Generating recipe";
+
+    @Getter
+    final String description = "Generates a new file.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                acc.incrementAndGet();
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        if (acc.get() > 0) {
+            return List.of(PlainText.builder()
+                    .text("generated content")
+                    .sourcePath(Path.of("generated.txt"))
+                    .build());
+        }
+        return List.of();
+    }
+}
+
+class GeneratesInvalidPathRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Generates a file with an invalid path";
+
+    @Getter
+    final String description = "Generates a source file whose path points outside the source root.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("outside")
+          .sourcePath(Path.of("../outside.txt"))
+          .build());
+    }
+}
+
 @AllArgsConstructor
 class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator> {
 
     final int position;
 
-    @Override
-    public String getDisplayName() {
-        return "Write text to a file";
-    }
+    @Getter
+    final String displayName = "Write text to a file";
 
-    @Override
-    public String getDescription() {
-        return "Writes text to a file.";
-    }
+    @Getter
+    final String description = "Writes text to a file.";
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
@@ -272,9 +698,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 Path workingDirectory = validateExecutionContext(ctx);
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isEmptyDirectory();
-                assertDoesNotThrow(() -> {
-                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-                });
+                assertDoesNotThrow(() ->
+                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE));
                 return tree;
             }
         };
@@ -285,9 +710,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         Path workingDirectory = validateExecutionContext(ctx);
         assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
         assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-        assertDoesNotThrow(() -> {
-            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-        });
+        assertDoesNotThrow(() ->
+            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
         return List.of();
     }
 
@@ -301,9 +725,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-                assertDoesNotThrow(() -> {
-                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-                });
+                assertDoesNotThrow(() ->
+                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
                 assert tree instanceof PlainText;
                 return ((PlainText) tree).withText("bar");
             }
@@ -311,5 +734,60 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
     }
 
     public record Accumulator(Path workingDirectory) {
+    }
+}
+
+class ScanningWarnRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Scanning warn";
+
+    @Getter
+    final String description = "Generates a file with an info markup and warns on existing text files.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        return List.of(Markup.info(PlainText.builder().text("generated").sourcePath(Path.of("generated.txt")).build(), "generated"));
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicInteger acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return "hello.txt".equals(text.getSourcePath().toString()) ?
+                  Markup.warn(text, new IllegalStateException("careful")) : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class WarnWithMessage extends Recipe {
+    @Option(displayName = "Message", description = "The warning message.", example = "careful")
+    String message;
+
+    String displayName = "Warn with message";
+
+    String description = "Adds a warning with the given message to every text file.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return Markup.warn(text, new IllegalStateException(message));
+            }
+        };
     }
 }

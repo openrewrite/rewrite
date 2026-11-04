@@ -15,12 +15,19 @@
  */
 package org.openrewrite.maven.cache;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Optional;
 
@@ -65,6 +72,45 @@ class RocksdbMavenCacheTest {
 
 
     @Test
+    void invalidateCacheWhenReferencedPomTypeSerializationChanges(@TempDir Path tempDir) throws Exception {
+        String pathString = tempDir.resolve(".rewrite-cache").toString();
+
+        try {
+            new RocksdbMavenPomCache(tempDir);
+
+            Pom pom = parsePomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.foo</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.2</version>
+                    <name>test</name>
+                </project>
+                """);
+
+            ObjectMapper previousPomMapper = RocksdbMavenPomCache.mapper.copy()
+                    .addMixIn(GroupArtifactVersion.class, NoObjectId.class)
+                    .addMixIn(ResolvedGroupArtifactVersion.class, NoObjectId.class);
+
+            RocksdbMavenPomCache.RocksCache cache = RocksdbMavenPomCache.getCache(pathString);
+            putRaw(cache,
+                    RocksdbMavenPomCache.serialize("org.openrewrite.maven.internal.Pom.version"),
+                    RocksdbMavenPomCache.serialize(2));
+            putRaw(cache,
+                    RocksdbMavenPomCache.serialize(pom.getGav().toString().getBytes(StandardCharsets.UTF_8)),
+                    previousPomMapper.writeValueAsBytes(pom));
+            RocksdbMavenPomCache.closeCache(pathString);
+
+            RocksdbMavenPomCache mavenCache = new RocksdbMavenPomCache(tempDir);
+            assertThat(mavenCache.getPom(pom.getGav())).isNull();
+        } finally {
+            RocksdbMavenPomCache.closeCache(pathString);
+        }
+    }
+
+
+    @Test
     void entryPersistedInExistingDatabase(@TempDir Path tempDir) throws Exception {
 
         String pathString = tempDir.resolve(".rewrite-cache").toString();
@@ -101,5 +147,15 @@ class RocksdbMavenCacheTest {
 
     private Pom parsePomXml(String pom) {
         return RawPom.parse(new ByteArrayInputStream(pom.getBytes()), null).toPom(null, null);
+    }
+
+    private void putRaw(RocksdbMavenPomCache.RocksCache cache, byte[] key, byte[] value) throws Exception {
+        Method put = RocksdbMavenPomCache.RocksCache.class.getDeclaredMethod("put", byte[].class, byte[].class);
+        put.setAccessible(true);
+        put.invoke(cache, key, value);
+    }
+
+    @JsonIdentityInfo(generator = ObjectIdGenerators.None.class)
+    private interface NoObjectId {
     }
 }

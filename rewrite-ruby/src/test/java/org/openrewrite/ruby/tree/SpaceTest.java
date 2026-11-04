@@ -1,0 +1,161 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.ruby.tree;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.RubyParser;
+import org.openrewrite.test.RewriteTest;
+
+import java.util.function.UnaryOperator;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.ruby.Assertions.ruby;
+
+public class SpaceTest implements RewriteTest {
+
+    @Test
+    void newlineEscape() {
+        rewriteRun(
+          ruby(
+            """
+              a = 1 \\
+                + 2
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getStatements()).hasSize(1))
+          )
+        );
+    }
+
+    @Test
+    void singleLineComment() {
+        rewriteRun(
+          ruby(
+            """
+              #!/usr/bin/ruby -w
+              # This is a single line comment.
+                            
+              puts "Hello, Ruby!"
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingComment() {
+        rewriteRun(
+          ruby(
+            """
+              counter = 42    # keeps track times page has been hit
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyCommentLine() {
+        rewriteRun(
+          ruby(
+            """
+              # Example:
+              #
+              def foo(a, b)
+                a
+              end
+              """
+          )
+        );
+    }
+
+    /**
+     * A `#` that is the last character of a file with no trailing newline is still a comment, and
+     * one that collects no text of its own.
+     */
+    @Test
+    void commentEndingTheFile() {
+        rewriteRun(
+          ruby("x = 1\n#")
+        );
+    }
+
+    @Test
+    void bareCommentIsTheWholeFile() {
+        rewriteRun(
+          ruby("#")
+        );
+    }
+
+    @Test
+    void commentEndingTheFileWithText() {
+        rewriteRun(
+          ruby("x = 1\n# ")
+        );
+    }
+
+    @Test
+    void multiLineComment() {
+        rewriteRun(
+          ruby(
+            """
+              #!/usr/bin/ruby -w
+                                  
+              puts("Hello, Ruby!")
+                                 
+              =begin
+              This is a multiline comment and can span as many lines as you
+              like. But =begin and =end should come in the first line only.\s
+              =end
+              """
+          )
+        );
+    }
+
+    /**
+     * {@code withText(getText())} is the only read-modify-write a recipe has, so it has to be
+     * lossless — including for a block comment, whose delimiters sit on lines of their own.
+     */
+    @Test
+    void rewritingCommentText() {
+        String source = "=begin rdoc\ndocs\n=end\nputs 1\n";
+        assertThat(rewriteComments(source, UnaryOperator.identity())).isEqualTo(source);
+        assertThat(rewriteComments(source, text -> text.replace("docs", "notes")))
+                .isEqualTo("=begin rdoc\nnotes\n=end\nputs 1\n");
+    }
+
+    @Test
+    void rewritingLineCommentText() {
+        String source = "# docs\nputs 1\n";
+        assertThat(rewriteComments(source, UnaryOperator.identity())).isEqualTo(source);
+        assertThat(rewriteComments(source, text -> text.replace("docs", "notes")))
+                .isEqualTo("# notes\nputs 1\n");
+    }
+
+    private static String rewriteComments(String source, UnaryOperator<String> rewrite) {
+        SourceFile cu = (SourceFile) RubyParser.builder().build().parse(source)
+                .findFirst().orElseThrow();
+        return ((SourceFile) new RubyIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                return space.withComments(ListUtils.map(space.getComments(), c ->
+                        c instanceof RubyTextComment ?
+                                ((RubyTextComment) c).withText(rewrite.apply(((RubyTextComment) c).getText())) : c));
+            }
+        }.visitNonNull(cu, 0)).printAll();
+    }
+}

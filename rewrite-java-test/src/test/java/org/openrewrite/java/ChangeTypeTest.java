@@ -19,17 +19,26 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.markSourceSetDirty;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -43,11 +52,11 @@ class ChangeTypeTest implements RewriteTest {
 
     @Language("java")
     String a1 = """
-          package a;
-          public class A1 extends Exception {
-              public static void stat() {}
-              public void foo() {}
-          }
+      package a;
+      public class A1 extends Exception {
+          public static void stat() {}
+          public void foo() {}
+      }
       """;
 
     @Language("java")
@@ -142,11 +151,41 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.lang.management.PlatformLoggingMXBean;
-              import java.util.logging.*;
 
               class Test {
                   static void method() {
                       PlatformLoggingMXBean loggingBean = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
+    @Test
+    void starImportUnfoldedWhenOtherTypesUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          java(
+            """
+              import java.util.logging.*;
+
+              class Test {
+                  static void method() {
+                      LoggingMXBean loggingBean = null;
+                      Logger logger = null;
+                  }
+              }
+              """,
+            """
+              import java.lang.management.PlatformLoggingMXBean;
+              import java.util.logging.Logger;
+
+              class Test {
+                  static void method() {
+                      PlatformLoggingMXBean loggingBean = null;
+                      Logger logger = null;
                   }
               }
               """
@@ -406,6 +445,26 @@ class ChangeTypeTest implements RewriteTest {
 
               @A2 public class B {}
               """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedAnnotationOnPackageDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {}"),
+          java("package a.b.d;\npublic @interface A2 {}"),
+          java(
+            """
+              @a.b.c.A1 package foo;
+              """,
+            """
+              @A2 package foo;
+
+              import a.b.d.A2;
+              """,
+            spec -> spec.path("foo/package-info.java")
           )
         );
     }
@@ -967,6 +1026,25 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classToStringKeyword() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
+          java(
+            """
+              class A {
+                  CharSequence foo = "";
+              }
+              """,
+            """
+              class A {
+                  String foo = "";
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/698")
     @Test
     void importOrdering() {
@@ -1294,6 +1372,99 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void fullyQualifiedJavadocLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2} here
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocSee() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * @see a.A1
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * @see a.A2
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedJavadocMemberLink() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+                  public void m() {}
+              }
+              """
+          ),
+          java(
+            """
+              /**
+               * {@link a.A1#m()} here
+               */
+              class Test {
+              }
+              """,
+            """
+              /**
+               * {@link a.A2#m()} here
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/978")
     @Test
     void onlyUpdateApplicableImport() {
@@ -1463,6 +1634,37 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               class Target {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void targetInDefaultPackageIsNeverImported() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "Target", true)),
+          java(a1),
+          java(
+            """
+              class Test {
+                  a.A1 a;
+              }
+              """,
+            """
+              class Test {
+                  Target a;
+              }
+              """
+          ),
+          java(
+            """
+              import static a.A1.stat;
+
+              class StaticImport {
+                  void m() {
+                      stat();
+                  }
               }
               """
           )
@@ -2466,4 +2668,382 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.demo.Before", "com.demo.After", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.demo;
+                  
+                  public class Before { }
+                  """,
+                """
+                  package com.demo;
+                  
+                  public class After { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.demo.Before;
+              
+              class X extends Before { }
+              """,
+            """
+              package app;
+              
+              import com.demo.After;
+              
+              class X extends After { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type -> TypeUtils.isAssignableTo("com.demo.After", type), "Assignable to updated type")
+            )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileContent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldImpl", "org.bar.NewImpl", false)),
+          text(
+            """
+              org.foo.OldImpl
+              org.other.Unrelated
+              """,
+            """
+              org.bar.NewImpl
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldInterface", "org.bar.NewInterface", false)),
+          text(
+            "org.foo.SomeImpl\n",
+            "org.foo.SomeImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.OldInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.NewInterface"))
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenSourceSetIsDirty() {
+        // Classpath knows of no other Ambiguous type in b.* or c.*, so ambiguity cannot be proven.
+        // A dirty source set must force the safe path: add an explicit import anyway.
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .executionContext(ctx)
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          mavenProject("demo",
+            java(
+              """
+                package a;
+                public class Ambiguous {}
+                """
+            ),
+            java(
+              """
+                package b;
+                public class Ambiguous {}
+                """
+            ),
+            java(
+              """
+                import a.Ambiguous;
+                import b.*;
+                import c.*;
+
+                class Test {
+                    Ambiguous a;
+                }
+                """,
+              """
+                import b.Ambiguous;
+                import b.*;
+                import c.*;
+
+                class Test {
+                    Ambiguous a;
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenStarImportsWouldBeAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Other {}
+              """
+          ),
+          java(
+            """
+              package c;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              import a.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """,
+            """
+              import b.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenStarImportCollidesWithJavaLang() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Number", "b.Number", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Number {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Number {}
+              """
+          ),
+          java(
+            """
+              import a.Number;
+              import b.*;
+
+              class Test {
+                  Number n;
+              }
+              """,
+            """
+              import b.Number;
+              import b.*;
+
+              class Test {
+                  Number n;
+              }
+              """,
+            spec -> spec.markers(JavaSourceSet.build("main", emptyList()))
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenTargetSimpleNameMeansAnotherTypeInFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
+          java(a1),
+          java(
+            """
+              package c;
+              public class Bar {
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import a.A1;
+
+              class SamePackage {
+                  A1 a;
+                  Bar bar;
+              }
+              """,
+            """
+              package c;
+
+              class SamePackage {
+                  b.Bar a;
+                  Bar bar;
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class TypeParameter<Bar> {
+                  A1 a;
+              }
+              """,
+            """
+              class TypeParameter<Bar> {
+                  b.Bar a;
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class NestedClass {
+                  A1 a;
+
+                  class Bar {
+                  }
+              }
+              """,
+            """
+              class NestedClass {
+                  b.Bar a;
+
+                  class Bar {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shortenWhenFileOnlyQualifiesAnotherTypeOfTheSameName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
+          java(a1),
+          java(
+            """
+              package c;
+              public class Bar {
+              }
+              """
+          ),
+          java(
+            """
+              import a.A1;
+
+              class Test {
+                  A1 a;
+                  c.Bar bar;
+              }
+              """,
+            """
+              import b.Bar;
+
+              class Test {
+                  Bar a;
+                  c.Bar bar;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyInFileThatKeepsOriginalDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Foo", "b.Foo", true)),
+          java(
+            """
+              package a;
+
+              public class Foo {
+                  Foo self;
+              }
+              """,
+            """
+              package a;
+
+              public class Foo {
+                  b.Foo self;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotFailOnClassDeclarationWithNullType() {
+        // Non-Java (e.g. Python) sources may produce a J.ClassDeclaration whose type is null.
+        // When such a file also references the type being changed, the precondition passes and
+        // ChangeClassDefinition iterates every class declaration; it must skip the null-typed one
+        // rather than dereference its type. ignoreDefinition is left unset so ChangeClassDefinition runs.
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("java.util.List", "java.util.Collection", null))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.List;
+
+              class Foo {
+                  List<String> l;
+              }
+              """,
+            """
+              import java.util.Collection;
+
+              class Foo {
+                  Collection<String> l;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                    return classDecl.withType(null);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
 }

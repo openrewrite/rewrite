@@ -21,8 +21,12 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+/**
+ * Use {@link org.openrewrite.java.marker.OmitBraces} instead.
+ */
 @Value
 @With
+@Deprecated
 public class OmitBraces implements Marker {
     UUID id;
 

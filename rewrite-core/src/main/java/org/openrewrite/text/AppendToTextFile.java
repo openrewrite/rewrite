@@ -34,7 +34,8 @@ import static java.util.stream.Collectors.toSet;
 @EqualsAndHashCode(callSuper = false)
 public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Option(displayName = "Relative file name",
-            description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",
+            description = "File name, using a relative path. May also be a glob expression (e.g. `**/*.txt`) to match one or more existing files; " +
+                          "when a glob is supplied no new file is created. If a non-plaintext file matches, that file is left unchanged.",
             example = "foo/bar/baz.txt")
     String relativeFileName;
 
@@ -93,7 +94,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (!fileExists.get() && sourceFile.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                if (!fileExists.get() && matchesTarget(sourceFile.getSourcePath())) {
                     fileExists.set(true);
                 }
                 return sourceFile;
@@ -103,6 +104,11 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public Collection<PlainText> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
+        // A glob can match multiple existing files but doesn't specify a concrete path to create.
+        if (relativeFileName.matches(".*[*?\\[{].*")) {
+            return emptyList();
+        }
+
         String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
         String content = this.content + maybeNewline;
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
@@ -132,7 +138,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (sourceFile.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                if (sourceFile instanceof PlainText && matchesTarget(sourceFile.getSourcePath())) {
                     String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
                     String content = AppendToTextFile.this.content + maybeNewline;
                     String preamble = AppendToTextFile.this.preamble != null ? AppendToTextFile.this.preamble + maybeNewline : "";
@@ -153,6 +159,10 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                 return sourceFile;
             }
         });
+    }
+
+    private boolean matchesTarget(Path sourcePath) {
+        return sourcePath.getFileSystem().getPathMatcher("glob:" + relativeFileName).matches(sourcePath);
     }
 
     /**

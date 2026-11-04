@@ -18,11 +18,24 @@ package org.openrewrite.python.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class SuppressNewline implements Marker {
+public class SuppressNewline implements Marker, RpcCodec<SuppressNewline> {
     UUID id;
+
+    @Override
+    public void rpcSend(SuppressNewline after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public SuppressNewline rpcReceive(SuppressNewline before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }

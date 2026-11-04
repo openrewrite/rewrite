@@ -1,46 +1,34 @@
 # Auto-generated stub file for IDE autocomplete support.
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
-from typing import Self
+from dataclasses import dataclass
+from typing import Any, ClassVar, List, Optional, TypeVar, Generic
+from typing_extensions import Self
+from uuid import UUID
+import weakref
 
-from rewrite.java.support_types import J, Comment
-from rewrite.markers import Marker
+P = TypeVar('P')
+T = TypeVar('T')
+J2 = TypeVar('J2', bound=J)
 
+from rewrite import TreeVisitor, Markers
+from rewrite.java.tree import J
+from rewrite.java import Comment
+from .visitor import PythonVisitor
 
+class Py(J):
+    def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
+    def accept_python(self, v: 'PythonVisitor[P]', p: P) -> Optional['J']: ...
+    def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...
+
+@dataclass(frozen=True)
 class PyComment(Comment):
-    aligned_to_indent: bool
+    _aligned_to_indent: bool
 
-    def replace(
-        self,
-        *,
-        aligned_to_indent: bool = ...,
-    ) -> Self: ...
 
-class KeywordArguments(Marker):
-    id: uuid.UUID
+    @property
+    def aligned_to_indent(self) -> bool: ...
+    @property
+    def multiline(self) -> bool: ...
 
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-    ) -> Self: ...
-
-class KeywordOnlyArguments(Marker):
-    id: uuid.UUID
-
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-    ) -> Self: ...
-
-class Quoted(Marker):
-    id: uuid.UUID
-    style: Style
-
-    def replace(
-        self,
-        *,
-        id: uuid.UUID = ...,
-        style: Style = ...,
-    ) -> Self: ...
+    def with_aligned_to_indent(self, aligned_to_indent: bool) -> Comment: ...

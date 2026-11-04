@@ -1,0 +1,100 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using OpenRewrite.Core.Rpc;
+
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace OpenRewrite.Core;
+
+/// <summary>
+/// A marker that can be attached to any LST element to carry additional metadata.
+/// </summary>
+public interface Marker
+{
+    Guid Id { get; }
+}
+
+/// <summary>
+/// Stands in for a Java marker that has no type here. Like Java's RpcMarker, it keeps the
+/// marker's fields along with its id, so that it is sent back as it came.
+/// </summary>
+public sealed class UnknownMarker(Guid id, string? javaType = null) : Marker
+{
+    public Guid Id { get; } = id;
+
+    /// <summary>
+    /// The Java type the marker arrived as.
+    /// </summary>
+    [JsonIgnore]
+    public string? JavaType { get; } = javaType;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Data { get; } = new();
+}
+
+/// <summary>
+/// A collection of markers attached to an LST element.
+/// Markers allow attaching metadata without modifying the tree structure.
+/// </summary>
+public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Markers>, IEquatable<Markers>
+{
+    public Guid Id { get; } = id;
+    public IList<Marker> MarkerList { get; } = markerList;
+
+    public void RpcSend(Markers after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSendListAsRef(after, m => m.MarkerList,
+            m => (object)m.Id, null);
+    }
+
+    public Markers RpcReceive(Markers before, RpcReceiveQueue q)
+    {
+        var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+        // No onChange: the queue dispatches markers implementing IRpcCodec itself, and
+        // codec-less markers arrive as inline values that an onChange callback would discard
+        var markerList = q.ReceiveList(before.MarkerList, null);
+        return new Markers(id, markerList!);
+    }
+
+    public static readonly Markers Empty = new(Guid.Empty, []);
+
+    public static Markers Build(IEnumerable<Marker> markers)
+    {
+        var list = markers.ToList();
+        return list.Count == 0 ? Empty : new Markers(Tree.RandomId(), list);
+    }
+
+    public T? FindFirst<T>() where T : Marker =>
+        MarkerList.OfType<T>().FirstOrDefault();
+
+    public Markers Add(Marker marker) =>
+        new(Id, [..MarkerList, marker]);
+
+    public Markers Remove<T>() where T : Marker =>
+        new(Id, MarkerList.Where(m => m is not T).ToList());
+
+    public Markers WithId(Guid id) =>
+        id == Id ? this : new(id, MarkerList);
+
+    public Markers WithMarkerList(IList<Marker> markerList) =>
+        ReferenceEquals(markerList, MarkerList) ? this : new(Id, markerList);
+
+    public bool Equals(Markers? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Markers);
+    public override int GetHashCode() => Id.GetHashCode();
+}

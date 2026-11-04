@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet package metadata -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>rewrite-csharp</ToolCommandName>
+    <PackageId>OpenRewrite.CSharp.Tool</PackageId>
+    <Version>0.0.0</Version>
+    <Authors>Moderne</Authors>
+    <Description>CLI tool for OpenRewrite C# language support (RPC server)</Description>
+    <PackageProjectUrl>https://docs.openrewrite.org</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
+    <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OpenRewriteSdkSourcePath Condition="'$(OpenRewriteSdkSourcePath)' == ''">../OpenRewrite/OpenRewrite.csproj</OpenRewriteSdkSourcePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(OpenRewriteSdkSourcePath)" />
+  </ItemGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+
+</Project>

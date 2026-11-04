@@ -31,16 +31,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.DependencyNotation;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
@@ -48,11 +42,11 @@ import org.openrewrite.trait.VisitFunction2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 public class GradleDependency implements Trait<J.MethodInvocation> {
@@ -100,9 +94,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         String methodName = methodInvocation.getSimpleName();
         if ("classpath".equals(methodName)) {
             return gradleProject.getBuildscript().getConfiguration(methodName);
-        } else {
-            return gradleProject.getConfiguration(methodName);
         }
+        return gradleProject.getConfiguration(methodName);
     }
 
     public static boolean isDependencyDeclaration(Cursor cursor) {
@@ -140,8 +133,40 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     @With
     Cursor cursor;
 
+    /**
+     * May have no transitive dependencies; use {@link #getResolvedDependencyWithTransitives()} to walk them.
+     */
     @Getter
     ResolvedDependency resolvedDependency;
+
+    /**
+     * Like {@code getResolvedDependency()}, but with its transitive dependencies populated. When a recipe has marked
+     * the configuration for re-resolution, the matcher resolves it with
+     * {@link GradleDependencyConfiguration#getDirectResolvedShallow()}, which leaves them empty.
+     */
+    public ResolvedDependency getResolvedDependencyWithTransitives() {
+        if (!resolvedDependency.getDependencies().isEmpty() || resolvedDependency.getDepth() < 0) {
+            return resolvedDependency;
+        }
+        GradleProject gradleProject = getGradleProject(cursor);
+        GradleDependencyConfiguration gdc = getConfiguration(gradleProject, getTree());
+        if (gradleProject == null || gdc == null) {
+            return resolvedDependency;
+        }
+        List<GradleDependencyConfiguration> resolvable = gdc.isCanBeResolved() ?
+                singletonList(gdc) : gradleProject.configurationsExtendingFrom(gdc, true);
+        for (GradleDependencyConfiguration c : resolvable) {
+            if (!c.isCanBeResolved()) {
+                continue;
+            }
+            for (ResolvedDependency rd : c.getDirectResolved()) {
+                if (rd.getGroupId().equals(getGroupId()) && rd.getArtifactId().equals(getArtifactId())) {
+                    return rd.withRequested(resolvedDependency.getRequested());
+                }
+            }
+        }
+        return resolvedDependency;
+    }
 
     /**
      * Gets the resolved group ID of the dependency after Gradle's dependency resolution.
@@ -236,7 +261,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
                     DependencyNotation.parse((String) ((J.Literal) arg).getValue());
-            return dep != null ? dep.getGroupId() : null;
+            if (dep != null) {
+                return dep.getGroupId();
+            }
+            // Multi-component form: ("group", "artifact", "version")
+            if (isMultiComponentDefinition(depArgs)) {
+                return (String) ((J.Literal) arg).getValue();
+            }
+            return null;
         }
 
         // GString notation: "group:artifact:$version"
@@ -335,7 +367,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep = DependencyNotation.parse((String) ((J.Literal) arg).getValue());
-            return dep != null ? dep.getArtifactId() : null;
+            if (dep != null) {
+                return dep.getArtifactId();
+            }
+            // Multi-component form: ("group", "artifact", "version")
+            if (isMultiComponentDefinition(depArgs) && depArgs.size() >= 2) {
+                return (String) ((J.Literal) depArgs.get(1)).getValue();
+            }
+            return null;
         }
 
         // GString notation: "group:artifact:$version"
@@ -427,7 +466,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
                     DependencyNotation.parse((String) ((J.Literal) arg).getValue());
-            return dep != null ? dep.getVersion() : null;
+            if (dep != null) {
+                return dep.getVersion();
+            }
+            // Multi-component form: ("group", "artifact", "version") or ("group", "artifact", versionVar)
+            if (isMultiComponentDefinition(depArgs) && depArgs.size() >= 3) {
+                return extractValueAsString(depArgs.get(2));
+            }
+            return null;
         }
 
         // Map notation - look for "version" entry
@@ -467,15 +513,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * Handles literals, identifiers, field access, method invocations, and GStrings.
      */
     private @Nullable String extractValueAsString(Expression value) {
-        Expression v = value.withMarkers(Markers.EMPTY);
-        if (v instanceof J.Literal) {
-            Object literalValue = ((J.Literal) v).getValue();
+        if (value instanceof J.Literal) {
+            Object literalValue = ((J.Literal) value).getValue();
             return literalValue instanceof String ? (String) literalValue : null;
-        } else if (v instanceof J.Identifier) {
-            return ((J.Identifier) v).getSimpleName();
-        } else if (v instanceof J.FieldAccess) {
+        }
+        if (value instanceof J.Identifier) {
+            return ((J.Identifier) value).getSimpleName();
+        }
+        // Normalize markers only for branches that use printTrimmed
+        Expression v = value.withMarkers(Markers.EMPTY);
+        if (v instanceof J.FieldAccess) {
             return v.printTrimmed(cursor);
-        } else if (v instanceof J.MethodInvocation) {
+        }
+        if (v instanceof J.MethodInvocation) {
             // Handle property('name') or findProperty('name') patterns
             J.MethodInvocation mi = (J.MethodInvocation) v;
             String methodName = mi.getSimpleName();
@@ -534,12 +584,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Tree tree = gStringValue.getTree();
                 if (tree instanceof J.Identifier) {
                     return ((J.Identifier) tree).getSimpleName();
-                } else if (tree instanceof J.FieldAccess) {
+                }
+                if (tree instanceof J.FieldAccess) {
                     return tree.printTrimmed(cursor);
-                } else if (tree instanceof J.MethodInvocation) {
+                }
+                if (tree instanceof J.MethodInvocation) {
                     // Recursively handle method invocations within GString
                     return extractValueAsString((J.MethodInvocation) tree);
-                } else if (tree instanceof G.Binary) {
+                }
+                if (tree instanceof G.Binary) {
                     // Recursively handle binary expressions within GString
                     return extractValueAsString((G.Binary) tree);
                 }
@@ -627,6 +680,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
+        // Handle multi-component definition with variable reference: ("group", "artifact", versionVar)
+        if (depArgs.size() >= 3 && depArgs.get(2) instanceof J.Identifier && isMultiComponentDefinition(depArgs)) {
+            return ((J.Identifier) depArgs.get(2)).getSimpleName();
+        }
+
         Expression arg = depArgs.get(0);
 
         // Handle binary concatenation: "group:artifact:" + version
@@ -653,9 +711,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Object versionTree = ((G.GString.Value) strings.get(1)).getTree();
                 if (versionTree instanceof J.Identifier) {
                     return ((J.Identifier) versionTree).getSimpleName();
-                } else if (versionTree instanceof J.FieldAccess) {
+                }
+                if (versionTree instanceof J.FieldAccess) {
                     return ((J.FieldAccess) versionTree).printTrimmed(cursor);
-                } else if (versionTree instanceof J.MethodInvocation) {
+                }
+                if (versionTree instanceof J.MethodInvocation) {
                     // Handle property('version') or findProperty('version')
                     String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
                     if (propName != null) {
@@ -694,12 +754,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             if (versionExp instanceof J.Identifier) {
                 return ((J.Identifier) versionExp).getSimpleName();
-            } else if (versionExp instanceof J.FieldAccess) {
+            }
+            if (versionExp instanceof J.FieldAccess) {
                 return versionExp.printTrimmed(cursor);
-            } else if (versionExp instanceof J.MethodInvocation) {
+            }
+            if (versionExp instanceof J.MethodInvocation) {
                 // Handle property('version') or findProperty('version')
                 return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionExp);
-            } else if (versionExp instanceof G.Binary) {
+            }
+            if (versionExp instanceof G.Binary) {
                 // Handle properties['version']
                 return extractPropertyNameFromGBinary((G.Binary) versionExp);
             } else if (versionExp instanceof G.GString) {
@@ -711,9 +774,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Object tree = versionGStringValue.getTree();
                     if (tree instanceof J.Identifier) {
                         return ((J.Identifier) tree).getSimpleName();
-                    } else if (tree instanceof J.FieldAccess) {
+                    }
+                    if (tree instanceof J.FieldAccess) {
                         return ((J.FieldAccess) tree).printTrimmed(cursor);
-                    } else if (tree instanceof J.MethodInvocation) {
+                    }
+                    if (tree instanceof J.MethodInvocation) {
                         String propName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) tree);
                         if (propName != null) {
                             return propName;
@@ -734,7 +799,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Object tree = versionTemplateExpr.getTree();
                     if (tree instanceof J.Identifier) {
                         return ((J.Identifier) tree).getSimpleName();
-                    } else if (tree instanceof J.FieldAccess) {
+                    }
+                    if (tree instanceof J.FieldAccess) {
                         return ((J.FieldAccess) tree).printTrimmed(cursor);
                     }
                 }
@@ -828,26 +894,33 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             J.Literal l = (J.Literal) m.getArguments().get(0);
             if (l.getType() == JavaType.Primitive.String) {
                 Dependency dep = DependencyNotation.parse((String) l.getValue());
-                if (dep == null || dep.getClassifier() != null || (dep.getType() != null && !"jar".equals(dep.getType()))) {
-                    return this;
+                if (dep != null) {
+                    if (dep.getClassifier() != null || (dep.getType() != null && !"jar".equals(dep.getType()))) {
+                        return this;
+                    }
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
+                            ChangeStringLiteral.withStringValue(l, DependencyNotation.toStringNotation(dep.withGav(dep.getGav().withVersion(null))))
+                    ));
+                } else if (isMultiComponentDefinition(m.getArguments()) && m.getArguments().size() >= 3) {
+                    // Multi-component form: remove the version (3rd) argument
+                    List<Expression> newArgs = new ArrayList<>(m.getArguments().subList(0, 2));
+                    if (m.getArguments().size() > 3) {
+                        newArgs.addAll(m.getArguments().subList(3, m.getArguments().size()));
+                    }
+                    updated = m.withArguments(newArgs);
                 }
-                updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                        ChangeStringLiteral.withStringValue(l, DependencyNotation.toStringNotation(dep.withGav(dep.getGav().withVersion(null))))
-                ));
             }
         } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                        //noinspection DataFlowIssue
-                        return null;
-                    }
-                    return entry;
-                }));
+                return mapLiteral.withElements(ListUtils.filter(mapLiteral.getElements(), entry ->
+                  !(entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue()))));
             }));
         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
             updated = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                if (!(arg instanceof G.MapEntry)) {
+                    return arg;
+                }
                 G.MapEntry entry = (G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
                     //noinspection DataFlowIssue
@@ -906,6 +979,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withGroupId(newGroupId));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
+                } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
+                    // Multi-component form: ("group", "artifact", "version")
+                    String currentGroup = (String) ((J.Literal) firstArg).getValue();
+                    if (!newGroupId.equals(currentGroup)) {
+                        updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
+                                arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newGroupId)));
+                    }
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -926,7 +1006,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -980,15 +1060,20 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (firstArg instanceof K.StringTemplate) {
             K.StringTemplate template = (K.StringTemplate) firstArg;
             List<J> strings = template.getStrings();
-            if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
+            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = DependencyNotation.parse((String) literal.getValue());
+                String originalValue = (String) literal.getValue();
+                Dependency dep = DependencyNotation.parse(originalValue);
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
                     Dependency updatedDep = dep.withGav(dep.getGav().withGroupId(newGroupId));
                     String replacement = DependencyNotation.toStringNotation(updatedDep);
+                    if (originalValue.endsWith(":")) {
+                        replacement = replacement + ":";
+                    }
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1039,6 +1124,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withArtifactId(newArtifactId));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
+                } else if (dep == null && isMultiComponentDefinition(m.getArguments()) && m.getArguments().size() >= 2) {
+                    // Multi-component form: ("group", "artifact", "version")
+                    String currentArtifact = (String) ((J.Literal) m.getArguments().get(1)).getValue();
+                    if (!newArtifactId.equals(currentArtifact)) {
+                        updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
+                                i == 1 ? ChangeStringLiteral.withStringValue((J.Literal) arg, newArtifactId) : arg));
+                    }
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -1059,7 +1151,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1113,15 +1205,20 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (firstArg instanceof K.StringTemplate) {
             K.StringTemplate template = (K.StringTemplate) firstArg;
             List<J> strings = template.getStrings();
-            if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
+            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = DependencyNotation.parse((String) literal.getValue());
+                String originalValue = (String) literal.getValue();
+                Dependency dep = DependencyNotation.parse(originalValue);
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
                     Dependency updatedDep = dep.withGav(dep.getGav().withArtifactId(newArtifactId));
                     String replacement = DependencyNotation.toStringNotation(updatedDep);
+                    if (originalValue.endsWith(":")) {
+                        replacement = replacement + ":";
+                    }
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1172,10 +1269,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
+                } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
+                    if (m.getArguments().size() >= 3) {
+                        Expression versionArg = m.getArguments().get(2);
+                        J.Literal replacement = versionReplacement(versionArg, newVersion, m.getArguments());
+                        if (replacement != null) {
+                            updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
+                                    i == 2 ? replacement : arg));
+                        }
+                    }
                 }
             }
         } else if (firstArg instanceof G.GString) {
-            // For GString, we convert to a simple string literal with the new version
+            // For GString, collapse to a single-element GString to preserve Groovy command expression formatting
             G.GString gstring = (G.GString) firstArg;
             List<J> strings = gstring.getStrings();
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
@@ -1185,8 +1291,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
                     String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    G.GString collapsed = gstring.withStrings(singletonList(newLiteral));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> collapsed));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1200,13 +1307,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             boolean versionFound = false;
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
-                        "version".equals(((J.Literal) entry.getKey()).getValue()) &&
-                        entry.getValue() instanceof J.Literal) {
-                    String currentVersion = (String) ((J.Literal) entry.getValue()).getValue();
-                    if (!newVersion.equals(currentVersion)) {
-                        G.MapEntry updatedEntry = entry.withValue(
-                                ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newVersion));
-
+                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                    J.Literal replacement = versionReplacement(entry.getValue(), newVersion, entries);
+                    if (replacement != null) {
+                        G.MapEntry updatedEntry = entry.withValue(replacement);
                         if (firstArg instanceof G.MapLiteral) {
                             G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
                             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
@@ -1222,29 +1326,46 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
             }
 
-            if (!versionFound && firstArg instanceof G.MapLiteral) {
-                // TODO Add version entry to map literal
+            if (!versionFound) {
+                // Add a new version entry
+                if (!entries.isEmpty()) {
+                    G.MapEntry templateEntry = entries.get(entries.size() - 1);
+                    G.MapEntry versionEntry = createVersionMapEntry(newVersion, templateEntry);
+
+                    if (firstArg instanceof G.MapLiteral) {
+                        G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
+                        updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
+                                mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), versionEntry))));
+                    } else {
+                        // Map entries as separate arguments
+                        updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionEntry));
+                    }
+                }
             }
         } else if (firstArg instanceof J.Assignment) {
             List<Expression> updatedArgs = m.getArguments();
+            boolean versionFound = false;
             for (Expression updatedArg : updatedArgs) {
                 if (updatedArg instanceof J.Assignment) {
                     J.Assignment assignment = (J.Assignment) updatedArg;
                     if (assignment.getVariable() instanceof J.Identifier &&
-                            "version".equals(((J.Identifier) assignment.getVariable()).getSimpleName()) &&
-                            assignment.getAssignment() instanceof J.Literal) {
-                        String currentVersion = (String) ((J.Literal) assignment.getAssignment()).getValue();
-                        if (!newVersion.equals(currentVersion)) {
-                            J.Assignment updatedAssignment = assignment.withAssignment(
-                                    ChangeStringLiteral.withStringValue((J.Literal) assignment.getAssignment(), newVersion));
+                            "version".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
+                        J.Literal replacement = versionReplacement(assignment.getAssignment(), newVersion, updatedArgs);
+                        if (replacement != null) {
+                            J.Assignment updatedAssignment = assignment.withAssignment(replacement);
                             updated = m.withArguments(ListUtils.map(m.getArguments(),
                                     arg -> arg == assignment ? updatedAssignment : arg));
                         }
+                        versionFound = true;
                         break;
                     }
                 }
             }
-            // TODO handle adding version when none exsits
+            if (!versionFound) {
+                // Add a new version assignment
+                J.Assignment versionAssignment = createVersionAssignment(newVersion);
+                updated = m.withArguments(insertBeforeTrailingClosure(m.getArguments(), versionAssignment));
+            }
         } else if (firstArg instanceof K.StringTemplate) {
             // For StringTemplate, we convert to a simple string literal with the new version
             K.StringTemplate template = (K.StringTemplate) firstArg;
@@ -1256,13 +1377,113 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
                     String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter())
+                            .withPrefix(template.getPrefix());
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> newLiteral));
                 }
             }
         }
 
+        // Sync rich version constraints inside any trailing `version { ... }` closure
+        // so that calls like `strictly(...)`, `require(...)`, `prefer(...)` reference the new version.
+        J.MethodInvocation withSyncedConstraints = (J.MethodInvocation) new JavaVisitor<Integer>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer i) {
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, i);
+                String name = mi.getSimpleName();
+                if (("strictly".equals(name) || "require".equals(name) || "prefer".equals(name)) &&
+                        withinBlock(getCursor(), "version")) {
+                    return mi.withArguments(ListUtils.map(mi.getArguments(), arg ->
+                            arg instanceof J.Literal ?
+                                    ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) :
+                                    arg));
+                }
+                return mi;
+            }
+        }.visitNonNull(updated, 0);
+
+        if (withSyncedConstraints != updated) {
+            updated = withSyncedConstraints;
+        }
+
         return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
+    }
+
+    private static J.@Nullable Literal versionReplacement(Expression declaredVersion, String newVersion,
+                                                          List<? extends Expression> quoteFrom) {
+        if (declaredVersion instanceof J.Literal) {
+            J.Literal literal = (J.Literal) declaredVersion;
+            J.Literal updated = ChangeStringLiteral.withStringValue(literal, newVersion);
+            return updated == literal ? null : updated;
+        }
+        String quote = quoteOf(quoteFrom);
+        String quotedVersion = quote + newVersion + quote;
+        return new J.Literal(randomId(), declaredVersion.getPrefix(), declaredVersion.getMarkers(),
+                newVersion, quotedVersion, null, JavaType.Primitive.String);
+    }
+
+    private static List<Expression> insertBeforeTrailingClosure(List<Expression> arguments, Expression argument) {
+        int last = arguments.size() - 1;
+        return ListUtils.insert(arguments, argument, arguments.get(last) instanceof J.Lambda ? last : last + 1);
+    }
+
+    private static String quoteOf(List<? extends Expression> arguments) {
+        for (Expression argument : arguments) {
+            Expression value = argument instanceof G.MapEntry ? ((G.MapEntry) argument).getValue() :
+                    argument instanceof J.Assignment ? ((J.Assignment) argument).getAssignment() : argument;
+            if (value instanceof J.Literal && ((J.Literal) value).getValue() instanceof String) {
+                String source = ((J.Literal) value).getValueSource();
+                return source != null && source.startsWith("'") ? "'" : "\"";
+            }
+        }
+        return "\"";
+    }
+
+    /**
+     * Creates a new G.MapEntry for version based on a template entry's style.
+     */
+    private static G.MapEntry createVersionMapEntry(String version, G.MapEntry template) {
+        // Determine the key style from template
+        Expression keyExpr;
+        if (template.getKey() instanceof J.Literal) {
+            J.Literal templateKey = (J.Literal) template.getKey();
+            String templateKeySource = templateKey.getValueSource();
+            String keySource;
+            if (templateKeySource != null && (templateKeySource.startsWith("'") || templateKeySource.startsWith("\""))) {
+                // Template uses quoted keys - use same quote style
+                char quote = templateKeySource.charAt(0);
+                keySource = quote + "version" + quote;
+            } else {
+                // Template uses unquoted keys
+                keySource = "version";
+            }
+            keyExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getKey().getPrefix().getLastWhitespace()), Markers.EMPTY, "version", keySource, null, JavaType.Primitive.String);
+        } else {
+            keyExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getKey().getPrefix().getLastWhitespace()), Markers.EMPTY, "version", "version", null, JavaType.Primitive.String);
+        }
+
+        // Determine value quote style from template
+        String valueSource = "'" + version + "'";
+        if (template.getValue() instanceof J.Literal) {
+            J.Literal templateValue = (J.Literal) template.getValue();
+            String templateValueSource = templateValue.getValueSource();
+            if (templateValueSource != null && templateValueSource.startsWith("\"")) {
+                valueSource = "\"" + version + "\"";
+            }
+        }
+        J.Literal valueExpr = new J.Literal(randomId(), Space.EMPTY.withWhitespace(template.getValue().getPrefix().getLastWhitespace()), Markers.EMPTY, version, valueSource, null, JavaType.Primitive.String);
+
+        return new G.MapEntry(randomId(), template.getPrefix().withWhitespace(" "), template.getMarkers(), template.getPadding().getKey().withElement(keyExpr), valueExpr, null);
+    }
+
+    /**
+     * Creates a new J.Assignment for version (Kotlin DSL style).
+     */
+    private static J.Assignment createVersionAssignment(String version) {
+        J.Identifier variable = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "version", null, null);
+        J.Literal valueExpr = new J.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, version, "\"" + version + "\"", null, JavaType.Primitive.String);
+
+        return new J.Assignment(randomId(), Space.format(" "), Markers.EMPTY, variable, new JLeftPadded<>(Space.SINGLE_SPACE, valueExpr, Markers.EMPTY), null);
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
@@ -1336,10 +1557,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
                 dependency = parseDependency(singletonList(((J.Binary) argument).getLeft()));
             } else if (argument instanceof J.MethodInvocation) {
-                if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
-                        "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                    dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
-                } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
+                J.MethodInvocation helper = (J.MethodInvocation) argument;
+                if ("platform".equals(helper.getSimpleName()) ||
+                        "enforcedPlatform".equals(helper.getSimpleName())) {
+                    dependency = parseDependency(helper.getArguments());
+                } else if ("kotlin".equals(helper.getSimpleName())) {
+                    dependency = parseKotlinHelperDependency(helper);
+                } else if ("project".equals(helper.getSimpleName())) {
                     // project dependencies are not yet supported
                     return null;
                 }
@@ -1351,7 +1575,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             if (gdc != null) {
                 if (gdc.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : gdc.getDirectResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getDirectResolvedShallow()) {
                         if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                             Dependency req = resolvedDependency.getRequested();
                             if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
@@ -1363,7 +1587,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 } else {
                     for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
                         if (transitiveConfiguration.isCanBeResolved()) {
-                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getDirectResolved()) {
+                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getDirectResolvedShallow()) {
                                 if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                     Dependency req = resolvedDependency.getRequested();
                                     if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
@@ -1406,11 +1630,38 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return resolved.withRequested(resolved.getRequested().withGav(requested.getGav()));
         }
 
+        private @Nullable Dependency parseKotlinHelperDependency(J.MethodInvocation helper) {
+            List<Expression> arguments = helper.getArguments();
+            if (arguments.isEmpty() || !(arguments.get(0) instanceof J.Literal) ||
+                    !(((J.Literal) arguments.get(0)).getValue() instanceof String)) {
+                return null;
+            }
+            String module = (String) ((J.Literal) arguments.get(0)).getValue();
+
+            String version = null;
+            if (arguments.size() > 1 && arguments.get(1) instanceof J.Literal &&
+                    ((J.Literal) arguments.get(1)).getValue() instanceof String) {
+                version = (String) ((J.Literal) arguments.get(1)).getValue();
+            }
+            return Dependency.builder()
+                    .gav(new GroupArtifactVersion("org.jetbrains.kotlin", "kotlin-" + module, version))
+                    .build();
+        }
+
         private @Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
-                return DependencyNotation.parse((String) ((J.Literal) argument).getValue());
-            } else if (argument instanceof G.GString) {
+                Dependency dep = DependencyNotation.parse((String) ((J.Literal) argument).getValue());
+                if (dep != null) {
+                    return dep;
+                }
+                // Multi-component form: ("group", "artifact") or ("group", "artifact", "version")
+                if (isMultiComponentDefinition(arguments)) {
+                    return parseMultiComponentLiterals(arguments);
+                }
+                return null;
+            }
+            if (argument instanceof G.GString) {
                 G.GString gstring = (G.GString) argument;
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
@@ -1506,5 +1757,53 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     .gav(new GroupArtifactVersion(group, artifact, version))
                     .build();
         }
+    }
+
+    /**
+     * Checks if the arguments represent a multi-component literal dependency declaration
+     * like {@code implementation("group", "artifact", "version")} or
+     * {@code implementation("group", "artifact", myVersionVariable)}.
+     * The first two arguments (group, artifact) must be string literals.
+     * The optional third argument (version) can be a string literal or a variable reference (identifier).
+     * The first argument must not contain a colon (to distinguish from colon-separated notation).
+     */
+    private static boolean isMultiComponentDefinition(List<Expression> arguments) {
+        if (arguments.size() < 2 || arguments.size() > 4) {
+            return false;
+        }
+        for (int i = 0; i < arguments.size(); i++) {
+            Expression arg = arguments.get(i);
+            // Version (3rd) and classifier (4th) args can also be variable references
+            if (i >= 2 && arg instanceof J.Identifier) {
+                continue;
+            }
+            if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
+                return false;
+            }
+        }
+        String first = (String) ((J.Literal) arguments.get(0)).getValue();
+        return first != null && !first.contains(":");
+    }
+
+    /**
+     * Parses a multi-component dependency declaration into a Dependency.
+     * Expects 2-4 arguments: group (literal), artifact (literal), [version], [classifier].
+     * Version and classifier can be string literals or variable references (identifiers).
+     * When a variable reference is used, that component is set to null in the returned Dependency.
+     */
+    private static @Nullable Dependency parseMultiComponentLiterals(List<Expression> arguments) {
+        String group = (String) ((J.Literal) arguments.get(0)).getValue();
+        String artifact = (String) ((J.Literal) arguments.get(1)).getValue();
+        String version = arguments.size() >= 3 && arguments.get(2) instanceof J.Literal ?
+                (String) ((J.Literal) arguments.get(2)).getValue() : null;
+        String classifier = arguments.size() >= 4 && arguments.get(3) instanceof J.Literal ?
+                (String) ((J.Literal) arguments.get(3)).getValue() : null;
+        if (group == null || group.isEmpty() || artifact == null || artifact.isEmpty()) {
+            return null;
+        }
+        return Dependency.builder()
+                .gav(new GroupArtifactVersion(group, artifact, version))
+                .classifier(classifier)
+                .build();
     }
 }

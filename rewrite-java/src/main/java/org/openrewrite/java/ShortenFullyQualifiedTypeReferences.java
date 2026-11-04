@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -22,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -31,27 +33,23 @@ import org.openrewrite.java.tree.Space;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Add imports for fully qualified references to types";
-    }
+    @Getter
+    final String displayName = "Add imports for fully qualified references to types";
 
-    @Override
-    public String getDescription() {
-        return "Any fully qualified references to Java types will be replaced with corresponding simple " +
-               "names and import statements, provided that it doesn't result in " +
-               "any conflicts with other imports or types declared in the local compilation unit.";
-    }
+    @Getter
+    final String description = "Any fully qualified references to Java types will be replaced with corresponding simple " +
+        "names and import statements, provided that it doesn't result in " +
+        "any conflicts with other imports or types declared in the local compilation unit.";
 
-    @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
@@ -79,10 +77,17 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
      * @see JavaVisitor#service(Class)
      */
     public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
-        return getVisitor(subtree);
+        return getVisitor(subtree, fqn -> false);
     }
 
-    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope) {
+    /**
+     * Like {@link #modifyOnly(J)}, but leaves references to types matching {@code keepQualified} fully qualified.
+     */
+    public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree, Predicate<String> keepQualified) {
+        return getVisitor(subtree, keepQualified);
+    }
+
+    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
             final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
@@ -99,7 +104,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         @Override
                         public J.Import visitImport(J.Import import_, Map<String, JavaType> types) {
                             if (!import_.isStatic() && isWellFormedType(import_.getQualid().getType())) {
-                                types.put(import_.getQualid().getSimpleName(), import_.getQualid().getType());
+                                J.Identifier alias = import_.getAlias();
+                                types.put(alias != null ? alias.getSimpleName() : import_.getQualid().getSimpleName(), import_.getQualid().getType());
                             }
                             return import_;
                         }
@@ -169,7 +175,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                 }
 
                 JavaType type = fieldAccess.getType();
-                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
+                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null &&
+                    !keepQualified.test(((JavaType.Class) type).getFullyQualifiedName())) {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
@@ -178,22 +185,52 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
-                        if (!fullyQualifiedName.startsWith("java.lang.")) {
-                            maybeAddImport(fullyQualifiedName);
-                            usedTypes.put(simpleName, type);
-                            if (!fieldAccess.getName().getAnnotations().isEmpty()) {
-                                return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
-                                    if (i == 0) {
-                                        return a.withPrefix(fieldAccess.getPrefix());
-                                    }
-                                    return a;
-                                }));
+                        if ("java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
+                            if (!isAnnotationTypeName() || conflictsWithSamePackageType(simpleName, fullyQualifiedName)) {
+                                return fieldAccess;
                             }
-                            return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        } else {
+                            maybeAddImport(fullyQualifiedName);
                         }
+                        usedTypes.put(simpleName, type);
+                        return shorten(fieldAccess);
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
+            }
+
+            private J shorten(J.FieldAccess fieldAccess) {
+                if (!fieldAccess.getName().getAnnotations().isEmpty()) {
+                    return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
+                        if (i == 0) {
+                            return a.withPrefix(fieldAccess.getPrefix());
+                        }
+                        return a;
+                    }));
+                }
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+
+            private boolean isAnnotationTypeName() {
+                J.Annotation annotation = getCursor().firstEnclosing(J.Annotation.class);
+                return annotation != null && annotation.getAnnotationType() == getCursor().getValue();
+            }
+
+            private boolean conflictsWithSamePackageType(String simpleName, String fullyQualifiedName) {
+                SourceFile sourceFile = getCursor().firstEnclosing(SourceFile.class);
+                if (!(sourceFile instanceof JavaSourceFile)) {
+                    return false;
+                }
+                JavaSourceFile javaSourceFile = (JavaSourceFile) sourceFile;
+                J.Package packageDeclaration = javaSourceFile.getPackageDeclaration();
+                String packageName = packageDeclaration == null ? "" : packageDeclaration.getPackageName();
+                String samePackageType = packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
+                return javaSourceFile.getMarkers().findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getClasspath)
+                        .orElseGet(java.util.Collections::emptyList)
+                        .stream()
+                        .anyMatch(fq -> !fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName) &&
+                                fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), samePackageType));
             }
         };
     }

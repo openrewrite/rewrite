@@ -21,6 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -46,15 +47,22 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
             emptyList(), Space.format(" "));
 
+    private final boolean autoFormat;
+
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates) {
+                                     String substitutedTemplate, JavaCoordinates coordinates,
+                                     boolean autoFormat) {
         super(templateParser, substitutions, substitutedTemplate, coordinates);
+        this.autoFormat = autoFormat;
     }
 
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
-            private boolean substituted;
+            @Override
+            public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
+                return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+            }
 
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer p) {
@@ -70,6 +78,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
+                    if (gen.isEmpty()) {
+                        throw new IllegalStateException("Unable to parse annotation arguments from template: \n" +
+                                                        substitutedTemplate +
+                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                    }
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
@@ -77,13 +90,106 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public @Nullable J preVisit(J tree, Integer p) {
+                if (loc == STATEMENT_PREFIX && mode != JavaCoordinates.Mode.REPLACEMENT && tree instanceof JavaSourceFile) {
+                    J spliced = insertIntoSourceFile((JavaSourceFile) tree, p);
+                    if (spliced != null) {
+                        stopAfterPreVisit();
+                        return spliced;
+                    }
+                }
+                return super.preVisit(tree, p);
+            }
+
+            /**
+             * A Groovy script has no block around its top-level statements, so the list the new statement joins can
+             * only be reached on the source file itself.
+             */
+            private @Nullable J insertIntoSourceFile(JavaSourceFile cu, Integer p) {
+                SourceFileStatementService statements = cu.service(SourceFileStatementService.class);
+                List<Statement> existing = statements.getStatements(cu);
+                if (existing.stream().noneMatch(s -> s.isScope(insertionPoint))) {
+                    return null;
+                }
+                return statements.withStatements(cu, ListUtils.flatMap(existing, statement -> {
+                    if (!isScope(statement)) {
+                        return statement;
+                    }
+                    return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
+                            new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
+                            substitutions.getTypeVariables(), loc, mode)), p);
+                }));
+            }
+
+            /**
+             * Position generated statements around the one the coordinate anchors on. An anchor that does not begin
+             * its own line leads a script: it has no line break to hand over, and the block it may nominally sit in
+             * is not an indentation level, so its neighbours are placed rather than formatted.
+             */
+            private List<Statement> spliceAround(Statement anchor, List<Statement> gen, Integer p) {
+                if (gen.isEmpty() && mode != JavaCoordinates.Mode.REPLACEMENT && !substitutedTemplate.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Expected a template that would generate at least one " +
+                                                       "statement to insert " + (mode == JavaCoordinates.Mode.BEFORE ? "before" : "after") + " a statement, but generated none. " +
+                                                       "Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                       "\nStatement:\n" + anchor);
+                }
+                boolean anchorBeginsLine = anchor.getPrefix().getWhitespace().contains("\n");
+                Cursor parent = getCursor();
+                for (int i = 0; i < gen.size(); i++) {
+                    Statement s = gen.get(i);
+                    if (anchorBeginsLine) {
+                        gen.set(i, autoFormat(i == 0 ? s.withPrefix(firstPrefix(anchor)) : s, p, parent));
+                    } else {
+                        gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
+                    }
+                }
+                switch (mode) {
+                    case BEFORE:
+                        return ListUtils.concat(gen, anchorBeginsLine ? anchor :
+                                (Statement) anchor.withPrefix(Space.format("\n")));
+                    case AFTER:
+                        return ListUtils.concat(anchor, gen);
+                    default:
+                        return gen;
+                }
+            }
+
+            /**
+             * The prefix for the first generated statement. When the anchor stays in the tree (BEFORE, AFTER) any
+             * blank-line separator above it belongs to the anchor and the new statement joins on a single break at
+             * the same indent. When the anchor is removed (REPLACEMENT) the new statement takes its position, so
+             * it also takes its whitespace — comments are dropped since replacement removes what they annotated,
+             * unless the anchor is passed back in as a parameter.
+             */
+            private Space firstPrefix(Statement anchor) {
+                if (mode == JavaCoordinates.Mode.REPLACEMENT) {
+                    return replacedPrefix(anchor);
+                }
+                String whitespace = anchor.getPrefix().getWhitespace();
+                return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+            }
+
+            private Space leadingPrefix(Statement anchor, int i) {
+                if (i > 0 || mode == JavaCoordinates.Mode.AFTER) {
+                    return Space.format("\n");
+                }
+                // Displacing the leading statement takes over its comments too, so a license header stays on top
+                return mode == JavaCoordinates.Mode.BEFORE ? anchor.getPrefix() : replacedPrefix(anchor);
+            }
+
+            private Space replacedPrefix(Statement anchor) {
+                return substitutions.isParameter(anchor) ? anchor.getPrefix() :
+                        anchor.getPrefix().withComments(emptyList());
+            }
+
+            @Override
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {
                         if (isScope(block)) {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
-                                    new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                    substitutions.getTypeVariables(), loc, mode));
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
+                                    new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
+                                    substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
 
                             if (coordinates.getComparator() != null) {
                                 J.Block b = block;
@@ -111,25 +217,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
                             if (isScope(statement)) {
-                                List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
+                                return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                        substitutions.getTypeVariables(), loc, mode));
-
-                                Cursor parent = getCursor();
-                                for (int i = 0; i < gen.size(); i++) {
-                                    Statement s = gen.get(i);
-                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(emptyList())) : s, p, parent);
-                                    gen.set(i, formattedS);
-                                }
-
-                                switch (mode) {
-                                    case REPLACEMENT:
-                                        return gen;
-                                    case BEFORE:
-                                        return ListUtils.concat(gen, statement);
-                                    case AFTER:
-                                        return ListUtils.concat(statement, gen);
-                                }
+                                        substitutions.getTypeVariables(), loc, mode)), p);
                             }
                             return statement;
                         }));
@@ -183,8 +273,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             } else {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
-                            if (c.getType() != null) {
-                                c = c.withType(((JavaType.Class) c.getType()).withInterfaces(ListUtils.concatAll(c.getType().getInterfaces(), implementsTypes)));
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            if (classType != null) {
+                                classType = classType.withInterfaces(ListUtils.concatAll(classType.getInterfaces(), implementsTypes));
+                                c = c.withType(parameterized == null ? classType : parameterized.withType(classType));
                             }
 
                             //noinspection ConstantConditions
@@ -237,6 +330,35 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public J visitIf(J.If iff, Integer p) {
+                if (loc == ELSE_PREFIX && isScope(iff)) {
+                    List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
+                            new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
+                            substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
+                    if (gen.size() != 1) {
+                        throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                                           "statement to become an else branch, but generated " + gen.size() +
+                                                           ". Template:\n" + substitutedTemplate);
+                    }
+                    Statement branch = gen.get(0);
+                    J.If.Else existing = iff.getElsePart();
+                    if (existing != null) {
+                        // Keep the chain: what this `if` used to fall through to now hangs off the new branch
+                        if (!(branch instanceof J.If)) {
+                            throw new IllegalArgumentException("Adding an else branch to an `if` that already has " +
+                                                               "one requires a template that produces an `if`, so that " +
+                                                               "the existing branch has somewhere to hang. Template:\n" + substitutedTemplate);
+                        }
+                        branch = ((J.If) branch).withElsePart(existing);
+                    }
+                    J.If.Else elsePart = new J.If.Else(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                            JRightPadded.build(branch.withPrefix(Space.SINGLE_SPACE)));
+                    return autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow());
+                }
+                return super.visitIf(iff, p);
+            }
+
+            @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc == IDENTIFIER_PREFIX && isScope(ident)) {
@@ -255,7 +377,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == LAMBDA_PARAMETERS_PREFIX && isScope(lambda.getParameters())) {
                     return lambda.withParameters(unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, 0);
+                if (loc == STATEMENT_PREFIX && isScope(lambda)) {
+                    return maybeReplaceStatement(lambda, J.class, 0);
+                }
+                // Recurse into the lambda's body so that templates targeting an expression or
+                // statement inside the body (e.g. `lambda.getBody().getCoordinates().replace()`)
+                // can find their scope. Without this, the visitor stops at the lambda and the
+                // apply call silently returns the input unchanged.
+                return super.visitLambda(lambda, p);
             }
 
             @Override
@@ -285,7 +414,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case BLOCK_PREFIX: {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(getCursor(), Statement.class,
                                     substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
                             J.Block body = method.getBody();
                             if (body == null) {
@@ -389,6 +518,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 if (getCursor().firstEnclosing(Javadoc.DocComment.class) != null) {
                     // We don't have support for changing method references in Javadoc comments (yet), so it's safer not to attempt any changes
+                    if (isScope(method)) {
+                        // Record the deliberate skip, so it isn't reported as a scope that could never be matched
+                        substituted = true;
+                    }
                     return method;
                 }
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {
@@ -426,12 +559,44 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     }
                     return m;
                 }
-                return maybeReplaceStatement(method, J.class, 0);
+                Object parentValue = getCursor().getParentTreeCursor().getValue();
+                if (loc == STATEMENT_PREFIX && isScope(method) &&
+                    (parentValue instanceof J.Return ||
+                     parentValue instanceof J.Assignment ||
+                     parentValue instanceof J.AssignmentOperation ||
+                     parentValue instanceof J.TypeCast)) {
+                    // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
+                    // not as a standalone statement in a block. Parse as expression replacement.
+                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                                    getCursor(),
+                                    substitutedTemplate,
+                                    substitutions.getTypeVariables(),
+                                    loc))
+                            .withPrefix(method.getPrefix()), integer);
+                }
+                if (isScope(method)) {
+                    return maybeReplaceStatement(method, J.class, 0);
+                }
+                // Descend, so that a coordinate on something nested in the arguments is still reachable
+                return super.visitMethodInvocation(method, integer);
             }
 
             @Override
             public J visitNewClass(J.NewClass newClass, Integer p) {
                 if (isScope(newClass)) {
+                    Object parentValue = getCursor().getParentTreeCursor().getValue();
+                    if (loc == STATEMENT_PREFIX &&
+                        (parentValue instanceof J.Return ||
+                         parentValue instanceof J.Assignment ||
+                         parentValue instanceof J.AssignmentOperation ||
+                         parentValue instanceof J.TypeCast)) {
+                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                                        getCursor(),
+                                        substitutedTemplate,
+                                        substitutions.getTypeVariables(),
+                                        loc))
+                                .withPrefix(newClass.getPrefix()), p);
+                    }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
                 }
@@ -456,25 +621,27 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
-                        if (gen.size() != 1) {
+                        J3 replacement;
+                        if (gen.size() == 1) {
+                            replacement = gen.get(0);
+                        } else if (gen.size() == 2 && gen.get(0) instanceof J.Empty) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
                             // of a method that has an implicit return
-                            if (gen.size() == 2) {
-                                if (gen.get(0) instanceof J.Empty) {
-                                    return autoFormat(gen.get(1).withPrefix(statement.getPrefix()), p);
-                                }
-                                if (gen.get(1) instanceof J.Empty) {
-                                    return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
-                                }
-                            }
+                            replacement = gen.get(1);
+                        } else if (gen.size() == 2 && gen.get(1) instanceof J.Empty) {
+                            replacement = gen.get(0);
+                        } else {
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
                                                                ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
                                                                "\nStatement:\n" + statement);
                         }
-
-                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
+                        if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
+                            //noinspection unchecked
+                            replacement = (J3) substitutions.toStatement(replacement);
+                        }
+                        return autoFormat(replacement.withPrefix(statement.getPrefix()), p);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -513,7 +680,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
                 try {
-                    return substitutions.unsubstitute(j);
+                    return substitutions.unsubstitute(substitutions.resolveTypeVariables(j));
+                } finally {
+                    substituted = true;
+                }
+            }
+
+            private <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+                try {
+                    return substitutions.unsubstituteStatements(ListUtils.map(js, substitutions::resolveTypeVariables));
                 } finally {
                     substituted = true;
                 }
@@ -521,7 +696,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    return substitutions.unsubstitute(js);
+                    return substitutions.unsubstitute(ListUtils.map(js, substitutions::resolveTypeVariables));
                 } finally {
                     substituted = true;
                 }

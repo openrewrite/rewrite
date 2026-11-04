@@ -1,0 +1,475 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://docs.moderne.io/licensing/moderne-source-available-license
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Client for the ty-types CLI.
+
+This module provides a client that communicates with the ty-types binary via
+line-delimited JSON-RPC over stdin/stdout. The ty-types CLI returns all node
+types in a single batch call per file, with structured type descriptors and
+cross-file deduplication.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import queue
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from .type_mapping import SessionTypeCache
+
+logger = logging.getLogger(__name__)
+
+# ty has only ever shipped Python 3 stubs.
+_TY_PYTHON_VERSION = re.compile(r'3\.\d+')
+
+
+def _ty_user_config_dir(python_version: str) -> str:
+    """A throwaway ``XDG_CONFIG_HOME`` holding a ty user config naming
+    ``python_version``. ty ranks a project's own ``ty.toml`` and
+    ``requires-python`` above it, so it only fills in versions ty cannot read
+    for itself, such as setuptools classifiers.
+    """
+    config_dir = tempfile.mkdtemp(prefix='ty-user-config-')
+    ty_dir = os.path.join(config_dir, 'ty')
+    os.mkdir(ty_dir)
+    with open(os.path.join(ty_dir, 'ty.toml'), 'w', encoding='utf-8') as f:
+        f.write('[environment]\npython-version = "%s"\n' % python_version)
+    return config_dir
+
+
+class TyTypesClient:
+    """Client for the ty-types CLI.
+
+    ``initialize`` starts `ty-types --serve` as a subprocess, which communicates via
+    line-delimited JSON-RPC over stdin/stdout. Create an instance per parse
+    batch and close it when done.
+
+    Note: This client is NOT thread-safe. Use one instance per thread.
+
+    Usage:
+        with TyTypesClient() as client:
+            client.initialize("/path/to/project")
+            result = client.get_types("/path/to/file.py")
+    """
+
+    def __init__(self, virtual_env: Optional[str] = None,
+                 python_version: Optional[str] = None):
+        """Create a client. ``initialize`` starts the ``ty-types --serve`` subprocess.
+
+        Args:
+            virtual_env: Optional path to a virtual environment whose
+                ``site-packages`` ty-types should use to resolve the project's
+                third-party dependencies. When provided it is exported as
+                ``VIRTUAL_ENV`` to the subprocess. The normal parse
+                path uses this to point ty-types at a dependency workspace built
+                from the project's ``pyproject.toml`` so that supertypes reaching
+                into installed dependencies (e.g. ``class User(BaseModel)``)
+                resolve.
+            python_version: Optional Python version ("3.10") whose stdlib
+                surface ty resolves against, for projects declaring one
+                somewhere ty does not look. Non-3.x values are ignored.
+        """
+        self._process: Optional[subprocess.Popen] = None
+        self._request_id: int = 0
+        self._initialized = False
+        self._project_root: Optional[str] = None
+        self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+        self._python_version: Optional[str] = (
+            python_version if python_version and _TY_PYTHON_VERSION.fullmatch(python_version)
+            else None
+        )
+        self._ty_config_dir: Optional[str] = None
+
+        # Cumulative type table for the lifetime of this ``--serve`` session.
+        #
+        # ty's ``--serve`` session deduplicates type descriptors: each type is
+        # emitted in full exactly once, in the first ``getTypes`` response that
+        # references it, and later responses reference it by id only. When a
+        # whole project is parsed through one shared session (see
+        # ``handle_parse_project``), a type first seen in an earlier file (e.g.
+        # ``pydantic.BaseModel``) is therefore absent from later files'
+        # responses. Because each file builds its own per-file registry, those
+        # later files could not resolve such cross-file references — supertypes
+        # of first-party classes silently degraded to ``Unknown``.
+        #
+        # Accumulating every descriptor here, keyed by ty's session-stable type
+        # ids, lets per-file mappings fall back to the cumulative table for any
+        # id missing from their own response, restoring resolution while keeping
+        # ty's dedup performance benefit. It is reset whenever a new session
+        # starts (a fresh client, or ``initialize`` with a different root) so no
+        # state leaks across unrelated parses.
+        self.session_types: Dict[int, Dict[str, Any]] = {}
+        # The session table's classLiterals, indexed as they arrive: by class name (the first id
+        # wins, as the per-file back-fill used to give) and by module. A file's mapping falls back
+        # to them instead of copying the whole session table, which grows with every file.
+        self.session_class_literals: Dict[str, int] = {}
+        self.session_classes_by_module: Dict[str, List[int]] = {}
+
+        # The JavaTypes those descriptors resolve to, sharing their lifetime.
+        self.java_types = SessionTypeCache()
+
+        self._binary = self._find_binary()
+        if self._binary is None:
+            raise RuntimeError(
+                "ty-types is not installed. Ensure the ty-types binary is on PATH."
+            )
+        self._process_root: Optional[str] = None
+
+    def __enter__(self) -> TyTypesClient:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.shutdown()
+
+    def _start_process(self, project_root: str) -> None:
+        """Start the ty-types subprocess for a session rooted at ``project_root``."""
+        if self._python_version is not None and self._ty_config_dir is None:
+            self._ty_config_dir = _ty_user_config_dir(self._python_version)
+
+        try:
+            self._process = subprocess.Popen(
+                [str(self._binary), '--serve'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=self._subprocess_env(virtual_env=self._virtual_env,
+                                         ty_config_dir=self._ty_config_dir,
+                                         project_root=project_root),
+            )
+        except FileNotFoundError:
+            self._process = None
+            # Callers drop a client whose initialize raised without shutting it down.
+            self._discard_ty_config()
+            raise RuntimeError(
+                "ty-types is not installed. Ensure the ty-types binary is on PATH."
+            )
+        self._process_root = project_root
+
+        # Draining both pipes keeps ty from deadlocking on a full buffer; threads
+        # because a pipe read cannot be bounded on Windows.
+        self._responses: queue.Queue = queue.Queue()
+        self._consecutive_timeouts = 0
+        threading.Thread(target=self._drain_stdout, args=(self._process,),
+                         name="ty-types-stdout", daemon=True).start()
+        threading.Thread(target=self._drain_stderr, args=(self._process,),
+                         name="ty-types-stderr", daemon=True).start()
+
+    def _drain_stdout(self, process: subprocess.Popen) -> None:
+        """Read response lines into the queue until EOF; EOF enqueues None."""
+        responses = self._responses
+        stdout = process.stdout
+        while True:
+            line = stdout.readline()
+            if not line:
+                responses.put(None)
+                return
+            try:
+                responses.put(json.loads(line.decode('utf-8')))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.debug("ty-types emitted a non-JSON line on stdout")
+
+    @staticmethod
+    def _drain_stderr(process: subprocess.Popen) -> None:
+        stderr = process.stderr
+        while True:
+            line = stderr.readline()
+            if not line:
+                return
+            logger.debug("ty-types stderr: %s", line.decode('utf-8', 'replace').rstrip())
+
+    @staticmethod
+    def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
+                        prefix: Optional[str] = None,
+                        base_prefix: Optional[str] = None,
+                        virtual_env: Optional[str] = None,
+                        ty_config_dir: Optional[str] = None,
+                        project_root: Optional[str] = None) -> Dict[str, str]:
+        """Build the environment for the ty-types subprocess.
+
+        ty-types resolves a project's third-party packages by discovering the
+        active Python environment, primarily via ``VIRTUAL_ENV``.
+
+        Precedence:
+
+        1. An explicit ``virtual_env`` (a dependency workspace built from the
+           project's ``pyproject.toml``) is exported as ``VIRTUAL_ENV`` and wins
+           over everything else. This is the normal parse path: the interpreter
+           running the parse (e.g. the CLI's RPC server) does not have the
+           project's dependencies installed, so ty must be pointed at a venv that
+           does, otherwise imports like ``pydantic`` — and the supertypes
+           reachable through them — resolve to ``Unknown``.
+        2. Otherwise, a ``.venv`` in ``project_root`` holding a ``pyvenv.cfg``
+           is the project's own environment and is exported likewise.
+        3. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
+        4. Otherwise, when the interpreter running the parse is itself a virtual
+           environment (``prefix`` differs from ``base_prefix``) — e.g. tests
+           launched through an absolute interpreter path rather than an activated
+           venv — fall back to that interpreter's environment.
+
+        The interpreter checks (``prefix``/``base_prefix``) and ``virtual_env``
+        are injectable to keep this unit-testable.
+        """
+        env = dict(os.environ if base_env is None else base_env)
+
+        # Where ty looks for its user config, per platform.
+        if ty_config_dir:
+            env['APPDATA' if os.name == 'nt' else 'XDG_CONFIG_HOME'] = ty_config_dir
+
+        def _point_at(venv: str) -> None:
+            env['VIRTUAL_ENV'] = venv
+            bin_dir = os.path.join(venv, 'Scripts' if os.name == 'nt' else 'bin')
+            env['PATH'] = bin_dir + os.pathsep + env.get('PATH', '')
+
+        # 1. Explicit dependency workspace venv takes precedence, overriding any
+        #    inherited VIRTUAL_ENV (which would point at the parser's own env).
+        if virtual_env:
+            _point_at(virtual_env)
+            return env
+
+        # 2. ty fails to initialize on an exported VIRTUAL_ENV without a pyvenv.cfg.
+        project_venv = os.path.join(project_root, '.venv') if project_root else None
+        if project_venv and os.path.isfile(os.path.join(project_venv, 'pyvenv.cfg')):
+            _point_at(project_venv)
+            return env
+
+        prefix = sys.prefix if prefix is None else prefix
+        base_prefix = sys.base_prefix if base_prefix is None else base_prefix
+
+        # 3./4. Only when the caller hasn't already pinned an environment and we
+        #       are inside a virtual environment.
+        if 'VIRTUAL_ENV' not in env and prefix != base_prefix:
+            _point_at(prefix)
+        return env
+
+    @staticmethod
+    def _find_binary() -> Optional[Path]:
+        """Find the ty-types binary via the ty-types package or PATH."""
+        try:
+            from ty_types.__main__ import find_ty_types_bin
+            return Path(find_ty_types_bin())
+        except (ImportError, FileNotFoundError):
+            pass
+
+        import shutil
+        ty_types = shutil.which('ty-types')
+        if ty_types:
+            return Path(ty_types)
+        return None
+
+    # Kill the process after this many consecutive timeouts; further requests degrade to None.
+    _MAX_CONSECUTIVE_TIMEOUTS = 3
+
+    def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None,
+                      timeout: float = 0) -> Optional[Any]:
+        """Send a JSON-RPC request and wait for its response from the reader
+        thread's queue.
+
+        Args:
+            method: The JSON-RPC method name.
+            params: Optional parameters for the request.
+            timeout: Maximum seconds to wait for a response (0 = no limit).
+        """
+        if self._process is None or self._process.stdin is None:
+            return None
+
+        self._request_id += 1
+        request: Dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "id": self._request_id,
+        }
+        if params is not None:
+            request["params"] = params
+
+        line = json.dumps(request) + "\n"
+
+        try:
+            self._process.stdin.write(line.encode('utf-8'))
+            self._process.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return None
+
+        end = None if timeout <= 0 else time.monotonic() + timeout
+        while True:
+            try:
+                remaining = None if end is None else end - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    raise queue.Empty
+                response = self._responses.get(timeout=remaining)
+            except queue.Empty:
+                self._consecutive_timeouts += 1
+                if self._consecutive_timeouts >= self._MAX_CONSECUTIVE_TIMEOUTS:
+                    logger.debug("ty-types unresponsive after %d timeouts; shutting it down",
+                                 self._consecutive_timeouts)
+                    self._kill()
+                return None
+
+            if response is None:
+                # EOF sentinel: the process exited.
+                return None
+            # A response to an abandoned earlier request; drop it and keep waiting.
+            if response.get('id') != self._request_id:
+                continue
+
+            self._consecutive_timeouts = 0
+            if response.get('error') is not None:
+                return None
+            return response.get('result')
+
+    def initialize(self, project_root: str) -> bool:
+        """Initialize the ty-types session with a project root.
+
+        If already initialized with the same project root, this is a no-op.
+        Otherwise it starts a ty-types process for the root, replacing one that
+        serves another root or has been shut down.
+        """
+        if self._initialized and self._project_root == project_root:
+            return True
+
+        # The process environment depends on the root's .venv.
+        if self._process is not None and (self._initialized or self._process_root != project_root):
+            self.shutdown()
+        if self._process is None:
+            # A new ty session numbers its type ids from scratch, so ids from an
+            # earlier session would collide.
+            self.session_types.clear()
+            self.session_class_literals.clear()
+            self.session_classes_by_module.clear()
+            self.java_types.clear()
+            self._start_process(project_root)
+
+        if self._try_initialize(project_root):
+            return True
+
+        # ty rejects a version outside the range it ships stubs for by failing
+        # initialization outright, which costs the batch every type rather than
+        # only the version-gated ones. The version is a fallback, so trade it
+        # away. A timeout is no verdict on it, and retrying would pay it twice.
+        if self._python_version is not None and self._consecutive_timeouts == 0:
+            logger.debug("ty-types rejected python-version %s; retrying without it",
+                         self._python_version)
+            self._python_version = None
+            self.shutdown()
+            self._start_process(project_root)
+            return self._try_initialize(project_root)
+        return False
+
+    def _try_initialize(self, project_root: str) -> bool:
+        # Bounded so a wedged ty degrades to untyped instead of hanging; large
+        # because ty indexes the whole project up front.
+        result = self._send_request("initialize", {"projectRoot": project_root},
+                                    timeout=600)
+        if result and result.get("ok"):
+            self._initialized = True
+            self._project_root = project_root
+            return True
+        return False
+
+    def get_types(self, file_path: str, timeout: float = 30,
+                  include_display: bool = False,
+                  include_bindings: bool = False) -> Optional[Dict[str, Any]]:
+        """Get all node types for a Python file.
+
+        Args:
+            file_path: Absolute path to the Python file.
+            timeout: Maximum seconds to wait for a response (default 30s).
+                     Some files with recursive types can cause ty to hang.
+            include_display: Whether to include display strings in type
+                           descriptors (default False — uses structured data).
+            include_bindings: Whether each name and attribute reference carries the
+                           module and qualified name binding it. Costs roughly 10%
+                           inference time and 17% payload.
+        """
+        if not self._initialized:
+            return None
+        result = self._send_request(
+            "getTypes",
+            {"file": file_path, "includeDisplay": include_display,
+             "includeBindings": include_bindings},
+            timeout=timeout,
+        )
+        if result:
+            # Fold this response's type table into the cumulative session table.
+            # Keys are stringified ids in the JSON payload; ty keeps ids stable
+            # across the session, and each descriptor is emitted in full only on
+            # first sight, so ``setdefault`` preserves that full descriptor.
+            types = result.get('types')
+            if types:
+                for type_id_str, descriptor in types.items():
+                    type_id = int(type_id_str)
+                    if type_id in self.session_types:
+                        continue
+                    self.session_types[type_id] = descriptor
+                    if descriptor.get('kind') == 'classLiteral':
+                        class_name = descriptor.get('className')
+                        if class_name:
+                            self.session_class_literals.setdefault(class_name, type_id)
+                        self.session_classes_by_module.setdefault(
+                            descriptor.get('moduleName') or '', []).append(type_id)
+        return result
+
+    @property
+    def is_available(self) -> bool:
+        """Check if the ty-types process is available and initialized."""
+        return self._process is not None and self._initialized
+
+    def shutdown(self) -> None:
+        """Gracefully shut down the ty-types process."""
+        # Local: the "shutdown" request can trip the breaker, whose ``_kill`` detaches ``self._process``.
+        process = self._process
+        if process is None:
+            self._discard_ty_config()
+            return
+
+        try:
+            self._send_request("shutdown", timeout=5)
+            process.wait(timeout=5)
+        except (subprocess.TimeoutExpired, OSError):
+            process.kill()
+        finally:
+            self._process = None
+            self._initialized = False
+            self._project_root = None
+            self._discard_ty_config()
+
+    def _kill(self) -> None:
+        """Forcibly terminate an unresponsive ty-types process."""
+        process = self._process
+        self._process = None
+        self._initialized = False
+        self._project_root = None
+        self._discard_ty_config()
+        if process is not None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def _discard_ty_config(self) -> None:
+        """Remove the throwaway user-config dir; ``_start_process`` rebuilds it
+        while a version is still in play."""
+        if self._ty_config_dir is not None:
+            shutil.rmtree(self._ty_config_dir, ignore_errors=True)
+            self._ty_config_dir = None

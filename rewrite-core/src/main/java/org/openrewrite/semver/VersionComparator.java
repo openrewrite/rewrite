@@ -21,11 +21,10 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-.+].*)?");
+    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.\\d+)*(?<qualifier>[-.+].*?$)?");
     String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
     Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
 
@@ -38,6 +37,21 @@ public interface VersionComparator extends Comparator<String> {
     }
 
     int compare(@Nullable String currentVersion, String v1, String v2);
+
+    /**
+     * The highest of {@code availableVersions} this selector admits, in its original spelling,
+     * first-seen candidate winning ties. Unlike {@link #upgrade}, not constrained to exceed a
+     * current version.
+     */
+    default Optional<String> maxSatisfying(Collection<String> availableVersions) {
+        String best = null;
+        for (String candidate : availableVersions) {
+            if (isValid(null, candidate) && (best == null || compare(null, candidate, best) > 0)) {
+                best = candidate;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
 
     default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
         boolean seen = false;
@@ -57,30 +71,34 @@ public interface VersionComparator extends Comparator<String> {
     }
 
     static boolean checkVersion(String version, @Nullable String metadataPattern, boolean requireRelease) {
-        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!matcher.matches()) {
+        ParsedVersion parsed = ParsedVersion.parse(version);
+        if (!parsed.matches()) {
             return false;
         }
-        if (requireRelease && PRE_RELEASE_ENDING.matcher(version).find()) {
+        if (requireRelease && parsed.isPreReleaseEnding()) {
             return false;
         }
 
         boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
-        String versionMeta = matcher.group(6);
+        String versionMeta = parsed.qualifier();
         if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
+            if (versionMeta != null && versionMeta.matches(metadataPattern)) {
+                return true;
+            }
+        } else if (versionMeta == null || !requireRelease) {
             return true;
-        } else if (requireRelease) {
+        } else {
             String lowercaseVersionMeta = versionMeta.toLowerCase();
             for (String suffix : RELEASE_SUFFIXES) {
                 if (suffix.equals(lowercaseVersionMeta)) {
                     return true;
                 }
             }
-            return false;
         }
-        return true;
+
+        // A backpatch is admitted wherever the version it patches is.
+        String patchedVersion = parsed.patchedVersion();
+        return patchedVersion != null && checkVersion(patchedVersion, metadataPattern, requireRelease);
     }
 
 }

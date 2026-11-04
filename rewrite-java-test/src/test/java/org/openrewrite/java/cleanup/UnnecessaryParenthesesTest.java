@@ -932,6 +932,63 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unwrapUnaryInAssignment() {
+        rewriteRun(
+          unnecessaryParentheses(style -> style.withAssign(true)),
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = (++i);
+                      int b = (i++);
+                      int c = (--i);
+                      int d = (i--);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = ++i;
+                      int b = i++;
+                      int c = --i;
+                      int d = i--;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapUnaryInMethodArgument() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println((++i));
+                      System.out.println((i++));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println(++i);
+                      System.out.println(i++);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ExpectedToFail("Not implemented yet")
     @Test
     void unwrapBinaryInIf() {
@@ -1140,6 +1197,54 @@ class UnnecessaryParenthesesTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1790")
+        @Test
+        void methodInvocationSelectUnary() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (++i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i++).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (--i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i--).toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/534")
@@ -1156,6 +1261,132 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                }
             }
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void keepLineBreaksWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (s.trim())
+                  );
+                  sb.append((
+                    s.trim()
+                  ));
+                  sb.insert(
+                    0,
+                    (s.trim())
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim()
+                  );
+                  sb.append(
+                    s.trim()
+                  );
+                  sb.insert(
+                    0,
+                    s.trim()
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void doNotDoubleLineBreaksWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (
+                      s.trim()
+                    )
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim()
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void keepCommentsWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (s.trim() /* inner */) // outer
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim() /* inner */ // outer
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void doNotAddBlankLineWhenUnwrappingMethodInvocationSelect() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s) {
+                  (
+                    s.trim()
+                  ).length();
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s) {
+                  s.trim().length();
+                }
+              }
+              """
           )
         );
     }

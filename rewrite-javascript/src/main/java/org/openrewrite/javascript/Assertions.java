@@ -17,26 +17,51 @@ package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.yaml.YamlParser;
+import org.openrewrite.yaml.tree.Yaml;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 @SuppressWarnings({"unused", "DataFlowIssue"})
+@CheckReturnValue
 public class Assertions {
 
     private Assertions() {
     }
 
     public static SourceSpecs npm(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.Npm, sources);
+    }
+
+    public static SourceSpecs yarnBerry(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.YarnBerry, sources);
+    }
+
+    public static SourceSpecs pnpm(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.Pnpm, sources);
+    }
+
+    public static SourceSpecs nodePackageManager(Path relativeTo, PackageManager pm, SourceSpecs... sources) {
         String packageJsonContent = null;
 
         // First pass: find package.json content and write it to relativeTo
@@ -57,13 +82,14 @@ public class Assertions {
             }
         }
 
-        // Second pass: get or create cached workspace and symlink node_modules and package-lock.json
+        // Second pass: get or create cached workspace and symlink node_modules and the lockfile
         if (packageJsonContent != null) {
-            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent);
+            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent, pm);
+            String lockFileName = lockFileName(pm);
             Path nodeModulesSource = workspaceDir.resolve("node_modules");
             Path nodeModulesTarget = relativeTo.resolve("node_modules");
-            Path lockFileSource = workspaceDir.resolve("package-lock.json");
-            Path lockFileTarget = relativeTo.resolve("package-lock.json");
+            Path lockFileSource = workspaceDir.resolve(lockFileName);
+            Path lockFileTarget = relativeTo.resolve(lockFileName);
 
             try {
                 if (Files.exists(nodeModulesSource) && !Files.exists(nodeModulesTarget)) {
@@ -72,12 +98,30 @@ public class Assertions {
                 if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
                     Files.createSymbolicLink(lockFileTarget, lockFileSource);
                 }
+                // Yarn berry needs .yarnrc.yml (nodeLinker: node-modules) next to the
+                // package.json so any tool re-invoking yarn in this dir honors the
+                // same linker as the cached workspace.
+                if (pm == PackageManager.YarnBerry) {
+                    Path yarnrcSource = workspaceDir.resolve(".yarnrc.yml");
+                    Path yarnrcTarget = relativeTo.resolve(".yarnrc.yml");
+                    if (Files.exists(yarnrcSource) && !Files.exists(yarnrcTarget)) {
+                        Files.createSymbolicLink(yarnrcTarget, yarnrcSource);
+                    }
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for node_modules", e);
             }
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);
+    }
+
+    private static String lockFileName(PackageManager pm) {
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(pm);
+        if (regen == null) {
+            throw new IllegalArgumentException("Unsupported package manager: " + pm);
+        }
+        return regen.getLockFile();
     }
 
     public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {
@@ -115,6 +159,99 @@ public class Assertions {
         json.after(s -> after);
         spec.accept(json);
         return json;
+    }
+
+    // --- PM-free lock-file factories (pure-Java parsers, no package manager) -----------------
+    // Parse package.json + its lock with in-process parsers so recipe end-to-end tests run
+    // without executing a package manager. The NodeResolutionResult marker is supplied by the
+    // test rather than derived from a real install.
+
+    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          NodeResolutionResult marker) {
+        return packageJson(before, after, marker, s -> {
+        });
+    }
+
+    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          NodeResolutionResult marker, Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, JsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        if (after != null) {
+            json.after(s -> after);
+        }
+        json.markers(marker);
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs packageLock(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
+        return packageLock(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs packageLock(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, JsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package-lock.json");
+        if (after != null) {
+            json.after(s -> after);
+        }
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs pnpmLock(@Language("yaml") @Nullable String before, @Language("yaml") @Nullable String after) {
+        return pnpmLock(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs pnpmLock(@Language("yaml") @Nullable String before, @Language("yaml") @Nullable String after,
+                                       Consumer<SourceSpec<Yaml.Documents>> spec) {
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(
+                Yaml.Documents.class, null, YamlParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        yaml.path("pnpm-lock.yaml");
+        if (after != null) {
+            yaml.after(s -> after);
+        }
+        spec.accept(yaml);
+        return yaml;
+    }
+
+    /** A minimal {@link NodeResolutionResult} for PM-free recipe tests, carrying the declared deps and package manager. */
+    public static NodeResolutionResult nodeResolutionResult(PackageManager pm, Dependency... dependencies) {
+        return nodeResolutionResult(pm, null, dependencies);
+    }
+
+    /**
+     * A {@link NodeResolutionResult} for a workspace root, additionally carrying the resolved member
+     * {@code package.json} paths (relative to the root manifest's directory).
+     */
+    public static NodeResolutionResult nodeResolutionResult(PackageManager pm,
+                                                            @Nullable List<String> workspacePackagePaths,
+                                                            Dependency... dependencies) {
+        return new NodeResolutionResult(
+                Tree.randomId(), null, null, null, "package.json", workspacePackagePaths,
+                Arrays.asList(dependencies),
+                emptyList(), emptyList(), emptyList(), emptyList(),
+                emptyList(), pm, null, null);
+    }
+
+    public static Dependency dependency(String name, String versionConstraint) {
+        return new Dependency(name, versionConstraint, null);
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before) {

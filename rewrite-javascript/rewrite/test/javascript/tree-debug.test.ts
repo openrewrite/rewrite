@@ -21,80 +21,29 @@ import {
     JavaScriptParser,
     JS,
     LstDebugPrinter,
-    LstDebugVisitor
-} from "../../src/javascript";
+    LstDebugVisitor,
+    sourceFileCache} from "../../src/javascript";
 import {Cursor, ExecutionContext} from "../../src";
 import {J} from "../../src/java";
 
 describe("LST Debug Utilities", () => {
 
     describe("formatWhitespace", () => {
-        test("empty string returns ''", () => {
-            expect(formatWhitespace("")).toBe("''");
-        });
-
-        test("undefined returns ''", () => {
-            expect(formatWhitespace(undefined)).toBe("''");
-        });
-
-        test("single space shows · (implicit ₁)", () => {
-            const result = formatWhitespace(" ");
-            expect(result).toBe("'·'");
-        });
-
-        test("multiple spaces show count subscript", () => {
-            const result = formatWhitespace("    ");
-            expect(result).toBe("'·₄'");
-        });
-
-        test("newline shows \\n (implicit ₁)", () => {
-            const result = formatWhitespace("\n");
-            expect(result).toBe("'\\n'");
-        });
-
-        test("newline + spaces shows \\n·₂", () => {
-            const result = formatWhitespace("\n  ");
-            expect(result).toBe("'\\n·₂'");
-        });
-
-        test("tabs show - with count", () => {
-            const result = formatWhitespace("\t");
-            expect(result).toBe("'-'");
-        });
-
-        test("multiple tabs show count subscript", () => {
-            const result = formatWhitespace("\t\t");
-            expect(result).toBe("'-₂'");
-        });
-
-        test("mixed whitespace with multiple newlines", () => {
-            const result = formatWhitespace("\n    \n  ");
-            expect(result).toBe("'\\n·₄\\n·₂'");
-        });
-
-        test("two newlines show \\n₂", () => {
-            const result = formatWhitespace("\n\n");
-            expect(result).toBe("'\\n₂'");
-        });
-
-        test("carriage return shows \\r", () => {
-            const result = formatWhitespace("\r\n");
-            expect(result).toBe("'\\r\\n'");
-        });
-
-        test("spaces and tabs mixed", () => {
-            const result = formatWhitespace("  \t\t");
-            expect(result).toBe("'·₂-₂'");
-        });
-
-        test("10 spaces shows ·₁₀", () => {
-            const result = formatWhitespace("          "); // 10 spaces
-            expect(result).toBe("'·₁₀'");
-        });
-
-        test("12 spaces shows ·₁₂", () => {
-            const result = formatWhitespace("            "); // 12 spaces
-            expect(result).toBe("'·₁₂'");
+        test.each([
+            ["empty", "", "''"],
+            ["undefined", undefined, "''"],
+            ["one space", " ", "'\u00b7'"],
+            ["a run of spaces", "    ", "'\u00b7\u2084'"],
+            ["a run long enough for two subscript digits", "          ", "'\u00b7\u2081\u2080'"],
+            ["one newline", "\n", "'\\n'"],
+            ["a run of newlines", "\n\n", "'\\n\u2082'"],
+            ["one tab", "\t", "'-'"],
+            ["a run of tabs", "\t\t", "'-\u2082'"],
+            ["a carriage return", "\r\n", "'\\r\\n'"],
+            ["adjacent runs of different characters", "  \t\t", "'\u00b7\u2082-\u2082'"],
+            ["runs either side of a newline", "\n    \n  ", "'\\n\u00b7\u2084\\n\u00b7\u2082'"],
+        ])("%s", (_name, input, expected) => {
+            expect(formatWhitespace(input)).toBe(expected);
         });
     });
 
@@ -210,7 +159,7 @@ describe("LST Debug Utilities", () => {
     });
 
     describe("AstDebugPrinter", () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         async function parse(source: string): Promise<JS.CompilationUnit> {
             const gen = parser.parse({text: source, sourcePath: 'test.ts'});
@@ -334,7 +283,7 @@ describe("LST Debug Utilities", () => {
     });
 
     describe("AstDebugVisitor", () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         async function parse(source: string): Promise<JS.CompilationUnit> {
             const gen = parser.parse({text: source, sourcePath: 'test.ts'});

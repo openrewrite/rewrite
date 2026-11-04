@@ -260,6 +260,24 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void innerClassWithBuilderAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.builder.Builder
+
+              class Outer {
+                  @Builder
+                  class Inner {
+                      String controller
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4705")
     @Test
     void constructorWithDef() {
@@ -481,6 +499,34 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recordDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              record Point(int x, int y) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sealedClass() {
+        rewriteRun(
+          groovy(
+            """
+              sealed class Shape permits Circle, Square {
+              }
+              final class Circle extends Shape {
+              }
+              non-sealed class Square extends Shape {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
     @Test
     void nestedStaticClass() {
@@ -500,4 +546,5 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
 }

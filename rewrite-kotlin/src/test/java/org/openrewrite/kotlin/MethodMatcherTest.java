@@ -18,11 +18,14 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -54,6 +57,54 @@ class MethodMatcherTest implements RewriteTest {
               fun usesFunction() {
                   function()
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void libraryTopLevelFunctionPopulatesMethodType() {
+        rewriteRun(
+          spec -> spec
+            .parser(KotlinParser.builder().classpath("jackson-module-kotlin"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, ExecutionContext ctx) {
+                    if ("jacksonObjectMapper".equals(mi.getSimpleName())) {
+                        assertThat(mi.getMethodType())
+                          .as("Kotlin parser should resolve method type for library top-level function")
+                          .isNotNull();
+                    }
+                    return super.visitMethodInvocation(mi, ctx);
+                }
+            })),
+          kotlin(
+            """
+              import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+
+              fun mapper() = jacksonObjectMapper()
+              """
+          )
+        );
+    }
+
+    @Test
+    void usesMethodMatchesLibraryTopLevelFunction() {
+        rewriteRun(
+          spec -> spec
+            .parser(KotlinParser.builder().classpath("jackson-module-kotlin"))
+            .recipe(toRecipe(() -> new UsesMethod<>(
+              "com.fasterxml.jackson.module.kotlin.ExtensionsKt jacksonObjectMapper()", false))),
+          kotlin(
+            """
+              import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+
+              fun mapper() = jacksonObjectMapper()
+              """,
+            """
+              /*~~>*/import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+
+              fun mapper() = jacksonObjectMapper()
               """
           )
         );

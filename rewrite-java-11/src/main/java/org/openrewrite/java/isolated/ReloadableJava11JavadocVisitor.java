@@ -25,15 +25,21 @@ import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Name;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.JavadocParameterName;
 import org.openrewrite.java.marker.LeadingBrace;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -51,6 +57,8 @@ import static org.openrewrite.java.tree.Space.format;
 
 public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
+    private final Symtab syms;
+    private final Types types;
 
     private final Symbol.@Nullable TypeSymbol symbol;
 
@@ -71,6 +79,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     public ReloadableJava11JavadocVisitor(Context context, TreePath scope, ReloadableJava11TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
+        this.syms = Symtab.instance(context);
+        this.types = Types.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
 
@@ -192,8 +202,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitAttribute(AttributeTree node, List<Javadoc> body) {
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         List<Javadoc> beforeEqual;
         List<Javadoc> value;
 
@@ -400,8 +409,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitEndElement(EndElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("</"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.EndElement(
                 randomId(),
                 Markers.EMPTY,
@@ -583,7 +591,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         JavaType qualifierType;
         TypedTree qualifier;
 
-        if (ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null && !resolveWithoutCompleting(ref.qualifierExpression)) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
             } catch (NullPointerException ignored) {
@@ -622,9 +630,17 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             cursor += ref.memberName.toString().length();
 
-            JavaType.Method methodRefType = methodReferenceType(ref, qualifierType);
-            JavaType.Variable fieldRefType = methodRefType == null ?
-                    fieldReferenceType(ref, qualifierType) : null;
+            JavaType.Method methodRefType;
+            JavaType.Variable fieldRefType;
+            if (ref.paramTypes != null) {
+                // Has parentheses -> must be a method reference
+                methodRefType = methodReferenceType(ref, qualifierType);
+                fieldRefType = null;
+            } else {
+                // No parentheses -> try field first (per Javadoc spec), fall back to method
+                fieldRefType = fieldReferenceType(ref, qualifierType);
+                methodRefType = fieldRefType == null ? methodReferenceType(ref, qualifierType) : null;
+            }
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;
@@ -642,8 +658,21 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < paramTypes.size(); i++) {
                         JCTree param = paramTypes.get(i);
                         Expression paramExpr = (Expression) javaVisitor.scan(param, Space.build(whitespaceBeforeAsString(), emptyList()));
-                        Space rightFmt = Space.format(i == paramTypes.size() - 1 ?
-                                sourceBeforeAsString(")") : sourceBeforeAsString(","));
+                        // javac only records parameter types, so a non-standard parameter name such
+                        // as `str` in `#bar(String str)` is left in `afterParam`. Keep it out of the
+                        // whitespace-only Space by recording it on the parameter type expression; the
+                        // JavadocPrinter re-emits it verbatim.
+                        String afterParam = i == paramTypes.size() - 1 ?
+                                sourceBeforeAsString(")") : sourceBeforeAsString(",");
+                        int nameStart = 0;
+                        while (nameStart < afterParam.length() && Character.isWhitespace(afterParam.charAt(nameStart))) {
+                            nameStart++;
+                        }
+                        if (nameStart < afterParam.length()) {
+                            paramExpr = paramExpr.withMarkers(paramExpr.getMarkers().add(
+                                    new JavadocParameterName(randomId(), afterParam.substring(nameStart))));
+                        }
+                        Space rightFmt = Space.format(afterParam.substring(0, nameStart));
                         parameters.add(new JRightPadded<>(paramExpr, rightFmt, Markers.EMPTY));
                     }
                     paramContainer = JContainer.build(
@@ -728,7 +757,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < ref.paramTypes.size(); i++) {
                         JCTree param = ref.paramTypes.get(i);
                         JavaType testParamType = parameterTypes.get(i);
-                        Type paramType = attr.attribType(param, symbol);
+                        Type paramType = resolveWithoutCompleting(param) ? param.type : attr.attribType(param, symbol);
                         if (!paramTypeMatches(testParamType, paramType)) {
                             continue nextMethod;
                         }
@@ -738,6 +767,52 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
         return null;
+    }
+
+    /**
+     * Resolves a {@code pkg.Name} reference to the class symbol its package lists, which needs no class file
+     * read, and types the tree with it so the type mapping can serve it from the factory. Every other shape,
+     * and a class not accessible from here, is left to attribution. So is a package whose listing fails, as with an
+     * unreadable classpath jar.
+     */
+    private boolean resolveWithoutCompleting(JCTree tree) {
+        if (!(tree instanceof JCTree.JCFieldAccess) || symbol == null) {
+            return false;
+        }
+        JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+        Name packageName = TreeInfo.fullName(select.selected);
+        if (packageName == null) {
+            return false;
+        }
+        Symbol.PackageSymbol pkg;
+        try {
+            pkg = syms.lookupPackage(symbol.packge().modle, packageName);
+            pkg.complete();
+        } catch (Symbol.CompletionFailure ignored) {
+            return false;
+        }
+        if (!pkg.exists()) {
+            return false;
+        }
+        Symbol.ClassSymbol cls = null;
+        for (Symbol member : pkg.members().getSymbolsByName(select.name)) {
+            if (member instanceof Symbol.ClassSymbol) {
+                cls = (Symbol.ClassSymbol) member;
+            }
+        }
+        if (cls == null) {
+            return false;
+        }
+        Type erasure = cls.erasure(types);
+        JavaType.FullyQualified mapped = TypeUtils.asFullyQualified(typeMapping.type(erasure));
+        boolean accessible = mapped != null &&
+                             (mapped.hasFlags(Flag.Public) || symbol.packge().fullname.equals(packageName));
+        if (!accessible) {
+            return false;
+        }
+        select.sym = cls;
+        select.type = erasure;
+        return true;
     }
 
     private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
@@ -858,8 +933,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitStartElement(StartElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("<"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.StartElement(
                 randomId(),
                 Markers.EMPTY,
@@ -927,6 +1001,16 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
                 texts.add(lineBreak);
+
+                // Java 23+ javac's DCText/DCComment getBody() strips per-line leading whitespace that
+                // older versions preserved; the cleaned source still carries that whitespace, so realign
+                // cursor by appending any source whitespace before node's next non-whitespace character.
+                if (i + 1 < node.length() && !Character.isWhitespace(node.charAt(i + 1))) {
+                    while (cursor < source.length() && source.charAt(cursor) != '\n' && Character.isWhitespace(source.charAt(cursor))) {
+                        text.append(source.charAt(cursor));
+                        cursor++;
+                    }
+                }
             } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
                 int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
@@ -946,6 +1030,28 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private static String unicodeEscaped(char c) {
         return String.format("\\u%04X", (int) c);
+    }
+
+    /**
+     * Consume the given {@code name} from the source, preserving any Unicode escape sequences (e.g. {@code \u00ef})
+     * that the Java compiler expanded before the Javadoc parser saw the source. Returns the raw source representation
+     * so that the printed output remains byte-for-byte identical to the input.
+     */
+    private String consumeNameWithUnicodeEscapes(String name) {
+        StringBuilder raw = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (cursor < source.length() && source.charAt(cursor) != c &&
+                    (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor))) {
+                int escapedCharLength = unicodeEscaped(c).length();
+                raw.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
+            } else {
+                raw.append(c);
+                cursor++;
+            }
+        }
+        return raw.toString();
     }
 
     @Override
@@ -1131,6 +1237,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 js.addAll(whitespaceBefore());
                 if (dt instanceof DCTree.DCText) {
                     js.addAll(visitText(((DCTree.DCText) dt).getBody()));
+                } else if (dt instanceof DCTree.DCComment) {
+                    js.addAll(visitText(((DCTree.DCComment) dt).getBody()));
                 } else {
                     js.add((Javadoc) scan(dt, emptyList()));
                 }
@@ -1212,6 +1320,19 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (source.startsWith("[", cursor)) {
                 cursor++;
                 dimension = JLeftPadded.build(Space.build(sourceBeforeAsString("]"), emptyList())).withBefore(before);
+            } else if (source.startsWith("...", cursor)) {
+                // Varargs (e.g. `Object...`) is array-typed; model it as a J.ArrayType and record
+                // the `...` syntax with a marker so it round-trips and is structurally discoverable.
+                cursor += 3;
+                return new J.ArrayType(
+                        randomId(),
+                        fmt,
+                        Markers.EMPTY.add(new Varargs(randomId())),
+                        elemType,
+                        null,
+                        JLeftPadded.build(Space.EMPTY).withBefore(before),
+                        typeMapping.type(node)
+                );
             } else {
                 cursor = saveCursor;
                 return elemType.withPrefix(fmt);

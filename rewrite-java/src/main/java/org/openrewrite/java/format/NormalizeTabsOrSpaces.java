@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -28,15 +29,11 @@ import static java.util.Objects.requireNonNull;
 
 public class NormalizeTabsOrSpaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Normalize to tabs or spaces";
-    }
+    @Getter
+    final String displayName = "Normalize to tabs or spaces";
 
-    @Override
-    public String getDescription() {
-        return "Consistently use either tabs or spaces in indentation.";
-    }
+    @Getter
+    final String description = "Consistently use either tabs or spaces in indentation.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

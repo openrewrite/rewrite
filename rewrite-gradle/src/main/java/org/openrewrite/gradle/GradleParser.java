@@ -24,11 +24,14 @@ import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -36,6 +39,25 @@ import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
+    @SuppressWarnings("LanguageMismatch")
+    private static final String KTS_BUILD_STUBS =
+            "package org.gradle.api\n" +
+            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
+            "import org.gradle.plugin.use.PluginDependencySpec\n" +
+            "fun Project.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
+            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n" +
+            "fun Project.android(block: com.android.build.api.dsl.ApplicationExtension.() -> Unit) {}\n";
+
+    @SuppressWarnings("LanguageMismatch")
+    private static final String KTS_SETTINGS_STUBS =
+            "package org.gradle.api.initialization\n" +
+            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
+            "import org.gradle.plugin.use.PluginDependencySpec\n" +
+            "import org.gradle.plugin.management.PluginManagementSpec\n" +
+            "fun Settings.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
+            "fun Settings.pluginManagement(block: PluginManagementSpec.() -> Unit) {}\n" +
+            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+
     private final GradleParser.Builder base;
 
     private @Nullable List<Path> defaultClasspath;
@@ -66,6 +88,10 @@ public class GradleParser implements Parser {
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(buildscriptClasspath)
+                    .dependsOn(KTS_BUILD_STUBS)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.Project")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
         if (groovySettingsParser == null) {
@@ -88,6 +114,10 @@ public class GradleParser implements Parser {
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(settingsClasspath)
+                    .dependsOn(KTS_SETTINGS_STUBS)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
 
@@ -119,6 +149,29 @@ public class GradleParser implements Parser {
         return new Builder();
     }
 
+    /**
+     * A mapping {@link Function} for use in a {@code stream.map(...)} / {@code optional.map(...)} chain over the
+     * result of parsing a generated Gradle code snippet, in place of {@code SomeType.class::cast}.
+     * <p>
+     * Recipes parse constant, valid Gradle snippets, so a {@link ParseError} here means the underlying Groovy or
+     * Kotlin parser threw while parsing the snippet. Rethrow that real cause — its
+     * {@link org.openrewrite.ParseExceptionResult} carries the full stack trace — instead of letting the cast mask
+     * it with an opaque {@link ClassCastException} ("Cannot cast ParseError to ...").
+     *
+     * @param expected the {@link SourceFile} subtype the snippet is expected to parse into
+     * @return a function that casts to {@code expected}, or throws with the underlying parse failure as its cause
+     */
+    public static <S extends SourceFile> Function<SourceFile, S> requireParsed(Class<S> expected) {
+        return sourceFile -> {
+            if (sourceFile instanceof ParseError) {
+                throw new IllegalStateException(
+                        "Failed to parse generated Gradle code as " + expected.getSimpleName(),
+                        ((ParseError) sourceFile).toException());
+            }
+            return expected.cast(sourceFile);
+        };
+    }
+
     public static class Builder extends Parser.Builder {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
         protected KotlinParser.Builder kotlinParser = KotlinParser.builder();
@@ -140,6 +193,16 @@ public class GradleParser implements Parser {
 
         public Builder kotlinParser(KotlinParser.Builder kotlinParser) {
             this.kotlinParser = kotlinParser;
+            return this;
+        }
+
+        /**
+         * Forward a {@link JavaTypeFactory} to both the Groovy and Kotlin sub-parsers
+         * so either DSL variant produces types from the caller's factory.
+         */
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.groovyParser.typeFactory(typeFactory);
+            this.kotlinParser.typeFactory(typeFactory);
             return this;
         }
 
@@ -181,6 +244,14 @@ public class GradleParser implements Parser {
         @Override
         public String getDslName() {
             return "gradle";
+        }
+
+        @Override
+        public Builder clone() {
+            Builder clone = (Builder) super.clone();
+            clone.groovyParser = this.groovyParser.clone();
+            clone.kotlinParser = this.kotlinParser.clone();
+            return clone;
         }
     }
 

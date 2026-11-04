@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../src/test";
 import {OrderImports} from "../../../src/javascript/recipes/order-imports";
 import {typescript} from "../../../src/javascript";
@@ -68,6 +67,17 @@ import {beta as b, alpha as a} from 'module';
                 `
 import {alpha as a, beta as b} from 'module';
 `))
+    });
+
+    test("sorts string literal module export names by their value", () => {
+        return spec.rewriteRun(
+            typescript(
+                `
+                    import {"zeta-z" as z, beta, "alpha-a" as a} from 'module';
+                `,
+                `
+                    import {"alpha-a" as a, beta, "zeta-z" as z} from 'module';
+                `))
     });
 
     test("side-effect imports come first", () => {

@@ -1,0 +1,83 @@
+# Copyright 2025 the original author or authors.
+#
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://docs.moderne.io/licensing/moderne-source-available-license
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+ReorderMethodArguments recipe for Python that delegates to Java's ReorderMethodArguments.
+
+This recipe reorders arguments in method invocations matching a pattern.
+"""
+from dataclasses import dataclass, field
+
+from rewrite import Recipe, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
+from rewrite.rpc.rpc_recipe import RpcRecipe
+
+
+@categorize(Python)
+@dataclass
+class ReorderMethodArguments(Recipe):
+    """
+    Reorder arguments in method invocations matching a pattern.
+
+    This recipe delegates to Java's org.openrewrite.java.ReorderMethodArguments recipe.
+
+    Example:
+        ReorderMethodArguments(
+            method_pattern="datetime.datetime replace(..)",
+            new_parameter_names=["year", "month", "day"],
+            old_parameter_names=["day", "month", "year"]
+        )
+    """
+
+    method_pattern: str = field(default="", metadata=option(
+        display_name="Method pattern",
+        description="A method pattern that matches method invocations to reorder.",
+        example="datetime.datetime replace(..)"
+    ))
+
+    new_parameter_names: list[str] | None = field(default=None, metadata=option(
+        display_name="New parameter names",
+        description="The parameter names in the desired order.",
+        example='["year", "month", "day"]'
+    ))
+
+    old_parameter_names: list[str] | None = field(default=None, metadata=option(
+        display_name="Old parameter names",
+        description="The current parameter names (optional if using positional reordering).",
+        required=False
+    ))
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.python.ReorderMethodArguments"
+
+    @property
+    def display_name(self) -> str:
+        return "Reorder method arguments"
+
+    @property
+    def description(self) -> str:
+        return "Reorder arguments in method invocations matching a pattern."
+
+    def recipe_list(self) -> list[Recipe]:
+        # ``oldParameterNames`` is optional on the Java side: null or an empty
+        # array both mean "use the resolved parameter names", so passing it
+        # unconditionally (even when None) matches the prior conditional omit.
+        return [RpcRecipe(
+            "org.openrewrite.java.ReorderMethodArguments",
+            methodPattern=self.method_pattern,
+            newParameterNames=self.new_parameter_names,
+            oldParameterNames=self.old_parameter_names,
+        )]

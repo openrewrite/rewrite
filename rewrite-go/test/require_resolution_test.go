@@ -1,0 +1,95 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+)
+
+func TestProjectImporterStubsRequiredModule(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/foo", nil)
+	pi.AddRequire("github.com/x/y")
+
+	pkg, err := pi.Import("github.com/x/y")
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package, got nil")
+	assert.Equalf(t, "github.com/x/y", pkg.Path(), "Path: want %q", "github.com/x/y")
+	assert.Equalf(t, "y", pkg.Name(), "Name: want %q", "y")
+}
+
+func TestProjectImporterStubMatchesSubPath(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/foo", nil)
+	pi.AddRequire("github.com/x/y")
+
+	// `import "github.com/x/y/sub"` should also stub-resolve, because the
+	// require covers the whole module subtree.
+	pkg, err := pi.Import("github.com/x/y/sub")
+	require.NoError(t, err, "Import returned error")
+	require.NotNil(t, pkg, "expected stub package for sub-path, got nil")
+	assert.Equalf(t, "sub", pkg.Name(), "Name: want %q", "sub")
+}
+
+func TestProjectImporterUnknownPathFallsThroughToError(t *testing.T) {
+	pi := parser.NewProjectImporter("example.com/foo", nil)
+	pi.AddRequire("github.com/x/y")
+
+	// A module not in requires and not stdlib should not stub-resolve —
+	// importer.Default() returns an error for it.
+	if _, err := pi.Import("github.com/never/heard/of"); err == nil {
+		t.Errorf("expected error for unrequired non-stdlib path, got success")
+	}
+}
+
+func TestGoProjectThirdPartyImportResolves(t *testing.T) {
+	mainSrc := test.Golang(`
+		package main
+
+		import "github.com/x/y"
+
+		func main() { _ = y.Hello() }
+	`).WithPath("main.go")
+	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
+		t.Helper()
+		// `y` references the imported package; with the stub in place the
+		// identifier should now have a non-nil Type. Without require-driven
+		// stubbing this would be nil.
+		ids := collectIdentTypes(cu)
+		assert.NotNil(t, ids["y"], "expected `y` import identifier to have a non-nil Type via the require stub; got nil")
+	}
+
+	spec := test.NewRecipeSpec()
+	spec.RewriteRun(t,
+		test.GoProject("foo",
+			test.GoMod(`
+				module example.com/foo
+
+				go 1.22
+
+				require github.com/x/y v1.2.3
+			`),
+			mainSrc,
+		),
+	)
+}

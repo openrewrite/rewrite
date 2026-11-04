@@ -15,14 +15,29 @@
  */
 package org.openrewrite.yaml.style;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 @With
 public class IndentsStyle implements YamlStyle {
-    private int indentSize;
+    int indentSize;
+
+    boolean indentedSequences;
+
+    @JsonCreator
+    public IndentsStyle(int indentSize, @Nullable Boolean indentedSequences) {
+        this.indentSize = indentSize;
+        this.indentedSequences = indentedSequences == null || indentedSequences;
+    }
+
+    @Deprecated
+    public IndentsStyle(int indentSize) {
+        this(indentSize, null);
+    }
 }

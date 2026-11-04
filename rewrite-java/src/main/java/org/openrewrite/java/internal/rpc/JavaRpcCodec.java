@@ -21,8 +21,6 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 public class JavaRpcCodec extends DynamicDispatchRpcCodec<J> {
-    private final JavaSender sender = new JavaSender();
-    private final JavaReceiver receiver = new JavaReceiver();
 
     @Override
     public String getSourceFileType() {
@@ -36,11 +34,11 @@ public class JavaRpcCodec extends DynamicDispatchRpcCodec<J> {
 
     @Override
     public void rpcSend(J after, RpcSendQueue q) {
-        sender.visit(after, q);
+        new JavaSender().visit(after, q);
     }
 
     @Override
     public J rpcReceive(J before, RpcReceiveQueue q) {
-        return receiver.visitNonNull(before, q);
+        return new JavaReceiver().visitNonNull(before, q);
     }
 }

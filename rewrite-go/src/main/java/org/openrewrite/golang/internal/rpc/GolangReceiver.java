@@ -1,0 +1,359 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.golang.internal.rpc;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.golang.GolangVisitor;
+import org.openrewrite.golang.tree.Go;
+import org.openrewrite.rpc.RpcReceiveQueue;
+
+import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
+
+public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
+    private final GolangReceiverDelegate delegate = new GolangReceiverDelegate(this);
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
+        if (tree instanceof Go) {
+            return super.visit(tree, p);
+        }
+        return delegate.visit(tree, p);
+    }
+
+    @Override
+    public J preVisit(J j, RpcReceiveQueue q) {
+        return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
+                .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
+                .withMarkers(q.receive(j.getMarkers()));
+    }
+
+    @Override
+    public J visitGoCompilationUnit(Go.CompilationUnit cu, RpcReceiveQueue q) {
+        return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
+                .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
+                .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
+                .withChecksum(q.receive(cu.getChecksum()))
+                .<Go.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
+                .getPadding().withPackageDecl(q.receive(cu.getPadding().getPackageDecl(), el -> visitRightPadded(el, q)))
+                .withImportsContainer(q.receive(cu.getImportsContainer(), c -> visitContainer(c, q)))
+                .getPadding().withStatements(q.receiveList(cu.getPadding().getStatements(), stmt -> visitRightPadded(stmt, q)))
+                .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
+    }
+
+    @Override
+    public J visitGoStatement(Go.GoStatement goStmt, RpcReceiveQueue q) {
+        return goStmt
+                .withExpression(q.receive(goStmt.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitDefer(Go.Defer defer, RpcReceiveQueue q) {
+        return defer
+                .withExpression(q.receive(defer.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitSend(Go.Send send, RpcReceiveQueue q) {
+        return send
+                .withChannelExpr(q.receive(send.getChannelExpr(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withArrow(q.receive(send.getPadding().getArrow(), el -> visitLeftPadded(el, q)));
+    }
+
+    @Override
+    public J visitGoto(Go.Goto gotoStmt, RpcReceiveQueue q) {
+        return gotoStmt
+                .withLabelIdent(q.receive(gotoStmt.getLabelIdent(), el -> (J.Identifier) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitFallthrough(Go.Fallthrough fallthrough, RpcReceiveQueue q) {
+        return fallthrough;
+    }
+
+    @Override
+    public J visitComposite(Go.Composite composite, RpcReceiveQueue q) {
+        return composite
+                .withTypeExpr(q.receive(composite.getTypeExpr(), el -> (Expression) visitNonNull(el, q)))
+                .getPadding().withElements(q.receive(composite.getPadding().getElements(), el -> visitContainer(el, q)))
+                .withType(q.receive(composite.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitKeyValue(Go.KeyValue keyValue, RpcReceiveQueue q) {
+        return keyValue
+                .withKeyExpr(q.receive(keyValue.getKeyExpr(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withValue(q.receive(keyValue.getPadding().getValue(), el -> visitLeftPadded(el, q)));
+    }
+
+    @Override
+    public J visitSliceExpr(Go.SliceExpr slice, RpcReceiveQueue q) {
+        return slice
+                .withIndexed(q.receive(slice.getIndexed(), expr -> (Expression) visitNonNull(expr, q)))
+                .withOpenBracket(q.receive(slice.getOpenBracket(), space -> visitSpace(space, q)))
+                .getPadding().withLow(q.receive(slice.getPadding().getLow(), el -> visitRightPadded(el, q)))
+                .getPadding().withHigh(q.receive(slice.getPadding().getHigh(), el -> visitRightPadded(el, q)))
+                .withMax(q.receive(slice.getMax(), expr -> (Expression) visitNonNull(expr, q)))
+                .withCloseBracket(q.receive(slice.getCloseBracket(), space -> visitSpace(space, q)));
+    }
+
+    @Override
+    public J visitGoArrayType(Go.ArrayType arrayType, RpcReceiveQueue q) {
+        return arrayType
+                .getPadding().withLength(q.receive(arrayType.getPadding().getLength(), el -> visitRightPadded(el, q)))
+                .withElementType(q.receive(arrayType.getElementType(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(arrayType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitMapType(Go.MapType mapType, RpcReceiveQueue q) {
+        return mapType
+                .withOpenBracket(q.receive(mapType.getOpenBracket(), space -> visitSpace(space, q)))
+                .getPadding().withKey(q.receive(mapType.getPadding().getKey(), el -> visitRightPadded(el, q)))
+                .withValue(q.receive(mapType.getValue(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(mapType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitTypeAssertion(Go.TypeAssertion ta, RpcReceiveQueue q) {
+        //noinspection unchecked
+        return ta
+                .getPadding().withLeft(q.receive(ta.getPadding().getLeft(), el -> visitRightPadded(el, q)))
+                .withAssertedType(q.receive(ta.getAssertedType(), el -> (J.ControlParentheses<Expression>) visitNonNull(el, q)))
+                .withType(q.receive(ta.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitExpressionStatement(Go.ExpressionStatement es, RpcReceiveQueue q) {
+        return es
+                .withExpression(q.receive(es.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitStatementExpression(Go.StatementExpression se, RpcReceiveQueue q) {
+        return se
+                .withStatement(q.receive(se.getStatement(), el -> (Statement) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitPointerType(Go.PointerType pointerType, RpcReceiveQueue q) {
+        return pointerType
+                .withElem(q.receive(pointerType.getElem(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(pointerType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitChannel(Go.Channel channel, RpcReceiveQueue q) {
+        return channel
+                .withDir(q.receiveAndGet(channel.getDir(), v -> Go.ChanDir.valueOf((String) v)))
+                .withValue(q.receive(channel.getValue(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(channel.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitFuncType(Go.FuncType funcType, RpcReceiveQueue q) {
+        return funcType
+                .getPadding().withParameters(q.receive(funcType.getPadding().getParameters(), el -> visitContainer(el, q)))
+                .withReturnType(q.receive(funcType.getReturnType(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(funcType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitStructType(Go.StructType structType, RpcReceiveQueue q) {
+        return structType
+                .withBody(q.receive(structType.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withType(q.receive(structType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitSelect(Go.Select select, RpcReceiveQueue q) {
+        return select
+                .withBody(q.receive(select.getBody(), el -> (J.Block) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitInterfaceType(Go.InterfaceType interfaceType, RpcReceiveQueue q) {
+        return interfaceType
+                .withBody(q.receive(interfaceType.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withType(q.receive(interfaceType.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitTypeList(Go.TypeList typeList, RpcReceiveQueue q) {
+        return typeList
+                .getPadding().withTypes(q.receive(typeList.getPadding().getTypes(), el -> visitContainer(el, q)))
+                .withType(q.receive(typeList.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitUnion(Go.Union union, RpcReceiveQueue q) {
+        return union
+                .getPadding().withTypes(q.receiveList(union.getPadding().getTypes(), t -> visitRightPadded(t, q)))
+                .withType(q.receive(union.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitUnderlyingType(Go.UnderlyingType underlyingType, RpcReceiveQueue q) {
+        return underlyingType
+                .withElement(q.receive(underlyingType.getElement(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitTypeDecl(Go.TypeDecl typeDecl, RpcReceiveQueue q) {
+        return typeDecl
+                .withLeadingAnnotations(q.receiveList(typeDecl.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+                .withName(q.receive(typeDecl.getName(), el -> (J.Identifier) visitNonNull(el, q)))
+                .withTypeParameters(q.receive(typeDecl.getTypeParameters(), el -> (J.TypeParameters) visitNonNull(el, q)))
+                .getPadding().withAssign(q.receive(typeDecl.getPadding().getAssign(), el -> visitLeftPadded(el, q)))
+                .withDefinition(q.receive(typeDecl.getDefinition(), el -> (Expression) visitNonNull(el, q)))
+                .getPadding().withSpecs(q.receive(typeDecl.getPadding().getSpecs(), el -> visitContainer(el, q)));
+    }
+
+    @Override
+    public J visitDeclarationBlock(Go.DeclarationBlock declarationBlock, RpcReceiveQueue q) {
+        return declarationBlock
+                .withLeadingAnnotations(q.receiveList(declarationBlock.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+                .withKind(q.receiveAndGet(declarationBlock.getKind(), v -> Go.DeclKind.valueOf((String) v)))
+                .getPadding().withSpecs(q.receive(declarationBlock.getPadding().getSpecs(), el -> visitContainer(el, q)));
+    }
+
+    @Override
+    public J visitMultiAssignment(Go.MultiAssignment multiAssignment, RpcReceiveQueue q) {
+        return multiAssignment
+                .getPadding().withVariables(q.receiveList(multiAssignment.getPadding().getVariables(), v -> visitRightPadded(v, q)))
+                .getPadding().withOperator(q.receive(multiAssignment.getPadding().getOperator(), el -> visitLeftPadded(el, q)))
+                .getPadding().withValues(q.receiveList(multiAssignment.getPadding().getValues(), v -> visitRightPadded(v, q)));
+    }
+
+    @Override
+    public J visitGoReturn(Go.Return aReturn, RpcReceiveQueue q) {
+        return aReturn
+                .getPadding().withExpressions(q.receiveList(aReturn.getPadding().getExpressions(), v -> visitRightPadded(v, q)));
+    }
+
+    @Override
+    public J visitGoMethodDeclaration(Go.MethodDeclaration methodDeclaration, RpcReceiveQueue q) {
+        return methodDeclaration
+                .getPadding().withReceiver(q.receive(methodDeclaration.getPadding().getReceiver(), el -> visitContainer(el, q)))
+                .withDeclaration(q.receive(methodDeclaration.getDeclaration(), el -> (J.MethodDeclaration) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitStatementWithInit(Go.StatementWithInit statementWithInit, RpcReceiveQueue q) {
+        return statementWithInit
+                .getPadding().withInit(q.receive(statementWithInit.getPadding().getInit(), el -> visitRightPadded(el, q)))
+                .withStatement(q.receive(statementWithInit.getStatement(), el -> (Statement) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitCommClause(Go.CommClause commClause, RpcReceiveQueue q) {
+        return commClause
+                .withComm(q.receive(commClause.getComm(), el -> (Statement) visitNonNull(el, q)))
+                .withColon(q.receive(commClause.getColon(), space -> visitSpace(space, q)))
+                .getPadding().withBody(q.receiveList(commClause.getPadding().getBody(), stmt -> visitRightPadded(stmt, q)));
+    }
+
+    @Override
+    public J visitIndexList(Go.IndexList indexList, RpcReceiveQueue q) {
+        return indexList
+                .withTarget(q.receive(indexList.getTarget(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withIndices(q.receive(indexList.getPadding().getIndices(), el -> visitContainer(el, q)))
+                .withType(q.receive(indexList.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitGoUnary(Go.Unary unary, RpcReceiveQueue q) {
+        return unary
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Unary.Type.class))))
+                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(unary.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitGoBinary(Go.Binary binary, RpcReceiveQueue q) {
+        return binary
+                .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Binary.Type.class))))
+                .withRight(q.receive(binary.getRight(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, RpcReceiveQueue q) {
+        return assignOp
+                .withVariable(q.receive(assignOp.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.AssignmentOperation.Type.class))))
+                .withAssignment(q.receive(assignOp.getAssignment(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(assignOp.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitGoVariadic(Go.Variadic variadic, RpcReceiveQueue q) {
+        return variadic
+                .withElement(q.receive(variadic.getElement(), expr -> (Expression) visitNonNull(expr, q)))
+                .withDots(q.receive(variadic.getDots(), space -> visitSpace(space, q)))
+                .withPostfix(q.receive(variadic.isPostfix()))
+                .withType(q.receive(variadic.getType(), type -> visitType(type, q)));
+    }
+
+    // Delegation methods to JavaReceiver for RPC-specific visit methods
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
+        return delegate.visitLeftPadded(left, q);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q, java.util.function.Function<Object, T> mapValue) {
+        return delegate.visitLeftPadded(left, q, mapValue);
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+        return delegate.visitRightPadded(right, q);
+    }
+
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, RpcReceiveQueue q) {
+        return delegate.visitContainer(container, q);
+    }
+
+    public Space visitSpace(Space space, RpcReceiveQueue q) {
+        return delegate.visitSpace(space, q);
+    }
+
+    @Override
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
+        return delegate.visitType(javaType, q);
+    }
+
+    private static class GolangReceiverDelegate extends JavaReceiver {
+        private final GolangReceiver delegate;
+
+        public GolangReceiverDelegate(GolangReceiver delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
+            if (tree instanceof Go) {
+                return delegate.visit(tree, p);
+            }
+            return super.visit(tree, p);
+        }
+    }
+}

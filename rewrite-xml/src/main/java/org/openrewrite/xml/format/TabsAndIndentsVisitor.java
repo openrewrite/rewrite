@@ -43,11 +43,17 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
             String prefix = x.getPrefix();
             if (prefix.contains("\n")) {
                 int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
-                if (getCursor().getValue() instanceof Xml.Attribute ||
+                boolean attributeContinuation = x instanceof Xml.Attribute;
+                boolean docTypeContinuation = isDocTypeContinuation(x);
+                if (!attributeContinuation && (getCursor().getValue() instanceof Xml.Attribute ||
                         getCursor().getValue() instanceof Xml.CharData ||
                         getCursor().getValue() instanceof Xml.Comment ||
-                        getCursor().getValue() instanceof Xml.ProcessingInstruction) {
+                        getCursor().getValue() instanceof Xml.ProcessingInstruction ||
+                        docTypeContinuation)) {
                     indentMultiple++;
+                }
+                if (docTypeContinuation) {
+                    indentMultiple = Math.max(indentMultiple, 1);
                 }
 
                 StringBuilder shiftedPrefixBuilder = new StringBuilder(prefix.substring(0, prefix.lastIndexOf('\n') + 1));
@@ -55,9 +61,16 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
                     if(style.getUseTabCharacter()) {
                         shiftedPrefixBuilder.append("\t");
                     } else {
-                        for(int j = 0; j < (x instanceof Xml.Attribute ? style.getContinuationIndentSize() : style.getIndentSize()); j++) {
+                        int indentSize = docTypeContinuation ? style.getContinuationIndentSize() : style.getIndentSize();
+                        for(int j = 0; j < indentSize; j++) {
                             shiftedPrefixBuilder.append(" ");
                         }
+                    }
+                }
+                if (attributeContinuation) {
+                    String continuationIndent = style.getUseTabCharacter() ? "\t" : " ";
+                    for (int i = 0; i < style.getContinuationIndentSize(); i++) {
+                        shiftedPrefixBuilder.append(continuationIndent);
                     }
                 }
 
@@ -68,6 +81,11 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
             }
         }
         return x;
+    }
+
+    private boolean isDocTypeContinuation(Xml x) {
+        return x instanceof Xml.Ident &&
+                getCursor().getPathAsStream().anyMatch(Xml.DocTypeDecl.class::isInstance);
     }
 
     @Override

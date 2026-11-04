@@ -1,0 +1,104 @@
+plugins {
+    id("org.openrewrite.build.language-library")
+    id("org.openrewrite.build.moderne-source-available-license")
+    scala
+}
+
+dependencies {
+    api(project(":rewrite-java"))
+
+    // Scala 3 compiler (dotty) and library
+    implementation("org.scala-lang:scala3-compiler_3:3.+")
+    implementation("org.scala-lang:scala3-library_3:3.+")
+
+    compileOnly(project(":rewrite-test"))
+    compileOnly("org.slf4j:slf4j-api:1.7.+")
+
+    // Nothing here uses Micrometer, but the Scala compiler fails to load rewrite's classes without it.
+    implementation("io.micrometer:micrometer-core:latest.release")
+
+    api("org.jetbrains:annotations:latest.release")
+
+    api("com.fasterxml.jackson.core:jackson-annotations")
+
+    testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-java-test"))
+    testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+
+    // Not latest.release: log4j publishes 3.0.0 betas as releases
+    constraints {
+        zinc("org.apache.logging.log4j:log4j-api:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-49844")
+        }
+        zinc("org.apache.logging.log4j:log4j-core:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-34480, CVE-2025-68161, CVE-2026-49844")
+        }
+    }
+}
+
+// Zinc never opens the terminal or REPL these back; CVE-2023-50572, CVE-2026-56740, CVE-2026-56741
+configurations.named("zinc") {
+    exclude(group = "org.scala-sbt.jline", module = "jline")
+    exclude(group = "org.jline", module = "jline")
+}
+
+// Scala publishes release candidates as full Maven Central releases (3.10.0-RC1 today), with a
+// compiler API that `ScalaCompilerBridge` does not compile against. `latest.release` would defeat
+// this rule: on a Maven repo it evaluates only the `<release>` version, which is the RC.
+val scalaPreRelease = Regex("-(RC|M|NIGHTLY|ALPHA|BETA)", RegexOption.IGNORE_CASE)
+
+configurations.all {
+    resolutionStrategy {
+        componentSelection {
+            all {
+                if (candidate.group == "org.scala-lang" && scalaPreRelease.containsMatchIn(candidate.version)) {
+                    reject("pre-release")
+                }
+            }
+        }
+    }
+}
+
+// Configure Scala source sets and compilation order
+sourceSets {
+    main {
+        scala {
+            srcDirs("src/main/scala")
+        }
+    }
+}
+
+// Configure mixed Java/Scala compilation
+// Scala needs to see Java classes from the same module
+tasks.named<ScalaCompile>("compileScala") {
+    // Include Java source files in Scala compilation
+    source(sourceSets.main.get().java)
+    // Scala compiler will compile both Java and Scala files together
+    classpath = sourceSets.main.get().compileClasspath
+    // Scala 3.8+ requires Java 17 as the minimum bytecode target
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
+    // Forwarded to javac during Zinc joint compilation so .java files keep
+    // method parameter names in bytecode (MethodParameters attribute).
+    options.compilerArgs.add("-parameters")
+}
+
+// Ensure Java compilation uses output from Scala compilation
+// Since Scala already compiled Java files, we just need to ensure the classpath is correct
+tasks.named<JavaCompile>("compileJava") {
+    dependsOn("compileScala")
+    // Exclude Java files from Java compilation since Scala already compiled them
+    exclude("**/*.java")
+}
+
+// A test JVM doesn't live long enough for C2 to pay for compiling the Scala compiler, which cost more CPU
+// than the tests themselves, and its small heap needs no concurrent collector.
+tasks.named<Test>("test") {
+    jvmArgs("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC")
+}

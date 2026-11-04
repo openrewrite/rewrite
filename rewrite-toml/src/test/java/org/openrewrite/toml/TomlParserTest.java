@@ -16,9 +16,13 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
+
+import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
@@ -301,6 +305,21 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void quotedKeyNameHoldsTheTextTheEscapesStandFor() {
+        rewriteRun(
+          toml(
+            """
+              "a\\tb\\u00e9" = 1
+              'a\\tb' = 2
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Identifier) ((Toml.KeyValue) kv).getKey()).getName())
+              .containsExactly("a\tbé", "a\\tb"))
+          )
+        );
+    }
+
+    @Test
     void quotedKeys() {
         rewriteRun(
           toml(
@@ -310,7 +329,20 @@ class TomlParserTest implements RewriteTest {
               "ʎǝʞ" = "value"
               'key2' = "value"
               'quoted "value"' = "value"
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                // Quoted-key identifier exposes the unquoted form as `name` and the
+                // verbatim source (with quotes) as `source`. The printer uses
+                // `source` so round-tripping preserves the original syntax.
+                assertThat(doc.getValues()).hasSize(5);
+                Toml.Identifier ipKey = (Toml.Identifier) ((Toml.KeyValue) doc.getValues().get(0)).getKey();
+                assertThat(ipKey.getName()).isEqualTo("127.0.0.1");
+                assertThat(ipKey.getSource()).isEqualTo("\"127.0.0.1\"");
+
+                Toml.Identifier literalKey = (Toml.Identifier) ((Toml.KeyValue) doc.getValues().get(3)).getKey();
+                assertThat(literalKey.getName()).isEqualTo("key2");
+                assertThat(literalKey.getSource()).isEqualTo("'key2'");
+            })
           )
         );
     }
@@ -442,6 +474,52 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\"hello\"",
+      "'hello'",
+      "\"\"\"hello\"\"\"",
+      "'''hello'''"
+    })
+    void stringValueStrippedForAnyQuoteStyle(String quoted) {
+        rewriteRun(
+          toml(
+            "greeting = " + quoted,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getValues())
+                .extracting(Toml.KeyValue.class::cast)
+                .extracting(keyValue -> ((Toml.Literal) keyValue.getValue()).getValue())
+                .containsExactly("hello"))
+          )
+        );
+    }
+
+    /**
+     * A basic string's value is the decoded text, so a marker such as
+     * {@code python_version < "3.11"} written with escaped quotes reads back with the quotes
+     * themselves; a literal string has no escapes and keeps its backslashes.
+     */
+    @Test
+    void basicStringEscapesAreDecoded() {
+        rewriteRun(
+          toml(
+            """
+              basic = "tomli; python_version < \\"3.11\\"\\tx\\\\y\\u00e9"
+              literal = 'a\\"b'
+              multiline = \"""
+              first\\
+                  second\"""
+              beyondUnicode = "\\U00110000"
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getValues())
+                .extracting(Toml.KeyValue.class::cast)
+                .extracting(keyValue -> ((Toml.Literal) keyValue.getValue()).getValue())
+                .containsExactly("tomli; python_version < \"3.11\"\tx\\yé", "a\\\"b", "firstsecond", "\\U00110000"))
+          )
+        );
+    }
+
     @Test
     void multiBytesUnicode() {
         rewriteRun(
@@ -488,5 +566,17 @@ class TomlParserTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"config.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", ".xmake.cfg"})
+    void acceptsTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
+    void rejectsNonTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
     }
 }

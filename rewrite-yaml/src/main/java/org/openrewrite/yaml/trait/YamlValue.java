@@ -52,8 +52,12 @@ public class YamlValue implements Trait<Yaml.Mapping.Entry> {
     }
 
     public YamlValue withValue(String newValue) {
-        Yaml.Scalar value = getValueAsScalar().withValue(newValue);
-        cursor = new Cursor(cursor.getParent(), getTree().withValue(value));
+        Yaml.Scalar scalar = getValueAsScalar();
+        Yaml.Scalar updated = new BlockScalar.Matcher()
+                .get(scalar, cursor)
+                .map(b -> b.withBody(newValue))
+                .orElseGet(() -> scalar.withValue(newValue));
+        cursor = new Cursor(cursor.getParent(), getTree().withValue(updated));
         return this;
     }
 

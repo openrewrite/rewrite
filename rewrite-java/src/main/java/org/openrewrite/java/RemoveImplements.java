@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -54,7 +55,9 @@ public class RemoveImplements extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+        // Also require the interface type to be used so the recipe only runs on source files
+        // that reference it.
+        return Preconditions.check(Preconditions.and(new UsesType<>(interfaceType, true), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext ctx) {
                 if (!(classDeclaration.getType() instanceof JavaType.Class) || classDeclaration.getImplements() == null) {
@@ -66,7 +69,7 @@ public class RemoveImplements extends Recipe {
                 }
                 return super.visitClassDeclaration(classDeclaration, ctx);
             }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+        }), new JavaIsoVisitor<ExecutionContext>() {
             @Nullable
             AnnotationService annotationService;
 

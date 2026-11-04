@@ -1,0 +1,12 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_markers.py (test_parses_invalid, test_parses_invalid_malformed_quoted_string)
+# Retrieved: 2026-07-16
+# Strings that must not parse as markers.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+this_isnt_a_real_variable >= '1.0'
+python_version
+(python_version)
+python_version >= 1.0 and (python_version)
+(python_version == "2.7" and os_name == "linux"
+(python_version == "2.7") with random text
+os_name == "C:\\"
+os_name == "\\x"

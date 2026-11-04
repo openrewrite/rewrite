@@ -17,6 +17,8 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -24,6 +26,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptyList;
@@ -171,6 +174,54 @@ class JavaTemplateTest6Test implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9520")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "interface Wrapper<T>",
+      "class Wrapper<T>",
+      "interface Wrapper",
+      "class Wrapper",
+      "interface Wrapper<T> extends java.util.function.Supplier<T>",
+      "abstract class Wrapper<T> extends java.util.AbstractList<T> implements java.util.function.Supplier<T>",
+      "interface Wrapper extends java.util.function.Supplier<String>",
+      "abstract class Wrapper extends java.util.AbstractList<String> implements java.util.function.Supplier<String>"
+    })
+    void addImplementsClause(String declaration) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if (TypeUtils.isAssignableTo("java.io.Serializable", classDecl.getType())) {
+                      return classDecl;
+                  }
+                  JavaType.FullyQualified original = classDecl.getType();
+                  J.ClassDeclaration result = JavaTemplate.builder("java.io.Serializable")
+                    .build()
+                    .apply(getCursor(), classDecl.getCoordinates().addImplementsClause());
+                  JavaType.FullyQualified updated = result.getType();
+                  assertThat(updated.getFullyQualifiedName()).isEqualTo(original.getFullyQualifiedName());
+                  assertThat(updated.getKind()).isEqualTo(original.getKind());
+                  assertThat(updated.getSupertype()).isSameAs(original.getSupertype());
+                  assertThat(updated.getTypeParameters()).containsExactlyElementsOf(original.getTypeParameters());
+                  assertThat(updated.getInterfaces()).hasSize(original.getInterfaces().size() + 1);
+                  assertThat(updated.getInterfaces().subList(0, original.getInterfaces().size()))
+                    .containsExactlyElementsOf(original.getInterfaces());
+                  assertThat(TypeUtils.isOfClassType(updated.getInterfaces().getLast(), "java.io.Serializable")).isTrue();
+                  if (original instanceof JavaType.Parameterized) {
+                      assertThat(updated).isInstanceOf(JavaType.Parameterized.class);
+                  }
+                  assertThat(result.getName()).isSameAs(classDecl.getName());
+                  return result;
+              }
+          })),
+          java(
+            declaration + " {\n}",
+            declaration + (declaration.contains(" extends ") || declaration.contains(" implements ") ? ", " :
+              declaration.startsWith("interface") ? " extends " : " implements ") + "java.io.Serializable {\n}"
+          )
+        );
+    }
+
     @Test
     void replaceClassImplements() {
         rewriteRun(
@@ -243,9 +294,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getThrows() == null) {
-                      return JavaTemplate.builder("Exception")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replaceThrows());
+                      return JavaTemplate.apply("Exception", getCursor(), method.getCoordinates().replaceThrows());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -266,6 +315,54 @@ class JavaTemplateTest6Test implements RewriteTest {
             """
               class Test {
                   void test() throws Exception {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParametersResolvesSimpleNamesThroughSourceFileImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  if (method.getParameters().getFirst() instanceof J.Empty) {
+                      return JavaTemplate.builder("List<String> names")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceParameters());
+                  }
+                  return super.visitMethodDeclaration(method, p);
+              }
+          }))
+            // resolving List through the file's imports is what this tests
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build())
+            .afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+              assertThat(type).isNotNull();
+              assertThat(type.getParameterTypes().getFirst())
+                .as("The parameter's type should resolve through the source file's `java.util.List` import")
+                .matches(t -> TypeUtils.isOfClassType(t, "java.util.List"));
+          }),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+
+                  void test() {
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+
+                  void test(List<String> names) {
+                  }
               }
               """
           )
@@ -494,6 +591,101 @@ class JavaTemplateTest6Test implements RewriteTest {
                               new Integer(i);
                           }
                       }.toString();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotateMethodInAnonymousClassAsFieldInitializerArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("compare") && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> a.getSimpleName().equals("Deprecated"))) {
+                      return JavaTemplate.builder("@Deprecated")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Comparator;
+              import java.util.TreeSet;
+              class Test {
+                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
+                      public int compare(String a, String b) {
+                          return a.compareTo(b);
+                      }
+                  });
+              }
+              """,
+            """
+              import java.util.Comparator;
+              import java.util.TreeSet;
+              class Test {
+                  TreeSet<String> set = new TreeSet<>(new Comparator<String>() {
+                      @Deprecated
+                      public int compare(String a, String b) {
+                          return a.compareTo(b);
+                      }
+                  });
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6520")
+    @Test
+    void annotateMethodInAnonymousClassWithMultipleArgs() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("toString") && m.getLeadingAnnotations().stream().noneMatch(
+                    a -> a.getSimpleName().equals("SuppressWarnings"))) {
+                      return JavaTemplate.builder("@SuppressWarnings(\"all\")")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
+                  }
+              }
+              """,
+            """
+              class A {
+                  A(Object o, String name) {}
+              }
+              class B {
+                  void test() {
+                      new A(new Object() {
+                          @Override
+                          @SuppressWarnings("all")
+                          public String toString() { return null; }
+                      }, "Elvar Fridriksson");
                   }
               }
               """

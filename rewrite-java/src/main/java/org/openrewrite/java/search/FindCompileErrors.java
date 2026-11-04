@@ -15,36 +15,34 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.CompileErrors;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 public class FindCompileErrors extends Recipe {
 
     transient CompileErrors report = new CompileErrors(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find compile errors";
-    }
+    @Getter
+    final String displayName = "Find compile errors";
 
-    @Override
-    public String getDescription() {
-        return "Compile errors result in a particular LST structure that can be searched for.";
-    }
+    @Getter
+    final String description = "Compile errors result in a particular LST structure that can be searched for.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Erroneous visitErroneous(J.Erroneous erroneous, ExecutionContext ctx) {
-                J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
                 String sourceFile = cu != null ? cu.getSourcePath().toString() : "Unknown source file";
-                String code = erroneous.print(getCursor());
+                String code = erroneous.print(getCursor().getParentOrThrow());
                 report.insertRow(ctx, new CompileErrors.Row(
                         sourceFile,
                         code

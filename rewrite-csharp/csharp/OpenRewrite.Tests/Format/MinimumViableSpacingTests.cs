@@ -1,0 +1,517 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using OpenRewrite.Core;
+using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Format;
+using OpenRewrite.Java;
+
+namespace OpenRewrite.Tests.Format;
+
+/// <summary>
+/// Tests for <see cref="MinimumViableSpacingVisitor"/>.
+///
+/// Strategy: parse well-formed C#, strip ALL whitespace to Space.Empty
+/// (simulating a recipe that synthesizes nodes with empty spacing), then
+/// run the MVS visitor and verify the minimum token separation is restored.
+/// </summary>
+public class MinimumViableSpacingTests
+{
+    private readonly CSharpParser _parser = new();
+    private readonly CSharpPrinter<int> _printer = new();
+
+    /// <summary>
+    /// Strips all whitespace from a parsed tree, then runs MVS, then prints.
+    /// </summary>
+    private string StripAndRestore(string source)
+    {
+        var cu = _parser.Parse(source);
+        var stripped = new WhitespaceStripper().Visit(cu, 0) as CompilationUnit ?? cu;
+        var restored = new MinimumViableSpacingVisitor().Visit(stripped, 0) as CompilationUnit ?? stripped;
+        return _printer.Print(restored);
+    }
+
+    [Fact]
+    public void ClassWithModifiers()
+    {
+        var result = StripAndRestore("public sealed class Foo { }");
+        Assert.DoesNotContain("publicsealed", result);
+        Assert.DoesNotContain("sealedclass", result);
+        Assert.DoesNotContain("classFoo", result);
+    }
+
+    [Fact]
+    public void MethodWithModifiersAndReturnType()
+    {
+        var result = StripAndRestore(
+            "class Foo { public static void Bar() { } }");
+        Assert.DoesNotContain("publicstatic", result);
+        Assert.DoesNotContain("staticvoid", result);
+        Assert.DoesNotContain("voidBar", result);
+    }
+
+    [Fact]
+    public void MethodWithNoModifiers()
+    {
+        var result = StripAndRestore(
+            "class Foo { int Bar() { return 42; } }");
+        // Return type and method name must not merge
+        Assert.DoesNotContain("intBar", result);
+    }
+
+    [Fact]
+    public void VariableDeclarationWithModifiers()
+    {
+        var result = StripAndRestore(
+            "class Foo { private static int _x; }");
+        Assert.DoesNotContain("privatestatic", result);
+        Assert.DoesNotContain("staticint", result);
+        Assert.DoesNotContain("int_x", result);
+    }
+
+    /// <summary>
+    /// Simulates what MakeFieldReadOnly does: adds a readonly modifier to a field
+    /// that previously had none. The type expression has an empty prefix because
+    /// the indentation lives on the VariableDeclarations prefix.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithGenericType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                List<int> _elements = new List<int>();
+            }
+            """);
+
+        // Add a readonly modifier to the field, simulating what a recipe does
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        // Run MVS to ensure spacing
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", result);
+        Assert.Contains("readonly List", result);
+    }
+
+    /// <summary>
+    /// Same scenario as AddedModifierToFieldWithGenericType but going through the full
+    /// RoslynFormatter.Format() pipeline, which involves MVS → print → Roslyn → reconcile.
+    /// This is the actual code path used by MaybeAutoFormat in recipes.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithGenericTypeThroughRoslynFormatter()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        // Add a readonly modifier to the field, simulating what MakeFieldReadOnly does
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        // Run through the full formatting pipeline (same as MaybeAutoFormat)
+        var formatted = RoslynFormatter.Format(cu);
+        var result = _printer.Print(formatted);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", result);
+        Assert.Contains("readonly List", result);
+    }
+
+    /// <summary>
+    /// Same as above but with a simple (non-generic) type.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithSimpleType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                int _x;
+            }
+            """);
+
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        Assert.DoesNotContain("readonlyint", result);
+        Assert.Contains("readonly int", result);
+    }
+
+    [Fact]
+    public void ReturnWithExpression()
+    {
+        var result = StripAndRestore(
+            "class Foo { int Bar() { return 42; } }");
+        Assert.DoesNotContain("return42", result);
+    }
+
+    [Fact]
+    public void ThrowWithExpression()
+    {
+        var result = StripAndRestore(
+            "class Foo { void Bar() { throw new System.Exception(); } }");
+        Assert.DoesNotContain("thrownew", result);
+    }
+
+    [Fact]
+    public void NewClassSpacing()
+    {
+        var result = StripAndRestore(
+            "class Foo { void Bar() { throw new System.Exception(); } }");
+        // new keyword must not merge with the type name
+        Assert.DoesNotContain("newSystem", result);
+    }
+
+    [Fact]
+    public void ClassExtends()
+    {
+        var result = StripAndRestore(
+            "class MyException : System.Exception { }");
+        // The : must be separated from the class name
+        Assert.DoesNotContain("MyException:", result);
+    }
+
+    [Fact]
+    public void ClassImplementsMultiple()
+    {
+        var result = StripAndRestore(
+            "class Foo : System.IDisposable, System.ICloneable { }");
+        Assert.DoesNotContain("Foo:", result);
+    }
+
+    [Fact]
+    public void ConstructorWithInitializer()
+    {
+        var result = StripAndRestore("""
+            class MyException : System.Exception
+            {
+                public MyException(string message) : base(message) { }
+            }
+            """);
+        // Modifiers and constructor name must not merge
+        Assert.DoesNotContain("publicMyException", result);
+    }
+
+    [Fact]
+    public void IdempotentOnWellFormedCode()
+    {
+        // Use the exact same source as the AutoFormatTests.WellFormattedCodeReturnsReferentiallyIdenticalTree test
+        const string source = """
+            using System;
+
+            namespace Test
+            {
+                public class Foo
+                {
+                    private int _x;
+
+                    public int Add(int a, int b)
+                    {
+                        var result = a + b;
+                        _x = result;
+                        return result;
+                    }
+
+                    public void DoNothing()
+                    {
+                    }
+                }
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+        var result = new MinimumViableSpacingVisitor().Visit(cu, 0);
+
+        // Well-formed code should be unchanged (same reference)
+        Assert.True(ReferenceEquals(cu, result),
+            "Expected same object reference when spacing is already present");
+    }
+
+    [Fact]
+    public void PreservesExistingFormatting()
+    {
+        const string source = """
+            public   sealed   class   Foo
+            {
+                private   static   int   _x;
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+        var printed1 = _printer.Print(cu);
+
+        var result = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var printed2 = _printer.Print(result);
+
+        // Existing non-empty whitespace should not be modified
+        Assert.Equal(printed1, printed2);
+    }
+
+    [Fact]
+    public void IntegrationWithAutoFormat()
+    {
+        const string source = """
+            class MyException : System.Exception
+            {
+                public MyException(string message) : base(message) { }
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+
+        // Strip all whitespace (simulating recipe that builds nodes with Space.Empty)
+        var stripped = new WhitespaceStripper().Visit(cu, 0) as CompilationUnit ?? cu;
+
+        // Run through AutoFormat — MVS ensures printed output is parseable,
+        // then Roslyn formats it, then WhitespaceReconciler maps formatting back
+        var formatted = RoslynFormatter.Format(stripped);
+
+        var result = _printer.Print(formatted);
+
+        // Should not have smashed tokens
+        Assert.DoesNotContain("publicMyException", result);
+    }
+
+    [Fact]
+    public void MultipleModifiersOnClass()
+    {
+        var result = StripAndRestore("public abstract class Foo { }");
+        Assert.DoesNotContain("publicabstract", result);
+        Assert.DoesNotContain("abstractclass", result);
+    }
+
+    [Fact]
+    public void AnnotatedClassWithModifier()
+    {
+        var result = StripAndRestore("""
+            [System.Serializable]
+            public class Foo { }
+            """);
+        // After annotation, modifier needs space
+        Assert.DoesNotContain("]public", result);
+    }
+
+    [Fact]
+    public void UsingDirective()
+    {
+        var result = StripAndRestore("using System;");
+        Assert.DoesNotContain("usingSystem", result);
+    }
+
+    [Fact]
+    public void UsingStaticDirective()
+    {
+        var result = StripAndRestore("using static System.Math;");
+        Assert.DoesNotContain("usingstatic", result);
+        Assert.DoesNotContain("staticSystem", result);
+    }
+
+    [Fact]
+    public void NamespaceDeclaration()
+    {
+        var result = StripAndRestore("namespace MyApp { class Foo { } }");
+        Assert.DoesNotContain("namespaceMyApp", result);
+    }
+
+    [Fact]
+    public void FileScopedNamespace()
+    {
+        var result = StripAndRestore("""
+            namespace MyApp;
+            class Foo { }
+            """);
+        Assert.DoesNotContain("namespaceMyApp", result);
+    }
+
+    [Fact]
+    public void PropertyDeclaration()
+    {
+        var result = StripAndRestore("""
+            class Foo { public int Bar { get; set; } }
+            """);
+        Assert.DoesNotContain("publicint", result);
+        Assert.DoesNotContain("intBar", result);
+    }
+
+    [Fact]
+    public void ForEachLoop()
+    {
+        var result = StripAndRestore("""
+            class Foo { void Bar() { foreach (var x in new int[0]) { } } }
+            """);
+        Assert.DoesNotContain("innew", result);
+    }
+
+    /// <summary>
+    /// Reproduces the exact MakeFieldReadOnly pattern: a visitor that adds a modifier
+    /// in VisitVariableDeclarations, then calls MaybeAutoFormat at the CU level.
+    /// This is the actual code path that was producing "readonlyList&lt;T&gt;".
+    /// </summary>
+    [Fact]
+    public void AddedModifierWithMaybeAutoFormatAtCuLevel()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        // Use a visitor that adds readonly and calls MaybeAutoFormat at CU level
+        var visitor = new AddReadonlyWithAutoFormatVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0) as CompilationUnit ?? cu;
+        var printed = _printer.Print(result);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List", printed);
+    }
+
+    /// <summary>
+    /// Same as above but using RecipeScheduler.Run() — the exact path that
+    /// recipes-csharp uses. This matches how MakeFieldReadOnly actually executes.
+    /// </summary>
+    [Fact]
+    public void AddedModifierWithMaybeAutoFormatViaRecipeScheduler()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        var recipe = new AddReadonlyRecipe();
+        var results = RecipeScheduler.Run(recipe, [cu], new OpenRewrite.Core.ExecutionContext());
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].After);
+        var printed = _printer.Print(results[0].After!);
+
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List", printed);
+    }
+
+    /// <summary>
+    /// Visitor that strips all whitespace from the tree, simulating a recipe
+    /// that builds nodes with Space.Empty everywhere.
+    /// </summary>
+    private class WhitespaceStripper : CSharpVisitor<int>
+    {
+        public override Space VisitSpace(Space space, int p)
+        {
+            return Space.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier to field declarations,
+    /// simulating what the MakeFieldReadOnly recipe does.
+    /// </summary>
+    private class AddReadonlyModifierVisitor : CSharpVisitor<int>
+    {
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, int p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            // Only add to fields (inside a class body)
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            // Don't add if already has readonly
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>()));
+            return v.WithModifiers(newModifiers);
+        }
+    }
+
+    /// <summary>
+    /// ScanningRecipe that adds readonly to fields, matching MakeFieldReadOnly's
+    /// structure for use with RecipeScheduler.Run().
+    /// </summary>
+    private class AddReadonlyRecipe : ScanningRecipe<int>
+    {
+        public override string DisplayName => "Test";
+        public override string Description => "Test";
+        public override int GetInitialValue(OpenRewrite.Core.ExecutionContext ctx) => 0;
+        public override ITreeVisitor<OpenRewrite.Core.ExecutionContext> GetScanner(int acc) => ITreeVisitor<OpenRewrite.Core.ExecutionContext>.Noop();
+        public override ITreeVisitor<OpenRewrite.Core.ExecutionContext> GetVisitor(int acc) => new AddReadonlyWithAutoFormatVisitor<OpenRewrite.Core.ExecutionContext>();
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier in VisitVariableDeclarations and
+    /// calls MaybeAutoFormat at the CompilationUnit level — the exact pattern
+    /// used by MakeFieldReadOnly.
+    /// </summary>
+    private class AddReadonlyWithAutoFormatVisitor : AddReadonlyWithAutoFormatVisitor<int>;
+
+    private class AddReadonlyWithAutoFormatVisitor<P> : CSharpVisitor<P>
+    {
+        public override J VisitCompilationUnit(CompilationUnit cu, P p)
+        {
+            var before = cu;
+            cu = (CompilationUnit)base.VisitCompilationUnit(cu, p);
+            return MaybeAutoFormat(before, cu, p, Cursor);
+        }
+
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, P p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            // Skip properties (has accessors)
+            if (Cursor.FirstEnclosing<PropertyDeclaration>() != null)
+                return v;
+
+            // Test with keyword string but using Add
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>(), "readonly"));
+            return v.WithModifiers(newModifiers);
+        }
+    }
+}

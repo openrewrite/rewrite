@@ -33,15 +33,10 @@ class JavaTemplateNamedTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitAssert(J.Assert anAssert, ExecutionContext p) {
-                  return JavaTemplate.builder(
-                      """
-                        if(#{name:any(int)} != #{}) {
-                          #{name}++;
-                        }"""
-                    )
-                    .build()
-                    .apply(getCursor(), anAssert.getCoordinates().replace(),
-                      ((J.Binary) anAssert.getCondition()).getLeft(), "1");
+                  return JavaTemplate.apply("""
+                      if(#{name:any(int)} != #{}) {
+                        #{name}++;
+                      }""", getCursor(), anAssert.getCoordinates().replace(), ((J.Binary) anAssert.getCondition()).getLeft(), "1");
               }
           })),
           java(

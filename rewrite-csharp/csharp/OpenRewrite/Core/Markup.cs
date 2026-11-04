@@ -1,0 +1,143 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
+
+namespace OpenRewrite.Core;
+
+/// <summary>
+/// Markers for annotating LST nodes with error, warning, info, or debug messages.
+/// </summary>
+public abstract class Markup(Guid id, string message, string? detail) : Marker, IEquatable<Markup>
+{
+    public Guid Id { get; } = id;
+    public string Message { get; } = message;
+    public string? Detail { get; } = detail;
+
+    public bool Equals(Markup? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Markup);
+    public override int GetHashCode() => Id.GetHashCode();
+
+    /// <summary>
+    /// Attaches <paramref name="marker"/> to <paramref name="tree"/>, resolving the wither on the
+    /// concrete type. Throws when the node exposes none: a search recipe's whole output is the marker
+    /// it attaches, so quietly returning the node unchanged reports "no findings" for code that does
+    /// have them — a failure mode with no symptom at all. Every J type in this assembly exposes
+    /// <c>WithMarkers(Markers)</c> (enforced by <c>JWitherContractTests</c>), so this cannot fire for
+    /// in-tree nodes.
+    /// </summary>
+    private static T AddMarker<T>(T tree, Markup marker) where T : J
+        => tree.Markers.MarkerList.Any(m => m.GetType() == marker.GetType() && m is Markup markup &&
+                                            markup.Message == marker.Message && markup.Detail == marker.Detail)
+            ? tree
+            : J.SetMarkers(tree, tree.Markers.Add(marker));
+
+    /// <summary>
+    /// Adds an Error markup marker to the given tree node.
+    /// </summary>
+    public static T CreateError<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Error(Tree.RandomId(), message, detail));
+
+    /// <summary>
+    /// Adds a Warn markup marker to the given tree node.
+    /// </summary>
+    public static T CreateWarn<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Warn(Tree.RandomId(), message, detail));
+
+    /// <summary>
+    /// Adds an Info markup marker to the given tree node.
+    /// </summary>
+    public static T CreateInfo<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Info(Tree.RandomId(), message, detail));
+
+    /// <summary>
+    /// Adds a Debug markup marker to the given tree node.
+    /// </summary>
+    public static T CreateDebug<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Debug(Tree.RandomId(), message, detail));
+
+    public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
+    {
+        public void RpcSend(Error after, RpcSendQueue q)
+        {
+            q.GetAndSend(after, m => m.Id);
+            q.GetAndSend(after, m => m.Message);
+            q.GetAndSend(after, m => m.Detail);
+        }
+
+        public Error RpcReceive(Error before, RpcReceiveQueue q)
+        {
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return new Error(id, message!, detail);
+        }
+    }
+
+    public sealed class Warn(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Warn>
+    {
+        public void RpcSend(Warn after, RpcSendQueue q)
+        {
+            q.GetAndSend(after, m => m.Id);
+            q.GetAndSend(after, m => m.Message);
+            q.GetAndSend(after, m => m.Detail);
+        }
+
+        public Warn RpcReceive(Warn before, RpcReceiveQueue q)
+        {
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return new Warn(id, message!, detail);
+        }
+    }
+
+    public sealed class Info(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Info>
+    {
+        public void RpcSend(Info after, RpcSendQueue q)
+        {
+            q.GetAndSend(after, m => m.Id);
+            q.GetAndSend(after, m => m.Message);
+            q.GetAndSend(after, m => m.Detail);
+        }
+
+        public Info RpcReceive(Info before, RpcReceiveQueue q)
+        {
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return new Info(id, message!, detail);
+        }
+    }
+
+    public sealed class Debug(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Debug>
+    {
+        public void RpcSend(Debug after, RpcSendQueue q)
+        {
+            q.GetAndSend(after, m => m.Id);
+            q.GetAndSend(after, m => m.Message);
+            q.GetAndSend(after, m => m.Detail);
+        }
+
+        public Debug RpcReceive(Debug before, RpcReceiveQueue q)
+        {
+            var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+            var message = q.Receive(before.Message);
+            var detail = q.Receive(before.Detail);
+            return new Debug(id, message!, detail);
+        }
+    }
+}

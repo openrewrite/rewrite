@@ -1,0 +1,216 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package parser_test
+
+import (
+	"math/big"
+	"strconv"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+// litRHS parses src and returns the J.Literal on the RHS of the first `:=`.
+func litRHS(t *testing.T, src string) *java.Literal {
+	t.Helper()
+	rhs := firstAssignRHS(t, src)
+	lit, ok := rhs.(*java.Literal)
+	require.Truef(t, ok, "expected *java.Literal, got %T", rhs)
+	return lit
+}
+
+func bigInt(s string) *big.Int {
+	i, _ := new(big.Int).SetString(s, 10)
+	return i
+}
+
+// A literal's Value must carry the decoded semantic value (no quotes, escapes
+// resolved, numbers typed), matching the other rewrite parsers. The raw source
+// text — with quotes — is preserved only in Source for lossless printing.
+func TestBasicLitDecodedValue(t *testing.T) {
+	cases := []struct {
+		name       string
+		expr       string
+		wantValue  any
+		wantSource string
+	}{
+		// given
+		{"interpreted string", `"foo"`, "foo", `"foo"`},
+		{"string with escape", `"a\tb"`, "a\tb", `"a\tb"`},
+		{"raw string", "`foo`", "foo", "`foo`"},
+		{"char", `'a'`, int64('a'), `'a'`},
+		{"char escape", `'\n'`, int64('\n'), `'\n'`},
+		{"char multibyte", `'π'`, int64('π'), `'π'`},
+		{"int", `42`, int64(42), `42`},
+		{"hex int", `0x7f`, int64(127), `0x7f`},
+		{"underscored int", `1_000`, int64(1000), `1_000`},
+		{"int wider than int64", `300000000000000000000`, bigInt("300000000000000000000"), `300000000000000000000`},
+		{"hex int wider than int64", `0xffffffffffffffffff`, bigInt("4722366482869645213695"), `0xffffffffffffffffff`},
+		{"float", `3.14`, 3.14, `3.14`},
+		{"float with exponent", `3e20`, 3e20, `3e20`},
+		{"float without fraction", `3.0`, 3.0, `3.0`},
+		{"hex float", `0x1p-2`, 0.25, `0x1p-2`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// when
+			src := "package main\n\nfunc main() {\n\tv := " + tc.expr + "\n\t_ = v\n}\n"
+			lit := litRHS(t, src)
+
+			// then
+			assert.Equalf(t, tc.wantValue, lit.Value, "Value = %#v (%T), want %#v (%T)",
+				lit.Value, lit.Value, tc.wantValue, tc.wantValue)
+			assert.Equal(t, lit.Source, tc.wantSource, "Source")
+		})
+	}
+}
+
+// A Go int constant whose value exceeds Integer.MAX_VALUE must fall back to the
+// `long` primitive, since the JVM LST deserializer reconstructs an `int`-keyword
+// literal via Integer.valueOf, which throws on an out-of-range value.
+func TestIntLiteralExceedingInt32FallsBackToLong(t *testing.T) {
+	// given: an untyped int constant larger than Integer.MAX_VALUE (2147483647)
+	src := "package main\n\nfunc main() {\n\tv := 5243700879\n\t_ = v\n}\n"
+
+	// when
+	lit := litRHS(t, src)
+
+	// then
+	prim, ok := lit.Type.(*java.JavaTypePrimitive)
+	require.Truef(t, ok, "expected *java.JavaTypePrimitive, got %T", lit.Type)
+	assert.Equal(t, "long", prim.Keyword, "keyword")
+	assert.Equal(t, int64(5243700879), lit.Value, "value")
+}
+
+// An untyped constant compared against a value of a named type (here `i Code`,
+// `type Code int`) is converted to that named type by go/types. Because a
+// J.Literal on the Java side can only carry a JavaType.Primitive, the literal
+// must be attributed the named type's underlying basic (int) rather than the
+// named type itself, which the Java receiver would drop to null.
+func TestUntypedConstantAgainstNamedTypeKeepsPrimitive(t *testing.T) {
+	// given
+	src := "package main\n\ntype Code int\n\nfunc (i Code) String() string {\n\tif 2052 <= i {\n\t\treturn \"x\"\n\t}\n\treturn \"\"\n}\n"
+
+	// when
+	cu, err := parser.NewGoParser().Parse("g.go", src)
+	require.NoError(t, err, "parse")
+	var found *java.Literal
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if lit, ok := n.(*java.Literal); ok && lit.Value == int64(2052) {
+			found = lit
+			return false
+		}
+		return true
+	})
+	require.NotNil(t, found, "literal 2052 not found")
+
+	// then
+	prim, ok := found.Type.(*java.JavaTypePrimitive)
+	require.Truef(t, ok, "expected *java.JavaTypePrimitive, got %T (a named type would be dropped to null on the Java side)", found.Type)
+	assert.Equal(t, "int", prim.Keyword, "keyword")
+}
+
+// firstLiteralOfType parses src and returns the first *java.Literal whose
+// attributed Type is the primitive `keyword` (e.g. "byte", "char").
+func firstLiteralOfType(t *testing.T, src, keyword string) *java.Literal {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("g.go", src)
+	require.NoError(t, err, "parse")
+	var found *java.Literal
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if lit, ok := n.(*java.Literal); ok {
+			if prim, ok := lit.Type.(*java.JavaTypePrimitive); ok && prim.Keyword == keyword {
+				found = lit
+				return false
+			}
+		}
+		return true
+	})
+	require.NotNilf(t, found, "no *java.Literal of primitive type %q found", keyword)
+	return found
+}
+
+func TestLiteralKeywords(t *testing.T) {
+	for _, tc := range []struct{ decl, want string }{
+		{"var v rune = 'b'", "char"},
+		{"var v byte = 'c'", "byte"},
+		{"var v int32 = 3", "int"},
+		{"var v int8 = 3", "byte"},
+		{"var v int64 = 3", "long"},
+		{"var v float64 = 3.5", "double"},
+		{"var v string = \"s\"", "String"},
+	} {
+		t.Run(tc.decl, func(t *testing.T) {
+			lit := firstLiteral(t, "package main\n\nfunc main() {\n\t"+tc.decl+"\n\t_ = v\n}\n")
+			prim, ok := lit.Type.(*java.JavaTypePrimitive)
+			require.Truef(t, ok, "Type is %T, want *java.JavaTypePrimitive", lit.Type)
+			assert.Equal(t, tc.want, prim.Keyword)
+		})
+	}
+}
+
+func TestComplexLiteralCarriesNoPrimitive(t *testing.T) {
+	lit := firstLiteral(t, "package main\n\nfunc main() {\n\tvar v complex128 = 3i\n\t_ = v\n}\n")
+	assert.Nil(t, lit.Type)
+	assert.Equal(t, "3i", lit.Value)
+}
+
+func firstLiteral(t *testing.T, src string) *java.Literal {
+	t.Helper()
+	cu, err := parser.NewGoParser().Parse("g.go", src)
+	require.NoError(t, err, "parse")
+	var found *java.Literal
+	visitor.Walk(cu, func(n java.Tree) bool {
+		if lit, ok := n.(*java.Literal); ok && found == nil {
+			found = lit
+		}
+		return found == nil
+	})
+	require.NotNil(t, found, "no literal in tree")
+	return found
+}
+
+// A Go byte-typed character literal such as `'^'` must round-trip through the
+// JVM-side LST deserializer. That deserializer is type-directed: for a J.Literal
+// whose Type is the `byte` primitive it coerces the value with
+func TestByteCharLiteralRoundTripsAsByte(t *testing.T) {
+	// given: `'^'` in a byte context, so go/types attributes it the `byte` type
+	src := "package main\n\nfunc main() {\n\tvar b byte = '^'\n\t_ = b\n}\n"
+
+	// when
+	lit := firstLiteralOfType(t, src, "byte")
+
+	// then: the Value must be the numeric code point, so the JVM stores it
+	// without running Byte.valueOf on a character string.
+	if s, ok := lit.Value.(string); ok {
+		if _, err := strconv.ParseInt(s, 10, 8); err != nil {
+			t.Fatalf("byte literal Value = %q (string): the JVM runs Byte.valueOf(%q), "+
+				"which throws NumberFormatException (%v). A byte literal's Value must be a "+
+				"numeric code point, not the raw character string.", s, s, err)
+		}
+	}
+	if lit.Value != int64('^') {
+		t.Errorf("Value = %#v (%T), want %#v (int64)", lit.Value, lit.Value, int64('^'))
+	}
+}

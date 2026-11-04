@@ -18,12 +18,14 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpdateScmFromGitOriginTest implements RewriteTest {
@@ -457,6 +459,62 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                   </project>
                   """,
                 spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5812")
+        @Test
+        void addsScmToRootPomOnly() {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateScmFromGitOrigin(true)),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app-parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                        <module>module1</module>
+                      </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app-parent</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                        <module>module1</module>
+                      </modules>
+                      <scm>
+                        <url>https://github.com/example/repo</url>
+                        <connection>scm:git:https://github.com/example/repo.git</connection>
+                        <developerConnection>scm:git:git@github.com:example/repo.git</developerConnection>
+                      </scm>
+                    </project>
+                    """,
+                  spec -> spec.markers(gitProvenance("https://github.com/example/repo.git"))
+                ),
+                mavenProject("module1",
+                  pomXml(
+                    """
+                      <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-app-parent</artifactId>
+                          <version>1</version>
+                        </parent>
+                        <artifactId>module1</artifactId>
+                      </project>
+                      """
+                  ))
               )
             );
         }

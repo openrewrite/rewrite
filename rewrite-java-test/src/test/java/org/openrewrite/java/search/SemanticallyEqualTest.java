@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
@@ -46,6 +47,15 @@ class SemanticallyEqualTest {
             }
             """
         );
+    }
+
+    @Test
+    void nullIsOnlyEqualToNull() {
+        J.CompilationUnit cu = javaParser.parse("class A {}").findFirst().map(J.CompilationUnit.class::cast).orElseThrow();
+
+        assertFalse(SemanticallyEqual.areEqual(null, cu));
+        assertFalse(SemanticallyEqual.areEqual(cu, null));
+        assertTrue(SemanticallyEqual.areEqual(null, null));
     }
 
     @Test
@@ -348,6 +358,59 @@ class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void instanceOfDeconstructionPatternBindingNames() {
+        assertExpressionsEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s1);
+                boolean b = o instanceof R(String s2);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDifferentDeconstructionPatterns() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                record Q(int n) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof Q(int n);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDeconstructionPatternAndTypePattern() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof R r;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R r;
+                boolean b = o instanceof R(String s);
+            }
+            """
+        );
+    }
+
     @SuppressWarnings({"DataFlowIssue", "OptionalGetWithoutIsPresent", "Convert2Diamond"})
     @Nested
     class Generics {
@@ -434,6 +497,33 @@ class SemanticallyEqualTest {
             J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
             assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
             assertFalse(SemanticallyEqual.areEqual(((J.FieldAccess) a.getVariable()).getName(), a.getAssignment()));
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/953")
+        @Test
+        void fieldNotEqualToShadowedNameVariableWithoutTypeAttribution() {
+            J.CompilationUnit cu = javaParser.parse(
+                """
+                  class T {
+                      int a = 1;
+                      void m(int a) {
+                          this.a = a;
+                      }
+                  }
+                  """
+              ).findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .get();
+            J.CompilationUnit unattributed = (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                    return identifier.withFieldType(null).withType(null);
+                }
+            }.visitNonNull(cu, 0);
+            J.MethodDeclaration m = (J.MethodDeclaration) unattributed.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
+            assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
+            assertFalse(SemanticallyEqual.areEqual(a.getAssignment(), a.getVariable()));
         }
 
         @Test

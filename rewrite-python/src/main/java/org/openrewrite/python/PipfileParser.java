@@ -1,0 +1,322 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Moderne Proprietary. Only for use by Moderne customers under the terms of a commercial contract.
+ */
+package org.openrewrite.python;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.InstalledEnvParser;
+import org.openrewrite.python.internal.PipfileLockParser;
+import org.openrewrite.python.internal.pipfilelock.PipenvLockEngine;
+import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.python.marker.PythonResolutionResult.SourceIndex;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.tree.Toml;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
+
+/**
+ * Parser for Pipfile files that delegates to {@link TomlParser} and attaches a
+ * {@link PythonResolutionResult} marker with dependency metadata.
+ */
+public class PipfileParser implements Parser {
+
+    private final TomlParser tomlParser = new TomlParser();
+
+    @Nullable
+    private final Path installedEnv;
+
+    public PipfileParser() {
+        this(null);
+    }
+
+    /**
+     * @param installedEnv the project's dependency environment, which the marker resolves against when no
+     *                     Pipfile.lock exists, or null to leave such a marker unresolved
+     */
+    public PipfileParser(@Nullable Path installedEnv) {
+        this.installedEnv = installedEnv;
+    }
+
+    @Override
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return tomlParser.parseInputs(sources, relativeTo, ctx).map(sf -> {
+            if (!(sf instanceof Toml.Document)) {
+                return sf;
+            }
+            Toml.Document doc = (Toml.Document) sf;
+            PythonResolutionResult marker = createMarker(doc);
+            if (marker == null) {
+                return sf;
+            }
+            marker = resolveFromLockFile(marker, doc, relativeTo);
+            return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
+        });
+    }
+
+    private PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
+                                                              Toml.Document doc,
+                                                              @Nullable Path relativeTo) {
+        Path sourcePath = doc.getSourcePath();
+        Path pipfileDir = relativeTo != null
+                ? relativeTo.resolve(sourcePath).getParent()
+                : sourcePath.getParent();
+
+        if (pipfileDir == null) {
+            return marker;
+        }
+
+        List<ResolvedDependency> resolvedDeps = PipfileLockParser.findAndParse(pipfileDir, relativeTo);
+        if (resolvedDeps.isEmpty() && installedEnv != null &&
+            PipfileLockParser.findLockFile(pipfileDir, relativeTo) == null) {
+            resolvedDeps = InstalledEnvParser.parse(installedEnv);
+        }
+        if (!resolvedDeps.isEmpty()) {
+            return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
+        }
+        return marker;
+    }
+
+    public static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
+        Map<String, Toml.Table> tables = indexTables(doc);
+
+        Toml.Table packagesTable = tables.get("packages");
+        Toml.Table devPackagesTable = tables.get("dev-packages");
+
+        // A Pipfile should have at least one dependency section
+        if (packagesTable == null && devPackagesTable == null) {
+            return null;
+        }
+
+        List<Dependency> dependencies = parseDependencyTable(packagesTable);
+
+        Map<String, List<Dependency>> optionalDependencies = new LinkedHashMap<>();
+        List<Dependency> devDeps = parseDependencyTable(devPackagesTable);
+        if (!devDeps.isEmpty()) {
+            optionalDependencies.put("dev-packages", devDeps);
+        }
+
+        Toml.Table requiresTable = tables.get("requires");
+        String requiresPython = requiresTable != null ? getStringValue(requiresTable, "python_version") : null;
+
+        return new PythonResolutionResult(
+                randomId(),
+                null,
+                null,
+                null,
+                null,
+                doc.getSourcePath().toString(),
+                requiresPython,
+                null,
+                emptyList(),
+                dependencies,
+                optionalDependencies,
+                emptyMap(),
+                emptyList(),
+                emptyList(),
+                emptyList(),
+                PackageManager.Pipenv,
+                parseSourceIndexes(doc)
+        );
+    }
+
+    private static @Nullable List<SourceIndex> parseSourceIndexes(Toml.Document doc) {
+        List<SourceIndex> indexes = new ArrayList<>();
+        for (Toml value : doc.getValues()) {
+            if (!(value instanceof Toml.Table)) {
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            if (table.getName() == null || !"source".equals(table.getName().getName())) {
+                continue;
+            }
+            String url = getStringValue(table, "url");
+            if (url == null) {
+                continue;
+            }
+            String name = getStringValue(table, "name");
+            if (name == null) {
+                name = hostOf(url);
+            }
+            indexes.add(new SourceIndex(name, url, indexes.isEmpty() || "pypi".equals(name)));
+        }
+        return indexes.isEmpty() ? null : indexes;
+    }
+
+    private static String hostOf(String url) {
+        int scheme = url.indexOf("://");
+        String rest = scheme < 0 ? url : url.substring(scheme + 3);
+        int slash = rest.indexOf('/');
+        if (slash >= 0) {
+            rest = rest.substring(0, slash);
+        }
+        int at = rest.lastIndexOf('@');
+        if (at >= 0) {
+            rest = rest.substring(at + 1);
+        }
+        int colon = rest.indexOf(':');
+        if (colon >= 0) {
+            rest = rest.substring(0, colon);
+        }
+        return rest.isEmpty() ? "source" : rest;
+    }
+
+    private static List<Dependency> parseDependencyTable(Toml.@Nullable Table table) {
+        if (table == null) {
+            return emptyList();
+        }
+        List<Dependency> deps = new ArrayList<>();
+        for (Toml value : table.getValues()) {
+            if (!(value instanceof Toml.KeyValue)) {
+                continue;
+            }
+            Toml.KeyValue kv = (Toml.KeyValue) value;
+            String name = PyProjectHelper.extractKeyName(kv);
+            if (name == null) {
+                continue;
+            }
+            String versionConstraint = extractVersion(kv.getValue());
+            if ("*".equals(versionConstraint)) {
+                versionConstraint = null;
+            }
+            Toml.Table spec = kv.getValue() instanceof Toml.Table ? (Toml.Table) kv.getValue() : null;
+            deps.add(new Dependency(name, versionConstraint, spec == null ? null : getExtras(spec),
+                    spec == null ? null : getMarker(spec), null));
+        }
+        return deps;
+    }
+
+    private static @Nullable List<String> getExtras(Toml.Table spec) {
+        for (Toml value : spec.getValues()) {
+            if (value instanceof Toml.KeyValue &&
+                "extras".equals(PyProjectHelper.extractKeyName((Toml.KeyValue) value)) &&
+                ((Toml.KeyValue) value).getValue() instanceof Toml.Array) {
+                List<String> extras = new ArrayList<>();
+                for (Toml extra : ((Toml.Array) ((Toml.KeyValue) value).getValue()).getValues()) {
+                    if (extra instanceof Toml.Literal && ((Toml.Literal) extra).getValue() instanceof String) {
+                        extras.add((String) ((Toml.Literal) extra).getValue());
+                    }
+                }
+                return extras.isEmpty() ? null : extras;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * pipenv takes a marker from {@code markers} and from keys named for a marker variable, such as
+     * {@code sys_platform = "== 'win32'"}, which all have to hold.
+     */
+    private static @Nullable String getMarker(Toml.Table spec) {
+        List<String> markers = new ArrayList<>();
+        String declared = getStringValue(spec, "markers");
+        if (declared != null) {
+            markers.add(declared);
+        }
+        for (String variable : PipenvLockEngine.MARKER_KEYS) {
+            String value = getStringValue(spec, variable);
+            if (value != null) {
+                markers.add(variable + " " + value);
+            }
+        }
+        return markers.isEmpty() ? null : markers.size() == 1 ? markers.get(0) :
+                "(" + String.join(") and (", markers) + ")";
+    }
+
+    private static @Nullable String extractVersion(Toml value) {
+        if (value instanceof Toml.Literal) {
+            Object v = ((Toml.Literal) value).getValue();
+            return v instanceof String ? (String) v : null;
+        }
+        if (value instanceof Toml.Table) {
+            // Inline table: {version = ">=3.2", ...}
+            for (Toml inner : ((Toml.Table) value).getValues()) {
+                if (inner instanceof Toml.KeyValue) {
+                    Toml.KeyValue innerKv = (Toml.KeyValue) inner;
+                    if (innerKv.getKey() instanceof Toml.Identifier &&
+                            "version".equals(((Toml.Identifier) innerKv.getKey()).getName())) {
+                        return extractVersion(innerKv.getValue());
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String getStringValue(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) value;
+                if (kv.getKey() instanceof Toml.Identifier &&
+                        key.equals(((Toml.Identifier) kv.getKey()).getName()) &&
+                        kv.getValue() instanceof Toml.Literal) {
+                    Object v = ((Toml.Literal) kv.getValue()).getValue();
+                    return v instanceof String ? (String) v : null;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, Toml.Table> indexTables(Toml.Document doc) {
+        Map<String, Toml.Table> tables = new LinkedHashMap<>();
+        for (Toml value : doc.getValues()) {
+            if (value instanceof Toml.Table) {
+                Toml.Table table = (Toml.Table) value;
+                if (table.getName() != null) {
+                    tables.put(table.getName().getName(), table);
+                }
+            }
+        }
+        return tables;
+    }
+
+    @Override
+    public boolean accept(Path path) {
+        return path.endsWith("Pipfile");
+    }
+
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("Pipfile");
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder extends Parser.Builder {
+
+        Builder() {
+            super(Toml.Document.class);
+        }
+
+        @Override
+        public PipfileParser build() {
+            return new PipfileParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "Pipfile";
+        }
+    }
+}

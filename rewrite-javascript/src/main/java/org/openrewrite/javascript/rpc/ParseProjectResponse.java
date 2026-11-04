@@ -43,5 +43,10 @@ class ParseProjectResponse extends ArrayList<ParseProjectResponse.Item> {
          * - org.openrewrite.yaml.tree.Yaml$Documents
          */
         String sourceFileType;
+
+        /**
+         * The relative source path of the file.
+         */
+        String sourcePath;
     }
 }

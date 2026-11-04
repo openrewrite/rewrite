@@ -15,17 +15,50 @@
  */
 package org.openrewrite.groovy;
 
+import java.lang.reflect.Field;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyParserTest implements RewriteTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "Jenkinsfile",
+      "ci/Jenkinsfile.release",
+      "Jenkinsfile-nightly",
+      "Jenkinsfile_deploy",
+      "src/main/groovy/Script.groovy"
+    })
+    void acceptsGroovySourcesAndJenkinsfiles(String path) {
+        assertThat(GroovyParser.builder().build().accept(Path.of(path))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "src/main/java/org/openrewrite/jenkins/JenkinsfileAsGroovy.java",
+      "src/test/kotlin/JenkinsfileTest.kt"
+    })
+    void doesNotAcceptFilesMerelyNamedAfterJenkinsfile(String path) {
+        assertThat(GroovyParser.builder().build().accept(Path.of(path))).isFalse();
+    }
 
     @Test
     void groovyPackageDefinition() {
@@ -230,8 +263,8 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
         rewriteRun(groovy(groovy));
     }
@@ -337,4 +370,200 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineString() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  foo
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolationFollowedByTripleQuote() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""${foo}\"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringDollarVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "x"
+              String name = \"""
+                  $foo bar
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEmbeddedQuotes() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  "quoted" and ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEscapedDollar() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  \\$literal then ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+                    def a() {
+                    do {
+                    } while (c)
+                    }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultMethodWithThis() {
+        rewriteRun(
+          groovy(
+            """
+            interface A {
+
+                default void a() {
+                    this.a(false)
+                }
+
+                void a(boolean b)
+
+            }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void notInstanceOfOperator() {
+        rewriteRun(
+          groovy(
+            """
+              if (a !instanceof B) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unboundedWildcardInMethod() {
+        rewriteRun(
+          groovy(
+            """
+                    class C {
+                       // these two method together fails
+                        String a(def a1) {
+                            Map<String, ?> r = b(a1)
+                            return r.key
+                        }
+                        Map<String, ?> b(def b) {
+                        }
+                    }
+
+              """
+          )
+        );
+    }
+
+    @Test
+    void cloneDoesNotShareStylesWithOriginal() throws Exception {
+        // given
+        GroovyParser.Builder original = GroovyParser.builder();
+        NamedStyles styles = new NamedStyles(Tree.randomId(), "test", "test", "test", emptySet(), emptyList());
+
+        // when
+        GroovyParser.Builder clone = original.clone().styles(singletonList(styles));
+
+        // then
+        assertThat(styles(clone)).containsExactly(styles);
+        assertThat(styles(original)).isEmpty();
+    }
+
+    @Test
+    void cloneDoesNotShareCompilerCustomizersWithOriginal() {
+        // given
+        GroovyParser.Builder original = GroovyParser.builder();
+        AtomicInteger invocations = new AtomicInteger();
+
+        // when
+        GroovyParser.Builder clone = original.clone().compilerCustomizers(config -> invocations.incrementAndGet());
+
+        // then
+        parse(original);
+        assertThat(invocations).hasValue(0);
+        parse(clone);
+        assertThat(invocations).hasPositiveValue();
+    }
+
+    private static void parse(GroovyParser.Builder builder) {
+        builder.build().parse(new InMemoryExecutionContext(), "def a = 1").findFirst().orElseThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<NamedStyles> styles(GroovyParser.Builder builder) throws ReflectiveOperationException {
+        Field styles = GroovyParser.Builder.class.getDeclaredField("styles");
+        styles.setAccessible(true);
+        return (List<NamedStyles>) styles.get(builder);
+    }
 }

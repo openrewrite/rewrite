@@ -6,7 +6,7 @@ from typing import TypeVar, Type, Iterable, Optional, Set, cast
 from uuid import UUID
 
 from .markers import Marker
-from .utils import random_id
+from .utils import random_id, replace_if_changed
 
 
 class Style(ABC):
@@ -22,14 +22,10 @@ S = TypeVar('S', bound=Style)
 
 @dataclass(frozen=True)
 class NamedStyles(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
-    def with_id(self, id: UUID) -> NamedStyles:
-        return self if id is self._id else replace(self, _id=id)
+    def with_id(self, id: int | UUID) -> NamedStyles:
+        return replace_if_changed(self, _id=id)
 
     _name: str
     _display_name: str

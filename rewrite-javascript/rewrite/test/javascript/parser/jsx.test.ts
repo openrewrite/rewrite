@@ -1,6 +1,5 @@
 // noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptMissingConfigOption,NpmUsedModulesInstalled,TypeScriptJSXUnresolvedComponent
 
-import {describe} from "@jest/globals";
 import {JavaScriptVisitor, JSX, npm, packageJson, tsx} from "../../../src/javascript";
 import {RecipeSpec} from "../../../src/test";
 import {J, Type} from "../../../src/java";
@@ -138,7 +137,7 @@ describe("jsx mapping", () => {
         ));
 
     test("jsx namespace element", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             tsx("<foo:bar />"),
         )
@@ -146,7 +145,7 @@ describe("jsx mapping", () => {
 
 
     test("jsx member expression", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             // noinspection JSXUnresolvedComponent
             tsx("<Foo.Bar />"),
@@ -154,7 +153,7 @@ describe("jsx mapping", () => {
     });
 
     test("jsx text", () => {
-        spec.rewriteRun(
+        return spec.rewriteRun(
             //language=jsx
             tsx("<div>hello world</div>"),
         )

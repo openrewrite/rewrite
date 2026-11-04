@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -68,7 +69,9 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
               }
           }))
           // custom missing type validation
-          .afterTypeValidationOptions(TypeValidation.none())
+          .recipeQualityValidation(RecipeQualityValidation.builder()
+            .types(TypeValidation.none())
+            .build())
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
@@ -479,13 +482,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .build()
-                      .apply(
-                        updateCursor(mi),
-                        mi.getCoordinates().replace(),
-                        arguments.toArray()
-                      );
+                    mi = JavaTemplate.apply("#{any(java.lang.String)}.formatted(#{any()})", updateCursor(mi), mi.getCoordinates().replace(), arguments.toArray());
 
                     return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);

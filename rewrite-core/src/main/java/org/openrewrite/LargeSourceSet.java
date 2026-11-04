@@ -99,4 +99,28 @@ public interface LargeSourceSet {
      */
     @Nullable
     SourceFile getBefore(Path sourcePath);
+
+    /**
+     * Called when a recipe's {@code generate()} produces a file whose path collides with
+     * an existing source file or with another generated file. The generated file is silently
+     * dropped. Implementations may override this to detect the collision (e.g. the test
+     * framework raises an assertion failure).
+     *
+     * @param sourcePath    The colliding source path.
+     * @param existingFile  {@code true} if the collision is with an existing source file,
+     *                      {@code false} if it's with another generated file.
+     */
+    default void onGenerateCollision(Path sourcePath, boolean existingFile) {
+    }
+
+    /**
+     * Called when a recipe's {@code generate()} produces a file whose path is structurally invalid
+     * (for example absolute, empty, not normalized, or outside the source root). The generated file
+     * is dropped. Implementations may override this to detect the problem (e.g. the test framework
+     * raises an assertion failure).
+     *
+     * @param sourcePath The invalid source path.
+     */
+    default void onGenerateInvalidPath(Path sourcePath) {
+    }
 }

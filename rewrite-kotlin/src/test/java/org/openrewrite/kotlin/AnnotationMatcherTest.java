@@ -36,8 +36,8 @@ class AnnotationMatcherTest implements RewriteTest {
               class A
               """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
-                    AnnotationMatcher matcher = new AnnotationMatcher("@kotlin.Deprecated");
+                    var found = new AtomicBoolean(false);
+                    var matcher = new AnnotationMatcher("@kotlin.Deprecated");
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
                         public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
@@ -67,16 +67,12 @@ class AnnotationMatcherTest implements RewriteTest {
               class A
               """,
             spec -> spec.afterRecipe(cu -> {
-                AnnotationMatcher javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension.class)");
-                AtomicBoolean foundJavaStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension.class)");
+                var foundJavaStyle = getMatcherVisitor(javaStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundJavaStyle.get()).isTrue();
 
-                AnnotationMatcher kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
-                AtomicBoolean foundKotlinStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
+                var foundKotlinStyle = getMatcherVisitor(kotlinStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundKotlinStyle.get()).isTrue();
             })
           )
@@ -96,16 +92,12 @@ class AnnotationMatcherTest implements RewriteTest {
               class A
               """,
             spec -> spec.afterRecipe(cu -> {
-                AnnotationMatcher javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension.class)");
-                AtomicBoolean foundJavaStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension.class)");
+                var foundJavaStyle = getMatcherVisitor(javaStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundJavaStyle.get()).isTrue();
 
-                AnnotationMatcher kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension::class.java)");
-                AtomicBoolean foundKotlinStyle = new AtomicBoolean(false);
-
-                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension::class.java)");
+                var foundKotlinStyle = getMatcherVisitor(kotlinStyleMatcher).reduce(cu, new AtomicBoolean(false));
                 assertThat(foundKotlinStyle.get()).isTrue();
             })
           )

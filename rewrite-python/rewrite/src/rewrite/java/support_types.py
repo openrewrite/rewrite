@@ -2,39 +2,54 @@ from __future__ import annotations
 
 import weakref
 from abc import abstractmethod, ABC
-from dataclasses import dataclass, field, replace
-from enum import Enum, auto
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast
+from dataclasses import dataclass, field
+from enum import Enum, IntFlag
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
+from rewrite.utils import lst_dataclass, lst_value_dataclass, replace_if_changed
 
 if TYPE_CHECKING:
     from .visitor import JavaVisitor
 
 P = TypeVar('P')
 
+# Cached on first use to avoid the import-machinery cost of repeating
+# `from .visitor import JavaVisitor` inside is_acceptable / accept on every
+# visited Java node (millions of calls per recipe run). The lazy-then-cached
+# pattern preserves the original circular-import workaround.
+_JavaVisitor: Any = None
+
 
 class J(Tree):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def prefix(self) -> Space:
         ...
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
-        from .visitor import JavaVisitor
-        return isinstance(v, JavaVisitor)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return v.is_adaptable_to(_JavaVisitor)
 
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
-        from .visitor import JavaVisitor
-        return self.accept_java(v.adapt(J, JavaVisitor), p)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return self.accept_java(v.adapt(J, _JavaVisitor), p)
 
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']:
         ...
 
 
-@dataclass(frozen=True)
+@lst_value_dataclass
 class Comment(ABC):
     @property
     @abstractmethod
@@ -59,22 +74,12 @@ class Comment(ABC):
     def markers(self) -> Markers:
         return self._markers
 
-    def replace(self, **kwargs) -> 'Comment':
-        """Replace fields on this Comment using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+    def replace(self, **kwargs) -> Self:
+        """Replace fields on this Comment, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True)
+@lst_value_dataclass
 class TextComment(Comment):
     _multiline: bool
 
@@ -84,13 +89,13 @@ class TextComment(Comment):
 
     # IMPORTANT: This explicit constructor aligns the parameter order with the Java side
     def __init__(self, _multiline: bool, _text: str, _suffix: str, _markers: Markers) -> None:
-        object.__setattr__(self, '_multiline', _multiline)
-        object.__setattr__(self, '_text', _text)
-        object.__setattr__(self, '_suffix', _suffix)
-        object.__setattr__(self, '_markers', _markers)
+        self._multiline = _multiline  # ty: ignore[invalid-assignment]  # frozen to a checker only
+        self._text = _text  # ty: ignore[invalid-assignment]
+        self._suffix = _suffix  # ty: ignore[invalid-assignment]
+        self._markers = _markers  # ty: ignore[invalid-assignment]
 
 
-@dataclass(frozen=True)
+@lst_value_dataclass
 class Space:
     _comments: List[Comment]
 
@@ -105,21 +110,32 @@ class Space:
         return self._whitespace if self._whitespace is not None else ""
 
     def replace(self, **kwargs) -> 'Space':
-        """Replace fields on this Space using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Space, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def is_empty(self) -> bool:
         return len(self._comments) == 0 and (self._whitespace is None or self._whitespace == '')
+
+    @classmethod
+    def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
+        """A comment-free Space is the instance `shared` has for its whitespace, when there is one.
+        Every other Space is built fresh."""
+        if not comments:
+            shared = cls.shared(whitespace or '')
+            if shared is not None:
+                return shared
+        return cls(comments, whitespace)
+
+    @classmethod
+    def shared(cls, whitespace: str) -> Optional[Space]:
+        """As in Java's Space.shared, the one comment-free Space shared for `whitespace`, or None
+        when it is too long to share."""
+        if not whitespace:
+            return cls.EMPTY
+        if len(whitespace) > 50:
+            return None
+        shared = _SHARED_SPACES.get(whitespace)
+        return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:
@@ -166,270 +182,80 @@ class Space:
     EMPTY: ClassVar[Space]
     SINGLE_SPACE: ClassVar[Space]
 
-    class Location(Enum):
-        ANNOTATED_TYPE_PREFIX = auto()
-        ANNOTATIONS = auto()
-        ANNOTATION_ARGUMENTS = auto()
-        ANNOTATION_ARGUMENT_SUFFIX = auto()
-        ANNOTATION_PREFIX = auto()
-        ANY = auto()
-        ARRAY_ACCESS_PREFIX = auto()
-        ARRAY_INDEX_SUFFIX = auto()
-        ARRAY_TYPE_PREFIX = auto()
-        ASSERT_DETAIL = auto()
-        ASSERT_DETAIL_PREFIX = auto()
-        ASSERT_PREFIX = auto()
-        ASSIGNMENT = auto()
-        ASSIGNMENT_OPERATION_OPERATOR = auto()
-        ASSIGNMENT_OPERATION_PREFIX = auto()
-        ASSIGNMENT_PREFIX = auto()
-        BINARY_OPERATOR = auto()
-        BINARY_PREFIX = auto()
-        BLOCK_END = auto()
-        BLOCK_PREFIX = auto()
-        BLOCK_STATEMENT_SUFFIX = auto()
-        BREAK_PREFIX = auto()
-        CASE = auto()
-        CASE_BODY = auto()
-        CASE_EXPRESSION = auto()
-        CASE_PREFIX = auto()
-        CASE_SUFFIX = auto()
-        CATCH_ALTERNATIVE_SUFFIX = auto()
-        CATCH_PREFIX = auto()
-        CLASS_DECLARATION_PREFIX = auto()
-        CLASS_KIND = auto()
-        COMPILATION_UNIT_EOF = auto()
-        COMPILATION_UNIT_PREFIX = auto()
-        CONTINUE_PREFIX = auto()
-        CONTROL_PARENTHESES_PREFIX = auto()
-        DIMENSION = auto()
-        DIMENSION_PREFIX = auto()
-        DIMENSION_SUFFIX = auto()
-        DO_WHILE_PREFIX = auto()
-        ELSE_PREFIX = auto()
-        EMPTY_PREFIX = auto()
-        ENUM_VALUE_PREFIX = auto()
-        ENUM_VALUE_SET_PREFIX = auto()
-        ENUM_VALUE_SUFFIX = auto()
-        ERRONEOUS_PREFIX = auto()
-        EXPRESSION_PREFIX = auto()
-        EXTENDS = auto()
-        FIELD_ACCESS_NAME = auto()
-        FIELD_ACCESS_PREFIX = auto()
-        FOREACH_ITERABLE_SUFFIX = auto()
-        FOREACH_VARIABLE_SUFFIX = auto()
-        FOR_BODY_SUFFIX = auto()
-        FOR_CONDITION_SUFFIX = auto()
-        FOR_CONTROL_PREFIX = auto()
-        FOR_EACH_CONTROL_PREFIX = auto()
-        FOR_EACH_LOOP_PREFIX = auto()
-        FOR_INIT_SUFFIX = auto()
-        FOR_PREFIX = auto()
-        FOR_UPDATE_SUFFIX = auto()
-        IDENTIFIER_PREFIX = auto()
-        IF_ELSE_SUFFIX = auto()
-        IF_PREFIX = auto()
-        IF_THEN_SUFFIX = auto()
-        IMPLEMENTS = auto()
-        IMPLEMENTS_SUFFIX = auto()
-        IMPORT_ALIAS_PREFIX = auto()
-        IMPORT_PREFIX = auto()
-        IMPORT_SUFFIX = auto()
-        INSTANCEOF_PREFIX = auto()
-        INSTANCEOF_SUFFIX = auto()
-        INTERSECTION_TYPE_PREFIX = auto()
-        LABEL_PREFIX = auto()
-        LABEL_SUFFIX = auto()
-        LAMBDA_ARROW_PREFIX = auto()
-        LAMBDA_PARAMETER = auto()
-        LAMBDA_PARAMETERS_PREFIX = auto()
-        LAMBDA_PREFIX = auto()
-        LANGUAGE_EXTENSION = auto()
-        LITERAL_PREFIX = auto()
-        MEMBER_REFERENCE_CONTAINING = auto()
-        MEMBER_REFERENCE_NAME = auto()
-        MEMBER_REFERENCE_PREFIX = auto()
-        METHOD_DECLARATION_DEFAULT_VALUE = auto()
-        METHOD_DECLARATION_PARAMETERS = auto()
-        METHOD_DECLARATION_PARAMETER_SUFFIX = auto()
-        METHOD_DECLARATION_PREFIX = auto()
-        METHOD_INVOCATION_ARGUMENTS = auto()
-        METHOD_INVOCATION_ARGUMENT_SUFFIX = auto()
-        METHOD_INVOCATION_NAME = auto()
-        METHOD_INVOCATION_PREFIX = auto()
-        METHOD_SELECT_SUFFIX = auto()
-        MODIFIER_PREFIX = auto()
-        MULTI_CATCH_PREFIX = auto()
-        NAMED_VARIABLE_SUFFIX = auto()
-        NEW_ARRAY_INITIALIZER = auto()
-        NEW_ARRAY_INITIALIZER_SUFFIX = auto()
-        NEW_ARRAY_PREFIX = auto()
-        NEW_CLASS_ARGUMENTS = auto()
-        NEW_CLASS_ARGUMENTS_SUFFIX = auto()
-        NEW_CLASS_ENCLOSING_SUFFIX = auto()
-        NEW_CLASS_PREFIX = auto()
-        NEW_PREFIX = auto()
-        NULLABLE_TYPE_PREFIX = auto()
-        NULLABLE_TYPE_SUFFIX = auto()
-        PACKAGE_PREFIX = auto()
-        PACKAGE_SUFFIX = auto()
-        PARAMETERIZED_TYPE_PREFIX = auto()
-        PARENTHESES_PREFIX = auto()
-        PARENTHESES_SUFFIX = auto()
-        PERMITS = auto()
-        PERMITS_SUFFIX = auto()
-        PRIMITIVE_PREFIX = auto()
-        RECORD_STATE_VECTOR = auto()
-        RECORD_STATE_VECTOR_SUFFIX = auto()
-        RETURN_PREFIX = auto()
-        STATEMENT_PREFIX = auto()
-        STATIC_IMPORT = auto()
-        STATIC_INIT_SUFFIX = auto()
-        SWITCH_EXPRESSION_PREFIX = auto()
-        SWITCH_PREFIX = auto()
-        SYNCHRONIZED_PREFIX = auto()
-        TERNARY_FALSE = auto()
-        TERNARY_PREFIX = auto()
-        TERNARY_TRUE = auto()
-        THROWS = auto()
-        THROWS_SUFFIX = auto()
-        THROW_PREFIX = auto()
-        TRY_FINALLY = auto()
-        TRY_PREFIX = auto()
-        TRY_RESOURCE = auto()
-        TRY_RESOURCES = auto()
-        TRY_RESOURCE_SUFFIX = auto()
-        TYPE_BOUNDS = auto()
-        TYPE_BOUND_SUFFIX = auto()
-        TYPE_CAST_PREFIX = auto()
-        TYPE_PARAMETERS = auto()
-        TYPE_PARAMETERS_PREFIX = auto()
-        TYPE_PARAMETER_SUFFIX = auto()
-        UNARY_OPERATOR = auto()
-        UNARY_PREFIX = auto()
-        UNKNOWN_PREFIX = auto()
-        UNKNOWN_SOURCE_PREFIX = auto()
-        VARARGS = auto()
-        VARIABLE_DECLARATIONS_PREFIX = auto()
-        VARIABLE_INITIALIZER = auto()
-        VARIABLE_PREFIX = auto()
-        WHILE_BODY_SUFFIX = auto()
-        WHILE_CONDITION = auto()
-        WHILE_PREFIX = auto()
-        WILDCARD_BOUND = auto()
-        WILDCARD_PREFIX = auto()
-        YIELD_PREFIX = auto()
-
 
 Space.EMPTY = Space([], '')
 Space.SINGLE_SPACE = Space([], ' ')
-
-
-@dataclass
-class CoordinateBuilder:
-    tree: J
-
-    def before(self, loc: Space.Location) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc, JavaCoordinates.Mode.BEFORE)
-
-    def after(self, loc: Space.Location) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc, JavaCoordinates.Mode.AFTER)
-
-    def replace(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc, JavaCoordinates.Mode.REPLACE)
-
-
-@dataclass
-class _ExpressionCoordinateBuilder(CoordinateBuilder):
-    def after(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.EXPRESSION_PREFIX, JavaCoordinates.Mode.AFTER)
-
-    def before(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.EXPRESSION_PREFIX, JavaCoordinates.Mode.BEFORE)
-
-    def replace(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.EXPRESSION_PREFIX, JavaCoordinates.Mode.REPLACE)
-
-
-@dataclass
-class _StatementCoordinateBuilder(CoordinateBuilder):
-    def after(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.STATEMENT_PREFIX, JavaCoordinates.Mode.AFTER)
-
-    def before(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.STATEMENT_PREFIX, JavaCoordinates.Mode.BEFORE)
-
-    def replace(self, loc: Optional[Space.Location] = None) -> JavaCoordinates:
-        return JavaCoordinates(self.tree, loc or Space.Location.STATEMENT_PREFIX, JavaCoordinates.Mode.REPLACE)
-
-
-@dataclass
-class _BlockCoordinateBuilder(_StatementCoordinateBuilder):
-    def first_statement(self) -> JavaCoordinates:
-        if not self.tree.statements:
-            return self.last_statement()
-        return self.tree.statements[0].get_coordinates().before()
-
-    def last_statement(self) -> JavaCoordinates:
-        return self.before(Space.Location.BLOCK_END)
-
-
-CoordinateBuilder.Expression = _ExpressionCoordinateBuilder  # type: ignore
-CoordinateBuilder.Statement = _StatementCoordinateBuilder  # type: ignore
-CoordinateBuilder.Block = _BlockCoordinateBuilder  # type: ignore
-
-
-@dataclass
-class JavaCoordinates:
-    tree: J
-    loc: Space.Location
-    mode: Mode
-
-    def is_replacement(self) -> bool:
-        return self.mode == JavaCoordinates.Mode.REPLACE
-
-    class Mode(Enum):
-        AFTER = 0,
-        BEFORE = 1,
-        REPLACE = 2,
+_SHARED_SPACES: Dict[str, Space] = {' ': Space.SINGLE_SPACE}
 
 
 class JavaSourceFile(J, SourceFile):
-    pass
+    __slots__ = ()
 
 
 class Expression(J):
-    def get_coordinates(self) -> CoordinateBuilder.Expression:  # type: ignore
-        return CoordinateBuilder.Expression(self)  # type: ignore
+    __slots__ = ()
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class Statement(J):
-    def get_coordinates(self) -> CoordinateBuilder.Statement:  # type: ignore
-        return CoordinateBuilder.Statement(self)  # type: ignore
+    __slots__ = ()
 
 
 class TypedTree(J):
-    pass
+    __slots__ = ()
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        return None
 
 
 class NameTree(TypedTree):
-    pass
+    __slots__ = ()
 
 
 class TypeTree(NameTree):
-    pass
+    __slots__ = ()
 
 
 class Loop(Statement):
-    pass
+    __slots__ = ()
 
 
 class MethodCall(Expression):
-    pass
+    __slots__ = ()
 
 
-class JavaType(ABC):
-    class FullyQualified:
+def _fully_qualified_repr(self) -> str:
+    """A type's identity, not its graph: `object` is reachable from nearly every
+    method signature, so expanding fields re-prints everything reachable at every
+    position it occupies. Assigned in each subclass body because `dataclass`
+    generates a `__repr__` unless the body defines one."""
+    return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
+
+
+# Mirrors Java, where every kind of type implements the `JavaType` interface. A nested class
+# cannot name the class that encloses it, so at runtime the nested bases resolve to this
+# placeholder and are rebased onto the real `JavaType` once its body has run.
+if not TYPE_CHECKING:
+    class JavaType:
+        __slots__ = ()
+
+    _JavaTypePlaceholder = JavaType
+
+
+class JavaType:
+    __slots__ = ()
+
+    class Flag(IntFlag):
+        """Bits of a type's ``flags_bit_map``, the same as Java's ``org.openrewrite.java.tree.Flag``."""
+        Static = 1 << 3
+
+    class FullyQualified(JavaType):
+        __slots__ = ()
+
         class Kind(Enum):
             Class = 0
             Enum = 1
@@ -437,35 +263,207 @@ class JavaType(ABC):
             Annotation = 3
             Record = 4
 
-    class Unknown(FullyQualified):
-        pass
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            return getattr(self, '_supertype', None)
 
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            return getattr(self, '_interfaces', None) or []
+
+    class Unknown(FullyQualified):
+        __slots__ = ()
+
+        # Carries no name to render, and a heap address would make the repr of every
+        # node holding one differ run to run.
+        def __repr__(self) -> str:
+            return 'JavaType.Unknown()'
+
+    # Identity equality, as for the other `lst_dataclass` types here: a type graph is
+    # cyclic through members and methods, and Java compares these on name and type
+    # parameters alone.
+    @lst_dataclass
     class Class(FullyQualified):
-        _flags_bit_map: int
-        _fully_qualified_name: str
-        _kind: FullyQualified.Kind
-        _type_parameters: Optional[List[JavaType]]
-        _supertype: Optional[JavaType.FullyQualified]
-        _owning_class: Optional[JavaType.FullyQualified]
-        _annotations: Optional[List[JavaType.FullyQualified]]
-        _interfaces: Optional[List[JavaType.FullyQualified]]
-        _members: Optional[List[JavaType.Variable]]
-        _methods: Optional[List[JavaType.Method]]
+        _flags_bit_map: int = 0
+        _fully_qualified_name: str = ''
+        # `Kind` lives on the base, which a nested class body cannot see, so the
+        # declaration-time default is filled in once the module is loaded.
+        _kind: Optional[JavaType.FullyQualified.Kind] = None
+        _type_parameters: Optional[List[JavaType]] = None
+        _supertype: Optional[JavaType.FullyQualified] = None
+        _owning_class: Optional[JavaType.FullyQualified] = None
+        _annotations: Optional[List[JavaType.FullyQualified]] = None
+        _interfaces: Optional[List[JavaType.FullyQualified]] = None
+        _members: Optional[List[JavaType.Variable]] = None
+        _methods: Optional[List[JavaType.Method]] = None
+
+        __repr__ = _fully_qualified_repr
+
+        def __post_init__(self):
+            if self._kind is None:
+                self._kind = JavaType.FullyQualified.Kind.Class
+
+        @property
+        def fully_qualified_name(self) -> str:
+            return self._fully_qualified_name
 
     class ShallowClass(Class):
-        pass
+        __slots__ = ()
 
+    @lst_dataclass
     class Parameterized(FullyQualified):
-        _type: JavaType.FullyQualified
-        _type_parameters: Optional[List[JavaType]]
+        _type: Optional[JavaType.FullyQualified] = None
+        _type_parameters: Optional[List[JavaType]] = None
 
-    class GenericTypeVariable:
+        __repr__ = _fully_qualified_repr
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return cast(JavaType.FullyQualified, self._type)
+
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]:
+            return self._type_parameters
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
+
+    @lst_dataclass
+    class Annotation(FullyQualified):
+        _type: Optional[JavaType.FullyQualified] = None
+        _values: Optional[List[JavaType.Annotation.ElementValue]] = None
+
+        __repr__ = _fully_qualified_repr
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return cast(JavaType.FullyQualified, self._type)
+
+        @property
+        def values(self) -> List[JavaType.Annotation.ElementValue]:
+            return self._values if self._values is not None else []
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+        @property
+        def supertype(self) -> Optional[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.supertype if t is not None else None
+
+        @property
+        def interfaces(self) -> List[JavaType.FullyQualified]:
+            t = getattr(self, '_type', None)
+            return t.interfaces if t is not None else []
+
+        class ElementValue(ABC):
+            """Base class for annotation element values."""
+
+            __slots__ = ()
+
+            @property
+            @abstractmethod
+            def element(self) -> Optional[JavaType]:
+                ...
+
+        @dataclass(slots=True)
+        class SingleElementValue(ElementValue):
+            """A single annotation element value (one constant or one reference)."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_value: Optional[Any] = field(default=None)
+            _reference_value: Optional[JavaType] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_value(self) -> Optional[Any]:
+                return self._constant_value
+
+            @property
+            def reference_value(self) -> Optional[JavaType]:
+                return self._reference_value
+
+        @dataclass(slots=True)
+        class ArrayElementValue(ElementValue):
+            """An array of annotation element values."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_values: Optional[List[Any]] = field(default=None)
+            _reference_values: Optional[List[JavaType]] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_values(self) -> Optional[List[Any]]:
+                return self._constant_values
+
+            @property
+            def reference_values(self) -> Optional[List[JavaType]]:
+                return self._reference_values
+
+    @dataclass(slots=True)
+    class GenericTypeVariable(JavaType):
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
 
-    class Primitive(Enum):
+        _name: str = field(default="")
+        _variance: JavaType.GenericTypeVariable.Variance = field(default=Variance.Invariant)
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def variance(self) -> JavaType.GenericTypeVariable.Variance:
+            return self._variance
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass(slots=True)
+    class Union(JavaType):
+        """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass(slots=True)
+    class Intersection(JavaType):
+        """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    class Primitive(JavaType, Enum):
         Boolean = 0
         Byte = 1
         Char = 2
@@ -485,8 +483,8 @@ class JavaType(ABC):
                 return cls.None_
             return super()._missing_(value)
 
-    @dataclass
-    class Method:
+    @dataclass(slots=True)
+    class Method(JavaType):
         _flags_bit_map: int = field(default=0)
         _declaring_type: Optional[JavaType.FullyQualified] = field(default=None)
         _name: str = field(default="")
@@ -509,6 +507,12 @@ class JavaType(ABC):
         @property
         def name(self) -> str:
             return self._name
+
+        @property
+        def is_constructor(self) -> bool:
+            """The model names a construction ``<constructor>``; ``<init>`` is javac's
+            name for the same thing, which MethodMatcher accepts as an alias."""
+            return self._name in ('<constructor>', '<init>')
 
         @property
         def return_type(self) -> Optional[JavaType]:
@@ -538,11 +542,53 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]:
             return self._declared_formal_type_names
 
-    class Variable:
-        pass
+    @dataclass(slots=True)
+    class Variable(JavaType):
+        _flags_bit_map: int = field(default=0)
+        _name: str = field(default="")
+        _owner: Optional[JavaType] = field(default=None)
+        _type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
-    class Array:
-        pass
+        @property
+        def flags_bit_map(self) -> int:
+            return self._flags_bit_map
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def owner(self) -> Optional[JavaType]:
+            return self._owner
+
+        @property
+        def type(self) -> Optional[JavaType]:
+            return self._type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
+
+    @dataclass(slots=True)
+    class Array(JavaType):
+        _elem_type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+
+        @property
+        def elem_type(self) -> Optional[JavaType]:
+            return self._elem_type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
+
+
+if not TYPE_CHECKING:
+    for _nested in vars(JavaType).values():
+        if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
+            _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
+    del _nested, _JavaTypePlaceholder
 
 
 T = TypeVar('T')
@@ -550,7 +596,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 
-@dataclass(frozen=True)
+@lst_dataclass
 class JRightPadded(Generic[T]):
     _element: T
 
@@ -579,27 +625,24 @@ class JRightPadded(Generic[T]):
         return hash(self._element)
 
     def replace(self, **kwargs) -> 'JRightPadded[T]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
+        """Replace fields on this JRightPadded, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     @classmethod
     def get_elements(cls, padded_list: List[JRightPadded[T]]) -> List[T]:
         return [x.element for x in padded_list]
 
     @classmethod
-    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2 | JRightPadded[J2]]) -> List[JRightPadded[J2]]:
+        # Helper to extract element - handles both wrapped JRightPadded and unwrapped elements
+        def get_element(t):
+            return t.element if isinstance(t, JRightPadded) else t
+
         # a cheaper check for the most common case when there are no changes
         if len(elements) == len(before):
             has_changes = False
             for i in range(len(before)):
-                if before[i].element is not elements[i]:
+                if before[i].element is not get_element(elements[i]):
                     has_changes = True
                     break
             if not has_changes:
@@ -616,63 +659,18 @@ class JRightPadded(Generic[T]):
             before_by_id[j.element.id] = j
 
         for t in elements:
-            found = before_by_id.get(t.id)
+            elem = get_element(t)
+            found = before_by_id.get(elem.id)
             if found is not None:
-                after.append(found.replace(element=t))
+                after.append(found.replace(element=elem))
             else:
-                after.append(JRightPadded(t, Space.EMPTY, Markers.EMPTY))
+                after.append(JRightPadded(elem, Space.EMPTY, Markers.EMPTY))
 
         return after
 
-    class Location(Enum):
-        ANNOTATION_ARGUMENT = Space.Location.ANNOTATION_ARGUMENT_SUFFIX
-        ARRAY_INDEX = Space.Location.ARRAY_INDEX_SUFFIX
-        BLOCK_STATEMENT = Space.Location.BLOCK_STATEMENT_SUFFIX
-        CASE = Space.Location.CASE_SUFFIX
-        CASE_BODY = Space.Location.CASE_BODY
-        CASE_EXPRESSION = Space.Location.CASE_EXPRESSION
-        CATCH_ALTERNATIVE = Space.Location.CATCH_ALTERNATIVE_SUFFIX
-        DIMENSION = Space.Location.DIMENSION_SUFFIX
-        ENUM_VALUE = Space.Location.ENUM_VALUE_SUFFIX
-        FOREACH_ITERABLE = Space.Location.FOREACH_ITERABLE_SUFFIX
-        FOREACH_VARIABLE = Space.Location.FOREACH_VARIABLE_SUFFIX
-        FOR_BODY = Space.Location.FOR_BODY_SUFFIX
-        FOR_CONDITION = Space.Location.FOR_CONDITION_SUFFIX
-        FOR_INIT = Space.Location.FOR_INIT_SUFFIX
-        FOR_UPDATE = Space.Location.FOR_UPDATE_SUFFIX
-        IF_ELSE = Space.Location.IF_ELSE_SUFFIX
-        IF_THEN = Space.Location.IF_THEN_SUFFIX
-        IMPLEMENTS = Space.Location.IMPLEMENTS_SUFFIX
-        IMPORT = Space.Location.IMPORT_SUFFIX
-        INSTANCEOF = Space.Location.INSTANCEOF_SUFFIX
-        LABEL = Space.Location.LABEL_SUFFIX
-        LAMBDA_PARAM = Space.Location.LAMBDA_PARAMETER
-        LANGUAGE_EXTENSION = Space.Location.LANGUAGE_EXTENSION
-        MEMBER_REFERENCE_CONTAINING = Space.Location.MEMBER_REFERENCE_CONTAINING
-        METHOD_DECLARATION_PARAMETER = Space.Location.METHOD_DECLARATION_PARAMETER_SUFFIX
-        METHOD_INVOCATION_ARGUMENT = Space.Location.METHOD_INVOCATION_ARGUMENT_SUFFIX
-        METHOD_SELECT = Space.Location.METHOD_SELECT_SUFFIX
-        NAMED_VARIABLE = Space.Location.NAMED_VARIABLE_SUFFIX
-        NEW_ARRAY_INITIALIZER = Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX
-        NEW_CLASS_ARGUMENTS = Space.Location.NEW_CLASS_ARGUMENTS_SUFFIX
-        NEW_CLASS_ENCLOSING = Space.Location.NEW_CLASS_ENCLOSING_SUFFIX
-        NULLABLE = Space.Location.NULLABLE_TYPE_SUFFIX
-        PACKAGE = Space.Location.PACKAGE_SUFFIX
-        PARENTHESES = Space.Location.PARENTHESES_SUFFIX
-        PERMITS = Space.Location.PERMITS_SUFFIX
-        RECORD_STATE_VECTOR = Space.Location.RECORD_STATE_VECTOR_SUFFIX
-        STATIC_INIT = Space.Location.STATIC_INIT_SUFFIX
-        THROWS = Space.Location.THROWS_SUFFIX
-        TRY_RESOURCE = Space.Location.TRY_RESOURCE_SUFFIX
-        TYPE_BOUND = Space.Location.TYPE_BOUND_SUFFIX
-        TYPE_PARAMETER = Space.Location.TYPE_PARAMETER_SUFFIX
-        WHILE_BODY = Space.Location.WHILE_BODY_SUFFIX
-
-        def __init__(self, after_location: Space.Location):
-            self.after_location = after_location
 
 
-@dataclass(frozen=True)
+@lst_dataclass
 class JLeftPadded(Generic[T]):
     _before: Space
 
@@ -701,44 +699,12 @@ class JLeftPadded(Generic[T]):
         return hash(self._element)
 
     def replace(self, **kwargs) -> 'JLeftPadded[T]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
-
-    class Location(Enum):
-        ARRAY_TYPE_DIMENSION = Space.Location.DIMENSION_PREFIX
-        ASSERT_DETAIL = Space.Location.ASSERT_DETAIL_PREFIX
-        ASSIGNMENT = Space.Location.ASSIGNMENT
-        ASSIGNMENT_OPERATION_OPERATOR = Space.Location.ASSIGNMENT_OPERATION_OPERATOR
-        BINARY_OPERATOR = Space.Location.BINARY_OPERATOR
-        CLASS_KIND = Space.Location.CLASS_KIND
-        DIMENSION_PREFIX = Space.Location.CLASS_KIND
-        EXTENDS = Space.Location.EXTENDS
-        FIELD_ACCESS_NAME = Space.Location.FIELD_ACCESS_NAME
-        IMPORT_ALIAS_PREFIX = Space.Location.IMPORT_ALIAS_PREFIX
-        LANGUAGE_EXTENSION = Space.Location.LANGUAGE_EXTENSION
-        MEMBER_REFERENCE_NAME = Space.Location.MEMBER_REFERENCE_NAME
-        METHOD_DECLARATION_DEFAULT_VALUE = Space.Location.METHOD_DECLARATION_DEFAULT_VALUE
-        STATIC_IMPORT = Space.Location.STATIC_IMPORT
-        TERNARY_FALSE = Space.Location.TERNARY_FALSE
-        TERNARY_TRUE = Space.Location.TERNARY_TRUE
-        TRY_FINALLY = Space.Location.TRY_FINALLY
-        UNARY_OPERATOR = Space.Location.UNARY_OPERATOR
-        VARIABLE_INITIALIZER = Space.Location.VARIABLE_INITIALIZER
-        WHILE_CONDITION = Space.Location.WHILE_CONDITION
-        WILDCARD_BOUND = Space.Location.WILDCARD_BOUND
-
-        def __init__(self, before_location: Space.Location):
-            self.before_location = before_location
+        """Replace fields on this JLeftPadded, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True)
+
+@lst_dataclass
 class JContainer(Generic[J2]):
     _before: Space
 
@@ -769,15 +735,8 @@ class JContainer(Generic[J2]):
         return hash(tuple(self._elements))
 
     def replace(self, **kwargs) -> 'JContainer[J2]':
-        """Replace fields using keyword arguments."""
-        # Map public property names to private field names
-        mapped = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_') and hasattr(self, f'_{key}'):
-                mapped[f'_{key}'] = value
-            else:
-                mapped[key] = value
-        return replace(self, **mapped)
+        """Replace fields on this JContainer, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     @dataclass
     class PaddingHelper(Generic[J3]):
@@ -788,13 +747,7 @@ class JContainer(Generic[J2]):
             return self._t._elements
 
         def replace(self, **kwargs) -> JContainer[J3]:
-            """Replace fields of the container using keyword arguments."""
-            if 'elements' in kwargs:
-                elements = kwargs['elements']
-                if self._t._elements is elements:
-                    return self._t
-                return JContainer(self._t._before, elements, self._t._markers)
-            return self._t
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 
@@ -807,7 +760,7 @@ class JContainer(Generic[J2]):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = JContainer.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -821,33 +774,11 @@ class JContainer(Generic[J2]):
             return JContainer(Space.EMPTY, JRightPadded.merge_elements([], elements), Markers.EMPTY)
         return before.padding.replace(elements=JRightPadded.merge_elements(before._elements, elements))
 
-    _EMPTY: Optional[JContainer[J]] = None
+    _EMPTY: ClassVar[Optional[JContainer[J]]] = None
 
     @classmethod
     def empty(cls) -> JContainer[J2]:
         if cls._EMPTY is None:
             cls._EMPTY = JContainer(Space.EMPTY, [], Markers.EMPTY)
-        return cls._EMPTY  # type: ignore
+        return cls._EMPTY  # ty: ignore[invalid-return-type]  # _EMPTY is JContainer[J] but J2 is bound to J
 
-    class Location(Enum):
-        ANNOTATION_ARGUMENTS = (Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT)
-        CASE = (Space.Location.CASE, JRightPadded.Location.CASE)
-        CASE_EXPRESSION = (Space.Location.CASE_EXPRESSION, JRightPadded.Location.CASE_EXPRESSION)
-        IMPLEMENTS = (Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS)
-        LANGUAGE_EXTENSION = (Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION)
-        METHOD_DECLARATION_PARAMETERS = (
-            Space.Location.METHOD_DECLARATION_PARAMETERS, JRightPadded.Location.METHOD_DECLARATION_PARAMETER)
-        METHOD_INVOCATION_ARGUMENTS = (
-            Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT)
-        NEW_ARRAY_INITIALIZER = (Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER)
-        NEW_CLASS_ARGUMENTS = (Space.Location.NEW_CLASS_ARGUMENTS, JRightPadded.Location.NEW_CLASS_ARGUMENTS)
-        PERMITS = (Space.Location.PERMITS, JRightPadded.Location.PERMITS)
-        RECORD_STATE_VECTOR = (Space.Location.RECORD_STATE_VECTOR, JRightPadded.Location.RECORD_STATE_VECTOR)
-        THROWS = (Space.Location.THROWS, JRightPadded.Location.THROWS)
-        TRY_RESOURCES = (Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCE)
-        TYPE_BOUNDS = (Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND)
-        TYPE_PARAMETERS = (Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER)
-
-        def __init__(self, before_location: Space.Location, element_location: JRightPadded.Location):
-            self.before_location = before_location
-            self.element_location = element_location

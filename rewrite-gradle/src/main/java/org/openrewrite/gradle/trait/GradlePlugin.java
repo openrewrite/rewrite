@@ -48,6 +48,20 @@ public class GradlePlugin implements Trait<J> {
 
     boolean applied;
 
+    /**
+     * A plugin Gradle itself ships, which can be named in a `plugins` block with no version and needs nothing on the
+     * `buildscript` classpath. That distinction decides whether an `apply plugin:` statement can be rewritten into a
+     * `plugins` block without also resolving a version for it.
+     */
+    public static boolean isCorePlugin(String pluginId) {
+        for (String pluginName : Matcher.CORE_PLUGIN_NAMES) {
+            if (pluginName.equals(pluginId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static class Matcher extends GradleTraitMatcher<GradlePlugin> {
         private static final MethodMatcher ALIAS_DSL_MATCHER = new MethodMatcher("* alias(..)", false);
         private static final MethodMatcher APPLY_DSL_MATCHER = new MethodMatcher("* apply(..)", false);
@@ -141,35 +155,38 @@ public class GradlePlugin implements Trait<J> {
 
                         return maybeGradlePlugin(cursor, null, null, null, true);
                     } else if (APPLY_DSL_MATCHER.matches(m, true)) {
-                        if (!(m.getArguments().get(0) instanceof J.Literal) || !(m.getSelect() instanceof J.MethodInvocation)) {
+                        Expression applyArg = m.getArguments().get(0).unwrap();
+                        if (!(applyArg instanceof J.Literal) || !(m.getSelect() instanceof J.MethodInvocation)) {
                             return null;
                         }
 
                         J.MethodInvocation versionSelect = (J.MethodInvocation) m.getSelect();
+                        Expression versionArg = versionSelect.getArguments().get(0).unwrap();
                         if (!PLUGIN_VERSION_DSL_MATCHER.matches(versionSelect, true) ||
-                                !(versionSelect.getArguments().get(0) instanceof J.Literal) ||
+                                !(versionArg instanceof J.Literal) ||
                                 !(versionSelect.getSelect() instanceof J.MethodInvocation)) {
                             return null;
                         }
 
                         J.MethodInvocation idSelect = (J.MethodInvocation) versionSelect.getSelect();
+                        Expression idArg = idSelect.getArguments().get(0).unwrap();
                         if (!(PLUGIN_ID_DSL_MATCHER.matches(idSelect, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(idSelect, true)) ||
-                                !(idSelect.getArguments().get(0) instanceof J.Literal)) {
+                                !(idArg instanceof J.Literal)) {
                             return null;
                         }
 
-                        J.Literal idLiteral = (J.Literal) idSelect.getArguments().get(0);
-                        J.Literal versionLiteral = (J.Literal) versionSelect.getArguments().get(0);
-                        J.Literal applyLiteral = (J.Literal) m.getArguments().get(0);
+                        J.Literal idLiteral = (J.Literal) idArg;
+                        J.Literal versionLiteral = (J.Literal) versionArg;
+                        J.Literal applyLiteral = (J.Literal) applyArg;
                         String pluginId = "kotlin".equals(idSelect.getSimpleName()) ? "org.jetbrains.kotlin." + idLiteral.getValue() : (String) idLiteral.getValue();
                         String version = (String) versionLiteral.getValue();
                         boolean applied = Boolean.TRUE.equals(applyLiteral.getValue());
                         return maybeGradlePlugin(cursor, pluginId, null, version, applied);
                     } else if (PLUGIN_VERSION_DSL_MATCHER.matches(m, true)) {
                         String version = null;
-                        if (m.getArguments().get(0) instanceof J.Literal) {
-                            J.Literal versionLiteral = (J.Literal) m.getArguments().get(0);
-                            version = (String) versionLiteral.getValue();
+                        Expression versionArg = m.getArguments().get(0).unwrap();
+                        if (versionArg instanceof J.Literal) {
+                            version = (String) ((J.Literal) versionArg).getValue();
                         }
 
                         if (!(m.getSelect() instanceof J.MethodInvocation &&
@@ -178,19 +195,21 @@ public class GradlePlugin implements Trait<J> {
                         }
 
                         J.MethodInvocation select = (J.MethodInvocation) m.getSelect();
-                        if (!(select.getArguments().get(0) instanceof J.Literal)) {
+                        Expression idArg = select.getArguments().get(0).unwrap();
+                        if (!(idArg instanceof J.Literal)) {
                             return null;
                         }
 
-                        J.Literal idLiteral = (J.Literal) select.getArguments().get(0);
+                        J.Literal idLiteral = (J.Literal) idArg;
                         String pluginId = "kotlin".equals(select.getSimpleName()) ? "org.jetbrains.kotlin." + idLiteral.getValue() : (String) idLiteral.getValue();
                         return maybeGradlePlugin(cursor, pluginId, null, version, !withinBlock(cursor, "pluginManagement"));
                     } else if (PLUGIN_ID_DSL_MATCHER.matches(m, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(m, true)) {
-                        if (!(m.getArguments().get(0) instanceof J.Literal)) {
+                        Expression arg = m.getArguments().get(0).unwrap();
+                        if (!(arg instanceof J.Literal)) {
                             return null;
                         }
 
-                        J.Literal literal = (J.Literal) m.getArguments().get(0);
+                        J.Literal literal = (J.Literal) arg;
                         String pluginId = "kotlin".equals(m.getSimpleName()) ? "org.jetbrains.kotlin." + literal.getValue() : (String) literal.getValue();
                         return maybeGradlePlugin(cursor, pluginId, null, null, !withinBlock(cursor, "pluginManagement"));
                     }
@@ -240,12 +259,15 @@ public class GradlePlugin implements Trait<J> {
 
         private boolean withinPlugins(Cursor cursor) {
             Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-            if (parent.isRoot() || !"plugins".equals(((J.MethodInvocation) parent.getValue()).getSimpleName())) {
-                return false;
+            while (!parent.isRoot()) {
+                J.MethodInvocation parentMethod = parent.getValue();
+                if ("plugins".equals(parentMethod.getSimpleName())) {
+                    parent = parent.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
+                    return parent.isRoot() || "pluginManagement".equals(((J.MethodInvocation) parent.getValue()).getSimpleName());
+                }
+                parent = parent.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
             }
-
-            parent = parent.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-            return parent.isRoot() || "pluginManagement".equals(((J.MethodInvocation) parent.getValue()).getSimpleName());
+            return false;
         }
 
         private boolean isProjectReceiver(Cursor cursor) {
@@ -266,12 +288,7 @@ public class GradlePlugin implements Trait<J> {
         }
 
         private boolean isCorePlugin(String pluginId) {
-            for (String pluginName : CORE_PLUGIN_NAMES) {
-                if (pluginName.equals(pluginId)) {
-                    return true;
-                }
-            }
-            return false;
+            return GradlePlugin.isCorePlugin(pluginId);
         }
 
         private @Nullable GradlePlugin maybeGradlePlugin(Cursor cursor, @Nullable String pluginId, @Nullable String pluginClass, @Nullable String version, boolean applied) {

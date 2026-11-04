@@ -1,0 +1,205 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package format
+
+import (
+	"strings"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+// SpacesVisitor enforces gofmt's intra-line spacing rules:
+//
+//   - One space after `import`.
+//   - No space around unary operators (`!x`, `-y`).
+//   - One space after commas in argument/parameter lists
+//     (RightPadded.After fields don't get touched here — they precede
+//     the comma, not follow it).
+//   - One space around `=` and `:=` (Assignment / VariableDeclarator).
+//
+// Non-trivial whitespace (containing newlines) is preserved on the
+// theory that it was authored deliberately. SpacesVisitor only fixes
+// "0 spaces" and "2+ spaces" in single-line contexts; multi-line
+// expressions are left to the author and the indent visitor.
+type SpacesVisitor struct {
+	visitor.GoVisitor
+	stopAfterTracker
+}
+
+func NewSpacesVisitor(stopAfter java.Tree) *SpacesVisitor {
+	return visitor.Init(&SpacesVisitor{
+		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
+	})
+}
+
+func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
+	if v.shouldHalt() {
+		return t
+	}
+	out := v.GoVisitor.Visit(t, p)
+	v.noteVisited(t)
+	return out
+}
+
+// VisitCompilationUnit writes one space after each `import` keyword, ahead of
+// the `(` of a grouped declaration or the spec of an ungrouped one.
+func (v *SpacesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	if cu.Imports != nil {
+		markers := cu.Imports.Markers
+		group := java.FindMarker[golang.GroupedImport](markers)
+		if group != nil {
+			if before := ensureSingleSpace(group.Before); !java.SpaceEqual(before, group.Before) {
+				spaced := *group
+				spaced.Before = before
+				markers = withMarker(markers, spaced)
+			}
+		}
+		grouped := group != nil
+		elements := eachPadded(cu.Imports.Elements, func(rp java.RightPadded[*java.Import]) java.RightPadded[*java.Import] {
+			// Each declaration after the first starts at a spec that carries
+			// its `import` keyword on an ImportBlock marker.
+			block := java.FindMarker[golang.ImportBlock](rp.Element.Markers)
+			if block != nil {
+				grouped = block.Grouped
+			}
+			switch {
+			case block != nil && grouped:
+				if before := ensureSingleSpace(block.GroupedBefore); !java.SpaceEqual(before, block.GroupedBefore) {
+					spaced := *block
+					spaced.GroupedBefore = before
+					rp.Element = rp.Element.WithMarkers(withMarker(rp.Element.Markers, spaced))
+				}
+			case !grouped:
+				rp.Element = rp.Element.WithPrefix(ensureSingleSpace(rp.Element.Prefix))
+			}
+			return rp
+		})
+		if !java.MarkersEqual(markers, cu.Imports.Markers) || !java.SameSlice(elements, cu.Imports.Elements) {
+			imports := *cu.Imports
+			imports.Markers = markers
+			imports.Elements = elements
+			cu = cu.WithImports(&imports)
+		}
+	}
+	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
+// withMarker replaces the marker of m's entries that has marker's type.
+func withMarker[M java.Marker](m java.Markers, marker M) java.Markers {
+	entries := append([]java.Marker(nil), m.Entries()...)
+	for i, e := range entries {
+		if _, same := e.(M); same {
+			entries[i] = marker
+		}
+	}
+	return java.MakeMarkers(m.GetID(), entries)
+}
+
+func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {
+	a = v.GoVisitor.VisitAssignment(a, p).(*java.Assignment)
+	before := ensureSingleSpace(a.Value.Before)
+	value := ensureLeadingSingleSpace(a.Value.Element)
+	if java.SpaceEqual(before, a.Value.Before) && value == a.Value.Element {
+		return a
+	}
+	c := *a
+	c.Value.Before = before
+	c.Value.Element = value
+	return &c
+}
+
+func (v *SpacesVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
+	ao = v.GoVisitor.VisitAssignmentOperation(ao, p).(*java.AssignmentOperation)
+	before := ensureSingleSpace(ao.Operator.Before)
+	assignment := ensureLeadingSingleSpace(ao.Assignment)
+	if java.SpaceEqual(before, ao.Operator.Before) && assignment == ao.Assignment {
+		return ao
+	}
+	c := *ao
+	c.Operator.Before = before
+	c.Assignment = assignment
+	return &c
+}
+
+// VisitUnary writes the operand straight after the operator, except where the
+// two would then lex as one token.
+func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
+	u = v.GoVisitor.VisitUnary(u, p).(*java.Unary)
+	tightened := clearExpressionLeadingSpace(u.Operand)
+	op, ahead := prefixOperator(u.Operator.Element)
+	if !ahead || !fusesWith(op, printer.Print(tightened)) {
+		u = u.WithOperand(tightened)
+	}
+	return u
+}
+
+// prefixOperator returns the operator text for the forms that write it ahead of
+// the operand. The postfix forms report false: their operator lands on the far
+// side of the operand and never meets its leading space.
+func prefixOperator(op java.UnaryOperator) (string, bool) {
+	switch op {
+	case java.PostIncrement, java.PostDecrement:
+		return "", false
+	}
+	return printer.UnaryOperatorString(op), true
+}
+
+// ensureSingleSpace returns the space unchanged if it contains a
+// newline (deliberate multi-line layout), otherwise normalizes any
+// 0-or-many-spaces to exactly one space.
+func ensureSingleSpace(s java.Space) java.Space {
+	if strings.Contains(s.Whitespace(), "\n") {
+		return s
+	}
+	if s.Whitespace() == " " {
+		return s
+	}
+	s = java.MakeSpace(s.Comments(), " ")
+	return s
+}
+
+// ensureLeadingSingleSpace ensures an Expression's Prefix is a single
+// space. The parser attaches the leading whitespace to the outermost
+// element, so this operates on the expression's own Prefix.
+func ensureLeadingSingleSpace(e java.Expression) java.Expression {
+	if e == nil {
+		return e
+	}
+	out := transformPrefix(e, ensureSingleSpace)
+	if r, ok := out.(java.Expression); ok {
+		return r
+	}
+	return e
+}
+
+func clearExpressionLeadingSpace(e java.Expression) java.Expression {
+	if e == nil {
+		return e
+	}
+	prefix := getPrefix(e)
+	if strings.Contains(prefix.Whitespace(), "\n") {
+		return e
+	}
+	if prefix.Whitespace() == "" {
+		return e
+	}
+	prefix = java.MakeSpace(prefix.Comments(), "")
+	return withPrefix(e, prefix)
+}

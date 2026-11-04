@@ -17,12 +17,11 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.internal.NameCaseConvention.Compiled;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
@@ -31,14 +30,24 @@ import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.StreamSupport.stream;
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
+    /**
+     * The ids of children whose visit decided they're deleted, kept on their parent's cursor for its visit to act on.
+     */
+    private static final String TO_BE_REMOVED = DeleteProperty.class.getName() + ".TO_BE_REMOVED";
+
+    /**
+     * The inline comment that ends the last line of a child, by the child's id, kept on its parent's cursor once the
+     * deleted entry that held it is gone. The parser puts such a comment in the prefix of whatever follows.
+     */
+    private static final String TRAILING_COMMENT = DeleteProperty.class.getName() + ".TRAILING_COMMENT";
+
     @Option(displayName = "Property key",
-            description = "The key to be deleted.",
-            example = "management.metrics.binders.files.enabled")
+            description = "The key to be deleted. Supports glob patterns.",
+            example = "management.metrics.binders.files.*")
     String propertyKey;
 
     @Deprecated
@@ -71,12 +80,15 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                // TODO: Update DeleteProperty to support documents having Anchor / Alias Pairs
-                if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, ctx)) {
+                if (ReplaceAliasWithAnchorValueVisitor.hasResolvableAlias(documents)) {
                     return documents;
                 }
                 return super.visitDocuments(documents, ctx);
@@ -95,94 +107,208 @@ public class DeleteProperty extends Recipe {
                         .map(e2 -> e2.getKey().getValue())
                         .collect(joining("."));
 
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
-                    doAfterVisit(new DeletePropertyVisitor<>(entry));
+                if (keyMatcher.matchesGlob(prop)) {
+                    e = toBeRemoved(e);
                     if (Boolean.TRUE.equals(coalesce)) {
                         maybeCoalesceProperties();
                     }
+                } else if (isToBeRemoved(e.getValue())) {
+                    // a mapping or sequence emptied of its entries goes with its key
+                    e = toBeRemoved(e);
+                } else {
+                    trailingComment(e, trailingComment(e.getValue()));
                 }
 
                 return e;
             }
-        });
-    }
 
-    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
-        private final Yaml.Mapping.Entry scope;
-
-        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
-            this.scope = scope;
-        }
-
-        @Override
-        public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-            sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
-            List<Yaml.Sequence.Entry> entries = sequence.getEntries();
-            if (entries.isEmpty()) {
-                return sequence;
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                Yaml.Document d = super.visitDocument(document, ctx);
+                String comment = trailingComment(d.getBlock());
+                return comment == null ? d : d.withEnd(d.getEnd().withPrefix(comment + d.getEnd().getPrefix()));
             }
 
-            entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
-            return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
-        }
-
-        @Override
-        public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-            entry = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
-            if (entry.getBlock() instanceof Yaml.Mapping) {
-                Yaml.Mapping m = (Yaml.Mapping) entry.getBlock();
-                if (ToBeRemoved.hasMarker(m)) {
-                    return ToBeRemoved.withMarker(entry);
-                }
-            }
-            return entry;
-        }
-
-        @Override
-        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
-
-            boolean changed = false;
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
-            String deletedPrefix = null;
-            int count = 0;
-            for (Yaml.Mapping.Entry entry : m.getEntries()) {
-                if (ToBeRemoved.hasMarker(entry.getValue())) {
-                    changed = true;
-                    continue;
-                }
-
-                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
-                    deletedPrefix = entry.getPrefix();
-                    changed = true;
-                } else {
-                    if (deletedPrefix != null) {
-                        if (count == 0 && containsOnlyWhitespace(entry.getPrefix())) {
-                            // do this only if the entry will be the first element
-                            entry = entry.withPrefix(deletedPrefix);
-                        }
-                        deletedPrefix = null;
-                    }
-                    entries.add(entry);
-                    count++;
-                }
-            }
-
-            if (changed) {
-                m = m.withEntries(entries);
+            @Override
+            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
+                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                boolean childModified = (s != sequence);
+                List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
-                    m = ToBeRemoved.withMarker(m);
+                    return s;
                 }
 
-                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
-                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
-                    if (!document.isExplicit()) {
-                        m = m.withEntries(m.getEntries());
+                boolean changed = false;
+                String[] carried = {null};
+                entries = ListUtils.map(entries, entry -> {
+                    if (isToBeRemoved(entry)) {
+                        return null;
+                    }
+                    Yaml.Sequence.Entry kept = carried[0] == null ? entry :
+                            entry.withPrefix(carried[0] + entry.getPrefix());
+                    carried[0] = trailingComment(entry);
+                    return kept;
+                });
+                trailingComment(s, carried[0]);
+                if (entries.size() != s.getEntries().size()) {
+                    changed = true;
+                }
+
+                if ((changed || childModified) && s.getOpeningBracketPrefix() == null) {
+                    List<Yaml.Sequence.Entry> fixedEntries = null;
+                    for (int i = 1; i < entries.size(); i++) {
+                        Yaml.Sequence.Entry entry = entries.get(i);
+                        Yaml.Sequence.Entry prevEntry = entries.get(i - 1);
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry.getBlock())) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(entries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        entries = fixedEntries;
                     }
                 }
+
+                return entries.isEmpty() ? toBeRemoved(s) : s.withEntries(entries);
             }
-            return m;
-        }
+
+            @Override
+            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+                Yaml.Sequence.Entry e = super.visitSequenceEntry(entry, ctx);
+                if (e.getBlock() instanceof Yaml.Mapping && isToBeRemoved(e.getBlock())) {
+                    return toBeRemoved(e);
+                }
+                trailingComment(e, trailingComment(e.getBlock()));
+                return e;
+            }
+
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                boolean childModified = (m != mapping);
+
+                boolean changed = false;
+                boolean commentMoved = false;
+                List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+                String firstDeletedPrefix = null;
+                boolean previousWasDeleted = false;
+                // the inline comment that ends the line of the last kept entry, which the parser puts in the prefix
+                // of what follows, so it moves on when the entry after it is deleted
+                String carried = null;
+                for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                    if (isToBeRemoved(entry)) {
+                        // Entry is being deleted - capture prefix from the first deleted entry before any kept entries
+                        if (entries.isEmpty() && firstDeletedPrefix == null) {
+                            firstDeletedPrefix = entry.getPrefix();
+                        }
+                        if (carried == null && !previousWasDeleted && !entries.isEmpty()) {
+                            carried = extractInlineComment(entry.getPrefix());
+                        }
+                        changed = true;
+                        previousWasDeleted = true;
+                    } else {
+                        if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
+                            entry = entry.withPrefix(firstDeletedPrefix);
+                        } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
+                            entry = entry.withPrefix("\n" + entry.getPrefix());
+                        } else if (previousWasDeleted && !entries.isEmpty()
+                                && endsWithBlockScalar(entries.get(entries.size() - 1))
+                                && containsNewline(entry.getPrefix())) {
+                            // Block-scalar predecessor already owns the boundary newline; strip the duplicate.
+                            entry = entry.withPrefix(stripLeadingLineBreak(entry.getPrefix()));
+                        } else if (previousWasDeleted && containsNewline(entry.getPrefix()) &&
+                                   extractInlineComment(entry.getPrefix()) != null) {
+                            // the inline comment of the deleted line before goes with it
+                            entry = entry.withPrefix(entry.getPrefix().substring(entry.getPrefix().indexOf('\n')));
+                        }
+                        if (carried != null) {
+                            entry = entry.withPrefix(carried + entry.getPrefix());
+                            commentMoved = true;
+                        }
+                        entries.add(entry);
+                        previousWasDeleted = false;
+                        carried = trailingComment(entry);
+                    }
+                }
+                trailingComment(m, carried);
+
+                if (commentMoved && !changed) {
+                    m = m.withEntries(entries);
+                }
+                if (changed) {
+                    m = m.withEntries(entries);
+                    if (entries.isEmpty()) {
+                        m = toBeRemoved(m);
+                    }
+
+                    if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
+                        Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                        if (!document.isExplicit()) {
+                            m = m.withEntries(m.getEntries());
+                        }
+                    }
+                }
+
+                if ((changed || childModified) && m.getOpeningBracePrefix() == null) {
+                    List<Yaml.Mapping.Entry> currentEntries = m.getEntries();
+                    List<Yaml.Mapping.Entry> fixedEntries = null;
+                    for (int i = 1; i < currentEntries.size(); i++) {
+                        Yaml.Mapping.Entry entry = currentEntries.get(i);
+                        Yaml.Mapping.Entry prevEntry = currentEntries.get(i - 1);
+                        if (!containsNewline(entry.getPrefix()) && !endsWithBlockScalar(prevEntry)) {
+                            if (fixedEntries == null) {
+                                fixedEntries = new ArrayList<>(currentEntries);
+                            }
+                            fixedEntries.set(i, entry.withPrefix("\n" + entry.getPrefix()));
+                        }
+                    }
+                    if (fixedEntries != null) {
+                        m = m.withEntries(fixedEntries);
+                    }
+                }
+
+                return m;
+            }
+
+            /**
+             * Asks the visit of the parent of the element being visited to delete {@code y}, which takes its place.
+             */
+            private <Y extends Yaml> Y toBeRemoved(Y y) {
+                getCursor().getParentTreeCursor().<Set<UUID>>computeMessageIfAbsent(TO_BE_REMOVED, k -> new HashSet<>()).add(y.getId());
+                return y;
+            }
+
+            /**
+             * Whether the visit of {@code y}, a child of the element being visited, asked to delete it.
+             */
+            private boolean isToBeRemoved(Yaml y) {
+                Set<UUID> removed = getCursor().getMessage(TO_BE_REMOVED);
+                return removed != null && removed.contains(y.getId());
+            }
+
+            /**
+             * Asks the visit of the parent of the element being visited to put {@code comment}, which ends the last
+             * line of {@code y}, before what follows {@code y}.
+             */
+            private void trailingComment(Yaml y, @Nullable String comment) {
+                if (comment != null) {
+                    getCursor().getParentTreeCursor()
+                            .<Map<UUID, String>>computeMessageIfAbsent(TRAILING_COMMENT, k -> new HashMap<>())
+                            .put(y.getId(), comment);
+                }
+            }
+
+            /**
+             * The comment that ends the last line of {@code y}, a child of the element being visited, which the
+             * visit of {@code y} asked to put before what follows it.
+             */
+            private @Nullable String trailingComment(Yaml y) {
+                Map<UUID, String> comments = getCursor().getMessage(TRAILING_COMMENT);
+                return comments == null ? null : comments.get(y.getId());
+            }
+        });
     }
 
     private static boolean containsOnlyWhitespace(@Nullable String str) {
@@ -200,15 +326,66 @@ public class DeleteProperty extends Recipe {
         return true;
     }
 
-    @Value
-    @With
-    private static class ToBeRemoved implements Marker {
-        UUID id;
-        static <Y2 extends Yaml> Y2 withMarker(Y2 y) {
-            return y.withMarkers(y.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
+    private static String stripLeadingLineBreak(String s) {
+        if (s.startsWith("\r\n")) {
+            return s.substring(2);
         }
-        static boolean hasMarker(Yaml y) {
-            return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
+        if (s.startsWith("\n") || s.startsWith("\r")) {
+            return s.substring(1);
         }
+        // Line break not at the start — strip the first one found.
+        int idx = -1;
+        int idxN = s.indexOf('\n');
+        int idxR = s.indexOf('\r');
+        if (idxN >= 0 && (idxR < 0 || idxN < idxR)) {
+            idx = idxN;
+        } else if (idxR >= 0) {
+            idx = idxR;
+        }
+        if (idx < 0) {
+            return s;
+        }
+        int after = idx + 1;
+        if (s.charAt(idx) == '\r' && after < s.length() && s.charAt(after) == '\n') {
+            after++;
+        }
+        return s.substring(0, idx) + s.substring(after);
     }
+
+    private static boolean containsNewline(@Nullable String str) {
+        return str != null && str.indexOf('\n') >= 0;
+    }
+
+    /**
+     * Extract an inline comment from a prefix string. Inline comments appear before the
+     * first newline in the prefix (e.g. {@code " # comment\n  "} → {@code " # comment"}).
+     */
+    private static @Nullable String extractInlineComment(String prefix) {
+        int newlineIndex = prefix.indexOf('\n');
+        String beforeNewline = newlineIndex >= 0 ? prefix.substring(0, newlineIndex) : prefix;
+        return beforeNewline.contains("#") ? beforeNewline : null;
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Mapping.Entry entry) {
+        return endsWithBlockScalar(entry.getValue());
+    }
+
+    private static boolean endsWithBlockScalar(Yaml.Block block) {
+        if (block instanceof Yaml.Scalar) {
+            Yaml.Scalar.Style style = ((Yaml.Scalar) block).getStyle();
+            return style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL;
+        } else if (block instanceof Yaml.Mapping) {
+            List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1));
+            }
+        } else if (block instanceof Yaml.Sequence) {
+            List<Yaml.Sequence.Entry> entries = ((Yaml.Sequence) block).getEntries();
+            if (!entries.isEmpty()) {
+                return endsWithBlockScalar(entries.get(entries.size() - 1).getBlock());
+            }
+        }
+        return false;
+    }
+
 }

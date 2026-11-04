@@ -22,13 +22,15 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
 
 public class RpcSendQueue {
     private final int batchSize;
-    private final List<RpcObjectData> batch;
+    private List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
     private final IdentityHashMap<Object, Integer> refs;
     private final @Nullable String sourceFileType;
@@ -55,13 +57,21 @@ public class RpcSendQueue {
 
     /**
      * Called whenever the batch size is reached or at the end of the tree.
+     * <p>
+     * The batch is handed to {@code drain} directly — no defensive copy. This is
+     * safe because (1) all {@code put}/{@code flush} calls happen on a single
+     * traversal thread, so reassignment of {@code batch} can't race with {@code put},
+     * and (2) the drain consumer (a capacity-1 {@code BlockingQueue.put}) blocks
+     * until the consumer takes the list, so by the time {@code drain.accept} returns
+     * there's no in-flight reader of the just-handed-off list either.
      */
     public void flush() {
         if (batch.isEmpty()) {
             return;
         }
-        drain.accept(new ArrayList<>(batch));
-        batch.clear();
+        List<RpcObjectData> sending = batch;
+        batch = new ArrayList<>(batchSize);
+        drain.accept(sending);
     }
 
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
@@ -106,16 +116,33 @@ public class RpcSendQueue {
 
         if (beforeVal == afterVal) {
             put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+        } else if (afterVal instanceof List && beforeVal instanceof List) {
+            // The concrete List implementation class (e.g. List.of vs ArrayList) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because sendList emits
+            // positions into the before list while the receiver's ADD path starts from an empty one.
+            sendChange(afterVal, beforeVal, onChange);
         } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass())) {
             // Treat as ADD when before is null OR types differ (it's a new object, not a change)
             add(after, onChange);
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null, trace));
+        } else if (after instanceof Reference) {
+            // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+            // instance may be aliased by any number of other slots and source files. A CHANGE would
+            // be applied to that shared instance in place, corrupting every alias, so the new value
+            // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+            add(after, onChange);
         } else {
-            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
-            doChange(afterVal, beforeVal, onChange, afterCodec);
+            sendChange(afterVal, beforeVal, onChange);
         }
+    }
+
+    private void sendChange(Object afterVal, Object beforeVal, @Nullable Runnable onChange) {
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+        // Without an onChange callback or codec, no property messages follow, so the
+        // value must travel inline or the receiver keeps the stale object
+        put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+        doChange(afterVal, beforeVal, onChange, afterCodec);
     }
 
     <T> void sendList(@Nullable List<T> after,
@@ -126,43 +153,82 @@ public class RpcSendQueue {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
-            Map<Object, Integer> beforeIdx = putListPositions(after, before, id);
+            int[] positions = putListPositions(after, before, id);
 
+            // Walked with an iterator rather than by index so a sequential-access list
+            // costs the same here as a random-access one; `positions` is already indexed.
+            int i = 0;
             for (T anAfter : after) {
-                Integer beforePos = beforeIdx.get(id.apply(anAfter));
+                int beforePos = positions == null ? ADDED_LIST_ITEM : positions[i++];
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
-                if (beforePos == null) {
-                    add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
+                if (beforePos == ADDED_LIST_ITEM) {
+                    if (anAfter == null) {
+                        put(new RpcObjectData(DELETE, null, null, null, trace));
+                    } else {
+                        add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
+                    }
                 } else {
-                    T aBefore = before == null ? null : before.get(beforePos);
+                    T aBefore = requireNonNull(before).get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
-                    } else if (aBefore == null || anAfter.getClass() != aBefore.getClass()) {
-                        // Type changed - treat as ADD
+                    } else if (anAfter == null) {
+                        put(new RpcObjectData(DELETE, null, null, null, trace));
+                    } else if (asRef || aBefore == null || anAfter.getClass() != aBefore.getClass()) {
+                        // Type changed - treat as ADD. Ref-deduplicated items are also always
+                        // re-added rather than CHANGEd (see send()).
                         add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
-                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
-                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
+                        sendChange(anAfter, aBefore, onChangeRun);
                     }
                 }
             }
         });
     }
 
-    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
-        Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
-        if (before != null) {
-            for (int i = 0; i < before.size(); i++) {
-                beforeIdx.put(id.apply(before.get(i)), i);
-            }
+    /**
+     * Emits the positions message and returns the same positions for the caller to walk,
+     * or null when every element is new.
+     */
+    private <T> int @Nullable [] putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
+        int afterSize = after.size();
+        if (before == null || before.isEmpty()) {
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a per-element array.
+            put(new RpcObjectData(CHANGE, null, afterSize == 0 ? emptyList() :
+                    nCopies(afterSize, ADDED_LIST_ITEM), null, trace));
+            return null;
         }
-        List<Integer> positions = new ArrayList<>();
-        for (T t : after) {
-            Integer beforePos = beforeIdx.get(id.apply(t));
-            positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
+
+        Map<Object, Integer> beforeIdx = new HashMap<>((int) (before.size() / 0.75f) + 1);
+        for (int i = 0; i < before.size(); i++) {
+            beforeIdx.put(id.apply(before.get(i)), i);
         }
-        put(new RpcObjectData(CHANGE, null, positions, null, trace));
-        return beforeIdx;
+        int[] positions = new int[afterSize];
+        for (int i = 0; i < afterSize; i++) {
+            Integer beforePos = beforeIdx.get(id.apply(after.get(i)));
+            positions[i] = beforePos == null ? ADDED_LIST_ITEM : beforePos;
+        }
+        put(new RpcObjectData(CHANGE, null, new BoxedIntList(positions), null, trace));
+        return positions;
+    }
+
+    /** Presents an {@code int[]} to the serializer without boxing it into a second collection. */
+    private static final class BoxedIntList extends AbstractList<Integer> implements RandomAccess {
+        private final int[] values;
+
+        BoxedIntList(int[] values) {
+            this.values = values;
+        }
+
+        @Override
+        public Integer get(int index) {
+            return values[index];
+        }
+
+        @Override
+        public int size() {
+            return values.length;
+        }
     }
 
     private void add(Object after, @Nullable Runnable onChange) {
@@ -199,19 +265,70 @@ public class RpcSendQueue {
         }
     }
 
+    private static final String JAVA_TYPE_PACKAGE = "org.openrewrite.java.tree";
+    private static final String JAVA_TYPE_NAME = JAVA_TYPE_PACKAGE + ".JavaType";
+
+    private static final ClassValue<@Nullable String> VALUE_TYPE_CACHE = new ClassValue<String>() {
+        private @Nullable Class<?> javaTypeClass;
+        private boolean javaTypeResolved;
+
+        private @Nullable Class<?> getJavaTypeClass(Class<?> from) {
+            if (!javaTypeResolved) {
+                try {
+                    javaTypeClass = Class.forName(JAVA_TYPE_NAME, false, from.getClassLoader());
+                } catch (ClassNotFoundException ignored) {
+                }
+                javaTypeResolved = true;
+            }
+            return javaTypeClass;
+        }
+
+        @Override
+        protected @Nullable String computeValue(Class<?> afterType) {
+            Package pkg = afterType.getPackage();
+            String pkgName = pkg == null ? "" : pkg.getName();
+            if (afterType.isPrimitive() || afterType.isArray() || pkgName.startsWith("java.lang") ||
+                // JDK value types have no codec on either side, so a valueType only buys the
+                // receiver a bogus Objenesis instance it discards. Send them as scalars.
+                pkgName.startsWith("java.time") || pkgName.startsWith("java.math") ||
+                afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType) ||
+                Map.class.isAssignableFrom(afterType)) {
+                // A plain Map (like a Collection) is serialized structurally and needs no
+                // valueType. Sending one would make the receiver treat the map as a typed
+                // object and inject type/identity metadata keys (e.g. "@c"/"@ref") that leak
+                // into the map as real entries, corrupting it (see RpcObjectData#getValue).
+                return null;
+            } else if (Enum.class.isAssignableFrom(afterType) && !JAVA_TYPE_NAME.concat("$Primitive").equals(afterType.getName())) {
+                // FIXME special case for `JavaType.Primitive` here
+                return null;
+            }
+
+            // If the class is a subtype of JavaType but in a different package,
+            // return the superclass name instead
+            Class<?> jt = getJavaTypeClass(afterType);
+            if (jt != null && pkg != null && !JAVA_TYPE_PACKAGE.equals(pkg.getName()) && jt.isAssignableFrom(afterType)) {
+                Class<?> superclass = afterType.getSuperclass();
+                if (superclass != null && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
+            // Synthetic tree subclasses generated outside the org.openrewrite packages
+            // -- must be reported to the remote as their real (super) type, not the proxy
+            // class name, which the remote has no codec/factory for.
+            if (pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
+                Class<?> superclass = afterType.getSuperclass();
+                Package superPkg = superclass == null ? null : superclass.getPackage();
+                if (superPkg != null && superPkg.getName().startsWith("org.openrewrite") && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
+            return afterType.getName();
+        }
+    };
+
     private static @Nullable String getValueType(@Nullable Object after) {
-        if (after == null) {
-            return null;
-        }
-        Class<?> afterType = after.getClass();
-        Package pkg = afterType.getPackage();
-        if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
-            afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType)) {
-            return null;
-        } else if (Enum.class.isAssignableFrom(afterType) && !"org.openrewrite.java.tree.JavaType$Primitive".equals(afterType.getName())) {
-            // FIXME special case for `JavaType.Primitive` here
-            return null;
-        }
-        return afterType.getName();
+        return after == null ? null : VALUE_TYPE_CACHE.get(after.getClass());
     }
 }

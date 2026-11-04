@@ -38,10 +38,8 @@ import static java.util.stream.Collectors.joining;
 public class FindDeprecatedMethods extends Recipe {
     private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
-    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
-
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "java.util.List add(..)",
             required = false)
     @Nullable
@@ -52,6 +50,12 @@ public class FindDeprecatedMethods extends Recipe {
             required = false)
     @Nullable
     Boolean ignoreDeprecatedScopes;
+
+    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
+
+    private String dataTableInstanceName() {
+        return methodPattern != null ? "Deprecated method calls matching `" + methodPattern + "`" : "Deprecated method calls";
+    }
 
     String displayName = "Find uses of deprecated methods";
 
@@ -77,7 +81,7 @@ public class FindDeprecatedMethods extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
 
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new JavaIsoVisitor<ExecutionContext>() {
             @SuppressWarnings("NullableProblems")
             @Override
             public J visit(Tree tree, ExecutionContext ctx) {
@@ -95,7 +99,15 @@ public class FindDeprecatedMethods extends Recipe {
                 }
                 return (J) tree;
             }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+        };
+
+        // When a method pattern is provided, also require a matching method use so the recipe
+        // only runs on source files that reference it.
+        if (methodMatcher != null) {
+            precondition = Preconditions.and(new UsesMethod<>(methodMatcher), precondition);
+        }
+
+        return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

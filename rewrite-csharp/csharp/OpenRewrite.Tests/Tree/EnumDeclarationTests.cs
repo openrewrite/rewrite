@@ -1,0 +1,193 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using OpenRewrite.Test;
+
+namespace OpenRewrite.Tests.Tree;
+
+public class EnumDeclarationTests : RewriteTest
+{
+    [Fact]
+    public void SimpleEnum()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Color {
+                    Red,
+                    Green,
+                    Blue
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithExplicitValues()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Status {
+                    Active = 1,
+                    Inactive = 0,
+                    Pending = 2
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithPublicModifier()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                public enum Color {
+                    Red,
+                    Green,
+                    Blue
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithUnderlyingType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Flags : byte {
+                    None = 0,
+                    First = 1,
+                    Second = 2
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithWhitespace()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum  Color  {
+                    Red ,
+                    Green ,
+                    Blue
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithInternalModifier()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                internal enum Status {
+                    Active,
+                    Inactive
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithMixedValues()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Priority {
+                    Low,
+                    Medium = 5,
+                    High
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithExpressionValues()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Flags {
+                    None = 0,
+                    First = 1,
+                    Second = 1 << 1,
+                    Third = 1 << 2
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithSingleMember()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum Single {
+                    Value
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EnumWithLongUnderlyingType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                enum BigNumbers : long {
+                    Big = 1000000000000,
+                    Bigger = 2000000000000
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EmptyEnumWithWhitespace()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                public enum LongEnum : long
+                {
+
+                }
+                """
+            )
+        );
+    }
+}

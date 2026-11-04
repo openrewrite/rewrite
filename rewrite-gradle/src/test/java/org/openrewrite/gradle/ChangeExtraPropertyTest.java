@@ -92,4 +92,36 @@ class ChangeExtraPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void setMethodSyntax() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext.set("foo", "bar")
+              """,
+            """
+              ext.set("foo", "baz")
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapeSequenceInOldValue() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                  foo = "a\\nb"
+              }
+              """,
+            """
+              ext {
+                  foo = "baz"
+              }
+              """
+          )
+        );
+    }
 }

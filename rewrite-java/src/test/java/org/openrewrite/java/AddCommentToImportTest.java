@@ -165,6 +165,27 @@ class AddCommentToImportTest implements RewriteTest {
     }
 
     @Test
+    void addSingleLineCommentAtTopOfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToImport(SHORT_COMMENT, "foo..*")),
+          //language=java
+          java(
+            """
+              import foo.Foo;
+              import foo.Bar;
+              class OtherOne {}
+              """,
+            """
+              /* Short comment to add */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherOne {}
+              """
+          )
+        );
+    }
+
+    @Test
     void addLongComment() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToImport(LONG_COMMENT, "foo..*")),
@@ -201,6 +222,47 @@ class AddCommentToImportTest implements RewriteTest {
             """
               package blah;
               /* Existing Comment */
+              /*
+               * This is a very long comment to add.
+               * The comment uses multiple lines.
+               */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void addLongCommentAtTopOfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToImport(LONG_COMMENT, "foo..*")),
+          //language=java
+          java(
+            """
+              import foo.Foo;
+              import foo.Bar;
+              class OtherOne {}
+              """,
+            """
+              /*
+               * This is a very long comment to add.
+               * The comment uses multiple lines.
+               */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
+              """,
+            """
               /*
                * This is a very long comment to add.
                * The comment uses multiple lines.

@@ -28,7 +28,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.*;
 
-import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -36,7 +35,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -49,7 +47,6 @@ import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
-@XmlRootElement(name = "project")
 @SuppressWarnings("unused")
 public class RawPom {
 
@@ -401,25 +398,32 @@ public class RawPom {
 
         @Nullable
         RawPluginRepositories pluginRepositories;
+
+        @Nullable
+        Build build;
     }
 
     public @Nullable String getGroupId() {
-        return groupId == null && parent != null ? parent.getGroupId() : groupId;
+        if (!StringUtils.isBlank(groupId)) {
+            return groupId;
+        }
+        if (parent != null && !StringUtils.isBlank(parent.getGroupId())) {
+            return parent.getGroupId();
+        }
+        return null;
     }
 
     public @Nullable String getVersion() {
-        if (version == null) {
-            if (currentVersion == null) {
-                if (parent == null) {
-                    return null;
-                } else {
-                    return parent.getVersion();
-                }
-            } else {
-                return currentVersion;
-            }
+        if (!StringUtils.isBlank(version)) {
+            return version;
         }
-        return version;
+        if (!StringUtils.isBlank(currentVersion)) {
+            return currentVersion;
+        }
+        if (parent != null && !StringUtils.isBlank(parent.getVersion())) {
+            return parent.getVersion();
+        }
+        return null;
     }
 
 
@@ -428,15 +432,26 @@ public class RawPom {
                 getParent().getGroupId(), getParent().getArtifactId(),
                 getParent().getVersion()), getParent().getRelativePath());
 
+        String resolvedGroupId = getGroupId();
+        String resolvedVersion = getVersion();
+        if (resolvedGroupId == null || resolvedVersion == null) {
+            throw new MavenParsingException(
+                    "POM is missing a required coordinate:" +
+                            (resolvedGroupId == null ? " groupId" : "") +
+                            (resolvedVersion == null ? " version" : "") +
+                            " for " + new GroupArtifactVersion(resolvedGroupId, artifactId, resolvedVersion) +
+                            (repo == null ? "" : " (from " + repo.getUri() + ")"));
+        }
+
         Pom.PomBuilder builder = Pom.builder()
                 .sourcePath(inputPath)
                 .repository(repo)
                 .parent(parent)
                 .gav(new ResolvedGroupArtifactVersion(
                         repo == null ? null : repo.getUri(),
-                        Objects.requireNonNull(getGroupId()),
+                        resolvedGroupId,
                         artifactId,
-                        Objects.requireNonNull(getVersion()),
+                        resolvedVersion,
                         null))
                 .name(name)
                 .obsoletePomVersion(pomVersion)
@@ -489,8 +504,8 @@ public class RawPom {
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
                             mapPluginRepositories(p.getPluginRepositories()),
-                            mapPlugins((build != null) ? build.getPlugins() : null),
-                            mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
+                            mapPlugins(p.getBuild() != null ? p.getBuild().getPlugins() : null),
+                            mapPlugins(p.getBuild() != null && p.getBuild().getPluginManagement() != null ? p.getBuild().getPluginManagement().getPlugins() : null)
                     ));
                 }
 

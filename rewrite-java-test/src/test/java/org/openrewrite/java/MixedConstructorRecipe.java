@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.Getter;
 import org.openrewrite.Recipe;
 
 public class MixedConstructorRecipe extends Recipe {
@@ -27,13 +28,9 @@ public class MixedConstructorRecipe extends Recipe {
     public MixedConstructorRecipe(boolean opt) {
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Mixed constructor";
-    }
+    @Getter
+    final String displayName = "Mixed constructor";
 
-    @Override
-    public String getDescription() {
-        return "A recipe with more than one constructor, with one marked as the primary.";
-    }
+    @Getter
+    final String description = "A recipe with more than one constructor, with one marked as the primary.";
 }

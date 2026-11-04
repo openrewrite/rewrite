@@ -427,7 +427,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @CsvSource({"5.x", "6.x", "6.0.0", "6.0.2"})
+            @ValueSource(strings = {"5.x", "6.x", "6.0.0", "6.0.2"})
             @ParameterizedTest
             void withAnyVersionAlwaysMarked(String version) {
                 rewriteRun(

@@ -45,11 +45,34 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
         if (getCursor().isScopeInPath(scope)) {
-            if (e.getPrefix().contains("\n")) {
-                e = e.withPrefix(shiftPrefix(e.getPrefix()));
-            }
+            e = e.withPrefix(shiftPrefix(e.getPrefix()));
         }
         return e;
+    }
+
+    @Override
+    public Yaml.Scalar visitScalar(Yaml.Scalar scalar, P p) {
+        Yaml.Scalar s = super.visitScalar(scalar, p);
+        if (getCursor().isScopeInPath(scope) &&
+                (s.getStyle() == Yaml.Scalar.Style.FOLDED || s.getStyle() == Yaml.Scalar.Style.LITERAL)) {
+            String value = s.getValue();
+            int headerEnd = value.indexOf('\n');
+            if (headerEnd >= 0) {
+                s = s.withValue(value.substring(0, headerEnd + 1) + shiftBlockBody(value.substring(headerEnd + 1)));
+            }
+        }
+        return s;
+    }
+
+    // A block scalar's body indent lives inside Yaml.Scalar.value and must dedent in step with the surrounding entry prefixes.
+    private String shiftBlockBody(String body) {
+        return String.join("\n", ListUtils.map(Arrays.asList(body.split("\\n", -1)), (index, s) -> {
+            int nonWs = StringUtils.indexOfNonWhitespace(s);
+            if (nonWs >= shift || (nonWs == -1 && s.length() >= shift)) {
+                return s.substring(shift);
+            }
+            return s;
+        }));
     }
 
     @SuppressWarnings("DynamicRegexReplaceableByCompiledPattern")

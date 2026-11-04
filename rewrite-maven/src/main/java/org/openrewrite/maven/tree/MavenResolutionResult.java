@@ -16,11 +16,14 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
@@ -41,7 +44,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
-public class MavenResolutionResult implements Marker {
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+public class MavenResolutionResult implements Marker, Heavyweight {
     @EqualsAndHashCode.Include
     @With
     UUID id;
@@ -60,6 +64,7 @@ public class MavenResolutionResult implements Marker {
     List<MavenResolutionResult> modules;
 
     @Nullable
+    @With
     MavenResolutionResult parent;
 
     @With

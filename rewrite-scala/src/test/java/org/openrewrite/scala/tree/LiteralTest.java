@@ -1,0 +1,180 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.scala.tree;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RewriteTest;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.scala.Assertions.scala;
+
+class LiteralTest implements RewriteTest {
+
+    @Test
+    void integerLiteral() {
+        rewriteRun(
+          scala("42")
+        );
+    }
+
+    @Test
+    void numericLiteralsWithUnderscoreSeparator() {
+        rewriteRun(
+          scala(
+            """
+            val i = 60_000
+            val l = 1_000_000L
+            val d = 3.141_592
+            """
+          )
+        );
+    }
+
+    @Test
+    void hexLiteral() {
+        rewriteRun(
+          scala("0xFF")
+        );
+    }
+
+    @Test
+    void longLiteral() {
+        rewriteRun(
+          scala("42L")
+        );
+    }
+
+    @Test
+    void floatLiteral() {
+        rewriteRun(
+          scala("3.14f")
+        );
+    }
+
+    @Test
+    void doubleLiteral() {
+        rewriteRun(
+          scala("3.14")
+        );
+    }
+
+    @Test
+    void booleanLiteralTrue() {
+        rewriteRun(
+          scala("true")
+        );
+    }
+
+    @Test
+    void booleanLiteralFalse() {
+        rewriteRun(
+          scala("false")
+        );
+    }
+
+    @Test
+    void characterLiteral() {
+        rewriteRun(
+          scala("'a'")
+        );
+    }
+
+    @Test
+    void stringLiteral() {
+        rewriteRun(
+          scala("\"hello\"")
+        );
+    }
+
+    @Test
+    void stringLiteralContainingTripleQuestionMark() {
+        // The `???` content must not be mistaken for the compiler-synthetic Predef.???
+        // placeholder and dropped from the block's trailing expression.
+        rewriteRun(
+          scala(
+            """
+            val code = {
+              "???"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringLiteral() {
+        rewriteRun(
+          scala(
+            """
+            \"""hello
+            world\"""
+            """
+          )
+        );
+    }
+
+    @Test
+    void nullLiteral() {
+        rewriteRun(
+          scala("null")
+        );
+    }
+
+    @Test
+    void symbolLiteral() {
+        // Scala 2 only - deprecated in Scala 3
+        rewriteRun(
+          scala("'symbol")
+        );
+    }
+
+    @SuppressWarnings("ScalaUnnecessaryParentheses")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          scala("(42)"),
+          scala("((42))")
+        );
+    }
+
+    @Test
+    void loneSurrogatesKeepTheirEscapeInValue() {
+        rewriteRun(
+          scala("val c = '\\uD83D'", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("\\uD83D"))),
+
+          scala("val s = \"{\\\"test\\uD83D\\\": 2}\"", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("{\"test\\uD83D\": 2}"))),
+
+          scala("val s = \"\\uD83D\\uDE00\\uDE00\"", spec -> spec.afterRecipe(cu ->
+            assertThat(firstLiteral(cu).getValue()).isEqualTo("\uD83D\uDE00\\uDE00")))
+        );
+    }
+
+    private static J.Literal firstLiteral(S.CompilationUnit cu) {
+        return new JavaIsoVisitor<AtomicReference<J.Literal>>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, AtomicReference<J.Literal> first) {
+                first.compareAndSet(null, literal);
+                return literal;
+            }
+        }.reduce(cu, new AtomicReference<>()).get();
+    }
+}

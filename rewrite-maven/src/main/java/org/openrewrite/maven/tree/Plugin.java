@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AccessLevel;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 
@@ -55,7 +54,6 @@ public class Plugin {
     List<Dependency> dependencies;
     List<Execution> executions;
 
-    @NonNull
     public String getGroupId() {
         return groupId == null ? PLUGIN_DEFAULT_GROUPID : groupId;
     }

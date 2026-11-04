@@ -1,0 +1,5 @@
+module example.com/withincompat
+
+go 1.22
+
+require github.com/legacy/lib v2.0.0+incompatible

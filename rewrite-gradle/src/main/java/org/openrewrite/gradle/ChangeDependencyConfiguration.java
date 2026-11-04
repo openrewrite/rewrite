@@ -19,20 +19,25 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
+import java.util.Iterator;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -74,14 +79,11 @@ public class ChangeDependencyConfiguration extends Recipe {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             // Still need to be able to change the configuration for project dependencies which are not yet supported by the `GradleDependency.Matcher`
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -89,15 +91,25 @@ public class ChangeDependencyConfiguration extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
+                boolean kotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
+                if (kotlin && !isKotlinDependencyDsl(m)) {
+                    return m;
+                }
+
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .configuration(configuration);
 
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent() && !matchesOtherDependency(m)) {
+                Optional<GradleDependency> matchedDependency = gradleDependencyMatcher.get(getCursor());
+                if (!matchedDependency.isPresent() && !matchesOtherDependency(m)) {
                     return m;
                 }
 
 
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+                if (kotlin && matchedDependency.isPresent()) {
+                    return dependencyMatcher.matches(matchedDependency.get().getGroupId(), matchedDependency.get().getArtifactId()) ?
+                            changeConfiguration(m, ctx) : m;
+                }
                 List<Expression> args = m.getArguments();
                 if (args.get(0) instanceof J.Literal) {
                     J.Literal arg = (J.Literal) args.get(0);
@@ -215,16 +227,59 @@ public class ChangeDependencyConfiguration extends Recipe {
                     return m;
                 }
 
+                return changeConfiguration(m, ctx);
+            }
+
+            private J.MethodInvocation changeConfiguration(J.MethodInvocation m, ExecutionContext ctx) {
                 if (newConfiguration.equals(m.getSimpleName())) {
                     return m;
                 }
 
+                SourceFile sf = getCursor().firstEnclosing(SourceFile.class);
+                if (sf != null) {
+                    JavaSourceSet.markDirty(ctx, sf);
+                }
                 return m.withName(m.getName().withSimpleName(newConfiguration));
+            }
+
+            private boolean isKotlinDependencyDsl(J.MethodInvocation method) {
+                if (method.getSelect() != null) {
+                    return false;
+                }
+                boolean dependencies = false;
+                Iterator<Object> path = getCursor().getParentOrThrow().getPath();
+                while (path.hasNext()) {
+                    Object value = path.next();
+                    if (!(value instanceof J.MethodInvocation)) {
+                        continue;
+                    }
+                    J.MethodInvocation enclosing = (J.MethodInvocation) value;
+                    if (enclosing.getSelect() != null) {
+                        return false;
+                    }
+                    if (!dependencies) {
+                        if (!"dependencies".equals(enclosing.getSimpleName())) {
+                            return false;
+                        }
+                        dependencies = true;
+                    } else if (!("subprojects".equals(enclosing.getSimpleName()) ||
+                                 "allprojects".equals(enclosing.getSimpleName()) ||
+                                 "project".equals(enclosing.getSimpleName()) ||
+                                 "buildscript".equals(enclosing.getSimpleName()))) {
+                        return false;
+                    }
+                }
+                return dependencies;
             }
 
             private boolean matchesOtherDependency(J.MethodInvocation m) {
                 if (!dependencyDsl.matches(m)) {
-                    return false;
+                    SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+                    GradleProject project = source == null ? null : source.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (!(source instanceof K.CompilationUnit) || project == null ||
+                        project.getConfiguration(m.getSimpleName()) == null) {
+                        return false;
+                    }
                 }
 
                 if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.MethodInvocation)) {

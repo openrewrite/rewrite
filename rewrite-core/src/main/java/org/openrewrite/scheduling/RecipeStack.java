@@ -22,12 +22,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Recipe;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 import static org.openrewrite.Recipe.PANIC;
 
@@ -35,7 +37,7 @@ class RecipeStack {
     private final Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
 
     @SuppressWarnings("NotNullFieldNotInitialized")
-    private Stack<Stack<Recipe>> allRecipesStack;
+    private Deque<RecipePath> allRecipesStack;
 
     /**
      * The zero-based position of the recipe that is currently doing a scan/generate/edit.
@@ -44,8 +46,26 @@ class RecipeStack {
     @Getter
     int recipePosition;
 
+    /**
+     * The next recipe that will be processed after the current one, or null if
+     * at the end of the recipe list. Available after {@link #recurseRecipeList}
+     * is called for the current recipe.
+     */
+    @NonFinal
+    @Getter
+    @Nullable
+    Recipe nextRecipe;
+
+    /**
+     * The recipe that is currently doing a scan/generate/edit, or null when no single recipe is responsible.
+     */
+    @NonFinal
+    @Getter
+    @Nullable
+    Recipe currentRecipe;
+
     public <T> @Nullable T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
-                                  BiFunction<@Nullable T, Stack<Recipe>, @Nullable T> consumer, @Nullable T acc) {
+                                  BiFunction<@Nullable T, List<Recipe>, @Nullable T> consumer, @Nullable T acc) {
         init(recipe);
         AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {
@@ -54,33 +74,41 @@ class RecipeStack {
             }
 
             this.recipePosition = recipePosition.getAndIncrement();
-            Stack<Recipe> recipeStack = allRecipesStack.pop();
-            if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
-                sourceSet.setRecipe(recipeStack);
-                acc = consumer.apply(acc, recipeStack);
-                recurseRecipeList(recipeStack);
+            RecipePath recipePath = allRecipesStack.pop();
+            if (recipePath.leaf().maxCycles() >= ctx.getCycle()) {
+                sourceSet.setRecipe(recipePath);
+                recurseRecipeList(recipePath);
+                this.nextRecipe = allRecipesStack.isEmpty() ? null : allRecipesStack.peek().leaf();
+                this.currentRecipe = recipePath.leaf();
+                acc = consumer.apply(acc, recipePath);
             } else {
-                this.recipePosition = recipePosition.getAndAdd(countRecipes(recipeStack.peek()));
+                this.recipePosition = recipePosition.getAndAdd(countRecipes(recipePath.leaf()));
             }
         }
+        this.nextRecipe = null;
+        this.currentRecipe = null;
         return acc;
     }
 
-    private void init(Recipe recipe) {
-        allRecipesStack = new Stack<>();
-        Stack<Recipe> rootRecipeStack = new Stack<>();
-        rootRecipeStack.push(recipe);
-        allRecipesStack.push(rootRecipeStack);
+    <T> T attributedTo(@Nullable Recipe recipe, Supplier<T> work) {
+        Recipe previous = currentRecipe;
+        currentRecipe = recipe;
+        try {
+            return work.get();
+        } finally {
+            currentRecipe = previous;
+        }
     }
 
-    private void recurseRecipeList(Stack<Recipe> recipeStack) {
-        List<Recipe> recipeList = getRecipeList(recipeStack.peek());
+    private void init(Recipe recipe) {
+        allRecipesStack = new ArrayDeque<>();
+        allRecipesStack.push(new RecipePath(recipe));
+    }
+
+    private void recurseRecipeList(RecipePath recipePath) {
+        List<Recipe> recipeList = getRecipeList(recipePath.leaf());
         for (int i = recipeList.size() - 1; i >= 0; i--) {
-            Recipe r = recipeList.get(i);
-            Stack<Recipe> nextStack = new Stack<>();
-            nextStack.addAll(recipeStack);
-            nextStack.push(r);
-            allRecipesStack.push(nextStack);
+            allRecipesStack.push(recipePath.child(recipeList.get(i)));
         }
     }
 

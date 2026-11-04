@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 import {typescript} from "../../src/javascript";
 import {IsSourceFile} from "../../src/search";
@@ -46,5 +45,48 @@ describe('IsSourceFile visitor', () => {
                 path: "src/utils/helper.ts"
             }
         );
+    });
+
+    test('a wildcard matches a dot-directory, as Java\'s PathUtils.matchesGlob does', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new IsSourceFile("**/component.ts"));
+
+        await spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `const a = 1`,
+                //@formatter:off
+                `/*~~>*/const a = 1`
+                //@formatter:on
+            ),
+            path: ".hidden/component.ts",
+        });
+    });
+
+    test('reads ";"-separated patterns without a leading "./", and none as any file, as Java\'s FindSourceFiles does', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new IsSourceFile("lib/*.ts; ./src/*.ts"));
+        await spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `const a = 1`,
+                //@formatter:off
+                `/*~~>*/const a = 1`
+                //@formatter:on
+            ),
+            path: "src/component.ts",
+        });
+
+        spec.recipe = fromVisitor(new IsSourceFile(" ; "));
+        await spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `const a = 1`,
+                //@formatter:off
+                `/*~~>*/const a = 1`
+                //@formatter:on
+            ),
+            path: "src/component.ts",
+        });
     });
 });

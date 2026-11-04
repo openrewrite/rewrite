@@ -17,8 +17,12 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.search.UsesType;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -33,7 +37,12 @@ public class RemoveAnnotation extends Recipe {
     String description = "Remove matching annotations wherever they occur.";
 
     @Override
-    public RemoveAnnotationVisitor  getVisitor() {
-        return new RemoveAnnotationVisitor(new AnnotationMatcher(annotationPattern));
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
+        // Only run on source files that reference the annotation type. The visitor is reachable
+        // directly (e.g. via `getVisitor().visitNonNull(...)` on a non-source-file node), where the
+        // precondition is bypassed, so this only filters whole-file traversals.
+        return Preconditions.check(new UsesType<>(annotationMatcher.getAnnotationName(), true),
+                new RemoveAnnotationVisitor(annotationMatcher));
     }
 }

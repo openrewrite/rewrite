@@ -16,18 +16,30 @@
 package org.openrewrite.marketplace;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.config.CategoryDescriptor;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.List;
 import java.util.Properties;
+
+import static java.util.Collections.emptyList;
 
 @RequiredArgsConstructor
 public class YamlRecipeBundleResolver implements RecipeBundleResolver {
     private final Properties properties;
+    private final RecipeMarketplace marketplace;
+    private final Collection<RecipeBundleResolver> resolvers;
+    private final List<CategoryDescriptor> categoryOverride;
+
+    public YamlRecipeBundleResolver(Properties properties, RecipeMarketplace marketplace,
+                                    Collection<RecipeBundleResolver> resolvers) {
+        this(properties, marketplace, resolvers, emptyList());
+    }
 
     @Override
     public String getEcosystem() {
@@ -36,12 +48,23 @@ public class YamlRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
-        try (InputStream is = Files.exists(Paths.get(bundle.getPackageName())) ?
-                Files.newInputStream(Paths.get(bundle.getPackageName())) :
-                URI.create(bundle.getPackageName()).toURL().openStream()) {
-            return new YamlRecipeBundleReader(bundle, is, URI.create(bundle.getPackageName()), properties);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        try {
+            Path path = Paths.get(bundle.getPackageName());
+            if (Files.exists(path)) {
+                try (InputStream is = Files.newInputStream(path)) {
+                    return new YamlRecipeBundleReader(bundle, is, path.toUri(), properties, marketplace, resolvers, categoryOverride);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            URI resource = URI.create(bundle.getPackageName());
+            try (InputStream is = resource.toURL().openStream()) {
+                return new YamlRecipeBundleReader(bundle, is, resource, properties, marketplace, resolvers, categoryOverride);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

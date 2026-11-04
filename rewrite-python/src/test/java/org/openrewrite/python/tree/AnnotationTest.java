@@ -60,11 +60,11 @@ class AnnotationTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                    "", "()", "( )",
-                    "(42)", "(42 )", "( 42 )",
-                    "(1, 2)", "(1,2)", "(1, 2 )", "( 1, 2 )", "( 1, 2)"
-            }
+      strings = {
+        "", "()", "( )",
+        "(42)", "(42 )", "( 42 )",
+        "(1, 2)", "(1,2)", "(1, 2 )", "( 1, 2 )", "( 1, 2)"
+      }
     )
     void decoratorArguments(String args) {
         rewriteRun(python(
@@ -78,9 +78,9 @@ class AnnotationTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                    "class C", "def m()"
-            }
+      strings = {
+        "class C", "def m()"
+      }
     )
     void multipleDecorators(String args) {
         rewriteRun(python(

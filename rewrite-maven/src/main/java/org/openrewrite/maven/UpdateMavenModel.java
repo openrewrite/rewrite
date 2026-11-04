@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -27,7 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -139,12 +139,42 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
 
         try {
+            Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
+            Path sourcePath = requested.getSourcePath();
+            if (sourcePath != null) {
+                projectPoms.put(sourcePath, requested);
+            }
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
+                    projectPoms);
+            markDirtyForAmbiguityRecipes(ctx, document, updated);
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
+        }
+    }
+
+    /**
+     * Record that this pom's project — and every aggregated child module's project — has had its
+     * resolved dependency set rewritten. Ambiguity-sensitive consumer recipes
+     * ({@code OrderImports}, {@code ChangePackage}, {@code ChangeType}) read this registry and fall
+     * back to the safe path when their {@code JavaSourceSet} classpath snapshot may be stale.
+     */
+    private void markDirtyForAmbiguityRecipes(ExecutionContext ctx, Xml.Document document, MavenResolutionResult updated) {
+        JavaSourceSet.markDirty(ctx, document);
+        markModulesRecursive(ctx, updated);
+    }
+
+    private static void markModulesRecursive(ExecutionContext ctx, MavenResolutionResult result) {
+        for (MavenResolutionResult module : result.getModules()) {
+            String moduleName = module.getPom().getRequested().getName();
+            if (moduleName == null || moduleName.isEmpty()) {
+                moduleName = module.getPom().getArtifactId();
+            }
+            if (moduleName != null && !moduleName.isEmpty()) {
+                JavaSourceSet.markDirty(ctx, moduleName);
+            }
+            markModulesRecursive(ctx, module);
         }
     }
 
@@ -165,31 +195,26 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx,
+                MavenExecutionContextView.view(ctx).effectiveSettings(getResolutionResult()),
                 getResolutionResult().getActiveProfiles());
 
-        AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
-            MavenResolutionResult mrr = resolutionResult
+            return resolutionResult
                     .withPom(resolved)
+                    // Re-resolve modules best-effort: a module that is transiently unresolvable mid-recipe keeps
+                    // its previous resolution rather than discarding this pom's own valid update.
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
                             return updateResult(ctx, module, projectPoms);
                         } catch (MavenDownloadingExceptions e) {
-                            exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
                             return module;
                         }
                     }))
                     .resolveDependencies(downloader, ctx);
-            if (exceptions.get() != null) {
-                throw exceptions.get();
-            }
-            return mrr;
-        } catch (MavenDownloadingExceptions e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
         } catch (MavenDownloadingException e) {
-            throw MavenDownloadingExceptions.append(exceptions.get(), e);
+            throw MavenDownloadingExceptions.append(null, e);
         }
     }
 }

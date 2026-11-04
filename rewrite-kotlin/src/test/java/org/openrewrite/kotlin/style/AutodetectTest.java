@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.style;
 
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -121,6 +122,77 @@ class AutodetectTest implements RewriteTest {
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getFunctionDeclarationParameters().getAlignWhenMultiple()).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndent() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                        s1: String,
+                        s2: String
+                ) {
+                }
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Outer {
+                data class Item(
+                        val id: String
+                )
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            fun main(
+                    args: Array<String>
+            ) {
+            }
+            """
+        )).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtIndentSize() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                    s1: String,
+                    s2: String
+                ) {
+                }
+            }
+            """
+        )).isFalse();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndentWithTabs() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+            	fun foo(
+            			s1: String,
+            			s2: String
+            	) {
+            	}
+            }
+            """
+        )).isTrue();
+    }
+
+    private static boolean parametersUseContinuationIndent(@Language("kotlin") String source) {
+        var detector = Autodetect.detector();
+        kp().parse(source).forEach(detector::sample);
+        var wrappingAndBraces = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(detector.build()));
+        return wrappingAndBraces.getFunctionDeclarationParameters().getUseContinuationIndent();
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
@@ -674,6 +746,70 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(3);
     }
 
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            class Outer {
+                enum class Measure(val label: Int) {
+                    One(1), Two(2), Three(3), Four(4), Five(5), Six(6)
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test
+
+            import org.openrewrite.test.Outer.Measure.*
+
+            class OuterTest {
+                fun used(): List<Any> {
+                    return listOf(One, Two, Three, Four, Five)
+                }
+
+                fun parameterized(measure: Outer.Measure): Int {
+                    return measure.label
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(5);
+    }
+
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsStaticallyImportedMethods() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            import java.util.Objects.*
+
+            class StaticMethods {
+                fun check(a: Any?, b: Any?): Boolean {
+                    requireNonNull(a)
+                    return equals(a, b) && hash(a, b) != 0 && isNull(b)
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(4);
+    }
+
     @Test
     void detectMethodArgs() {
         var cus = kp().parse(
@@ -1157,5 +1293,121 @@ class AutodetectTest implements RewriteTest {
         cus.forEach(detector::sample);
         var styles = detector.build();
         assertThat(styles).isNotNull();
+    }
+
+    @Test
+    void fourSpaceIndentDetection() {
+        // This test verifies that a file with 4-space indentation is correctly detected.
+        var cus = kp().parse(
+          """
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void fourSpaceWithLambdaAndSingleLineIf() {
+        // Test the pattern:
+        // - A function with 4-space indentation
+        // - Contains a lambda (logger.debug { ... })
+        // - Contains a single-line if statement
+        var cus = kp().parse(
+          """
+            class MyService {
+                private fun validateInput(value: Int) {
+                    logger.debug { "validating input" }
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void mixedIndentProjectPrefersLargerSample() {
+        // Test that when a project has files with different indentation styles,
+        // the autodetect picks the most common one.
+        // This can cause issues when a file uses a minority indentation style.
+        var cus = kp().parse(
+          // File 1: 2-space indentation (many statements)
+          """
+            class TwoSpaceFile1 {
+              fun method1() {
+                val a = 1
+                val b = 2
+                val c = 3
+                val d = 4
+              }
+              fun method2() {
+                val e = 5
+                val f = 6
+              }
+            }
+            """,
+          // File 2: 2-space indentation (many statements)
+          """
+            class TwoSpaceFile2 {
+              fun method1() {
+                val g = 7
+                val h = 8
+                val i = 9
+              }
+              fun method2() {
+                val j = 10
+                val k = 11
+                val l = 12
+              }
+            }
+            """,
+          // File 3: 4-space indentation (fewer statements - minority)
+          """
+            class FourSpaceFile {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
+                        throw Exception("error")
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        // The autodetect aggregates all files and picks the most common indentation.
+        // With more 2-space statements than 4-space statements, it picks 2 spaces.
+        // This demonstrates the potential issue - a file with 4-space indentation
+        // in a project that mostly uses 2-space will get reformatted to 2-space.
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        // We expect this to be 2 because that's the dominant style in the project
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);
     }
 }

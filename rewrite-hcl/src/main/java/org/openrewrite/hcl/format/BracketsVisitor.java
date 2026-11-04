@@ -62,8 +62,16 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
                 if (!lastSpace.getLastWhitespace().contains("\n")) {
                     return container.withLastSpace(lastSpace.withLastWhitespace("\n"));
                 }
-            }else {
+            } else {
                 return container.withLastSpace(lastSpace.withLastWhitespace(" "));
+            }
+        } else if (loc == HclContainer.Location.TUPLE_VALUES) {
+            final Hcl.Tuple tuple = getCursor().firstEnclosingOrThrow(Hcl.Tuple.class);
+            final Space lastSpace = container.getLastSpace();
+            if (isMultiline(tuple)) {
+                if (!lastSpace.getLastWhitespace().contains("\n")) {
+                    return container.withLastSpace(lastSpace.withLastWhitespace("\n"));
+                }
             }
         }
         return super.visitContainer(container, loc, p);
@@ -92,6 +100,32 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
         boolean multiLine = false;
         for (final Expression attribute : ov.getAttributes()) {
             if (attribute.getPrefix().getLastWhitespace().contains("\n")) {
+                multiLine = true;
+            }
+        }
+        return multiLine;
+    }
+
+    @Override
+    public Hcl.Tuple visitTuple(final Hcl.Tuple tuple, final P p) {
+        boolean multiLine = isMultiline(tuple);
+        if (multiLine) {
+            final List<Expression> newValues = ListUtils.map(tuple.getValues(), ((i, value) -> {
+                if (!value.getPrefix().getLastWhitespace().contains("\n")) {
+                    return value.withPrefix(value.getPrefix().withLastWhitespace("\n"));
+                } else {
+                    return value;
+                }
+            }));
+            return super.visitTuple(tuple.withValues(newValues), p);
+        }
+        return super.visitTuple(tuple, p);
+    }
+
+    private boolean isMultiline(final Hcl.Tuple tuple) {
+        boolean multiLine = false;
+        for (final Expression value : tuple.getValues()) {
+            if (value.getPrefix().getLastWhitespace().contains("\n")) {
                 multiLine = true;
             }
         }

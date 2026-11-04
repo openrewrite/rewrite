@@ -102,7 +102,7 @@ class MethodInvocationTest implements RewriteTest {
                         }
                         return super.visitVariable(variable, o);
                     }
-                })
+                }.visit(cu, 0))
           )
         );
     }
@@ -155,6 +155,31 @@ class MethodInvocationTest implements RewriteTest {
                 var md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
                 var mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
                 assertThat(mi.getMethodType().getParameterNames()).containsExactly("expected");
+            })
+          )
+        );
+    }
+
+    @Test
+    void renamingIdentifierKeepsConstructorType() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  A(int i) {
+                  }
+              }
+              class B extends A {
+                  B() {
+                      super(1);
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                var ctor = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
+                var superCall = (J.MethodInvocation) ctor.getBody().getStatements().get(0);
+                var renamed = superCall.withName(superCall.getName().withPrefix(Space.SINGLE_SPACE));
+                assertThat(renamed.getMethodType().isConstructor()).isTrue();
             })
           )
         );

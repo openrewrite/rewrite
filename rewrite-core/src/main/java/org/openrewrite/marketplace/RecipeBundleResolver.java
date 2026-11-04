@@ -15,8 +15,13 @@
  */
 package org.openrewrite.marketplace;
 
-public interface RecipeBundleResolver {
+public interface RecipeBundleResolver extends AutoCloseable {
     String getEcosystem();
 
     RecipeBundleReader resolve(RecipeBundle bundle);
+
+    @Override
+    default void close() throws Exception {
+        // no-op
+    }
 }

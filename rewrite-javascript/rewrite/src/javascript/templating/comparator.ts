@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {Cursor, Tree} from '../..';
-import {J} from '../../java';
+import {J, Type} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
-import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
+import {CaptureMarker, CaptureStorageValue, PlaceholderUtils, TEMPLATE_MODULE} from './utils';
 import {Capture, CaptureConstraintContext, CaptureMap, DebugLogEntry, MatchExplanation} from './types';
 import {CAPTURE_NAME_SYMBOL} from './capture';
 
@@ -55,8 +55,8 @@ export interface MatcherState {
  * Part of Layer 1 (Core Instrumentation).
  */
 export interface MatcherCallbacks {
-    handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => boolean;
-    handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => boolean;
+    handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => Promise<boolean>;
+    handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => Promise<boolean>;
     saveState: () => MatcherState;
     restoreState: (state: MatcherState) => void;
 
@@ -86,6 +86,17 @@ class CaptureMapImpl implements CaptureMap {
     }
 }
 
+/** A capture found in a pattern, and the target node it binds to. */
+interface CaptureAt {
+    marker: CaptureMarker;
+    target: J;
+}
+
+/** Parentheses that `JavaScriptSemanticComparatorVisitor.unwrap()` sees through. */
+function isParenthesized(j: any): boolean {
+    return j?.kind === J.Kind.Parentheses || j?.kind === J.Kind.ControlParentheses;
+}
+
 /**
  * A comparator for pattern matching that is lenient about optional properties.
  * Allows patterns without type annotations to match actual code with type annotations.
@@ -113,33 +124,59 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         };
     }
 
+    /** The capture this pattern node stands for, paired with the target node it should bind to. */
+    protected captureAt(j: Tree, p: J): CaptureAt | undefined {
+        const marker = PlaceholderUtils.getCaptureMarker(j as J);
+        return marker ? {marker, target: p} : this.captureBehindParentheses(j, p);
+    }
+
+    /** The marker `attachCaptureMarkers` moved onto a parenthesized capture's `J.RightPadded`, which `unwrap()` skips past. */
+    private captureBehindParentheses(j: Tree, p: J): CaptureAt | undefined {
+        let pattern: any = j;
+        let target: any = p;
+        while (isParenthesized(pattern)) {
+            const padded = pattern.tree as J.RightPadded<J> | undefined;
+            if (!padded) {
+                return undefined;
+            }
+            target = isParenthesized(target) ? target.tree.element : target;
+            const marker = PlaceholderUtils.getCaptureMarker(padded);
+            if (marker) {
+                return {marker, target: target as J};
+            }
+            pattern = padded.element;
+        }
+        return undefined;
+    }
+
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
         // Check if the pattern node is a capture - this handles unwrapped captures
         // (Wrapped captures in J.RightPadded are handled by visitRightPadded override)
         // Note: targetCursor will be pushed by parent's visit() method after this check
-        const captureMarker = PlaceholderUtils.getCaptureMarker(j)!;
-        if (captureMarker) {
+        const capture = this.captureAt(j, p);
+        if (capture) {
+            const {marker: captureMarker, target} = capture;
 
             // Push targetCursor to position it at the captured node for constraint evaluation
             // Only create cursor if targetCursor was initialized (meaning user provided one)
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
-                ? new Cursor(p, this.targetCursor)
-                : new Cursor(p);
+                ? new Cursor(target, this.targetCursor)
+                : new Cursor(target);
             this.targetCursor = cursorAtCapturedNode;
             try {
                 // Evaluate constraint with context (cursor + previous captures)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
                 if (captureMarker.constraint && !captureMarker.variadicOptions) {
                     const context = this.buildConstraintContext(cursorAtCapturedNode);
-                    if (!captureMarker.constraint(p, context)) {
+                    if (!captureMarker.constraint(target, context)) {
                         const captureName = captureMarker.captureName || 'unnamed';
-                        const targetKind = (p as any).kind || 'unknown';
+                        const targetKind = (target as any).kind || 'unknown';
                         return this.constraintFailed(captureName, targetKind) as R;
                     }
                 }
 
-                const success = this.matcher.handleCapture(captureMarker, p, undefined);
+                const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     return this.captureConflict(captureName) as R;
@@ -156,6 +193,14 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
         // Continue with parent's visit which will push targetCursor and traverse
         return await super.visit(j, p, parent);
+    }
+
+    /**
+     * A function the pattern's `context` declares lives in no module of the source,
+     * so it stands in for any function of its name.
+     */
+    protected override declaresAnyCallee(declaringType: Type.FullyQualified): boolean {
+        return Type.FullyQualified.getFullyQualifiedName(declaringType) === TEMPLATE_MODULE;
     }
 
     protected hasSameKind(j: J, other: J): boolean {
@@ -211,7 +256,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 }
 
                 // Handle the capture with the wrapper - use the element for pattern matching
-                const success = this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
+                const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
                     const captureName = captureMarker.captureName || 'unnamed';
                     return this.captureConflict(captureName);
@@ -276,91 +321,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         }
 
         return container;
-    }
-
-    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
-        // Check if any arguments are variadic captures
-        const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
-            PlaceholderUtils.isVariadicCapture(arg)
-        );
-
-        // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
-        if (!hasVariadicCapture) {
-            return super.visitMethodInvocation(methodInvocation, other);
-        }
-
-        // Otherwise, handle variadic captures ourselves
-        if (!this.match) {
-            return this.abort(methodInvocation);
-        }
-
-        if (other.kind !== J.Kind.MethodInvocation) {
-            // Set up cursors for kindMismatch
-            const savedCursor = this.cursor;
-            const savedTargetCursor = this.targetCursor;
-            this.cursor = new Cursor(methodInvocation, this.cursor);
-            this.targetCursor = new Cursor(other, this.targetCursor);
-            try {
-                return this.kindMismatch<J>();
-            } finally {
-                this.cursor = savedCursor;
-                this.targetCursor = savedTargetCursor;
-            }
-        }
-
-        const otherMethodInvocation = other as J.MethodInvocation;
-
-        // Set up cursors for the entire method
-        const savedCursor = this.cursor;
-        const savedTargetCursor = this.targetCursor;
-        this.cursor = new Cursor(methodInvocation, this.cursor);
-        this.targetCursor = new Cursor(otherMethodInvocation, this.targetCursor);
-        try {
-            // Compare select
-            if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
-                return this.structuralMismatch<J>('select');
-            }
-
-            // Visit select if present
-            if (methodInvocation.select && otherMethodInvocation.select) {
-                await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
-                if (!this.match) return methodInvocation;
-            }
-
-            // Compare typeParameters
-            if ((methodInvocation.typeParameters === undefined) !== (otherMethodInvocation.typeParameters === undefined)) {
-                return this.structuralMismatch<J>('typeParameters');
-            }
-
-            // Visit typeParameters if present
-            if (methodInvocation.typeParameters && otherMethodInvocation.typeParameters) {
-                if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
-                    return this.arrayLengthMismatch<J>('typeParameters.elements');
-                }
-
-                // Visit each type parameter in lock step (visit RightPadded to check for markers)
-                for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                    await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i]);
-                    if (!this.match) return methodInvocation;
-                }
-            }
-
-            // Visit name
-            await this.visit(methodInvocation.name, otherMethodInvocation.name);
-            if (!this.match) {
-                return methodInvocation;
-            }
-
-            // Special handling for variadic captures in arguments
-            if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
-                return this.structuralMismatch<J>('arguments');
-            }
-
-            return methodInvocation;
-        } finally {
-            this.cursor = savedCursor;
-            this.targetCursor = savedTargetCursor;
-        }
     }
 
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
@@ -462,14 +422,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
         }
-    }
-
-    /**
-     * Matches argument lists, with special handling for variadic captures.
-     * A variadic capture can match zero or more consecutive arguments.
-     */
-    private async matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): Promise<boolean> {
-        return await this.matchSequence(patternArgs, targetArgs, true);
     }
 
     /**
@@ -635,7 +587,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 const savedState = this.matcher.saveState();
 
                 // Handle the variadic capture
-                const success = this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
+                const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     // Restore state and try next amount
                     this.matcher.restoreState(savedState);
@@ -719,6 +671,3 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         return true;
     }
 }
-
-// Export debug comparator from debug module
-export { DebugPatternMatchingComparator } from './debug';

@@ -23,10 +23,17 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.AddImportTest;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.style.IntelliJ;
+import org.openrewrite.kotlin.style.OtherStyle;
+import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Arrays;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -169,8 +176,8 @@ class AutoFormatVisitorTest implements RewriteTest {
                   }
 
                   fun multilineMethod(
-                          foo: String,
-                          bar: String
+                      foo: String,
+                      bar: String
                   ) {
                       foo
                           .length
@@ -194,7 +201,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               package com.netflix.graphql.dgs.client.codegen
 
               class BaseProjectionNode (
-                      val type: Int = 1
+                  val type: Int = 1
               ) {
               }
               """
@@ -363,6 +370,176 @@ class AutoFormatVisitorTest implements RewriteTest {
           """);
     }
 
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedNestedDataClassIndentedToParent() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Response {
+                abstract class Item {
+                    abstract fun id(): String
+                }
+
+                fun first(): Item? = null
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration dataClass = KotlinParser.builder().build()
+          .parse("""
+            package p
+
+            data class Item(
+                val id: String,
+            )
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    // Keeping the replaced declaration's id tells the formatter where in the body the tree sits
+                    return autoFormat(dataClass.withId(classDecl.getId()).withPrefix(classDecl.getPrefix()), p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Response {
+              data class Item(
+                  val id: String,
+              )
+
+              fun first(): Item? = null
+          }
+          """);
+    }
+
+    private static NamedStyles wrapping(UnaryOperator<WrappingAndBracesStyle> with, boolean useTrailingComma) {
+        return new NamedStyles(randomId(), "test", "test", "test", emptySet(),
+          Arrays.asList(with.apply(IntelliJ.wrappingAndBraces()), new OtherStyle(useTrailingComma)));
+    }
+
+    @Test
+    void chopFunctionParametersIfTooLong() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().styles(singletonList(wrapping(w -> w
+            .withHardWrapAt(50)
+            .withFunctionDeclarationParameters(w.getFunctionDeclarationParameters().withWrap(LineWrapSetting.ChopIfTooLong)), true)))),
+          kotlin(
+            """
+              class Builder {
+                  fun short(a: String): String = a
+                  fun describe(description: String, category: String): String = description + category
+              }
+              """,
+            """
+              class Builder {
+                  fun short(a: String): String = a
+                  fun describe(
+                      description: String,
+                      category: String,
+                  ): String = description + category
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chopCallArgumentsIfTooLong() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().styles(singletonList(wrapping(w -> w
+            .withHardWrapAt(40)
+            .withFunctionCallArguments(w.getFunctionCallArguments().withWrap(LineWrapSetting.ChopIfTooLong)), false)))),
+          kotlin(
+            """
+              class Item(val id: String, val name: String)
+
+              fun build(id: String, name: String): Item {
+                  val s = maxOf(id.length + name.length, name.length, 100)
+                  val p = id to name.uppercase().lowercase().uppercase()
+                  return Item(id.uppercase(), name.lowercase())
+              }
+              """,
+            """
+              class Item(val id: String, val name: String)
+
+              fun build(id: String, name: String): Item {
+                  val s = maxOf(
+                      id.length + name.length,
+                      name.length,
+                      100
+                  )
+                  val p = id to name.uppercase().lowercase().uppercase()
+                  return Item(
+                      id.uppercase(),
+                      name.lowercase()
+                  )
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedDataClassChoppedWithExplicitStyles() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Response {
+                abstract class Item {
+                    abstract fun id(): String
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration dataClass = KotlinParser.builder().build()
+          .parse("""
+            package p
+
+            data class Item(val id: String, val name: String, val description: String, val category: String, val count: Int)
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+        NamedStyles styles = wrapping(w -> w
+          .withHardWrapAt(100)
+          .withFunctionDeclarationParameters(w.getFunctionDeclarationParameters().withWrap(LineWrapSetting.ChopIfTooLong)), true);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    return (J.ClassDeclaration) new AutoFormatVisitor<>(null, styles)
+                      .visit(dataClass.withId(classDecl.getId()).withPrefix(classDecl.getPrefix()), p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Response {
+              data class Item(
+                  val id: String,
+                  val name: String,
+                  val description: String,
+                  val category: String,
+                  val count: Int,
+              )
+          }
+          """);
+    }
+
     @Test
     void reorderImportsDefault() {
         rewriteRun(
@@ -411,6 +588,139 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preserveFourSpaceIndentWhenAddingBraces() {
+        // This test simulates what happens when a recipe (like NeedBraces) adds braces
+        // to a single-line if statement and calls autoFormat.
+        // When no style is attached, it falls back to IntelliJ defaults (4 spaces).
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+
+        // Simulate what NeedBraces does: wrap the throw statement in a block and autoFormat
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.If visitIf(J.If iff, Object p) {
+                if (!(iff.getThenPart() instanceof J.Block)) {
+                    // Add braces around the then part
+                    J.Block block = new J.Block(
+                        org.openrewrite.Tree.randomId(),
+                        org.openrewrite.java.tree.Space.EMPTY,
+                        org.openrewrite.marker.Markers.EMPTY,
+                        org.openrewrite.java.tree.JRightPadded.build(false),
+                        singletonList(
+                            org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
+                        ),
+                        org.openrewrite.java.tree.Space.EMPTY
+                    );
+                    iff = iff.withThenPart(block);
+                    return autoFormat(iff, p);
+                }
+                return iff;
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        String actual = result.printAll();
+
+        // The indentation uses IntelliJ defaults (4 spaces) since no style is attached
+        assertThat(actual).isEqualTo("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
+                    }
+                }
+            }
+            """);
+    }
+
+    @Test
+    void attachedStyleUsedForFormatting() {
+        // This test documents the current behavior: when a project-wide style is
+        // attached (e.g., via gradle/maven plugin), that style is used for formatting.
+        // This can result in indentation changes if the file's indentation differs
+        // from the project-wide style.
+        org.openrewrite.kotlin.style.TabsAndIndentsStyle twoSpaceStyle =
+            new org.openrewrite.kotlin.style.TabsAndIndentsStyle(
+                false, // useTabs
+                2,     // tabSize
+                2,     // indentSize
+                4,     // continuationIndent
+                false, // keepIndentsOnEmptyLines
+                new org.openrewrite.kotlin.style.TabsAndIndentsStyle.FunctionDeclarationParameters(true)
+            );
+
+        NamedStyles twoSpaceNamedStyle = new NamedStyles(
+            randomId(),
+            "test",
+            "test",
+            "test",
+            emptySet(),
+            singletonList(twoSpaceStyle)
+        );
+
+        // Parse a file with 4-space indentation but attach 2-space style
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+
+        // Attach the 2-space style to the source file (simulating what gradle plugin does)
+        cu = cu.withMarkers(cu.getMarkers().add(twoSpaceNamedStyle));
+
+        // Simulate what NeedBraces does: wrap the throw statement in a block and autoFormat
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.If visitIf(J.If iff, Object p) {
+                if (!(iff.getThenPart() instanceof J.Block)) {
+                    // Add braces around the then part
+                    J.Block block = new J.Block(
+                        org.openrewrite.Tree.randomId(),
+                        org.openrewrite.java.tree.Space.EMPTY,
+                        org.openrewrite.marker.Markers.EMPTY,
+                        org.openrewrite.java.tree.JRightPadded.build(false),
+                        singletonList(
+                            org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
+                        ),
+                        org.openrewrite.java.tree.Space.EMPTY
+                    );
+                    iff = iff.withThenPart(block);
+                    return autoFormat(iff, p);
+                }
+                return iff;
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        String actual = result.printAll();
+
+        // With 2-space style attached, the if statement and its contents get 2-space indentation.
+        // This creates mixed indentation in the file.
+        assertThat(actual).isEqualTo("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                  if (value <= 0) {
+                    throw IllegalArgumentException("error")
+                  }
+                }
+            }
+            """);
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/370")
     @Test
     void doNotFoldImport() {
@@ -427,6 +737,94 @@ class AutoFormatVisitorTest implements RewriteTest {
                   fun method() {
                       val x: Objects
                       val y: StringJoiner
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void splicedNestedClassReindentsKDocContinuationLines() {
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class Outer {
+                class Item
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+        J.ClassDeclaration documented = KotlinParser.builder().build()
+          .parse("""
+            /**
+             * An item.
+
+             * Blank lines stay blank.
+             */
+            class Item {
+                /**
+                 * Its id.
+                 */
+                val id: String = ""
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get()
+          .getClasses().get(0);
+
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object p) {
+                if ("Item".equals(classDecl.getSimpleName())) {
+                    J.ClassDeclaration spliced = documented.withId(classDecl.getId())
+                      .withPrefix(documented.getPrefix().withWhitespace(classDecl.getPrefix().getWhitespace()));
+                    return autoFormat(spliced, p, getCursor().getParentTreeCursor());
+                }
+                return super.visitClassDeclaration(classDecl, p);
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        assertThat(result.printAll()).isEqualTo("""
+          class Outer {
+              /**
+               * An item.
+
+               * Blank lines stay blank.
+               */
+              class Item {
+                  /**
+                   * Its id.
+                   */
+                  val id: String = ""
+              }
+          }
+          """);
+    }
+
+    @Test
+    void indentExpressionStatements() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(): Int {
+                  @Suppress("UNUSED_EXPRESSION")
+              1
+                  return run {
+                      val x = 1
+              x + 1
+                  }
+              }
+              """,
+            """
+              fun f(): Int {
+                  @Suppress("UNUSED_EXPRESSION")
+                  1
+                  return run {
+                      val x = 1
+                      x + 1
                   }
               }
               """

@@ -22,6 +22,10 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -124,9 +128,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   if ("test".equals(method.getSimpleName())) {
-                      return JavaTemplate.builder("#{} void test2() {}")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
+                      return JavaTemplate.apply("#{} void test2() {}", getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
                   }
                   return method;
               }
@@ -194,9 +196,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   var s = method.getBody().getStatements().getFirst();
-                  return JavaTemplate.builder("if(true) #{}")
-                    .build()
-                    .apply(getCursor(), s.getCoordinates().replace(), method.getBody());
+                  return JavaTemplate.apply("if(true) #{}", getCursor(), s.getCoordinates().replace(), method.getBody());
               }
           }).withMaxCycles(1)),
           java(
@@ -425,9 +425,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return JavaTemplate.builder("System.out.println(#{any()})")
-                    .build()
-                    .apply(getCursor(), method.getCoordinates().replace(), method);
+                  return JavaTemplate.apply("System.out.println(#{any()})", getCursor(), method.getCoordinates().replace(), method);
               }
           }).withMaxCycles(1)),
           java(
@@ -452,14 +450,101 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     }
 
     @Test
+    void anyWithInferredIntersectionType() {
+        MethodMatcher println = new MethodMatcher("java.io.PrintStream println(..)");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (println.matches(method)) {
+                      return method;
+                  }
+                  return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              import java.util.Objects;
+              class Test {
+                  void test(boolean flag) {
+                      List.of(1, 2.0);
+                      Objects.requireNonNull(flag ? "a" : 1);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.Objects;
+              class Test {
+                  void test(boolean flag) {
+                      System.out.println(List.of(1, 2.0));
+                      System.out.println(Objects.requireNonNull(flag ? "a" : 1));
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new JavaIsoVisitor<List<String>>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> types) {
+                    if (println.matches(method)) {
+                        types.add(String.valueOf(method.getMethodType()));
+                        types.add(String.valueOf(method.getArguments().getFirst().getType()));
+                    }
+                    return method;
+                }
+            }.reduce(cu, new ArrayList<>())).containsExactly(
+              "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
+              "java.util.List<java.lang.Number & java.lang.Comparable<Generic{? extends java.lang.Number & java.lang.Comparable<Generic{?}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc>",
+              "java.io.PrintStream{name=println,return=void,parameters=[java.lang.Object]}",
+              "java.io.Serializable & java.lang.Comparable<Generic{? extends java.io.Serializable & java.lang.Comparable<Generic{?}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc}> & java.lang.constant.Constable & java.lang.constant.ConstantDesc"
+            ))
+          )
+        );
+    }
+
+    @Test
+    void anyWithExtendsObjectWildcardTypeArgument() {
+        MethodMatcher println = new MethodMatcher("java.io.PrintStream println(..)");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (println.matches(method)) {
+                      return method;
+                  }
+                  return JavaTemplate.apply("System.out.println(#{any()});", getCursor(), method.getCoordinates().replace(), method);
+              }
+          })),
+          java(
+            """
+              import java.util.Map;
+              abstract class Test {
+                  abstract Map.Entry<String, ? extends Object> entry();
+                  void test() {
+                      entry();
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+              abstract class Test {
+                  abstract Map.Entry<String, ? extends Object> entry();
+                  void test() {
+                      System.out.println(entry());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void throwNewException() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation methodInvocation, ExecutionContext executionContext) {
-                  return JavaTemplate.builder("throw new RuntimeException()")
-                    .build()
-                    .apply(getCursor(), methodInvocation.getCoordinates().replace());
+                  return JavaTemplate.apply("throw new RuntimeException()", getCursor(), methodInvocation.getCoordinates().replace());
               }
           })),
           java(
@@ -550,5 +635,162 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             }
             return m;
         }
+    }
+
+    @Test
+    void changeVarargsToList() {
+        rewriteRun(
+          // Mimics what a Refaster template would generate for varargs
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation elem, ExecutionContext ctx) {
+                  JavaTemplate.Matcher matcher;
+                  JavaTemplate before = JavaTemplate.builder("java.util.stream.Stream.of(#{value:anyArray(T)}).toList()")
+                    .bindType("java.util.List<T>")
+                    .genericTypes("T").build();
+                  if ((matcher = before.matcher(getCursor())).find()) {
+                      maybeRemoveImport("java.util.stream.Stream");
+                      return JavaTemplate.builder("java.util.Arrays.asList(#{value:anyArray(T)})")
+                        .bindType("java.util.List<T>")
+                        .genericTypes("T")
+                        .build()
+                        .apply(getCursor(), elem.getCoordinates().replace(), matcher.parameter(0));
+                  }
+                  return super.visitMethodInvocation(elem, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+              
+              class Example {
+                  List<String> test() {
+                      return Stream.of("a", "b", "c").toList();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class Example {
+                  List<String> test() {
+                      return java.util.Arrays.asList("a", "b", "c");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterKeepsItsComments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("foo".equals(method.getSimpleName())) {
+                      return JavaTemplate.builder("bar(#{any(int)})")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      foo(/* keep */ 1);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo(int n) {}
+                  void bar(int n) {}
+                  void test() {
+                      bar(/* keep */ 1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedExpressionPassedAsParameterKeepsItsCommentsOnce() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+                  if ("o".equals(ident.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation m &&
+                      "println".equals(m.getSimpleName())) {
+                      return JavaTemplate.builder("String.valueOf(#{any()})")
+                        .build()
+                        .apply(getCursor(), ident.getCoordinates().replace(), ident);
+                  }
+                  return ident;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(Object o) {
+                      System.out.println(/* keep */ o);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Object o) {
+                      System.out.println(/* keep */ String.valueOf(o));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedStatementPassedAsParameterKeepsItsCommentsInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("toString".equals(method.getSimpleName()) && getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                      return JavaTemplate.builder("if (o != null) {\n#{any()};\n}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(Object o) {
+                      // keep
+                      o.toString();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Object o) {
+                      // keep
+                      if (o != null) {
+                          o.toString();
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 }

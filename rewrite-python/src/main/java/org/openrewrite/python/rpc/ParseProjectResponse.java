@@ -40,5 +40,10 @@ class ParseProjectResponse extends ArrayList<ParseProjectResponse.Item> {
          * Example: org.openrewrite.python.tree.Py$CompilationUnit
          */
         String sourceFileType;
+
+        /**
+         * The relative source path of the file.
+         */
+        String sourcePath;
     }
 }

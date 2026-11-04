@@ -27,8 +27,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.ProxyStatus;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
@@ -39,11 +39,13 @@ import org.openrewrite.semver.Semver;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
@@ -63,6 +65,16 @@ public class MavenPomDownloader {
             .withJitter(0.1)
             .withMaxRetries(5)
             .build();
+
+    /**
+     * Repository reachability probes retry a timeout once rather than five times. Each probe of a host that accepts
+     * connections but never answers would otherwise wait out six timeouts before normalization moved on.
+     */
+    private static final RetryPolicy<Object> probeRetryPolicy = RetryPolicy.builder(retryPolicy.getConfig())
+            .withMaxRetries(1)
+            .build();
+
+    private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
@@ -148,20 +160,32 @@ public class MavenPomDownloader {
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
+        return sendRequest(request, retryPolicy);
+    }
+
+    private byte[] sendRequest(HttpSender.Request request, RetryPolicy<Object> policy)
+            throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
-            return Failsafe.with(retryPolicy).get(() -> {
+            return Failsafe.with(policy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
                         throw new HttpSenderResponseException(null, response.getCode(),
-                                new String(response.getBodyAsBytes()));
+                                new String(response.getBodyAsBytes()), ProxyStatus.parse(response.getHeaders()));
                     }
                     return response.getBodyAsBytes();
                 }
             });
         } catch (FailsafeException failsafeException) {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
-                throw (HttpSenderResponseException) failsafeException.getCause();
+                HttpSenderResponseException e = (HttpSenderResponseException) failsafeException.getCause();
+                if (e.isThrottled()) {
+                    String endpoint = endpointOrNull(URI.create(request.getUrl().toString()));
+                    if (endpoint != null) {
+                        ctx.getThrottledEndpoints().put(endpoint, Instant.now().plus(THROTTLE_COOLDOWN));
+                    }
+                }
+                throw e;
             }
             throw failsafeException;
         } catch (UncheckedIOException e) {
@@ -169,6 +193,26 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
+    }
+
+    /**
+     * Whether the repository's endpoint answered HTTP 429 recently enough that it is still cooling down.
+     */
+    private boolean throttled(MavenRepository repo) {
+        Map<String, Instant> throttled = ctx.getThrottledEndpoints();
+        if (throttled.isEmpty()) {
+            return false;
+        }
+        String endpoint = endpointOrNull(URI.create(repo.getUri()));
+        Instant until = endpoint == null ? null : throttled.get(endpoint);
+        if (until == null) {
+            return false;
+        }
+        if (Instant.now().isBefore(until)) {
+            return true;
+        }
+        throttled.remove(endpoint, until);
+        return false;
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -214,12 +258,23 @@ public class MavenPomDownloader {
             return null;
         }
         String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (relativePath != null && relativePath.isEmpty()) {
+            return null;
+        }
+        if (relativePath == null) {
             relativePath = "../pom.xml";
+        }
+        // Maven resolves <relativePath> to a directory + /pom.xml when it doesn't
+        // already point to a file. Match that behaviour so that directory-style
+        // relative paths like "../my-parent" resolve correctly.
+        Path resolvedRelativePath = Paths.get(relativePath);
+        if (!relativePath.endsWith(".xml")) {
+            resolvedRelativePath = resolvedRelativePath.resolve("pom.xml");
         }
         Path parentPath = projectPom.getSourcePath()
                 .resolve("..")
-                .resolve(Paths.get(relativePath))
+                .resolve(resolvedRelativePath)
                 .normalize();
         Pom parentPom = projectPoms.get(parentPath);
         return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
@@ -247,14 +302,11 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
-            if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
-                continue;
-            }
             attemptedUris.add(repo.getUri());
             Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
             if (result == null) {
@@ -352,9 +404,10 @@ public class MavenPomDownloader {
      * @return Metadata or null if the metadata cannot be derived.
      */
     private @Nullable MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, IOException, MavenDownloadingException {
-        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
+        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null || throttled(repo)) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
+            // Do not derive metadata from an endpoint that has just answered 429 to the metadata request.
             return null;
         }
 
@@ -411,7 +464,7 @@ public class MavenPomDownloader {
         int start = responseBody.indexOf("<a href=\"");
         while (start > 0) {
             start += 9;
-            int end = responseBody.indexOf("\">", start);
+            int end = responseBody.indexOf("\"", start);
             if (end < 0) {
                 break;
             }
@@ -516,22 +569,40 @@ public class MavenPomDownloader {
             }
         }
 
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
-            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
-            if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath).resolve("pom.xml"))
-                        .normalize());
-                // Even poms published to remote repositories still contain relative paths to their parent poms
-                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
-                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom;
+                !(relativePath != null && relativePath.isEmpty())) {
+            // Maven POM §4.0.0 specifies that <relativePath> defaults to ".." when omitted.
+            // See DefaultModelBuilder#readParentLocally in maven-model-builder.
+            String effectiveRelativePath = relativePath == null ? ".." : relativePath;
+            if (!effectiveRelativePath.contains(":")) {
+                Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+                if (folderContainingPom != null) {
+                    Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(effectiveRelativePath).resolve("pom.xml"))
+                            .normalize());
+                    // Even poms published to remote repositories still contain relative paths to their parent poms.
+                    // Like Maven 3's DefaultModelBuilder#readParentLocally, check groupId, artifactId,
+                    // and version to guard against a relative path like ".." or "../.." coincidentally
+                    // resolving to an unrelated local pom. The version check is relaxed when it contains
+                    // unresolved placeholders (e.g. ${project.version}) that only the parent can resolve.
+                    if (maybeLocalPom != null &&
+                            gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                            gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                            (gav.getVersion().equals(maybeLocalPom.getVersion()) || gav.getVersion().contains("${"))) {
+                        return maybeLocalPom;
+                    }
                 }
             }
+        }
+
+        GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
+        gav = handleSnapshotTimestampVersion(gav);
+
+        if (gav.getVersion().contains("${")) {
+            throw new MavenDownloadingException("Unable to download POM " + gav +
+                    ". Version contains unresolved property placeholder.", null, originalGav);
         }
 
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
@@ -540,10 +611,6 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        GroupArtifactVersion originalGav = gav;
-        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
-        gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
         // Keep the repo and resolved GAV of the found JAR to avoid throwing if JAR is found
@@ -658,7 +725,9 @@ public class MavenPomDownloader {
                                     }
                                 }
                             } catch (HttpSenderResponseException e) {
-                                if (e.getResponseCode() != 404) {
+                                // Some repositories return 401 when no `.module` url is found (eg. virtual repo that is accessed unauthenticated)
+                                // As the retrieval of module is not critical for the pom, we're swallowing if we can reach the other server / it is a timeout.
+                                if (!e.isServerReached() && !e.isClientSideException()) {
                                     throw e;
                                 }
                             }
@@ -852,7 +921,7 @@ public class MavenPomDownloader {
         // Return lazy iterable
         return () -> new Iterator<MavenRepository>() {
             private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
-            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private final Set<String> seen = new HashSet<>();
             private @Nullable MavenRepository next;
 
             private @Nullable MavenRepository findNext() {
@@ -862,7 +931,11 @@ public class MavenPomDownloader {
 
                     if (normalized != null &&
                         (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
-                        seen.put(normalized.getId(), normalized) == null) {
+                        seen.add(uriKey(normalized))) {
+                        if (throttled(normalized)) {
+                            ctx.getResolutionListener().repositoryAccessFailedPreviously(normalized.getUri());
+                            continue;
+                        }
                         return normalized;
                     }
                 }
@@ -897,6 +970,13 @@ public class MavenPomDownloader {
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
         repository = applyAuthenticationToRepository(applyMirrors(repository));
+
+        // Normalize file URIs early, before the knownToExist check, so that all
+        // downstream URI.create() calls receive a properly encoded file:// URI.
+        if (!repository.getUri().contains("${") && repository.getUri().regionMatches(true, 0, "file:", 0, 5)) {
+            repository = repository.withUri(normalizeFileUri(repository.getUri()));
+        }
+
         try {
             if (repository.isKnownToExist()) {
                 return repository;
@@ -919,7 +999,8 @@ public class MavenPomDownloader {
                 return null;
             }
 
-            if ("file".equals(URI.create(repository.getUri()).getScheme())) {
+            URI uri = URI.create(repository.getUri());
+            if ("file".equals(uri.getScheme())) {
                 return repository;
             }
             result = mavenCache.getNormalizedRepository(repository);
@@ -927,12 +1008,30 @@ public class MavenPomDownloader {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
+                    mavenCache.putNormalizedRepository(repository, null);
+                    return null;
+                }
+                // An endpoint that has already failed to connect during this run is skipped rather
+                // than re-probed. The same dead repository is frequently declared (often under
+                // different ids) by many transitive POMs; the per-repository normalization cache
+                // does not dedupe those, so without this each one costs a full connection timeout.
+                // The key is the host:port the connection targets (not the full URI): a connection
+                // failure happens before any path is sent, so it is independent of the path, and so
+                // the same dead host declared under different paths or ids is deduped too.
+                String endpoint = endpointOrNull(uri);
+                if (endpoint != null && ctx.getUnreachableEndpoints().contains(endpoint)) {
+                    ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
                     return null;
                 }
                 MavenRepository normalized = null;
                 try {
                     normalized = normalizeRepository(repository);
                 } catch (Throwable e) {
+                    // normalizeRepository(repository) only throws once the endpoint is unreachable on
+                    // every probed URL, so remember it and skip the endpoint for the rest of the run.
+                    if (endpoint != null) {
+                        ctx.getUnreachableEndpoints().add(endpoint);
+                    }
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
                 }
 
@@ -956,35 +1055,58 @@ public class MavenPomDownloader {
         // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
         // This regex accepts any capitalization of the letters in "http"
         String originalUrl = repository.getUri();
-        String httpsUri = originalUrl.toLowerCase().startsWith("http:") ?
-                repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
-                repository.getUri();
-        if (!httpsUri.endsWith("/")) {
-            httpsUri += "/";
-        }
+        String httpsUri = normalizedRepositoryUri(originalUrl);
 
-        HttpSender.Request.Builder request = httpSender.options(httpsUri);
-
-        ReachabilityResult reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request));
+        ReachabilityResult reachability = reachable(repository, HttpSender.Method.OPTIONS, httpsUri);
         if (reachability.isSuccess()) {
             return repository.withUri(httpsUri);
         }
-        reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(httpsUri)));
+        reachability = reachable(repository, HttpSender.Method.HEAD, httpsUri);
         if (reachability.isReachable()) {
             return repository.withUri(httpsUri);
         }
         if (!originalUrl.equals(httpsUri)) {
-            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.OPTIONS).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.OPTIONS, originalUrl);
             if (reachability.isSuccess()) {
                 return repository.withUri(originalUrl);
             }
-            reachability = reachable(applyAuthenticationAndTimeoutToRequest(repository, request.withMethod(HttpSender.Method.HEAD).url(originalUrl)));
+            reachability = reachable(repository, HttpSender.Method.HEAD, originalUrl);
             if (reachability.isReachable()) {
                 return repository.withUri(originalUrl);
             }
         }
         // Won't be null if server is unreachable
         throw Objects.requireNonNull(reachability.throwable);
+    }
+
+    /**
+     * The URI form {@link #normalizeRepository(MavenRepository)} prefers: https over http, with a trailing
+     * slash so artifact paths can be appended directly. Since that is the form a reachable repository is
+     * normalized to, it is also the URI recorded on the POMs it serves. Exposed so callers keyed on that URI
+     * — a {@link org.openrewrite.maven.cache.MavenPomCache} matching a downloaded POM back to the repository
+     * declaration it came from, for one — can derive it without reimplementing the rule and drifting from it.
+     */
+    public static String normalizedRepositoryUri(String uri) {
+        String httpsUri = uri.toLowerCase().startsWith("http:") ?
+                uri.replaceFirst("[hH][tT][tT][pP]://", "https://") :
+                uri;
+        return httpsUri.endsWith("/") ? httpsUri : httpsUri + "/";
+    }
+
+    /**
+     * Probes {@code url} to establish whether the repository host answers at all. Anonymous first, as every
+     * other request is, but a host that refuses unauthenticated requests without answering them — a connection
+     * reset or a dropped TLS handshake rather than a 401 — must not be written off as unreachable until tried
+     * with credentials. A repository declared to be behind authentication is often exactly such a host, so when
+     * credentials are configured the probe is retried with them before concluding the repository is unreachable.
+     */
+    private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
+        ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
+        if (anonymous.isReachable() || !hasAuthentication(repository)) {
+            return anonymous;
+        }
+        ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
+        return authenticated.isReachable() ? authenticated : anonymous;
     }
 
     @Value
@@ -1014,7 +1136,7 @@ public class MavenPomDownloader {
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
         try {
-            sendRequest(request.build());
+            sendRequest(request.build(), probeRetryPolicy);
             return ReachabilityResult.success();
         } catch (Throwable t) {
             if (t instanceof HttpSenderResponseException) {
@@ -1030,22 +1152,34 @@ public class MavenPomDownloader {
 
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise probe anonymously first.
+        String endpoint = endpointOrNull(URI.create(jarUrl));
+        boolean preemptive = hasAuthentication(repo) && endpoint != null &&
+                             ctx.getAuthenticationRequiredEndpoints().contains(endpoint);
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
-                    try (HttpSender.Response response = httpSender.send(authenticated)) {
+                    HttpSender.Request request = preemptive ?
+                            applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build() :
+                            applyTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
+                    try (HttpSender.Response response = httpSender.send(request)) {
                         return response.isSuccessful();
                     }
                 });
             } catch (FailsafeException failsafeException) {
                 Throwable cause = failsafeException.getCause();
-                if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
+                if (cause instanceof HttpSenderResponseException && !preemptive && hasAuthentication(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
-                        HttpSender.Request unauthenticated = httpSender.head(jarUrl).build();
-                        try (HttpSender.Response response = httpSender.send(unauthenticated)) {
-                            return response.isSuccessful();
+                        HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
+                        try (HttpSender.Response response = httpSender.send(authenticated)) {
+                            boolean successful = response.isSuccessful();
+                            if (successful && endpoint != null) {
+                                // Remember so later requests to this host authenticate preemptively
+                                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+                            }
+                            return successful;
                         }
                     });
                 }
@@ -1058,27 +1192,39 @@ public class MavenPomDownloader {
 
 
     /**
-     * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
+     * Replicates Apache Maven's DeferredCredentialsProvider behavior: request anonymously first and only send
+     * credentials once the server challenges the anonymous request with a 4xx.
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException, IOException {
+        // If this host has already required authentication in this session, authenticate preemptively rather
+        // than paying another anonymous round-trip. Otherwise request anonymously first.
+        String endpoint = endpointOrNull(URI.create(uriString));
+        if (hasAuthentication(repo) && endpoint != null && ctx.getAuthenticationRequiredEndpoints().contains(endpoint)) {
+            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
+        }
         try {
-            HttpSender.Request.Builder request = httpSender.get(uriString);
-            return sendRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
+            return sendRequest(applyTimeoutToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
-            if (hasCredentials(repo) && e.isClientSideException()) {
-                return retryRequestAnonymously(uriString, e);
+            if (hasAuthentication(repo) && e.isClientSideException()) {
+                return retryRequestWithCredentials(repo, uriString, e);
             } else {
                 throw e;
             }
         }
     }
 
-    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException, IOException {
+    private byte[] retryRequestWithCredentials(MavenRepository repo, String uriString, HttpSenderResponseException anonymousException) throws HttpSenderResponseException, IOException {
         try {
-            return sendRequest(httpSender.get(uriString).build());
+            byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
+            // Remember so later requests to this host authenticate preemptively
+            String endpoint = endpointOrNull(URI.create(uriString));
+            if (endpoint != null) {
+                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
+            }
+            return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
-                throw originalException;
+                throw anonymousException;
             } else {
                 throw retryException;
             }
@@ -1093,28 +1239,34 @@ public class MavenPomDownloader {
     }
 
     /**
-     * Returns a request builder with Authorization header set if the provided repository specifies credentials
+     * Applies connect/read timeouts from the repository and any matching server configuration, without sending
+     * any credentials or configured HTTP headers. Used for anonymous-first requests.
      */
-    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+    private HttpSender.Request.Builder applyTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (mavenSettings != null && mavenSettings.getServers() != null) {
             request.withConnectTimeout(repository.getTimeout() == null ? Duration.ofSeconds(10) : repository.getTimeout());
             request.withReadTimeout(repository.getTimeout() == null ? Duration.ofSeconds(30) : repository.getTimeout());
             for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
                 if (server.getId().equals(repository.getId()) && server.getConfiguration() != null) {
                     MavenSettings.ServerConfiguration configuration = server.getConfiguration();
-                    if (server.getConfiguration().getHttpHeaders() != null) {
-                        for (MavenSettings.HttpHeader header : configuration.getHttpHeaders()) {
-                            request.withHeader(header.getName(), header.getValue());
-                        }
-                    }
                     if (configuration.getTimeout() != null) {
                         request.withConnectTimeout(Duration.ofMillis(configuration.getTimeout()));
-                    }
-                    if (configuration.getTimeout() != null) {
                         request.withReadTimeout(Duration.ofMillis(configuration.getTimeout()));
                     }
                 }
             }
+        }
+        return request;
+    }
+
+    /**
+     * Returns a request builder with timeouts, any configured HTTP headers, and an Authorization header when the
+     * repository specifies credentials. Only used to retry once an anonymous request has been challenged with a 4xx.
+     */
+    private HttpSender.Request.Builder applyAuthenticationAndTimeoutToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+        applyTimeoutToRequest(repository, request);
+        for (MavenSettings.HttpHeader header : resolveHttpHeaders(repository)) {
+            request.withHeader(header.getName(), header.getValue());
         }
         if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
@@ -1122,8 +1274,54 @@ public class MavenPomDownloader {
         return request;
     }
 
+    /**
+     * Whether an authenticated request to this repository would differ from an anonymous one at all, and so
+     * whether retrying with authentication after a 4xx is worth a round-trip. A {@code <server>} may carry
+     * only {@code <httpHeaders>} (a bearer token or PAT) with no username or password, which authenticates
+     * just as much as basic credentials do. Mirrors {@code MavenArtifactDownloader#hasAuthentication}.
+     */
+    private boolean hasAuthentication(MavenRepository repository) {
+        return hasCredentials(repository) || !resolveHttpHeaders(repository).isEmpty();
+    }
+
+    private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {
+        if (mavenSettings != null && mavenSettings.getServers() != null) {
+            for (MavenSettings.Server server : mavenSettings.getServers().getServers()) {
+                MavenSettings.ServerConfiguration configuration = server.getConfiguration();
+                if (server.getId().equals(repository.getId()) && configuration != null &&
+                    configuration.getHttpHeaders() != null) {
+                    return configuration.getHttpHeaders();
+                }
+            }
+        }
+        return emptyList();
+    }
+
     private static boolean hasCredentials(MavenRepository repository) {
         return repository.getUsername() != null && repository.getPassword() != null;
+    }
+
+    private static @Nullable String endpointOrNull(URI uri) {
+        String host = uri.getHost();
+        return host == null ? null : host + ':' + uri.getPort();
+    }
+
+    /**
+     * Repositories are deduplicated by the URI that would be asked rather than by id: the id is Maven's
+     * override key, but two declarations of one URL under different ids would cost a request each.
+     */
+    private static String uriKey(MavenRepository repository) {
+        String uri = repository.getUri();
+        if (uri.endsWith("/")) {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+        // Scheme and host are case-insensitive; the path is not
+        int authorityStart = uri.indexOf("://");
+        if (authorityStart < 0) {
+            return uri;
+        }
+        int pathStart = uri.indexOf('/', authorityStart + 3);
+        return pathStart < 0 ? uri.toLowerCase() : uri.substring(0, pathStart).toLowerCase() + uri.substring(pathStart);
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
@@ -1137,11 +1335,19 @@ public class MavenPomDownloader {
 
         private final String body;
 
+        private final List<ProxyStatus> proxyStatus;
+
         public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
                                            String body) {
+            this(cause, responseCode, body, emptyList());
+        }
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode,
+                                           String body, List<ProxyStatus> proxyStatus) {
             super(cause);
             this.responseCode = responseCode;
             this.body = body;
+            this.proxyStatus = proxyStatus;
         }
 
         /**
@@ -1161,11 +1367,15 @@ public class MavenPomDownloader {
         public String getMessage() {
             return responseCode == null ?
                     requireNonNull(getCause()).getMessage() :
-                    "HTTP " + responseCode;
+                    "HTTP " + responseCode + ProxyStatus.render(proxyStatus);
         }
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        public boolean isThrottled() {
+            return responseCode != null && responseCode == 429;
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
@@ -1224,5 +1434,34 @@ public class MavenPomDownloader {
             }
         }
         return null;
+    }
+
+    /**
+     * Normalizes a file:// URI so that non-ASCII characters are percent-encoded
+     * and Windows backslashes are converted to forward slashes. Already-encoded
+     * URIs pass through unchanged (idempotent).
+     */
+    static String normalizeFileUri(String uri) {
+        String path;
+        try {
+            // getPath() decodes %C3%BC → ü, ensuring re-encoding is idempotent
+            path = URI.create(uri).getPath();
+        } catch (IllegalArgumentException e) {
+            // Malformed (e.g. Windows backslashes) — extract path manually
+            path = uri.substring(5).replaceFirst("^/+", "/");
+        }
+
+        path = path.replace('\\', '/');
+        boolean trailingSlash = path.endsWith("/");
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+
+        try {
+            String normalized = new URI("file", "", path, null).toASCIIString();
+            return trailingSlash && !normalized.endsWith("/") ? normalized + "/" : normalized;
+        } catch (URISyntaxException e) {
+            return uri;
+        }
     }
 }

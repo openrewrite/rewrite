@@ -20,6 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
@@ -38,6 +39,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Nullable
     private final Tree stopAfter;
+    private boolean stopped;
 
     private final SpacesStyle style;
 
@@ -163,11 +165,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     // handle space before colon after declaration name
     private Markers spaceBeforeColonAfterDeclarationName(Markers markers) {
+        return spaceBeforeColon(markers, style.getOther().getBeforeColonAfterDeclarationName());
+    }
+
+    private Markers spaceBeforeColon(Markers markers, boolean spaceBefore) {
         return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
             if (marker instanceof TypeReferencePrefix) {
                 TypeReferencePrefix mf = (TypeReferencePrefix) marker;
-                return mf.withPrefix(updateSpace(mf.getPrefix(),
-                        style.getOther().getBeforeColonAfterDeclarationName()));
+                return mf.withPrefix(updateSpace(mf.getPrefix(), spaceBefore));
             }
             return marker;
         }));
@@ -176,7 +181,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        boolean omitBraces = c.getBody().getMarkers().findFirst(OmitBraces.class).isPresent();
+        boolean omitBraces = c.getBody().getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                             c.getBody().getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent();
         c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace && !omitBraces));
         if (c.getBody().getStatements().isEmpty()) {
             if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
@@ -350,12 +356,12 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
         J.TypeParameter pa = super.visitTypeParameter(typeParam, p);
 
-        // handle space before colon after declaration name
-        pa = pa.withMarkers(spaceBeforeColonAfterDeclarationName(pa.getMarkers()));
+        // a type parameter bound is a new type definition, e.g. `fun <T : Number> foo()`
+        pa = pa.withMarkers(spaceBeforeColon(pa.getMarkers(), style.getOther().getBeforeColonInNewTypeDefinition()));
         if (pa.getMarkers().findFirst(TypeReferencePrefix.class).isPresent()) {
             pa = pa.withBounds(
                     ListUtils.map(pa.getBounds(), b ->
-                            spaceBefore(b, style.getOther().getAfterColonBeforeDeclarationType()))
+                            spaceBefore(b, style.getOther().getAfterColonInNewTypeDefinition()))
             );
         }
         return pa;
@@ -1095,6 +1101,17 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         J.NewClass nc = super.visitNewClass(newClass, p);
+        // Kotlin has no `new` keyword; drop the space a grafted Java `new X()` leaves before the type.
+        if (!nc.getMarkers().findFirst(KObject.class).isPresent() &&
+            !nc.getMarkers().findFirst(TypeReferencePrefix.class).isPresent() &&
+            nc.getPadding().getEnclosing() == null) {
+            if (isCollapsibleSpace(nc.getNew())) {
+                nc = nc.withNew(Space.EMPTY);
+            }
+            if (nc.getClazz() != null && isCollapsibleSpace(nc.getClazz().getPrefix())) {
+                nc = nc.withClazz(nc.getClazz().withPrefix(Space.EMPTY));
+            }
+        }
         if (nc.getPadding().getArguments() != null) {
             nc = nc.getPadding().withArguments(spaceBefore(nc.getPadding().getArguments(), false, true));
             int argsSize = nc.getPadding().getArguments().getElements().size();
@@ -1117,6 +1134,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             );
         }
         return nc;
+    }
+
+    private static boolean isCollapsibleSpace(Space space) {
+        return space.getComments().isEmpty() && !space.getWhitespace().isEmpty() &&
+               space.getWhitespace().indexOf('\n') < 0 && space.getWhitespace().indexOf('\r') < 0;
     }
 
     @SuppressWarnings("ConstantValue")
@@ -1178,14 +1200,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().getRoot().putMessage("stop", true);
+            stopped = true;
         }
         return super.postVisit(tree, p);
     }
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (stopped) {
             return (J) tree;
         }
         return super.visit(tree, p);

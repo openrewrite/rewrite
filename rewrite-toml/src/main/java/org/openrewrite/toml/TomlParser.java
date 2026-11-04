@@ -69,7 +69,15 @@ public class TomlParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".toml") || path.endsWith(".xmake.cfg");
+        String fileName = path.getFileName().toString();
+        return fileName.endsWith(".toml") ||
+               "uv.lock".equals(fileName) ||
+               "poetry.lock".equals(fileName) ||
+               "pdm.lock".equals(fileName) ||
+               // Not yet needed by any recipe, and would grow every Rust repository's LST
+               // "Cargo.lock".equals(fileName) ||
+               "Pipfile".equals(fileName) ||
+               ".xmake.cfg".equals(fileName);
     }
 
     @Override

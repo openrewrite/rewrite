@@ -19,10 +19,13 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -31,6 +34,13 @@ import static java.util.Collections.emptyList;
 public class PrepareRecipe implements RpcRequest {
     String id;
     Map<String, Object> options;
+
+    /**
+     * Set by hosts that understand {@link PrepareRecipeResponse#getCausesAnotherCycle()}. Older hosts reject
+     * unknown response fields, so remotes only send it when asked.
+     */
+    @Nullable
+    Boolean acceptsCausesAnotherCycle;
 
     public interface Loader {
         Recipe load(String id, Map<String, Object> options) throws Exception;
@@ -44,8 +54,17 @@ public class PrepareRecipe implements RpcRequest {
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
             Recipe recipe = recipeLoader.load(request.id, request.getOptions());
+            return prepareTree(recipe, preparedRecipes, Boolean.TRUE.equals(request.acceptsCausesAnotherCycle));
+        }
+
+        static PrepareRecipeResponse prepareTree(Recipe recipe, PreparedRecipeCache preparedRecipes,
+                                                 boolean acceptsCausesAnotherCycle) {
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
+            List<PrepareRecipeResponse> children = new ArrayList<>();
+            for (Recipe child : recipe.getRecipeList()) {
+                children.add(prepareTree(child, preparedRecipes, acceptsCausesAnotherCycle));
+            }
             return new PrepareRecipeResponse(
                     instanceId,
                     recipe.getDescriptor(),
@@ -55,8 +74,10 @@ public class PrepareRecipe implements RpcRequest {
                     // of the edit visitor in this Java RPC process. Same for the scan precondition visitor below.
                     emptyList(),
                     recipe instanceof ScanningRecipe ? "scan:" + instanceId : null,
-                    emptyList()
-            );
+                    emptyList(),
+                    null,
+                    children,
+                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null);
         }
     }
 }

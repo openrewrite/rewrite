@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Xml;
 
@@ -23,10 +24,10 @@ import static org.openrewrite.Tree.randomId;
 
 public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
 
-    private final Xml.Tag scope;
-    private final String value;
+    private final Xml.@Nullable Tag scope;
+    private final @Nullable String value;
 
-    public ChangeTagValueVisitor(Xml.Tag scope, String value) {
+    public ChangeTagValueVisitor(Xml.@Nullable Tag scope, @Nullable String value) {
         this.scope = scope;
         this.value = value;
     }
@@ -34,7 +35,11 @@ public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
-        if (scope.isScope(t)) {
+        if (scope != null && scope.isScope(t)) {
+            if (value == null) {
+                doAfterVisit(new RemoveContentVisitor<>(t, false, true));
+                return tag;
+            }
             String prefix = "";
             String afterText = "";
             if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {

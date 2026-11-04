@@ -59,7 +59,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
     String group;
     Set<String> artifacts; //As dependencySet can have multiple Entry invocations
-    String version;
+    @Nullable String version;
 
     public SpringDependencyManagementPluginEntry withGroupArtifactVersion(DependencyMatcher matcher, @Nullable String newGroup, @Nullable String newArtifact, @Nullable String newVersion, @Nullable String versionPattern, MavenMetadataFailures metadataFailures, ExecutionContext ctx) {
         GradleProject gradleProject = getGradleProject();
@@ -79,6 +79,85 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
         Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
         return maybeGp.orElse(null);
+    }
+
+    /**
+     * Gets the version variable name if the dependency's version is specified via a variable reference
+     * in a GString or Kotlin StringTemplate.
+     *
+     * @return The variable name used for the version, or null if the version is a literal or cannot be determined
+     */
+    public @Nullable String getVersionVariable() {
+        J.MethodInvocation m = cursor.getValue();
+        if (m.getArguments().isEmpty()) {
+            return null;
+        }
+        return extractVersionVariable(m.getArguments().get(0));
+    }
+
+    private static @Nullable String extractVersionVariable(Expression arg) {
+        // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
+        if (arg instanceof G.GString) {
+            List<J> strings = ((G.GString) arg).getStrings();
+            if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof G.GString.Value) {
+                Object versionTree = ((G.GString.Value) strings.get(1)).getTree();
+                if (versionTree instanceof J.Identifier) {
+                    return ((J.Identifier) versionTree).getSimpleName();
+                } else if (versionTree instanceof J.FieldAccess) {
+                    return ((J.FieldAccess) versionTree).getSimpleName();
+                } else if (versionTree instanceof J.MethodInvocation) {
+                    // Handle property('version') or findProperty('version')
+                    return extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionTree);
+                } else if (versionTree instanceof G.Binary) {
+                    // Handle project.properties['version']
+                    return extractPropertyNameFromGBinary((G.Binary) versionTree);
+                }
+            }
+        }
+
+        // Handle Kotlin StringTemplate: "group:artifact:$version"
+        if (arg instanceof K.StringTemplate) {
+            List<J> strings = ((K.StringTemplate) arg).getStrings();
+            if (strings.size() == 2 && strings.get(0) instanceof J.Literal && strings.get(1) instanceof K.StringTemplate.Expression) {
+                Object versionTree = ((K.StringTemplate.Expression) strings.get(1)).getTree();
+                if (versionTree instanceof J.Identifier) {
+                    return ((J.Identifier) versionTree).getSimpleName();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract property name from method invocation patterns like property('name')
+     * or findProperty('name'), including project.property('name') and project.findProperty('name').
+     */
+    private static @Nullable String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
+        String methodName = mi.getSimpleName();
+        if ("property".equals(methodName) || "findProperty".equals(methodName)) {
+            if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
+                J.Literal literal = (J.Literal) mi.getArguments().get(0);
+                if (literal.getValue() instanceof String) {
+                    return (String) literal.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Handle Groovy binary access like project.properties['name']
+     * where the binary operator is Access (bracket notation).
+     */
+    private static @Nullable String extractPropertyNameFromGBinary(G.Binary binary) {
+        if (binary.getOperator() == G.Binary.Type.Access && binary.getRight() instanceof J.Literal) {
+            J.Literal right = (J.Literal) binary.getRight();
+            if (right.getValue() instanceof String) {
+                return (String) right.getValue();
+            }
+        }
+        return null;
     }
 
     public static class Matcher extends GradleTraitMatcher<SpringDependencyManagementPluginEntry> {
@@ -159,7 +238,19 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 if (importedBom != null) {
                     artifacts.add(importedBom.getArtifactId());
                 }
-                if (StringUtils.isBlank(group) || artifacts.isEmpty() || StringUtils.isBlank(version)) {
+                if (StringUtils.isBlank(group) || artifacts.isEmpty()) {
+                    return null;
+                }
+                // If version is blank, check if there's a version variable in the method invocation
+                if (StringUtils.isBlank(version)) {
+                    if (!methodInvocation.getArguments().isEmpty()) {
+                        // Handle Groovy GString: "group:artifact:$version" or "group:artifact:${...}"
+                        String versionVar = extractVersionVariable(methodInvocation.getArguments().get(0));
+                        if (versionVar != null) {
+                            // Use the variable name as a placeholder for the version
+                            return new SpringDependencyManagementPluginEntry(cursor, group, artifacts, "${" + versionVar + "}");
+                        }
+                    }
                     return null;
                 }
 
@@ -182,9 +273,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
         }
 
         private List<GroupArtifactVersion> parseDependencySet(J.MethodInvocation methodInvocation) {
-            List<String> entries = new ArrayList<>();
-
-            new JavaIsoVisitor<List<String>>() {
+            List<String> entries = new JavaIsoVisitor<List<String>>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> entries) {
                     if ("entry".equals(method.getSimpleName()) && method.getArguments().size() == 1) {
@@ -198,7 +287,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     }
                     return super.visitMethodInvocation(method, entries);
                 }
-            }.visit(methodInvocation, entries);
+            }.reduce(methodInvocation, new ArrayList<>());
 
             List<GroupArtifactVersion> dependencies = new ArrayList<>();
             List<Expression> arguments = methodInvocation.getArguments();
@@ -239,6 +328,20 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 String stringNotation = (String) ((J.Literal) argument).getValue();
                 Dependency dependency = stringNotation == null ? null : DependencyNotation.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
+            } else if (argument instanceof G.GString) {
+                G.GString gstring = (G.GString) argument;
+                List<J> strings = gstring.getStrings();
+                if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                    Dependency dependency = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return dependency == null ? null : dependency.getGav();
+                }
+            } else if (argument instanceof K.StringTemplate) {
+                K.StringTemplate template = (K.StringTemplate) argument;
+                List<J> strings = template.getStrings();
+                if (!strings.isEmpty() && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                    Dependency dependency = DependencyNotation.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    return dependency == null ? null : dependency.getGav();
+                }
             } else if (argument instanceof G.MapLiteral) {
                 gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
             } else if (argument instanceof G.MapEntry) {

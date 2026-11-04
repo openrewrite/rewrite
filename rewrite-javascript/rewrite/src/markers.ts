@@ -28,6 +28,9 @@ export const MarkersKind = {
     MarkupInfo: "org.openrewrite.marker.Markup$Info",
     MarkupDebug: "org.openrewrite.marker.Markup$Debug",
 
+    RecipesThatMadeChanges: "org.openrewrite.marker.RecipesThatMadeChanges",
+    RecipeThatMadeChanges: "org.openrewrite.marker.RecipeThatMadeChanges",
+
     /**
      * A generic marker that is sent/received as a bare map because the type hasn't been
      * defined in both Java and JavaScript.
@@ -125,11 +128,44 @@ export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Marker
     };
 }
 
+/**
+ * Removes every marker of the given kind, returning `markers` itself when none has that kind.
+ */
+export function removeMarkerByKind(markers: Markers, kind: Marker["kind"]): Markers {
+    const kept = markers.markers.filter(m => m.kind !== kind);
+    return kept.length === markers.markers.length ? markers : {...markers, markers: kept};
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),
     markers: []
 });
+
+/**
+ * One frame of a {@link RecipesThatMadeChanges} stack: how the recipe is named, how it was
+ * configured, and what it is worth.
+ */
+export interface RecipeThatMadeChanges {
+    readonly kind: typeof MarkersKind.RecipeThatMadeChanges
+    readonly name: string
+    readonly displayName?: string
+    readonly instanceName?: string
+    /**
+     * Configured option values. JavaScript never interprets them.
+     */
+    readonly options?: { [name: string]: any }
+    readonly estimatedEffortPerOccurrenceMillis?: number
+}
+
+/**
+ * Records which recipe stacks changed a source file. JavaScript holds the stacks without
+ * interpreting them, so a marker served to this peer returns to the host intact.
+ */
+export interface RecipesThatMadeChanges extends Marker {
+    readonly kind: typeof MarkersKind.RecipesThatMadeChanges
+    readonly recipes: RecipeThatMadeChanges[][]
+}
 
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,
@@ -239,6 +275,10 @@ export function markupDebug<T extends { markers: Markers }>(t: T, message: strin
  * Helper to add a markup marker to a tree node.
  */
 function addMarkup<T extends { markers: Markers }>(t: T, markup: Markup): T {
+    if (t.markers.markers.some(m => m.kind === markup.kind &&
+        (m as Markup).message === markup.message && (m as Markup).detail === markup.detail)) {
+        return t;
+    }
     return {
         ...t,
         markers: {

@@ -25,6 +25,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.internal.grammar.JsonPathLexer;
 import org.openrewrite.json.internal.grammar.JsonPathParser;
 import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
@@ -32,6 +33,7 @@ import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
@@ -52,7 +54,9 @@ public class JsonPathMatcher {
     private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
-        this.jsonPath = jsonPath;
+        this.jsonPath = jsonPath.endsWith(".") && jsonPath.length() > 1
+                ? jsonPath.substring(0, jsonPath.length() - 1)
+                : jsonPath;
     }
 
     public <T> Optional<T> find(Cursor cursor) {
@@ -72,7 +76,10 @@ public class JsonPathMatcher {
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
@@ -104,13 +111,16 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            parsed = jsonPath().jsonPath();
+            JsonPathParser parser = new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(jsonPath))));
+            parsed = parser.jsonPath();
+            // Ensure all input was consumed
+            if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {
+                throw new IllegalArgumentException(
+                        "Syntax error: extraneous input '" + parser.getCurrentToken().getText() +
+                        "' expecting EOF. Original input: '" + jsonPath + "'");
+            }
         }
         return parsed;
-    }
-
-    private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -147,7 +157,7 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Json.JsonObject)
+                        .filter(Json.JsonObject.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
                                 .filter(t -> t instanceof Json.Document && ((Json.Document) t).getValue() instanceof Json.JsonObject)
@@ -421,13 +431,12 @@ public class JsonPathMatcher {
                 s = ctx.StringLiteral().getText();
             } else if (ctx.TRUE() != null || ctx.FALSE() != null) {
                 return Boolean.valueOf(ctx.getText());
+            } else if (ctx.PositiveNumber() != null || ctx.NegativeNumber() != null || ctx.NumericLiteral() != null) {
+                return new BigDecimal(ctx.getText());
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
+            return s == null ? null : unquoteStringLiteral(s);
         }
 
         @Override
@@ -538,8 +547,8 @@ public class JsonPathMatcher {
                         if (member.getValue() instanceof Json.Array) {
                             Json.Array array = (Json.Array) ((Json.Member) lhs).getValue();
                             if (array.getValues().stream()
-                                    .filter(o -> o instanceof Json.Literal)
-                                    .map(o -> (Json.Literal) o)
+                                    .filter(Json.Literal.class::isInstance)
+                                    .map(Json.Literal.class::cast)
                                     .anyMatch(o -> String.valueOf(o.getValue()).contains(String.valueOf(rhs)))) {
                                 return originalScope;
                             }
@@ -571,6 +580,47 @@ public class JsonPathMatcher {
             }
 
             return null;
+        }
+
+        @Override
+        public @Nullable Object visitNegationExpression(JsonPathParser.NegationExpressionContext ctx) {
+            Object originalScope = scope;
+
+            // When scope contains multiple elements, iterate and collect
+            // elements where the inner expression does NOT match.
+            List<Object> elements = null;
+            if (originalScope instanceof List) {
+                elements = (List<Object>) originalScope;
+            } else if (originalScope instanceof Json.Array) {
+                elements = new ArrayList<>(((Json.Array) originalScope).getValues());
+            } else if (originalScope instanceof Json.Member &&
+                       ((Json.Member) originalScope).getValue() instanceof Json.Array) {
+                elements = new ArrayList<>(((Json.Array) ((Json.Member) originalScope).getValue()).getValues());
+            }
+
+            if (elements != null) {
+                List<Object> results = new ArrayList<>();
+                for (Object element : elements) {
+                    scope = element;
+                    Object result = ctx.filterExpression() != null ?
+                            visit(ctx.filterExpression()) :
+                            visitUnaryExpression(ctx.unaryExpression());
+                    boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+                    if (!matched) {
+                        results.add(element);
+                    }
+                }
+                scope = originalScope;
+                return getResultFromList(results);
+            }
+
+            // Non-list scope: simple boolean flip
+            Object result = ctx.filterExpression() != null ?
+                    visit(ctx.filterExpression()) :
+                    visitUnaryExpression(ctx.unaryExpression());
+            boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+            scope = originalScope;
+            return matched ? null : originalScope;
         }
 
         @Override
@@ -669,6 +719,9 @@ public class JsonPathMatcher {
 
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.NegationExpressionContext) {
+                ctx = visitNegationExpression((JsonPathParser.NegationExpressionContext) ctx);
             }
             return ctx;
         }
@@ -707,15 +760,25 @@ public class JsonPathMatcher {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 switch (operator) {
                     case "==":
-                        return Objects.equals(lh, rh);
+                        return valueEquals(lh, rh);
                     case "!=":
-                        return !Objects.equals(lh, rh);
+                        return !valueEquals(lh, rh);
                     case "=~":
                         return Pattern.compile(rh.toString()).matcher(lh.toString()).matches();
                 }
                 return false;
             };
             return predicate.test(lhs, rhs);
+        }
+
+        private boolean valueEquals(@Nullable Object lhs, @Nullable Object rhs) {
+            if (lhs instanceof Number && rhs instanceof BigDecimal) {
+                if (lhs instanceof Double && !Double.isFinite((Double) lhs)) {
+                    return false;
+                }
+                return new BigDecimal(lhs.toString()).compareTo((BigDecimal) rhs) == 0;
+            }
+            return Objects.equals(lhs, rhs);
         }
 
         // Extract the result from JSON objects that can match by key.
@@ -786,7 +849,7 @@ public class JsonPathMatcher {
 
         private static String unquoteStringLiteral(String literal) {
             if (literal != null && (literal.startsWith("'") || literal.startsWith("\""))) {
-                return literal.substring(1, literal.length() - 1);
+                return JsonString.decode(literal);
             }
             return "null".equals(literal) ? null : literal;
         }

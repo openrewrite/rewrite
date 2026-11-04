@@ -59,6 +59,23 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void annotationWithDefaultArgumentNamedLikeTheAttribute() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  static final String value = "ALL";
+
+                  @SuppressWarnings(value)
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotationWithArgument() {
         rewriteRun(
           java(

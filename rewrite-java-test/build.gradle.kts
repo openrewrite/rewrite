@@ -3,20 +3,29 @@ plugins {
 }
 
 recipeDependencies {
-    parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
+    testParserClasspath("jakarta.validation:jakarta.validation-api:3.0.2")
+    testParserClasspath("javax.validation:validation-api:1.1.0.Final")
+    testParserClasspath("org.hibernate:hibernate-validator:5.4.3.Final")
+    // parser classpath for ModerneWebsiteExampleTest — the LST example behind www.moderne.ai/platform/lst
+    testParserClasspath("org.apache.httpcomponents:httpclient:4.5.14")
+}
+
+// JavaSourceSetTest reads this 51 MB jar by its path. It stays off the test runtime classpath because javac
+// indexes every jar there each time a java() source in this module is parsed.
+val testHbaseShadedClient = configurations.create("testHbaseShadedClient") {
+    isCanBeConsumed = false
+    isTransitive = false
 }
 
 dependencies {
-    implementation("org.assertj:assertj-core:latest.release")
+    implementation("org.assertj:assertj-core:3.+") // CVE-2026-24400 in 4.0.0-M1 and no higher versions available
     implementation(project(":rewrite-java"))
-    implementation(project(":rewrite-kotlin"))
-    implementation(project(":rewrite-groovy"))
     implementation(project(":rewrite-test"))
 
-    testImplementation("io.github.classgraph:classgraph:latest.release")
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
+    // The shadowed :rewrite-java brings no transitive dependencies within this build
     testRuntimeOnly(project(":rewrite-java-21"))
-    testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
+    testHbaseShadedClient("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
@@ -37,6 +46,14 @@ java {
 
 tasks.withType<Test>().configureEach {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        @get:Classpath
+        val jar: FileCollection = testHbaseShadedClient
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.test.hbaseShadedClientJar=${jar.singleFile.absolutePath}"
+        )
+    })
 }
 
 configurations.all {

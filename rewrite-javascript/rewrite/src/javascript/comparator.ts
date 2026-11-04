@@ -2362,10 +2362,15 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return true;
     }
 
+    /** Whether a call declared on `declaringType` matches a call of the same name declared on any type. */
+    protected declaresAnyCallee(_declaringType: Type.FullyQualified): boolean {
+        return false;
+    }
+
     /**
      * Override method invocation comparison to include type attribution checking.
-     * When types match semantically, we allow matching even if one has a receiver
-     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
+     * When types match semantically, a call without a receiver matches one with
+     * (e.g., `isDate(x)` vs `util.isDate(x)`).
      */
     override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
         if (other.kind !== J.Kind.MethodInvocation) {
@@ -2374,39 +2379,28 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherMethod = other as J.MethodInvocation;
 
+        // Fast path: if both have method types with known names, compare canonical method names first.
+        // This catches most mismatches (e.g., jest.fn() vs jest.mock()) before the
+        // more expensive FQ declaring type analysis below.
+        // Skip when either name is the placeholder "unknown" (incomplete type attribution).
+        if (method.methodType && otherMethod.methodType &&
+            method.methodType.name !== otherMethod.methodType.name &&
+            method.methodType.name !== 'unknown' && otherMethod.methodType.name !== 'unknown') {
+            return this.valueMismatch('methodType.name', method.methodType.name, otherMethod.methodType.name);
+        }
+
         // Check if we can skip name checking based on type attribution
         // We can only skip the name check if both have method types AND they represent the SAME method
         // (not just type-compatible methods, but the actual same function with same FQN)
-        let canSkipNameCheck = false;
-        if (method.methodType && otherMethod.methodType) {
-            // Check if both method types have fully qualified declaring types with the same FQN
-            // This indicates they're the same method from the same module (possibly aliased)
-            const methodDeclaringType = method.methodType.declaringType;
-            const otherDeclaringType = otherMethod.methodType.declaringType;
-
-            if (methodDeclaringType && otherDeclaringType &&
-                Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
-
-                const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
-                const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
-
-                // Same module/class AND same method name in the type = same method (can be aliased)
-                if (methodFQN === otherFQN && method.methodType.name === otherMethod.methodType.name) {
-                    canSkipNameCheck = true;
-                }
-                // If FQNs or method names don't match, we can't skip name check - fall through to name checking
-            }
-            // If one or both don't have fully qualified types, we can't safely skip name checking
-            // Fall through to normal name comparison below
-        }
+        // Same module/class AND same method name in the type = same method (can be aliased)
+        const canSkipNameCheck = !!method.methodType && !!otherMethod.methodType &&
+            method.methodType.name === otherMethod.methodType.name &&
+            this.sameFullyQualifiedName(method.methodType.declaringType, otherMethod.methodType.declaringType);
 
         // Check names unless we determined we can skip based on type FQN matching
         if (!canSkipNameCheck) {
             if (method.name.simpleName !== otherMethod.name.simpleName) {
-                // Visit the name elements to push them onto the cursor stack
-                // This ensures the cursor contains the J$Identifier when we abort
-                await this.visit(method.name, otherMethod.name);
-                return method;
+                return this.valueMismatch<J>('name.simpleName', method.name.simpleName, otherMethod.name.simpleName);
             }
 
             // In strict mode, check type attribution requirements
@@ -2418,35 +2412,26 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 }
             }
 
-            // If neither has type, use structural comparison
-            if (!method.methodType && !otherMethod.methodType) {
-                return super.visitMethodInvocation(method, other);
-            }
-
             // If both have types with FQ declaring types, verify they're compatible
             // (This prevents matching completely different methods like util.isArray vs util.isBoolean)
             if (method.methodType && otherMethod.methodType) {
                 const methodDeclaringType = method.methodType.declaringType;
                 const otherDeclaringType = otherMethod.methodType.declaringType;
 
-                if (methodDeclaringType && otherDeclaringType &&
-                    Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType)) {
-
-                    const methodFQN = Type.FullyQualified.getFullyQualifiedName(methodDeclaringType as Type.FullyQualified);
-                    const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
-
-                    // Different declaring types = different methods, even with same name
-                    if (methodFQN !== otherFQN) {
-                        return this.valueMismatch<J>('methodType.declaringType');
-                    }
+                // Different declaring types = different methods, even with same name
+                if (Type.isFullyQualified(methodDeclaringType) && Type.isFullyQualified(otherDeclaringType) &&
+                    !this.sameFullyQualifiedName(methodDeclaringType, otherDeclaringType) &&
+                    !this.declaresAnyCallee(methodDeclaringType)) {
+                    return this.valueMismatch<J>('methodType.declaringType');
                 }
             }
         }
 
-        // When types match (canSkipNameCheck = true), we can skip select comparison entirely.
-        // This allows matching forwardRef() vs React.forwardRef() where types indicate same method.
-        if (!canSkipNameCheck) {
-            // Types didn't provide a match - must compare receivers structurally
+        // A static call is one function however its receiver is spelled, or whether it is spelled at all.
+        // Otherwise a written-out receiver still has to match, as `globalThis.Object.assign` is not `Object.assign`.
+        const staticCall = canSkipNameCheck &&
+            !!(method.methodType!.flags & otherMethod.methodType!.flags & Type.Flag.Static);
+        if (!canSkipNameCheck || method.select && !staticCall) {
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
                 return this.structuralMismatch<J>('select');
             }
@@ -2456,14 +2441,13 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                 if (!this.match) return method;
             }
         }
-        // else: types matched, skip select comparison (allows namespace vs named imports)
 
-        // Compare type parameters
-        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
-            return this.structuralMismatch<J>('typeParameters');
-        }
+        // A pattern that spells out no type arguments says nothing about them, as with parentheses
+        if (method.typeParameters) {
+            if (!otherMethod.typeParameters) {
+                return this.structuralMismatch<J>('typeParameters');
+            }
 
-        if (method.typeParameters && otherMethod.typeParameters) {
             await this.visitContainerProperty('typeParameters', method.typeParameters, otherMethod.typeParameters);
             if (!this.match) return method;
         }
@@ -2484,9 +2468,36 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     }
 
     /**
+     * A call whose callee is not a plain identifier, such as `getFn()(x)`, `arr[0](x)` or `fn?.(x)`.
+     * Type arguments constrain it under the same rule as `visitMethodInvocation`.
+     */
+    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+        if (other.kind !== JS.Kind.FunctionCall) {
+            return this.kindMismatch();
+        }
+
+        const otherFunctionCall = other as JS.FunctionCall;
+        if (functionCall.typeParameters) {
+            if (!otherFunctionCall.typeParameters) {
+                return this.structuralMismatch('typeParameters');
+            }
+
+            await this.visitContainerProperty('typeParameters', functionCall.typeParameters, otherFunctionCall.typeParameters);
+            if (!this.match) return functionCall;
+        }
+
+        // Type arguments are settled, so they come off both sides and the rest compares property by property
+        const patternCall: JS.FunctionCall = {...functionCall, typeParameters: undefined};
+        const targetCall: JS.FunctionCall = {...otherFunctionCall, typeParameters: undefined};
+        await super.visitFunctionCall(patternCall, targetCall);
+        return functionCall;
+    }
+
+    /**
      * Override identifier comparison to include:
      * 1. Type checking for field access
      * 2. Semantic equivalence between `undefined` identifier and void expressions
+     * 3. Names that differ but denote one declaration, as an import alias and its export do
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
         // Check if this identifier is "undefined" and the other is a void expression
@@ -2501,9 +2512,8 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherIdentifier = other as J.Identifier;
 
-        // Check name matches
         if (identifier.simpleName !== otherIdentifier.simpleName) {
-            return this.valueMismatch<J>('simpleName');
+            return this.denoteOneDeclaration(identifier, otherIdentifier) ? identifier : this.valueMismatch<J>('simpleName');
         }
 
         // For identifiers with field types, check type attribution
@@ -2522,12 +2532,36 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return super.visitIdentifier(identifier, other);
     }
 
+    /** An import alias and its export denote one declaration, where a variable holding the same value does not. */
+    private denoteOneDeclaration(identifier: J.Identifier, other: J.Identifier): boolean {
+        if (identifier.fieldType || other.fieldType) {
+            // An unresolved import has the placeholder name `unknown`, which identifies nothing
+            return !!identifier.fieldType && !!other.fieldType &&
+                identifier.fieldType.name === other.fieldType.name && identifier.fieldType.name !== 'unknown' &&
+                this.sameFullyQualifiedName(identifier.fieldType.owner, other.fieldType.owner);
+        }
+        // Only a nominal type names a declaration. The function and object type shells are shared,
+        // and a parameterized type is named after its base alone.
+        return identifier.type?.kind === Type.Kind.Class && other.type?.kind === Type.Kind.Class &&
+            !Type.isFunctionType(identifier.type) && !Type.isObjectType(identifier.type) &&
+            this.sameFullyQualifiedName(identifier.type, other.type);
+    }
+
+    private sameFullyQualifiedName(type?: Type, other?: Type): boolean {
+        return Type.isFullyQualified(type) && Type.isFullyQualified(other) &&
+            Type.FullyQualified.getFullyQualifiedName(type) === Type.FullyQualified.getFullyQualifiedName(other);
+    }
+
     /**
      * Override variable declarations comparison to handle lenient type matching.
      * When lenientTypeMatching is true, patterns without typeExpression can match
      * code with typeExpression.
      */
     override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.VariableDeclarations) {
+            return this.kindMismatch();
+        }
+
         const otherVariableDeclarations = other as J.VariableDeclarations;
 
         // Visit leading annotations
@@ -2586,6 +2620,10 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * code with returnTypeExpression.
      */
     override async visitMethodDeclaration(methodDeclaration: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodDeclaration) {
+            return this.kindMismatch();
+        }
+
         const otherMethodDeclaration = other as J.MethodDeclaration;
 
         // Visit leading annotations
@@ -2605,6 +2643,16 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             methodDeclaration.modifiers,
             otherMethodDeclaration.modifiers,
             async (mod1, mod2) => { await this.visit(mod1, mod2); }
+        );
+        if (!this.match) return methodDeclaration;
+
+        // Visit name annotations
+        await this.visitArrayProperty(
+            methodDeclaration,
+            'nameAnnotations',
+            methodDeclaration.nameAnnotations,
+            otherMethodDeclaration.nameAnnotations,
+            async (ann1, ann2) => { await this.visit(ann1, ann2); }
         );
         if (!this.match) return methodDeclaration;
 
@@ -2715,4 +2763,72 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         return literal;
     }
+}
+
+/**
+ * Whether two trees are the same code. Whitespace, comments, optional semicolons and trailing
+ * commas, quote style (`'a'` and `"a"`), number spelling (`255` and `0xFF`) and type attribution
+ * do not count. Markers count only where they are syntax that changes meaning, such as `?.`, a non-null
+ * `!`, `function*` and `yield*`, so a marker a recipe attaches does not make trees differ.
+ */
+export async function isEqual(a: J, b: J): Promise<boolean> {
+    return new CodeComparator().compare(a, b);
+}
+
+class CodeComparator extends JavaScriptComparatorVisitor {
+    private readonly meaningfulMarkers: ReadonlySet<string> = new Set([
+        JS.Markers.Optional, JS.Markers.NonNullAssertion, JS.Markers.Generator, JS.Markers.DelegatedYield
+    ]);
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        if (this.match && this.meaningOf(j as J) !== this.meaningOf(p)) {
+            return this.structuralMismatch('markers') as R;
+        }
+        return super.visit(j, p, parent);
+    }
+
+    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
+        if (Type.isType(j) || Type.isType(other)) {
+            return j;
+        }
+        return super.visitProperty(j, other, propertyName);
+    }
+
+    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+        if (!this.match) return literal;
+        const otherLiteral = other as J.Literal;
+        if (denotation(literal) !== denotation(otherLiteral)) {
+            return this.valueMismatch('value', literal.value, otherLiteral.value);
+        }
+        return literal;
+    }
+
+    private meaningOf(tree: J): string {
+        if (!tree.markers?.markers.length) {
+            return '';
+        }
+        return tree.markers.markers
+            .map(marker => marker.kind)
+            .filter(kind => this.meaningfulMarkers.has(kind))
+            .sort()
+            .join(',');
+    }
+}
+
+/**
+ * What a literal stands for, as a comparable key. A regex holds its source text as its value, so it
+ * is told apart from a string by its slashes. A string with a `\uXXXX` surrogate escape holds no
+ * decoded value, so its text between the quotes and its escapes stand in for one.
+ */
+function denotation(literal: J.Literal): string {
+    const source = literal.valueSource ?? '';
+    const primitive = literal.type?.keyword;
+    if (source.startsWith('/')) {
+        return JSON.stringify(['regex', source]);
+    }
+    if (literal.unicodeEscapes) {
+        const quoted = source.startsWith("'") || source.startsWith('"');
+        return JSON.stringify([primitive, quoted ? source.slice(1, -1) : source, literal.unicodeEscapes]);
+    }
+    return JSON.stringify([primitive, literal.value]);
 }

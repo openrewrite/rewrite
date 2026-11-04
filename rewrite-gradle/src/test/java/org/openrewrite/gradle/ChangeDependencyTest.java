@@ -15,20 +15,383 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Path;
+
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.toml.Assertions.toml;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi());
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryWhenVersionDoesNotChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "1.0.0",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "1.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryWhenLatestPatchHasNoUpgrade() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "latest.patch",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version = "999.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version = "999.0.0" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesTomlVersionCatalogLibraryVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = { group = "org.testcontainers", name = "mongodb", version = "1.0.0" }
+              """,
+            """
+              [libraries]
+              testcontainers = { group = "org.testcontainers", name = "testcontainers-mongodb", version = "2.0.5" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void changesTomlVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "2.0.5"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void addsVersionToTomlVersionlessLibraryWhenOverrideIsEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            true,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              testcontainers = "org.testcontainers:mongodb"
+              """,
+            """
+              [libraries]
+              testcontainers = "org.testcontainers:testcontainers-mongodb:2.0.5"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryToVersionLowerThanOldArtifactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.google.code.findbugs",
+            "jsr305",
+            "jakarta.annotation",
+            "jakarta.annotation-api",
+            "2.1.1",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
+              """,
+            """
+              [libraries]
+              jsr305 = "jakarta.annotation:jakarta.annotation-api:2.1.1"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesTomlVersionCatalogLibraryVersionReferenceWhenNoVersionIsSelected() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "999.x",
+            null,
+            null,
+            true
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          ),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesAndDetachesSharedTomlVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:mongodb", version.ref = "shared" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:testcontainers-mongodb", version = "2.0.5" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void relocatesSettingsVersionCatalogLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            null,
+            null,
+            null,
+            true
+          )),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('testcontainers', 'org.testcontainers', 'mongodb').version('1.0.0')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          library('testcontainers', 'org.testcontainers', 'testcontainers-mongodb').version('1.0.0')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changesSettingsVersionCatalogLibraryVersionReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "2.0.5",
+            null,
+            null,
+            true
+          )),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('testcontainers', '1.0.0')
+                          library('testcontainers', 'org.testcontainers', 'mongodb').versionRef('testcontainers')
+                      }
+                  }
+              }
+              """,
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version('testcontainers', '2.0.5')
+                          library('testcontainers', 'org.testcontainers', 'testcontainers-mongodb').versionRef('testcontainers')
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample
@@ -63,6 +426,47 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   implementation "org.apache.commons:commons-lang3:3.11"
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void relocateOnlyMatchingNotationsOfSeveralInOneCall() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              def langVersion = '2.6'
+              dependencies {
+                  implementation "commons-lang:commons-lang:${sharedVersion}", "com.google.guava:guava:${sharedVersion}"
+                  testImplementation "junit:junit:4.13.2", "commons-lang:commons-lang:${langVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              def langVersion = '3.11'
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11", "com.google.guava:guava:${sharedVersion}"
+                  testImplementation "junit:junit:4.13.2", "org.apache.commons:commons-lang3:${langVersion}"
               }
               """
           )
@@ -262,9 +666,99 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
+              def version = '3.11'
               dependencies {
-                  implementation platform("org.apache.commons:commons-lang3:3.11")
+                  implementation platform("org.apache.commons:commons-lang3:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithGStringFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:${commonsLangVersion}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslStringInterpolationFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -296,123 +790,6 @@ class ChangeDependencyTest implements RewriteTest {
                       classpath "io.moderne:moderne-gradle-plugin:0.39.0"
                       classpath group: "io.moderne", name: "moderne-gradle-plugin", version: "0.39.0"
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotPinWhenNotVersioned() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null, true)),
-          buildGradle(
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
-              }
-              """,
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly 'com.mysql:mysql-connector-j'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotPinWhenNotVersionedOnMap() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null, true)),
-          buildGradle(
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly group: 'mysql', name: 'mysql-connector-java'
-              }
-              """,
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void pinWhenOverrideManagedVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true, true)),
-          buildGradle(
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly 'mysql:mysql-connector-java'
-              }
-              """,
-            """
-              plugins {
-                id 'java'
-                id 'org.springframework.boot' version '2.6.1'
-                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
-              }
-
-              repositories {
-                 mavenCentral()
-              }
-
-              dependencies {
-                  runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
               }
               """
           )
@@ -573,8 +950,8 @@ class ChangeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  val commonsLangVersion = "2.6"
-                  implementation("org.apache.commons:commons-lang3:3.11")
+                  val commonsLangVersion = "3.11"
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -802,10 +1179,292 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void noDuplicateJacksonDatabindDependenciesInGradle() {
+    void dedupeDoesNotDowngradeSurvivorAtHigherVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.11.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupeUpgradesSurvivorViaSharedVariable() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.14.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.11"
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:${commonsVersion}"
+                  implementation "commons-lang:commons-lang:2.6"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.14.0"
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:${commonsVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupesAndUpgradesSurvivorWhenExistingNewGAAtLowerVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.14.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupeKeepsSiblingNotationsAndUpgradesSurvivorAmongThem() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+              "commons-lang",
+              "commons-lang",
+              "org.apache.commons",
+              "commons-lang3",
+              "3.14.x",
+              null,
+              null,
+              null
+          )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.11"
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre', 'commons-lang:commons-lang:2.6', 'org.apache.commons:commons-lang3:3.11'
+                  testImplementation 'junit:junit:4.13.2', 'commons-lang:commons-lang:2.6', "org.apache.commons:commons-lang3:${commonsVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.14.0"
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre', 'org.apache.commons:commons-lang3:3.14.0'
+                  testImplementation 'junit:junit:4.13.2', "org.apache.commons:commons-lang3:${commonsVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupesAndDoesNotAddVersionToBomManagedSurvivor() {
+        // Survivor is BOM-managed (no declared version); upgrade path should leave it alone.
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())
             .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson",
+                "jackson-bom",
+                "tools.jackson",
+                "jackson-bom",
+                "3.0.x",
+                null,
+                null,
+                null
+              ),
+              new ChangeDependency(
+                "com.fasterxml.jackson.datatype",
+                "jackson-datatype-jsr310",
+                "tools.jackson.core",
+                "jackson-databind",
+                "3.0.x",
+                null,
+                null,
+                null
+              )
+            ),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation platform("com.fasterxml.jackson:jackson-bom:2.19.0")
+                  implementation("tools.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+              }
+              """,
+            spec -> spec.after(buildGradle ->
+              assertThat(buildGradle)
+                .containsOnlyOnce("tools.jackson.core:jackson-databind")
+                .doesNotContain(":jackson-databind:")  // no version was added to survivor
+                .doesNotContain("jackson-datatype-jsr310")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void dedupeWithoutNewVersionDoesNotAlterSurvivor() {
+        // newVersion is null; dedupe should still fire but survivor's version stays untouched.
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                null,
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicateJacksonDatabindDependenciesInGradleWithBomManagedVersions() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson",
+                "jackson-bom",
+                "tools.jackson",
+                "jackson-bom",
+                "3.0.4",
+                null,
+                null,
+                null
+              ),
               new ChangeDependency(
                 "com.fasterxml.jackson.core",
                 "jackson-databind",
@@ -837,16 +1496,535 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
               dependencies {
+                  implementation platform("com.fasterxml.jackson:jackson-bom:2.19.0")
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation platform("tools.jackson:jackson-bom:3.0.4")
+                  implementation("tools.jackson.core:jackson-databind")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicateJacksonDatabindDependenciesInGradle() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson.core",
+                "jackson-databind",
+                "tools.jackson.core",
+                null,
+                "3.0.4",
+                null,
+                null,
+                null
+              ),
+              new ChangeDependency(
+                "com.fasterxml.jackson.datatype",
+                "jackson-datatype-jsr310",
+                "tools.jackson.core",
+                "jackson-databind",
+                "3.0.4",
+                null,
+                null,
+                null
+              )
+            ),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
                   implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
                   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.0")
               }
               """,
-            spec -> spec.after(buildGradle ->
-              assertThat(buildGradle)
-                .containsOnlyOnce("tools.jackson.core:jackson-databind:3")
-                .doesNotContain("datatype")
-                .actual())
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("tools.jackson.core:jackson-databind:3.0.4")
+              }
+              """
           )
         );
+    }
+
+    @Test
+    void sharedGStringVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "commons-lang:commons-lang:${version}"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedGradlePropertiesVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              sharedVersion=2.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "commons-lang:commons-lang:${sharedVersion}"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslStringTemplateVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("commons-lang:commons-lang:${version}")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedMapNotationVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  testImplementation([group: 'commons-lang', name: 'commons-lang', version: sharedVersion])
+                  compileOnly transitive: false, group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  runtimeOnly group: 'commons-lang', version: sharedVersion, name: 'commons-lang'
+                  testRuntimeOnly group: "commons-lang", name: "commons-lang", version: sharedVersion
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  testImplementation([group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'])
+                  compileOnly transitive: false, group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  runtimeOnly group: 'org.apache.commons', version: '3.11', name: 'commons-lang3'
+                  testRuntimeOnly group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslNamedArgumentsVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "commons-lang", name = "commons-lang", version = sharedVersion)
+                  testImplementation(group = "commons-lang", version = sharedVersion, name = "commons-lang")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
+                  testImplementation(group = "org.apache.commons", version = "3.11", name = "commons-lang3")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void isAcceptable() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("not-a-gradle-file.txt"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void isNotAcceptableForPlainTextWithGradleProjectMarker() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("build.gradle"))
+                .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
+                        singletonList(GradleProject.builder()
+                                .group("com.example")
+                                .name("test")
+                                .version("1.0")
+                                .path(":")
+                                .build())));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void doesNotChangeGroupIdWhenNewCoordinatesDontResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.hibernate", "hibernate-*", "org.hibernate.orm", null, "6.0.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate:hibernate-core:${hibernateVersion}"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate.orm:hibernate-core:6.0.2.Final"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyWhenJavaSourcesPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          mavenProject("sample",
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "commons-lang:commons-lang:2.6"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "org.apache.commons:commons-lang3:3.11"
+                }
+                """
+            ),
+            java(
+              """
+                class A {
+                    String foo(String s) {
+                        return s;
+                    }
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Nested
+    class OnGradle8 implements RewriteTest {
+
+        // Spring Boot 2's Gradle plugin calls Configuration#getUploadTaskName, which Gradle 9 removed
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.beforeRecipe(withToolingApi("8.14.5"));
+        }
+
+        @Test
+        void doNotPinWhenNotVersionedOnMap() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null, true)),
+              buildGradle(
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly group: 'mysql', name: 'mysql-connector-java'
+                  }
+                  """,
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNotPinWhenNotVersioned() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null, true)),
+              buildGradle(
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """,
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'com.mysql:mysql-connector-j'
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void pinWhenOverrideManagedVersion() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true, true)),
+              buildGradle(
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'mysql:mysql-connector-java'
+                  }
+                  """,
+                """
+                  plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.6.1'
+                    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+                  }
+
+                  repositories {
+                     mavenCentral()
+                  }
+
+                  dependencies {
+                      runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
+                  }
+                  """
+              )
+            );
+        }
     }
 }

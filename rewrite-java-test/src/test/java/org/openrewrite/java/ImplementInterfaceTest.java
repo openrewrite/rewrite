@@ -95,6 +95,46 @@ class ImplementInterfaceTest implements RewriteTest {
     }
 
     @Test
+    void firstImplementedInterfaceWithTypeParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  doAfterVisit(new ImplementInterface<>(
+                    classDecl,
+                    "b.B",
+                    List.of(
+                      new J.Identifier(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        emptyList(),
+                        "String",
+                        ShallowClass.build("java.lang.String"),
+                        null
+                      )
+                    )
+                  ));
+                  return classDecl;
+              }
+          })),
+          java(b, SourceSpec::skip),
+          java(
+            """
+              class A {
+              }
+              """,
+            """
+              import b.B;
+
+              class A implements B<String> {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addAnImplementedInterfaceWithTypeParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

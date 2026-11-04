@@ -24,13 +24,35 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 
+/**
+ * Finds Gradle build files ending in `.gradle` and `.gradle.kts` files, but not `settings.gradle` or `settings.gradle.kts` files.
+ * @param <P>
+ */
 public class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
+
+    /**
+     * Only match `build.gradle` and `build.gradle.kts` files, not any `dependencies.gradle` or similar files.
+     */
+    boolean exactMatch;
+
+    public IsBuildGradle() {
+        this(false);
+    }
+
+    public IsBuildGradle(boolean exactMatch) {
+        this.exactMatch = exactMatch;
+    }
+
     @Override
     public @Nullable Tree preVisit(@NonNull Tree tree, P p) {
         stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile sourceFile = (JavaSourceFile) tree;
-            if (matches(sourceFile.getSourcePath())) {
+            Path sourcePath = sourceFile.getSourcePath();
+            if (exactMatch) {
+                return sourcePath.endsWith("build.gradle") || sourcePath.endsWith("build.gradle.kts") ? SearchResult.found(sourceFile) : tree;
+            }
+            if (matches(sourcePath)) {
                 return SearchResult.found(sourceFile);
             }
         }

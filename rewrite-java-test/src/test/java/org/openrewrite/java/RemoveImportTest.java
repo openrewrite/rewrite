@@ -17,11 +17,16 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -63,6 +68,52 @@ class RemoveImportTest implements RewriteTest {
               import java.util.List;
               class A {
                  List<Integer> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportOfTypeTheSourceNeverNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """,
+            """
+              import java.util.Collections;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveImportOfTypeOnlyJavadocNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.List;
+              class A {
+                 /** Returns a {@link List}. */
+                 Object list() {
+                    return null;
+                 }
               }
               """
           )
@@ -115,6 +166,81 @@ class RemoveImportTest implements RewriteTest {
 
               class A {
                  Collection<Integer> c;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportOnlyIntoTypesTheSourceNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.nio.charset.CodingErrorAction")),
+          java(
+            """
+              import java.nio.charset.*;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """,
+            """
+              import java.nio.charset.CharsetDecoder;
+              import java.nio.charset.StandardCharsets;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportIntoOuterTypeOfQualifiedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Import visitImport(J.Import import_, ExecutionContext ctx) {
+                  maybeRemoveImport("java.util.List");
+                  return import_;
+              }
+
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  // only the nested type is attributed
+                  return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
+              }
+          })).afterTypeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
               }
               """
           )
@@ -177,7 +303,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeStarImportEvenIfReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List", true)),
+          spec -> spec.recipe(removeImport("java.util.List", true))
+            // forced removal leaves List named without an import
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
           java(
             """
               import java.util.List;
@@ -451,6 +579,268 @@ class RemoveImportTest implements RewriteTest {
               import java.util.ArrayList;
 
               public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesTrailingCommentOnLineBeforeRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              package com.example.foo;
+
+              import java.util.List; // ktlint-disable no-wildcard-imports
+              import java.util.ArrayList;
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """,
+            """
+              package com.example.foo;
+
+              import java.util.List; // ktlint-disable no-wildcard-imports
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesTrailingCommentAndBlankLineAfterRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              package com.example.foo;
+
+              import java.util.List; // ktlint-disable no-wildcard-imports
+              import java.util.ArrayList;
+
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """,
+            """
+              package com.example.foo;
+
+              import java.util.List; // ktlint-disable no-wildcard-imports
+
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void dropsTrailingCommentOfRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              import java.util.ArrayList; // explains the removed import
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """,
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8010")
+    @Test
+    void distinguishesLineEndingFromPrecedingLineCommentInSamePrefix() {
+        // A removed import's line-ending comment and the next import's preceding-line comment can
+        // both live in the next import's prefix; they have different owners and are treated separately.
+        // The line-ending comment (about the removed import) is dropped; the preceding-line comment
+        // (about the next import) is preserved.
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.ArrayList; // This comment is about ArrayList
+
+              // This comment is about List
+              import java.util.List;
+
+              class A {
+                  List<Integer> l;
+              }
+              """,
+            """
+              // This comment is about List
+              import java.util.List;
+
+              class A {
+                  List<Integer> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesCommentedOutLineBeforeRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              // import java.util.Date
+              import java.util.ArrayList;
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """,
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              // import java.util.Date
+              import java.util.UUID;
+
+              public class A {
+                  List<UUID> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesTrailingCommentOnLineAfterRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              import java.util.ArrayList;
+              import java.util.UUID; // explains UUID
+
+              public class A {
+                  List<UUID> l;
+              }
+              """,
+            """
+              package com.example.foo;
+
+              import java.util.List;
+              import java.util.UUID; // explains UUID
+
+              public class A {
+                  List<UUID> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void dropsTrailingCommentOfRemovedLastImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList; // explains the removed import
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesPreviousLineCommentWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List; // ktlint-disable no-wildcard-imports
+              import java.util.ArrayList;
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List; // ktlint-disable no-wildcard-imports
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesCommentedOutLineWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List;
+              // import java.util.Date
+              import java.util.ArrayList;
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List;
+              // import java.util.Date
+
+              class A {
               }
               """
           )
@@ -786,6 +1176,45 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1521")
+    @Test
+    void unfoldedStarImportHasTypeAttribution() {
+        rewriteRun(
+          spec -> spec.recipes(
+            removeImport("java.util.List"),
+            new ChangeType("java.util.Set", "java.util.HashSet", null)
+          ),
+          java(
+            """
+              package a;
+
+              import java.util.*;
+
+              public class A {
+                  Set<Integer> s;
+              }
+              """,
+            """
+              package a;
+
+              import java.util.HashSet;
+
+              public class A {
+                  HashSet<Integer> s;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Verify the unfolded import has proper type attribution
+                assertThat(cu.getImports()).hasSize(1);
+                assertThat(cu.getImports().getFirst().getQualid().getType())
+                  .isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) cu.getImports().getFirst().getQualid().getType())
+                  .getFullyQualifiedName()).isEqualTo("java.util.HashSet");
+            })
+          )
+        );
+    }
+
     @Test
     void unfoldSubpackage() {
         rewriteRun(
@@ -920,6 +1349,22 @@ class RemoveImportTest implements RewriteTest {
 
               class Test {
                   List<Integer> l = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://app.moderne.io/recipe-runs/qBYPkMYl0")
+    @Test
+    void doesNotCrashWhenTypeHasNoPackage() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("Foo")),
+          java(
+            """
+              import static java.util.Collections.*;
+
+              class A {
               }
               """
           )

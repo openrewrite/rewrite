@@ -17,14 +17,14 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class AddOrUpdateChildTagTest implements RewriteTest {
-    @CsvSource({"true", "false"})
+    @ValueSource(booleans = {true, false})
     @NullSource
     @ParameterizedTest
     void addsTagEverywhereWhenAbsent(Boolean replaceExisting) {
@@ -186,7 +186,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @CsvSource("true")
+    @ValueSource(booleans = true)
     @NullSource
     @ParameterizedTest
     void updateTagEverywhere(Boolean replaceExisting) {
@@ -416,7 +416,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @CsvSource({"true", "false"})
+    @ValueSource(booleans = {true, false})
     @NullSource
     @ParameterizedTest
     void dontTouchAnythingElse(Boolean replaceExisting) {

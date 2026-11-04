@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class FindKeyTest implements RewriteTest {
@@ -103,6 +104,116 @@ class FindKeyTest implements RewriteTest {
                     category: "match"
                     types: "something"
                     ~~>pattern: "p2"
+              """
+          )
+        );
+    }
+
+    @Test
+    void findKeyWithFilterPathEndingAtMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..steps[?(@.uses =~ '.*setup-java.*')]")),
+          yaml(
+                """
+              jobs:
+                build:
+                  steps:
+                    - name: Checkout
+                      uses: actions/checkout@v4
+                    - name: Setup Java
+                      id: setup-java
+                      uses: actions/setup-java@v5
+                    - run: ./gradlew build
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Checkout
+                      uses: actions/checkout@v4
+                    ~~>- name: Setup Java
+                      id: setup-java
+                      uses: actions/setup-java@v5
+                    - run: ./gradlew build
+              """
+          )
+        );
+    }
+
+    @Test
+    void findKeyWithFilterPathEndingAtMappingUsesFirst() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..steps[?(@.uses =~ '.*setup-java.*')]")),
+          yaml(
+                """
+              jobs:
+                build:
+                  steps:
+                    - uses: actions/setup-java@v5
+                      name: Setup Java
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    ~~>- uses: actions/setup-java@v5
+                      name: Setup Java
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidJsonPathFailsValidation() {
+        assertThat(new FindKey("$[invalid syntax").validate().isInvalid()).isTrue();
+        assertThat(new FindKey("$[invalid syntax").validate().failures().iterator().next().getMessage())
+                .contains("Invalid JsonPath expression")
+                .contains("Syntax error");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$.job.b")),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                ~~>b: 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void recursiveDescentPastAliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..b")),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+                ~~>b: 2
               """
           )
         );

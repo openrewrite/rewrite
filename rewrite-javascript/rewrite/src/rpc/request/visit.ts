@@ -18,7 +18,9 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics, extractSourcePath} from "./metrics";
+import {lookupVisitor} from "./visitor-registry";
 
 export interface VisitResponse {
     modified: boolean
@@ -29,12 +31,12 @@ type RecipePhase = 'scan' | 'edit';
 const recipePhases: WeakMap<Recipe, RecipePhase> = new WeakMap();
 
 export class Visit {
-    constructor(private readonly visitor: string,
-                private readonly sourceFileType: string,
-                private readonly visitorOptions: Map<string, any> | undefined,
-                private readonly treeId: string,
-                private readonly p: string,
-                private readonly cursor: string[] | undefined) {
+    constructor(readonly visitor: string,
+                readonly sourceFileType: string,
+                readonly visitorOptions: Map<string, any> | undefined,
+                readonly treeId: string,
+                readonly p: string,
+                readonly cursor: string[] | undefined) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -42,7 +44,9 @@ export class Visit {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
+                  captureRefCheckpoint: (treeId: string) => void,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
+                  dataTableStore: () => DataTableStore | undefined,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
@@ -51,6 +55,11 @@ export class Visit {
                 metricsCsv,
                 (context) => async (request) => {
                     const p = await getObject(request.p, undefined);
+                    const store = dataTableStore();
+                    if (store && p instanceof ExecutionContext) {
+                        p.messages[DATA_TABLE_STORE] = store;
+                    }
+                    captureRefCheckpoint(request.treeId);
                     const before: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
                     context.target = extractSourcePath(before, cursor);
@@ -70,7 +79,7 @@ export class Visit {
         );
     }
 
-    private static async instantiateVisitor(request: Visit,
+    static async instantiateVisitor(request: {visitor: string, visitorOptions?: Map<string, any>},
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
                                       p: any): Promise<TreeVisitor<any, any>> {
@@ -129,9 +138,12 @@ export class Visit {
             }
             return await recipe.editor();
         } else {
+            const ctor = lookupVisitor(visitorName) ?? (globalThis as any)[visitorName];
+            if (!ctor) {
+                throw new Error(`Unknown visitor: ${visitorName}`);
+            }
             return Reflect.construct(
-                // "as any" bypasses strict type checking
-                (globalThis as any)[visitorName],
+                ctor,
                 request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
         }
     }

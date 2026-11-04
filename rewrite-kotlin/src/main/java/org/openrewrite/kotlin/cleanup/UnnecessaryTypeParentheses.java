@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -26,20 +27,14 @@ import org.openrewrite.kotlin.KotlinVisitor;
 import java.time.Duration;
 
 public class UnnecessaryTypeParentheses extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove unnecessary parentheses on Kotlin types";
-    }
+    @Getter
+    final String displayName = "Remove unnecessary parentheses on Kotlin types";
 
-    @Override
-    public String getDescription() {
-        return "In Kotlin, it's possible to add redundant nested parentheses in type definitions. This recipe is designed to remove those unnecessary parentheses.";
-    }
+    @Getter
+    final String description = "In Kotlin, it's possible to add redundant nested parentheses in type definitions. This recipe is designed to remove those unnecessary parentheses.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

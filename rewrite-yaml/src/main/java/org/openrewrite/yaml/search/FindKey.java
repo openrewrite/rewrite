@@ -17,10 +17,12 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.JsonPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
@@ -42,6 +44,11 @@ public class FindKey extends Recipe {
     String description = "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("key", key));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
         return new YamlVisitor<ExecutionContext>() {
@@ -57,10 +64,20 @@ public class FindKey extends Recipe {
             @Override
             public Yaml visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, ctx);
-                if (matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor()) && !(getCursor().getParentTreeCursor().getValue() instanceof Yaml.Sequence.Entry)) {
                     m = SearchResult.found(m);
                 }
                 return m;
+            }
+
+            @Override
+            public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+                Yaml.Sequence.Entry e = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, ctx);
+                if (e.getBlock() instanceof Yaml.Mapping &&
+                        matcher.matches(new Cursor(getCursor(), e.getBlock()))) {
+                    e = SearchResult.found(e);
+                }
+                return e;
             }
         };
     }

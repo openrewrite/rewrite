@@ -1,0 +1,834 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Package internal contains primitives shared across the import-management
+// recipes (AddImport, RemoveImport, RemoveUnusedImports, OrderImports). It
+// is not part of the public API — callers depend on the recipe types
+// themselves, not on these helpers.
+package internal
+
+import (
+	"sort"
+	"strings"
+	"unicode"
+
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+// ImportGroup identifies which gofmt-style group an import belongs to.
+type ImportGroup int
+
+const (
+	// Stdlib imports — paths with no `.` in their first segment
+	// (e.g. "fmt", "net/http").
+	Stdlib ImportGroup = iota
+	// ThirdParty imports — paths with a `.` in their first segment
+	// (e.g. "github.com/x/y") that are not local to the current module.
+	ThirdParty
+	// Local imports — paths under the current module's path.
+	Local
+)
+
+// ImportPath returns the path an import names, without its quotes.
+func ImportPath(imp *java.Import) string {
+	return imp.Path()
+}
+
+// PackageName returns the qualifier used to reference the import: its alias,
+// else the name derived from the path ("" for blank/dot imports).
+func PackageName(imp *java.Import) string {
+	switch alias := AliasName(imp); alias {
+	case "":
+		return packageNameForPath(ImportPath(imp))
+	case "_", ".":
+		return ""
+	default:
+		return alias
+	}
+}
+
+// packageNameForPath derives the qualifier an import path binds. Under
+// semantic import versioning the version lives in the path rather than the
+// package name — a trailing `/vN` element, or the `.vN` suffix gopkg.in spells
+// it with — so the name comes from the segment before it. A module may declare
+// a package name matching neither; this is the better guess, not a guarantee.
+func packageNameForPath(path string) string {
+	last := path
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		last = path[i+1:]
+		if isVersionElement(last) {
+			rest := path[:i]
+			last = rest
+			if j := strings.LastIndex(rest, "/"); j >= 0 {
+				last = rest[j+1:]
+			}
+		}
+	}
+	if i := strings.LastIndex(last, "."); i > 0 && isVersionElement(last[i+1:]) {
+		last = last[:i]
+	}
+	return trimRepoAffix(last)
+}
+
+// trimRepoAffix drops the `go` a repository name carries to say what language
+// it holds — `go-toml` hosting `package toml`. A hyphen or a dot cannot appear
+// in a Go identifier, so an element spelling one is a repository name and never
+// the package name it declares.
+func trimRepoAffix(element string) string {
+	for _, affix := range []string{"go-", "go."} {
+		if len(element) > len(affix) && strings.HasPrefix(element, affix) {
+			return element[len(affix):]
+		}
+	}
+	for _, affix := range []string{"-go", ".go"} {
+		if len(element) > len(affix) && strings.HasSuffix(element, affix) {
+			return element[:len(element)-len(affix)]
+		}
+	}
+	return element
+}
+
+// isIdentifier reports whether s can be a Go identifier, and so whether it can
+// be the name a package declares.
+func isIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if r == '_' || unicode.IsLetter(r) || (i > 0 && unicode.IsDigit(r)) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// isVersionElement reports whether a path element is a major-version marker.
+func isVersionElement(s string) bool {
+	if len(s) < 2 || s[0] != 'v' {
+		return false
+	}
+	for _, r := range s[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// AliasName returns the alias used by an Import: a custom identifier for
+// `import alias "path"`, "_" for blank imports, "." for dot imports, or
+// "" when the import uses the name the path itself implies.
+func AliasName(imp *java.Import) string {
+	if imp == nil || imp.Alias == nil {
+		return ""
+	}
+	if imp.Alias.Element == nil {
+		return ""
+	}
+	return imp.Alias.Element.Name
+}
+
+// Returns nil if no match.
+func FindImport(cu *golang.CompilationUnit, importPath string) *java.Import {
+	if cu == nil || cu.Imports == nil {
+		return nil
+	}
+	for _, rp := range cu.Imports.Elements {
+		if ImportPath(rp.Element) == importPath {
+			return rp.Element
+		}
+	}
+	return nil
+}
+
+// HasImport returns true when an import with the given path (and matching
+// alias semantics) is already present.
+//   - alias == nil: any non-blank, non-dot form counts as a hit
+//   - alias != nil: requires an exact alias match (use "_" for blank,
+//     "." for dot)
+func HasImport(cu *golang.CompilationUnit, importPath string, alias *string) bool {
+	if cu == nil || cu.Imports == nil {
+		return false
+	}
+	for _, rp := range cu.Imports.Elements {
+		if ImportPath(rp.Element) != importPath {
+			continue
+		}
+		existingAlias := AliasName(rp.Element)
+		if alias == nil {
+			if existingAlias == "_" || existingAlias == "." {
+				continue
+			}
+			return true
+		}
+		if *alias == existingAlias {
+			return true
+		}
+	}
+	return false
+}
+
+// GroupOf returns the ImportGroup an import path belongs to relative to
+// the current module's path. modulePath may be empty when the file is
+// outside any known module — local detection then falls back to "any
+// non-stdlib path with a `.`" → ThirdParty.
+func GroupOf(importPath, modulePath string) ImportGroup {
+	if IsLocal(importPath, modulePath) {
+		return Local
+	}
+	if IsThirdParty(importPath) {
+		return ThirdParty
+	}
+	return Stdlib
+}
+
+// IsStdlib reports whether importPath looks like a stdlib package (no `.`
+// in the first path segment). Mirrors goimports/gofmt's heuristic.
+func IsStdlib(importPath string) bool {
+	first := importPath
+	if i := strings.Index(importPath, "/"); i >= 0 {
+		first = importPath[:i]
+	}
+	return !strings.Contains(first, ".")
+}
+
+// IsThirdParty reports whether importPath is a non-stdlib, non-local
+// dependency. Equivalent to `!IsStdlib && !IsLocal`.
+func IsThirdParty(importPath string) bool {
+	return !IsStdlib(importPath)
+}
+
+// IsLocal reports whether importPath belongs to the current module
+// (modulePath itself or any sub-package under it).
+func IsLocal(importPath, modulePath string) bool {
+	if modulePath == "" {
+		return false
+	}
+	return importPath == modulePath || strings.HasPrefix(importPath, modulePath+"/")
+}
+
+// ImportUses answers, for each import of a file, whether the file still uses
+// it. Build one per compilation unit with UsesOf and ask it about as many
+// imports as needed; the file is walked once.
+type ImportUses struct {
+	// refs holds the import paths the parser's Type attribution names.
+	refs map[string]bool
+	// quals holds the identifiers used lexically as package qualifiers — the
+	// attribution-free signal goimports relies on.
+	quals map[string]bool
+	// resolvedQuals holds the qualifiers an import refs names already binds.
+	// Valid Go cannot bind one qualifier twice, so a non-empty entry means
+	// either a tree mid-rewrite — how a major-version move reads — or input
+	// that arrived invalid, where the qualifier binds arbitrarily and no
+	// answer is better than another.
+	resolvedQuals map[string]bool
+}
+
+// UsesOf walks cu once and gathers the signals its imports are judged by.
+func UsesOf(cu *golang.CompilationUnit) ImportUses {
+	refs, quals := referencedImports(cu)
+	u := ImportUses{refs: refs, quals: quals, resolvedQuals: map[string]bool{}}
+	for _, imp := range ImportsOf(cu) {
+		if name := PackageName(imp); name != "" && refs[ImportPath(imp)] {
+			u.resolvedQuals[name] = true
+		}
+	}
+	return u
+}
+
+// Referenced reports whether the file still uses imp.
+func (u ImportUses) Referenced(imp *java.Import) bool {
+	if u.refs[ImportPath(imp)] {
+		return true
+	}
+	// Blank and dot imports bind no qualifier; whether they survive is a
+	// policy their callers hold.
+	name := PackageName(imp)
+	if name == "" {
+		return false
+	}
+	if u.quals[name] && !u.resolvedQuals[name] {
+		return true
+	}
+	// A name no package can declare matches no qualifier, so reading its
+	// absence as disuse would condemn the import on the one signal left.
+	return !isIdentifier(name)
+}
+
+// ImportsOf returns the imports cu declares, in source order.
+func ImportsOf(cu *golang.CompilationUnit) []*java.Import {
+	if cu == nil || cu.Imports == nil {
+		return nil
+	}
+	imps := make([]*java.Import, 0, len(cu.Imports.Elements))
+	for _, rp := range cu.Imports.Elements {
+		if rp.Element != nil {
+			imps = append(imps, rp.Element)
+		}
+	}
+	return imps
+}
+
+// ReferencedPackages returns the import paths the parser's Type attribution
+// names in the body of cu.
+func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
+	refs, _ := referencedImports(cu)
+	return refs
+}
+
+func referencedImports(cu *golang.CompilationUnit) (refs, quals map[string]bool) {
+	refs = map[string]bool{}
+	quals = map[string]bool{}
+	if cu == nil {
+		return refs, quals
+	}
+	v := visitor.Init(&referencedPackagesVisitor{refs: refs, quals: quals})
+	v.Visit(cu, nil)
+	return refs, quals
+}
+
+type referencedPackagesVisitor struct {
+	visitor.GoVisitor
+	refs  map[string]bool
+	quals map[string]bool
+}
+
+// The alias in `import s "strings"` carries the imported package as its
+// type, so the walk stops at the import declarations and counts only uses
+// in the body.
+func (v *referencedPackagesVisitor) VisitImport(imp *java.Import, p any) java.J {
+	return imp
+}
+
+func (v *referencedPackagesVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	if ident.Type != nil {
+		if fq, ok := ident.Type.(java.FullyQualified); ok {
+			if path := pkgPathOf(fq.GetFullyQualifiedName()); path != "" {
+				v.refs[path] = true
+			}
+		}
+	}
+	return ident
+}
+
+func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
+		if path := pkgPathOf(mi.MethodType.DeclaringType.GetFullyQualifiedName()); path != "" {
+			v.refs[path] = true
+		}
+	}
+	if mi.Select != nil {
+		if id, ok := mi.Select.Element.(*java.Identifier); ok {
+			v.quals[id.Name] = true
+		}
+	}
+	return v.GoVisitor.VisitMethodInvocation(mi, p)
+}
+
+func (v *referencedPackagesVisitor) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
+	if id, ok := fa.Target.(*java.Identifier); ok {
+		v.quals[id.Name] = true
+	}
+	return v.GoVisitor.VisitFieldAccess(fa, p)
+}
+
+// pkgPathOf returns the package import path implied by an FQN. The
+// type-mapper produces FQNs in two shapes:
+//   - "<importPath>"               — for package aliases (the `y` in
+//     `y.Hello()` after `import "github.com/x/y"`).
+//   - "<importPath>.<TypeName>"    — for named types in that package.
+//
+// Both shapes share an import-path prefix; we return that prefix so
+// RemoveUnusedImports can match against the literal import path.
+func pkgPathOf(fqn string) string {
+	if fqn == "" {
+		return ""
+	}
+	if strings.Contains(fqn, "/") {
+		// A `.` in the last path element separates `pkg` from `TypeName`,
+		// except for a gopkg.in-style `.vN`, which is part of the path.
+		lastSlash := strings.LastIndex(fqn, "/")
+		elements := strings.Split(fqn[lastSlash+1:], ".")
+		end := lastSlash + 1 + len(elements[0])
+		for _, element := range elements[1:] {
+			if !isVersionElement(element) {
+				break
+			}
+			end += 1 + len(element)
+		}
+		return fqn[:end]
+	}
+	// Stdlib paths (e.g. "fmt") and "fmt.Println"-style FQNs.
+	if dot := strings.Index(fqn, "."); dot >= 0 {
+		return fqn[:dot]
+	}
+	return fqn
+}
+
+// AddToBlock returns a copy of cu with imp inserted into one of its
+// import declarations. If cu has no imports container yet, one is created
+// with default formatting (single ungrouped `import "path"` line).
+//
+// The insertion preserves group ordering: imp is placed at the end of
+// its own group block (stdlib / third-party / local) so OrderImports'
+// invariant holds even when AddImport is invoked alone.
+//
+// Whitespace for the empty-container case: the printer concatenates
+// `<Container.Before>import<element traversal>`. To produce
+// `\n\nimport "fmt"` between `package main` and the first statement,
+// the new Container's Before is `"\n\n"`, the Import's Prefix is empty,
+// and the Qualid carries a leading space (printed as the space
+// between `import` and the path string). The first Statement's existing
+// Prefix supplies the trailing blank line before `func`.
+func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string) *golang.CompilationUnit {
+	if cu == nil {
+		return cu
+	}
+	c := *cu
+	if c.Imports == nil {
+		c.Imports = &java.Container[*java.Import]{
+			Before: java.MakeSpace(nil, "\n\n"),
+		}
+		// Wire the leading-space convention onto the new import: the
+		// space between `import` and the path lives on the Qualid's
+		// Prefix for regular imports. For aliased imports, the
+		// space after `import` lives on Import.Prefix and the space between
+		// alias and path lives on the Qualid.
+		if imp.Alias != nil {
+			imp.Prefix = java.MakeSpace(nil, " ")
+		} else {
+			imp.Qualid = withPrefix(imp.Qualid, java.MakeSpace(nil, " "))
+		}
+	}
+	imps := *c.Imports
+	if len(imps.Elements) == 0 {
+		imps.Elements = insertGrouped(imps.Elements, imp, modulePath)
+		c.Imports = &imps
+		return &c
+	}
+
+	// A file may hold several import declarations: the first one's shape
+	// lives on the container, each later one's on an ImportBlock marker on
+	// its first import. imp joins the last declaration holding its group.
+	elements := append([]java.RightPadded[*java.Import](nil), imps.Elements...)
+	start, end := targetDeclaration(elements, GroupOf(ImportPath(imp), modulePath), modulePath)
+
+	// Adding a second import to an ungrouped declaration promotes it to
+	// the grouped `import (...)` form — that's the only legal Go syntax
+	// for multiple imports in one declaration.
+	if !isGroupedDeclaration(imps, elements[start]) {
+		promoteToGrouped(&imps, elements, start, end)
+	}
+
+	inserted := insertGrouped(elements[start:end], imp, modulePath)
+	if start > 0 && java.FindMarker[golang.ImportBlock](inserted[0].Element.Markers) == nil {
+		inserted = moveImportBlock(inserted)
+	}
+	out := make([]java.RightPadded[*java.Import], 0, len(elements)+1)
+	out = append(out, elements[:start]...)
+	out = append(out, inserted...)
+	imps.Elements = append(out, elements[end:]...)
+	c.Imports = &imps
+	return &c
+}
+
+// targetDeclaration returns the [start, end) element range of the last
+// import declaration holding an import of group, else of the last
+// declaration.
+func targetDeclaration(elements []java.RightPadded[*java.Import], group ImportGroup, modulePath string) (int, int) {
+	starts := []int{0}
+	for i := 1; i < len(elements); i++ {
+		if elements[i].Element != nil && java.FindMarker[golang.ImportBlock](elements[i].Element.Markers) != nil {
+			starts = append(starts, i)
+		}
+	}
+	endOf := func(d int) int {
+		if d+1 < len(starts) {
+			return starts[d+1]
+		}
+		return len(elements)
+	}
+	for d := len(starts) - 1; d >= 0; d-- {
+		for i := starts[d]; i < endOf(d); i++ {
+			if elements[i].Element != nil && GroupOf(ImportPath(elements[i].Element), modulePath) == group {
+				return starts[d], endOf(d)
+			}
+		}
+	}
+	last := len(starts) - 1
+	return starts[last], endOf(last)
+}
+
+func isGroupedDeclaration(imps java.Container[*java.Import], first java.RightPadded[*java.Import]) bool {
+	if first.Element != nil {
+		if block := java.FindMarker[golang.ImportBlock](first.Element.Markers); block != nil {
+			return block.Grouped
+		}
+	}
+	return java.FindMarker[golang.GroupedImport](imps.Markers) != nil
+}
+
+// promoteToGrouped converts the ungrouped single-import declaration at
+// elements[start] to the grouped `import (...)` form: a GroupedImport
+// marker for the first declaration, a grouped ImportBlock for a later one.
+// It rewrites the element's Prefix / After so the printer emits it
+// indented inside parens, and has the declaration at elements[end], if
+// any, close those parens.
+func promoteToGrouped(imps *java.Container[*java.Import], elements []java.RightPadded[*java.Import], start, end int) {
+	rp := &elements[start]
+	if rp.Element == nil {
+		return
+	}
+	// The previously-ungrouped element had Qualid.Prefix=" " (space
+	// between `import` and the path). Inside parens we want the import
+	// indented onto its own line: imp.Prefix="\n\t", Qualid.Prefix="".
+	imp := *rp.Element
+	imp.Prefix = java.MakeSpace(nil, "\n\t")
+	if imp.Alias == nil {
+		imp.Qualid = withPrefix(imp.Qualid, java.EmptySpace)
+	}
+	if block := java.FindMarker[golang.ImportBlock](imp.Markers); block != nil {
+		block.Grouped = true
+		block.GroupedBefore = java.MakeSpace(nil, " ") // space between `import` and `(`
+		imp.Markers = withImportBlock(imp.Markers, block)
+	} else {
+		imps.Markers = java.AddMarker(imps.Markers, golang.GroupedImport{
+			Ident:  uuid.New(),
+			Before: java.MakeSpace(nil, " "), // space between `import` and `(`
+		})
+	}
+	rp.Element = &imp
+	rp.After = java.MakeSpace(nil, "\n") // newline before `)`
+
+	if end < len(elements) && elements[end].Element != nil {
+		next := *elements[end].Element
+		if block := java.FindMarker[golang.ImportBlock](next.Markers); block != nil {
+			block.ClosePrevious = true
+			next.Markers = withImportBlock(next.Markers, block)
+			elements[end].Element = &next
+		}
+	}
+}
+
+// moveImportBlock hands the ImportBlock marker, which prints a later
+// declaration's `import (`, from the import insertGrouped displaced to the
+// one now opening the declaration.
+func moveImportBlock(elements []java.RightPadded[*java.Import]) []java.RightPadded[*java.Import] {
+	displaced := *elements[1].Element
+	block := java.FindMarker[golang.ImportBlock](displaced.Markers)
+	if block == nil {
+		return elements
+	}
+	displaced.Markers = withImportBlock(displaced.Markers, nil)
+	elements[1].Element = &displaced
+	head := *elements[0].Element
+	head.Markers = withImportBlock(head.Markers, block)
+	elements[0].Element = &head
+	return elements
+}
+
+// withImportBlock returns markers with its ImportBlock replaced by block,
+// or dropped when block is nil.
+func withImportBlock(markers java.Markers, block *golang.ImportBlock) java.Markers {
+	entries := make([]java.Marker, 0, len(markers.Entries())+1)
+	for _, m := range markers.Entries() {
+		if _, ok := m.(golang.ImportBlock); !ok {
+			entries = append(entries, m)
+		}
+	}
+	if block != nil {
+		entries = append(entries, *block)
+	}
+	return java.MakeMarkers(markers.GetID(), entries)
+}
+
+// RemoveFromBlock returns a copy of cu with imp deleted from the imports
+// container. If the container becomes empty as a result, it's nil-ed out
+// so the printer doesn't emit an empty `import ()` block.
+//
+// Whitespace handling: the removed entry's trailing space (`RightPadded.After`,
+// the newline before the next element or the closing `)`) is donated to the new
+// last element so the block keeps its closing-paren-on-its-own-line shape. A
+// group separator on the new first element is dropped, since nothing precedes
+// it to separate from.
+func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.CompilationUnit {
+	if cu == nil || cu.Imports == nil || imp == nil {
+		return cu
+	}
+	c := *cu
+	imps := *c.Imports
+	removedLastAfter := java.EmptySpace
+	removedWasLast := false
+	removedWasFirst := false
+	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
+	for i, rp := range imps.Elements {
+		if rp.Element != nil && rp.Element.ID == imp.ID {
+			if i == 0 {
+				removedWasFirst = true
+			}
+			if i == len(imps.Elements)-1 {
+				removedLastAfter = rp.After
+				removedWasLast = true
+			}
+			continue
+		}
+		out = append(out, rp)
+	}
+	if removedWasLast && len(out) > 0 {
+		// Donate the closing-paren-on-own-line whitespace to the new
+		// last element so the block keeps its tidy shape.
+		out[len(out)-1].After = removedLastAfter
+	}
+	if removedWasFirst && len(out) > 0 {
+		out[0].Element = withoutLeadingBlankLines(out[0].Element)
+	}
+	imps.Elements = out
+	if len(out) == 0 {
+		c.Imports = nil
+	} else {
+		c.Imports = &imps
+	}
+	return &c
+}
+
+// withGroupSeparator prefixes imp with the blank line gofmt puts in front of
+// the import that opens a group.
+func withGroupSeparator(imp *java.Import, indent java.Space) *java.Import {
+	return withPrefixWhitespace(imp, "\n"+indent.Whitespace())
+}
+
+// withoutLeadingBlankLines is the inverse: imp keeps its indent but opens no
+// group.
+func withoutLeadingBlankLines(imp *java.Import) *java.Import {
+	if imp == nil {
+		return imp
+	}
+	return withPrefixWhitespace(imp, canonicalIndentOf(imp.Prefix.Whitespace()))
+}
+
+func withPrefixWhitespace(imp *java.Import, ws string) *java.Import {
+	if imp == nil || imp.Prefix.Whitespace() == ws {
+		return imp
+	}
+	cloned := *imp
+	cloned.Prefix = java.MakeSpace(imp.Prefix.Comments(), ws)
+	return &cloned
+}
+
+func canonicalIndentOf(ws string) string {
+	for strings.HasPrefix(ws, "\n\n") {
+		ws = ws[1:]
+	}
+	return ws
+}
+
+// canonicalIndent is the per-line indent inside an `import (...)` block,
+// read off the first sibling that carries one (typically "\n\t").
+func canonicalIndent(elements []java.RightPadded[*java.Import]) java.Space {
+	for _, rp := range elements {
+		if rp.Element == nil {
+			continue
+		}
+		if canonical := canonicalIndentOf(rp.Element.Prefix.Whitespace()); strings.HasPrefix(canonical, "\n") {
+			return java.MakeSpace(nil, canonical)
+		}
+	}
+	return java.MakeSpace(nil, "\n\t")
+}
+
+// insertGrouped places imp at the end of its own group while preserving
+// the relative order of pre-existing imports. New groups appear in
+// stdlib / third-party / local order.
+//
+// Whitespace handling: the new import takes the block's per-line indent, plus
+// a group separator when the import it follows belongs to another group.
+// Inserting ahead of every existing import moves that separator onto the
+// import displaced from the head, which now opens the second group. With no
+// siblings to read an indent from, the caller's prefix stands.
+func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, modulePath string) []java.RightPadded[*java.Import] {
+	target := GroupOf(ImportPath(imp), modulePath)
+	insertAt := len(elements)
+	for i, rp := range elements {
+		g := GroupOf(ImportPath(rp.Element), modulePath)
+		if g > target {
+			insertAt = i
+			break
+		}
+	}
+	wrapped := java.RightPadded[*java.Import]{Element: imp}
+	out := make([]java.RightPadded[*java.Import], 0, len(elements)+1)
+	out = append(out, elements[:insertAt]...)
+	out = append(out, wrapped)
+	out = append(out, elements[insertAt:]...)
+
+	if len(elements) > 0 {
+		indent := canonicalIndent(elements)
+		if imp.Prefix.Whitespace() == "" {
+			if insertAt > 0 && GroupOf(ImportPath(elements[insertAt-1].Element), modulePath) != target {
+				out[insertAt].Element = withGroupSeparator(imp, indent)
+			} else {
+				out[insertAt].Element = withPrefixWhitespace(imp, indent.Whitespace())
+			}
+		}
+		if insertAt == 0 {
+			out[1].Element = withGroupSeparator(out[1].Element, indent)
+		}
+	}
+
+	// Re-balance trailing whitespace: in a grouped block the last
+	// element's After holds the space before `)`. When we appended at
+	// the end, the previous tail's After is now between two siblings
+	// (and is redundant with the new sibling's leading Prefix); donate
+	// it forward so the new tail sits before `)` correctly.
+	if insertAt == len(elements) && len(out) >= 2 {
+		prev := &out[len(out)-2]
+		newTail := &out[len(out)-1]
+		newTail.After = prev.After
+		prev.After = java.EmptySpace
+	}
+	return out
+}
+
+func withPrefix(qualid *java.FieldAccess, prefix java.Space) *java.FieldAccess {
+	if qualid == nil {
+		return nil
+	}
+	cloned := *qualid
+	cloned.Prefix = prefix
+	return &cloned
+}
+
+// NewImport builds an Import LST node for `import [alias] "path"`. Pass
+// alias=nil for a regular import, "_" for a blank import, "." for a dot
+// import, or any identifier name for an aliased import.
+func NewImport(path string, alias *string) *java.Import {
+	imp := &java.Import{
+		ID: uuid.New(),
+		Qualid: &java.FieldAccess{
+			ID:     uuid.New(),
+			Target: &java.Empty{ID: uuid.New()},
+			Name:   java.LeftPadded[*java.Identifier]{Element: &java.Identifier{ID: uuid.New(), Name: path}},
+		},
+	}
+	if alias != nil {
+		imp.Qualid.Prefix = java.MakeSpace(nil, " ")
+		// the space before an alias is the import's own prefix, as the parser has it
+		imp.Alias = &java.LeftPadded[*java.Identifier]{
+			Element: &java.Identifier{
+				ID:   uuid.New(),
+				Name: *alias,
+			},
+		}
+	}
+	return imp
+}
+
+// SortByGroup returns the imports re-ordered into stdlib / third-party /
+// local sequence, alphabetized within each group, with a blank line
+// inserted between non-empty groups. Mirrors `goimports -w` output.
+//
+// Whitespace handling:
+//   - Element `Prefix` carries the per-line indent (typically `\n\t`), with a
+//     group separator on the first element of each non-leading group.
+//   - `RightPadded.After` is anchored to a position (between-elements vs.
+//     before-`)`) rather than to its element. When the order changes the
+//     anchor changes too — the element that was last is no longer last.
+//     This re-balances After so all but the new tail use the original
+//     between-element spacing and the new tail uses the original close-paren
+//     spacing.
+func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) []java.RightPadded[*java.Import] {
+	if len(elements) <= 1 {
+		return elements
+	}
+	betweenAfter := elements[0].After
+	closingAfter := elements[len(elements)-1].After
+
+	indentPrefix := canonicalIndent(elements)
+
+	type bucket struct {
+		group ImportGroup
+		items []java.RightPadded[*java.Import]
+	}
+	buckets := []bucket{
+		{group: Stdlib},
+		{group: ThirdParty},
+		{group: Local},
+	}
+	for _, rp := range elements {
+		g := GroupOf(ImportPath(rp.Element), modulePath)
+		buckets[int(g)].items = append(buckets[int(g)].items, rp)
+	}
+	for i := range buckets {
+		items := buckets[i].items
+		sort.SliceStable(items, func(a, b int) bool {
+			return ImportPath(items[a].Element) < ImportPath(items[b].Element)
+		})
+	}
+
+	out := make([]java.RightPadded[*java.Import], 0, len(elements))
+	for _, b := range buckets {
+		if len(b.items) == 0 {
+			continue
+		}
+		for j, item := range b.items {
+			if item.Element == nil {
+				continue
+			}
+			if j == 0 && len(out) > 0 {
+				item.Element = withGroupSeparator(item.Element, indentPrefix)
+			} else {
+				item.Element = withPrefixWhitespace(item.Element, indentPrefix.Whitespace())
+			}
+			b.items[j] = item
+		}
+		out = append(out, b.items...)
+	}
+	for i := range out {
+		if i == len(out)-1 {
+			out[i].After = closingAfter
+		} else {
+			out[i].After = betweenAfter
+		}
+	}
+	return out
+}
+
+// FindModulePath extracts the module import path from the cu's GoProject
+// marker. The full GoResolutionResult (dependency graph) lives on the
+// sibling go.mod, not on each compilation unit; GoProject carries just the
+// module path recipes need to classify imports — analogous to
+// JavaProject.Publication carrying GAV per source. Returns "" when no
+// marker is present (which is fine — IsLocal handles empty modulePath
+// by reporting false uniformly).
+func FindModulePath(cu *golang.CompilationUnit) string {
+	if cu == nil {
+		return ""
+	}
+	for _, m := range cu.Markers.Entries() {
+		if gp, ok := m.(golang.GoProject); ok && gp.ModulePath != "" {
+			return gp.ModulePath
+		}
+	}
+	return ""
+}
+
+// _ keeps the uuid import referenced regardless of build tags.
+var _ = uuid.UUID{}

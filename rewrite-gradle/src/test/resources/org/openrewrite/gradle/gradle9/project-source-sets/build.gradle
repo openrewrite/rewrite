@@ -1,0 +1,64 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+subprojects {
+    apply plugin: 'java-library'
+    repositories { maven { url = uri('https://repo.maven.apache.org/maven2') } }
+}
+project(':core') {
+    dependencies {
+        runtimeOnly 'commons-codec:commons-codec:1.17.0'
+        runtimeOnly 'org.apache.commons:commons-lang3:3.12.0'
+    }
+}
+configure(subprojects.findAll { it.name != 'core' }) {
+    dependencies {
+        compileOnly project(':core')
+        compileOnly project(':core').sourceSets.main.runtimeClasspath
+        compileOnly 'org.apache.commons:commons-lang3:3.17.0'
+    }
+    tasks.register('verifyRuntimeView') {
+        dependsOn tasks.named('testClasses')
+        doLast {
+            def cp = configurations.compileClasspath
+            def artifacts = cp.resolvedConfiguration.resolvedArtifacts
+            def ids = artifacts.collect { it.moduleVersion.id.toString() }.sort()
+            println "COMPILE_ARTIFACTS=${ids}"
+            assert cp.files.any { it.name == 'commons-codec-1.17.0.jar' }
+            assert ids.contains('org.apache.commons:commons-lang3:3.17.0')
+            assert !ids.contains('org.apache.commons:commons-lang3:3.12.0')
+            def coreEdges = cp.incoming.resolutionResult.allDependencies.findAll {
+                it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult &&
+                    it.selected.id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier &&
+                    it.selected.id.projectPath == ':core'
+            }
+            def variants = coreEdges.collect { it.resolvedVariant.displayName }.sort()
+            println "CORE_VARIANTS=${variants}"
+            if (project.findProperty('expectRuntimeVariant') == 'true') {
+                assert ids.contains('commons-codec:commons-codec:1.17.0')
+                assert variants.any { it.contains('runtimeElements') }
+                assert cp.files.any { it.name == 'main' || it.name.endsWith('.jar') }
+                assert cp.files.count { it.name.startsWith('commons-lang3-') } == 1
+            }
+            def loader = new URLClassLoader((cp.files + sourceSets.main.output.files).collect { it.toURI().toURL() } as URL[], (ClassLoader) null)
+            try {
+                def plugin = loader.loadClass('example.Plugin').getDeclaredConstructor().newInstance()
+                assert plugin.message() == 'core:d41d8cd98f00b204e9800998ecf8427e'
+                assert loader.getResourceAsStream('core.properties').getText('UTF-8').contains('message=core-resource')
+            } finally { loader.close() }
+        }
+    }
+    tasks.named('check') { dependsOn tasks.named('verifyRuntimeView') }
+}

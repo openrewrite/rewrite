@@ -20,7 +20,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.Find;
@@ -29,7 +36,13 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.List;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -39,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("NullableProblems")
 class DeclarativeRecipeTest implements RewriteTest {
 
     @DocumentExample
@@ -47,7 +61,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         rewriteRun(
           spec -> {
               spec.validateRecipeSerialization(false);
-              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+              var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
                 null, URI.create("null"), true, emptyList());
               dr.addPrecondition(
                 toRecipe(() -> new PlainTextVisitor<>() {
@@ -76,7 +90,7 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void addingPreconditionsWithOptions() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+        var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
           null, URI.create("dummy"), true, emptyList());
         dr.addPrecondition(
           toRecipe(() -> new PlainTextVisitor<>() {
@@ -97,7 +111,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
         dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
-          .hasSize(3) // precondition + 2 recipes with options
+          .hasSize(2)
           .flatExtracting(RecipeDescriptor::getOptions)
           .hasSize(2)
           .extracting(OptionDescriptor::getName)
@@ -105,8 +119,78 @@ class DeclarativeRecipeTest implements RewriteTest {
     }
 
     @Test
+    void preconditionDescriptorsIncludedInDescriptor() {
+        var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addPrecondition(new Find("precondition-marker", null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("2"));
+        dr.initialize(List.of());
+
+        RecipeDescriptor descriptor = dr.getDescriptor();
+        assertThat(descriptor.getPreconditions())
+          .hasSize(1)
+          .first()
+          .satisfies(p -> assertThat(p.getName()).isEqualTo("org.openrewrite.text.Find"));
+        assertThat(descriptor.getRecipeList())
+          .hasSize(1)
+          .first()
+          .satisfies(r -> assertThat(r.getName()).isEqualTo("org.openrewrite.text.ChangeText"));
+    }
+
+    @Test
+    void laterInitializationDoesNotUndoAnEarlierOne() {
+        var nested = new DeclarativeRecipe("org.example.Nested", "Nested", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        nested.addUninitialized("org.openrewrite.text.ChangeText");
+        ChangeText resolved = new ChangeText("2");
+        nested.initialize(key -> "org.openrewrite.text.ChangeText".equals(key) ? resolved : null);
+
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("dummy"), false, emptyList());
+        outer.addUninitialized(nested);
+        outer.initialize(key -> null);
+        nested.initialize(key -> null);
+
+        assertThat(nested.getRecipeList())
+          .as("neither the outer recipe's resolver nor a direct call can see the entry, " +
+              "so resolving again would drop it")
+          .containsExactly(resolved);
+        assertThat(outer.validateAll())
+          .allSatisfy(validated -> assertThat(validated.isValid()).isTrue());
+    }
+
+    @Test
+    void unresolvableNestedRecipeIsAttributedToTheRecipeThatDeclaresIt() {
+        var nested = new DeclarativeRecipe("org.example.Nested", "Nested", "Test.", emptySet(),
+          null, URI.create("file:///nested.yaml"), false, emptyList());
+        nested.addUninitialized("org.example.Missing");
+
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        outer.addUninitialized(nested);
+        outer.initialize(key -> null);
+
+        assertThat(outer.validate().isValid()).isTrue();
+        assertThat(nested.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .contains("org.example.Nested.recipeList[0] (in file:///nested.yaml)");
+    }
+
+    @Test
+    void unresolvablePreconditionIsAttributedToThePreconditionsProperty() {
+        var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        dr.addUninitializedPrecondition("org.example.Missing");
+        dr.initialize(key -> null);
+
+        assertThat(dr.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .contains("org.example.Outer.preconditions[0] (in file:///outer.yaml)");
+    }
+
+    @Test
     void uninitializedFailsValidation() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+        var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
           null, URI.create("dummy"), true, emptyList());
         dr.addUninitializedPrecondition(
           toRecipe(() -> new PlainTextVisitor<>() {
@@ -126,14 +210,61 @@ class DeclarativeRecipeTest implements RewriteTest {
           new ChangeText("3")
         );
         Validated<Object> validation = dr.validate();
-        assertThat(validation.isValid()).isFalse();
-        assertThat(validation.failures().size()).isEqualTo(2);
-        assertThat(validation.failures().getFirst().getProperty()).isEqualTo("initialization");
+        assertThat(validation.failures())
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("test.recipeList (in dummy)", "test.preconditions (in dummy)");
+        assertThat(new ValidationException(validation).getMessage())
+          .contains("test.recipeList (in dummy) was '[org.openrewrite.text.ChangeText, org.openrewrite.text.ChangeText]' " +
+                    "but it has not been initialized; call initialize() on the DeclarativeRecipe before using it.");
+    }
+
+    @Test
+    void unresolvableEntryInADeclarativePreconditionFailsValidation() {
+        var guard = new DeclarativeRecipe("org.example.Guard", "Guard", "Test.", emptySet(),
+          null, URI.create("file:///guard.yaml"), false, emptyList());
+        guard.addUninitialized("org.example.Missing");
+        var outer = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        outer.addPrecondition(guard);
+        outer.addUninitialized(new ChangeText("2"));
+        outer.initialize(key -> null);
+
+        assertThat(outer.validateAll())
+          .flatExtracting(Validated::failures)
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("org.example.Guard.recipeList[0] (in file:///guard.yaml)");
+    }
+
+    @Test
+    void misconfiguredPreconditionFailsValidation() {
+        var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        dr.addPrecondition(new Find(null, null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("2"));
+        dr.initialize(List.of());
+
+        assertThat(dr.validateAll())
+          .flatExtracting(Validated::failures)
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("org.openrewrite.text.Find.find");
+    }
+
+    @Test
+    void initializedRecipeReportsOnlyTheEntriesItCouldNotResolve() {
+        var dr = new DeclarativeRecipe("org.example.Outer", "Outer", "Test.", emptySet(),
+          null, URI.create("file:///outer.yaml"), false, emptyList());
+        dr.addUninitialized(new ChangeText("2"));
+        dr.addUninitialized("org.example.Missing");
+        dr.initialize(key -> null);
+
+        assertThat(dr.validate().failures())
+          .extracting(Validated.Invalid::getProperty)
+          .containsExactly("org.example.Outer.recipeList[1] (in file:///outer.yaml)");
     }
 
     @Test
     void uninitializedWithInitializedRecipesPassesValidation() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+        var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
           null, URI.create("dummy"), true, emptyList());
         dr.setPreconditions(
           List.of(
@@ -254,13 +385,90 @@ class DeclarativeRecipeTest implements RewriteTest {
               """, "org.openrewrite.PreconditionTest")
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
               s -> {
-                  //noinspection DataFlowIssue
                   assertThat(s.getAfter()).isNotNull();
                   assertThat(s.getAfter().getSourcePath()).isEqualTo(Path.of("test.txt"));
               }
             ))
             .expectedCyclesThatMakeChanges(1),
           text("1")
+        );
+    }
+
+    @Test
+    void yamlPreconditionWithScanningRecipeOverridingThreeArgGenerate() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.AppendToTextFile:
+                   relativeFileName: file.txt
+                   content: content
+              """, "org.openrewrite.PreconditionTest"),
+          text("1", spec -> spec.path("trigger.txt")),
+          text(
+            null,
+            """
+              content
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    @Test
+    void yamlPreconditionNotMetStillGeneratesSources() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.text.Find:
+                    find: 1
+              recipeList:
+                - org.openrewrite.text.AppendToTextFile:
+                   relativeFileName: file.txt
+                   content: content
+              """, "org.openrewrite.PreconditionTest"),
+          text("2", spec -> spec.path("trigger.txt")),
+          text(
+            null,
+            """
+              content
+              """,
+            spec -> spec.path("file.txt")
+          )
+        );
+    }
+
+    @Test
+    void preconditionDecoratorDelegatesThreeArgGenerate() {
+        rewriteRun(
+          spec -> {
+              spec.validateRecipeSerialization(false);
+              var dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+                null, URI.create("null"), false, emptyList());
+              dr.addPrecondition(
+                toRecipe(() -> new PlainTextVisitor<>() {
+                    @Override
+                    public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                        return SearchResult.found(text);
+                    }
+                })
+              );
+              dr.addUninitialized(new ThreeArgGenerateRecipe());
+              dr.initialize(List.of());
+              spec.recipe(dr);
+          },
+          text("trigger", spec -> spec.path("trigger.txt")),
+          text(null, "generated", spec -> spec.path("generated.txt"))
         );
     }
 
@@ -333,11 +541,48 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void exposesUnderlyingDataTables() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
+        var dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, emptyList());
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
+    }
+
+    @Test
+    void concurrentInitializeDoesNotDuplicateRecipes() throws Exception {
+        var dr = new DeclarativeRecipe("org.openrewrite.ConcurrentInitTest", "concurrent init test",
+          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("hello"));
+
+        int threadCount = 20;
+        try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
+            var startLatch = new CountDownLatch(1);
+            var doneLatch = new CountDownLatch(threadCount);
+            var errors = new ConcurrentLinkedQueue<Throwable>();
+
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        for (int j = 0; j < 50; j++) {
+                            dr.initialize(List.of());
+                        }
+                    } catch (Throwable t) {
+                        errors.add(t);
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            assertThat(errors).as("Concurrent initialize() should not throw").isEmpty();
+            assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(2);
+        }
     }
 
     @Test
@@ -354,7 +599,7 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void maxCyclesNested() {
-        AtomicInteger cycleCount = new AtomicInteger();
+        var cycleCount = new AtomicInteger();
         Recipe root = new MaxCycles(
           100,
           List.of(new MaxCycles(
@@ -371,7 +616,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(root).expectedCyclesThatMakeChanges(2), // the inner MaxCycles stops RepeatedFindAndReplace after two cycles
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);
@@ -425,15 +670,15 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void selfReferencingRecipeDetectedAsCycle() {
         // Test that a recipe referencing itself is detected as a cycle
-        DeclarativeRecipe selfReferencing = new DeclarativeRecipe(
-            "org.openrewrite.SelfReferencing",
-            "Self Referencing Recipe",
-            "A recipe that references itself",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var selfReferencing = new DeclarativeRecipe(
+          "org.openrewrite.SelfReferencing",
+          "Self Referencing Recipe",
+          "A recipe that references itself",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // Add itself as a sub-recipe
@@ -441,34 +686,34 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> selfReferencing.initialize(List.of(selfReferencing)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            .hasMessageContaining("org.openrewrite.SelfReferencing -> org.openrewrite.SelfReferencing");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          .hasMessageContaining("org.openrewrite.SelfReferencing -> org.openrewrite.SelfReferencing");
     }
 
     @Test
     void mutuallyRecursiveRecipesDetectedAsCycle() {
         // Test that mutually recursive recipes are detected as a cycle
-        DeclarativeRecipe recipeA = new DeclarativeRecipe(
-            "org.openrewrite.RecipeA",
-            "Recipe A",
-            "Recipe A that references Recipe B",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var recipeA = new DeclarativeRecipe(
+          "org.openrewrite.RecipeA",
+          "Recipe A",
+          "Recipe A that references Recipe B",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
-        DeclarativeRecipe recipeB = new DeclarativeRecipe(
-            "org.openrewrite.RecipeB",
-            "Recipe B",
-            "Recipe B that references Recipe A",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var recipeB = new DeclarativeRecipe(
+          "org.openrewrite.RecipeB",
+          "Recipe B",
+          "Recipe B that references Recipe A",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // A references B
@@ -479,46 +724,228 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            .hasMessageContaining("RecipeA")
-            .hasMessageContaining("RecipeB");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          .hasMessageContaining("RecipeA")
+          .hasMessageContaining("RecipeB");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void nestedScanningRecipeInOrPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          // jackson-config.json triggers the precondition, so all files get changed
+          text("config", "changed", spec -> spec.path("jackson-config.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void nestedScanningRecipeInOrPreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          text("config", spec -> spec.path("some-other-file.txt")),
+          text("original")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void sameScanningRecipeWithDifferentParametersInOrPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MultiFileCheck
+              description: Test.
+              preconditions:
+                - org.sample.HasAnyConfigFile
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.HasAnyConfigFile
+              description: OR precondition with same recipe type but different params
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-b.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-c.json"
+              """,
+            "org.sample.MultiFileCheck"
+          ),
+          // Only config-b.json exists, so should still match due to OR logic
+          // When matched, all files are changed
+          text("config b", "changed", spec -> spec.path("config-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void deeplyNestedOrPreconditionsWithScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.MiddleLevel
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MiddleLevel
+              description: Middle level precondition
+              recipeList:
+                - org.sample.BottomLevel
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/middle.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BottomLevel
+              description: Bottom level with scanning recipes
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-b.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // Only bottom-b.json exists, which should match through the nested OR chain
+          // When matched, all files are changed
+          text("bottom b config", "changed", spec -> spec.path("bottom-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void multipleNestedOrPreconditionsWithSameScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.BranchA
+                - org.sample.BranchB
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchA
+              description: First branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-a-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchB
+              description: Second branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-b-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // shared.json exists, which should satisfy both branches (AND of two ORs)
+          // When matched, all files are changed
+          text("shared config", "changed", spec -> spec.path("shared.json")),
+          text("original", "changed")
+        );
     }
 
     @Test
     void deeperCyclicReferencesDetectedAsCycle() {
         // Test that deeper cyclic references (A -> B -> C -> A) are detected as a cycle
-        DeclarativeRecipe recipeA = new DeclarativeRecipe(
-            "org.openrewrite.RecipeA",
-            "Recipe A",
-            "Recipe A that references Recipe B",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var recipeA = new DeclarativeRecipe(
+          "org.openrewrite.RecipeA",
+          "Recipe A",
+          "Recipe A that references Recipe B",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
-        DeclarativeRecipe recipeB = new DeclarativeRecipe(
-            "org.openrewrite.RecipeB",
-            "Recipe B",
-            "Recipe B that references Recipe C",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var recipeB = new DeclarativeRecipe(
+          "org.openrewrite.RecipeB",
+          "Recipe B",
+          "Recipe B that references Recipe C",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
-        DeclarativeRecipe recipeC = new DeclarativeRecipe(
-            "org.openrewrite.RecipeC",
-            "Recipe C",
-            "Recipe C that references Recipe A",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+        var recipeC = new DeclarativeRecipe(
+          "org.openrewrite.RecipeC",
+          "Recipe C",
+          "Recipe C that references Recipe A",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // A references B
@@ -532,11 +959,162 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB, recipeC)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            // The cycle path should show A -> B -> C -> A
-            .hasMessageContaining("RecipeA")
-            .hasMessageContaining("RecipeB")
-            .hasMessageContaining("RecipeC");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          // The cycle path should show A -> B -> C -> A
+          .hasMessageContaining("RecipeA")
+          .hasMessageContaining("RecipeB")
+          .hasMessageContaining("RecipeC");
+    }
+
+    // Uses separate RecipeRunCycles for scan and edit to verify that the accumulator
+    // survives when getRecipeList() is called again from a fresh RecipeStack.
+    // This can't be tested via rewriteRun() which uses a single RecipeRunCycle per cycle.
+    @Test
+    void scanningRecipeAccumulatorSurvivesAcrossRecipeRunCycles() {
+        var recipe = new DeclarativeRecipe(
+          "test.WithPrecondition", "With precondition", "Test with precondition.",
+          emptySet(), null, URI.create("test"), true, emptyList()
+        );
+        recipe.addPrecondition(new Singleton());
+        recipe.addUninitialized(new CountingRecipe());
+        recipe.initialize(List.of());
+
+        List<SourceFile> sources = List.of(
+          PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file1.txt")).text("hello").build(),
+          PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file2.txt")).text("world").build()
+        );
+
+        var rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var ctx = new WatchableExecutionContext(new InMemoryExecutionContext());
+        Recipe noop = Recipe.noop();
+
+        // Cycle 1: scan (simulates first yield batch on the platform)
+        var scanCycle = new RecipeRunCycle<>(
+          recipe, 1, rootCursor, ctx,
+          new RecipeRunStats(noop), new SearchResults(noop),
+          new SourcesFileResults(noop), new SourcesFileErrors(noop),
+          LargeSourceSet::edit
+        );
+        ctx.putCycle(scanCycle);
+        scanCycle.scanSources(new InMemoryLargeSourceSet(sources));
+
+        // Cycle 2: edit (simulates new RecipeRunCycle after worker yield — new RecipeStack, fresh getRecipeList() calls)
+        var editCycle = new RecipeRunCycle<>(
+          recipe, 1, rootCursor, ctx,
+          new RecipeRunStats(noop), new SearchResults(noop),
+          new SourcesFileResults(noop), new SourcesFileErrors(noop),
+          LargeSourceSet::edit
+        );
+        ctx.putCycle(editCycle);
+        LargeSourceSet edited = editCycle.editSources(new InMemoryLargeSourceSet(sources));
+
+        List<SourceFile> results = edited.getChangeset().getAllResults().stream()
+          .map(Result::getAfter)
+          .filter(Objects::nonNull)
+          .toList();
+
+        assertThat(results).anyMatch(sf -> ((PlainText) sf).getText().contains("[scanned:"));
+    }
+
+    @Test
+    void recipeDescriptorFiltersSingletonDuplicates() {
+        var leaf = new DeclarativeRecipe("leaf", "leaf", "", emptySet(),
+          null, URI.create("test"), false, emptyList());
+        leaf.addPrecondition(new Singleton());
+        leaf.initialize(List.of());
+
+        var root = new DeclarativeRecipe("root", "root", "", emptySet(),
+          null, URI.create("test"), false, emptyList());
+        root.addUninitialized(leaf);
+        root.addUninitialized(leaf);
+        root.initialize(List.of());
+
+        assertThat(root.getDescriptor().getRecipeList())
+          .hasSize(1)
+          .first()
+          .satisfies(r -> assertThat(r.getName()).isEqualTo("leaf"));
+    }
+
+    static class ThreeArgGenerateRecipe extends ScanningRecipe<AtomicBoolean> {
+        @Override
+        public String getDisplayName() {
+            return "Three-arg generate recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Generates a file by overriding only the three-arg generate overload.";
+        }
+
+        @Override
+        public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+            return new AtomicBoolean(false);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean fileExists) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (Path.of("generated.txt").equals(text.getSourcePath())) {
+                        fileExists.set(true);
+                    }
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public Collection<SourceFile> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
+            if (fileExists.get()) {
+                return emptyList();
+            }
+            return List.of(PlainText.builder()
+              .sourcePath(Path.of("generated.txt"))
+              .text("generated")
+              .build());
+        }
+    }
+
+    static class CountingRecipe extends ScanningRecipe<List<String>> {
+        @Override
+        public String getDisplayName() {
+            return "Counting recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Counts files during scan, appends count during edit.";
+        }
+
+        @Override
+        public List<String> getInitialValue(ExecutionContext ctx) {
+            return new ArrayList<>();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    acc.add(text.getText());
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (!acc.isEmpty()) {
+                        return text.withText(text.getText() + " [scanned:" + acc.size() + "]");
+                    }
+                    return text;
+                }
+            };
+        }
     }
 }

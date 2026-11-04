@@ -18,13 +18,12 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyIterator;
-import static java.util.stream.StreamSupport.stream;
+import static java.util.Collections.singletonList;
 
 /**
  * A container object which may or may not contain a valid value.
@@ -131,6 +130,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
     }
 
     @SuppressWarnings("unchecked")
+    @CheckReturnValue
     default Validated<T> and(Validated<? extends T> validated) {
         if (validated instanceof None) {
             return this;
@@ -139,6 +139,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
     }
 
     @SuppressWarnings("unchecked")
+    @CheckReturnValue
     default Validated<T> or(Validated<? extends T> validated) {
         if (validated instanceof None) {
             return this;
@@ -168,6 +169,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
+        @CheckReturnValue
         public Validated<T> or(Validated<? extends T> validated) {
             if (validated instanceof None) {
                 return this;
@@ -177,6 +179,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
+        @CheckReturnValue
         public Validated<T> and(Validated<? extends T> validated) {
             if (validated instanceof None) {
                 return this;
@@ -223,7 +226,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.of((Validated<T>) this).iterator();
+            return singletonList((Validated<T>) this).iterator();
         }
 
         public String getProperty() {
@@ -274,7 +277,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.of((Validated<T>) this).iterator();
+            return singletonList((Validated<T>) this).iterator();
         }
 
         public String getMessage() {
@@ -324,9 +327,12 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         public Optional<Validated<T>> findAny() {
-            return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator(), Spliterator.CONCURRENT), false)
-                    .filter(Validated::isValid)
-                    .findAny();
+            for (Validated<T> v : this) {
+                if (v.isValid()) {
+                    return Optional.of(v);
+                }
+            }
+            return Optional.empty();
         }
 
         @Override
@@ -340,15 +346,24 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         public Iterator<Validated<T>> iterator() {
             //If only one side is valid, this short circuits the invalid path.
             if (left.isValid() && right.isInvalid()) {
-                return stream(left.spliterator(), false).iterator();
+                return left.iterator();
             } else if (left.isInvalid() && right.isValid()) {
-                return stream(right.spliterator(), false).iterator();
+                return right.iterator();
             } else {
                 //If both are valid/invalid, concat all validations.
-                return Stream.concat(
-                        stream(left.spliterator(), false),
-                        stream(right.spliterator(), false)
-                ).iterator();
+                Iterator<Validated<T>> leftIt = left.iterator();
+                Iterator<Validated<T>> rightIt = right.iterator();
+                return new Iterator<Validated<T>>() {
+                    @Override
+                    public boolean hasNext() {
+                        return leftIt.hasNext() || rightIt.hasNext();
+                    }
+
+                    @Override
+                    public Validated<T> next() {
+                        return leftIt.hasNext() ? leftIt.next() : rightIt.next();
+                    }
+                };
             }
         }
     }
@@ -374,10 +389,22 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Stream.concat(
-                    stream(left.spliterator(), false),
-                    stream(right.spliterator(), false)
-            ).iterator();
+            List<Validated<T>> result = new ArrayList<>();
+            Deque<Validated<T>> stack = new ArrayDeque<>();
+            stack.push(this);
+            while (!stack.isEmpty()) {
+                Validated<T> current = stack.pop();
+                if (current instanceof Both) {
+                    Both<T> both = (Both<T>) current;
+                    stack.push(both.right);
+                    stack.push(both.left);
+                } else {
+                    for (Validated<T> v : current) {
+                        result.add(v);
+                    }
+                }
+            }
+            return result.iterator();
         }
     }
 }

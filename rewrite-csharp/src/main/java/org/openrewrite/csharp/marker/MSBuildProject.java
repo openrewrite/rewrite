@@ -1,0 +1,534 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.csharp.marker;
+
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Value;
+import lombok.With;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
+
+import java.io.Serializable;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
+
+/**
+ * Metadata about a .NET project (.csproj) extracted from MSBuild evaluation.
+ * Attached as a marker to the Xml.Document representing the .csproj file in the LST.
+ * Analogous to MavenResolutionResult for Maven and GradleProject for Gradle.
+ */
+@Value
+@Builder
+@AllArgsConstructor
+public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCodec<MSBuildProject> {
+
+    @With
+    @Builder.Default
+    UUID id = randomId();
+
+    /**
+     * The SDK attribute from the Project element (e.g., "Microsoft.NET.Sdk", "Microsoft.NET.Sdk.Web").
+     */
+    @With
+    @Nullable
+    String sdk;
+
+    /**
+     * MSBuild properties with provenance tracking.
+     * The key is the property name, the value includes the resolved value
+     * and the file where the property is defined.
+     */
+    @With
+    @Builder.Default
+    Map<String, PropertyValue> properties = emptyMap();
+
+    /**
+     * NuGet package sources configured for this project, extracted from nuget.config.
+     * Used by version upgrade recipes to resolve available package versions.
+     * Analogous to MavenRepository list on MavenResolutionResult/GradleProject.
+     */
+    @With
+    @Builder.Default
+    List<PackageSource> packageSources = emptyList();
+
+    /**
+     * Per-target-framework metadata. Each TFM has its own set of
+     * package references, resolved packages, and project references,
+     * since MSBuild evaluates the project independently per TFM.
+     */
+    @With
+    @Builder.Default
+    List<TargetFramework> targetFrameworks = emptyList();
+
+    @Override
+    public void rpcSend(MSBuildProject after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, MSBuildProject::getSdk);
+        // Send map as parallel lists: keys then values (each value through its codec)
+        q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().keySet()),
+                k -> k, k -> q.getAndSend(k, x -> x));
+        q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().values()),
+                v -> v.getValue(), v -> v.rpcSend(v, q));
+        q.getAndSendList(after, MSBuildProject::getPackageSources,
+                PackageSource::getKey,
+                ps -> ps.rpcSend(ps, q));
+        q.getAndSendList(after, MSBuildProject::getTargetFrameworks,
+                TargetFramework::getTargetFramework,
+                tf -> tf.rpcSend(tf, q));
+    }
+
+    @Override
+    public MSBuildProject rpcReceive(MSBuildProject before, RpcReceiveQueue q) {
+        UUID id = q.receiveAndGet(before.id, UUID::fromString);
+        String sdk = q.receive(before.sdk);
+        // Receive parallel lists and zip into map
+        Map<String, PropertyValue> beforeProps = before.properties != null ? before.properties : emptyMap();
+        List<String> keys = q.receiveList(new ArrayList<>(beforeProps.keySet()),
+                k -> q.<String, String>receiveAndGet(k, x -> x));
+        List<PropertyValue> values = q.receiveList(new ArrayList<>(beforeProps.values()),
+                v -> v.rpcReceive(v, q));
+        Map<String, PropertyValue> props = new LinkedHashMap<>();
+        if (keys != null && values != null) {
+            for (int i = 0; i < keys.size(); i++) {
+                props.put(keys.get(i), values.get(i));
+            }
+        }
+        return before
+                .withId(id)
+                .withSdk(sdk)
+                .withProperties(props)
+                .withPackageSources(q.receiveList(before.packageSources,
+                        ps -> ps.rpcReceive(ps, q)))
+                .withTargetFrameworks(q.receiveList(before.targetFrameworks,
+                        tf -> tf.rpcReceive(tf, q)));
+    }
+
+    /**
+     * Metadata for a single target framework within this project.
+     */
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class TargetFramework implements Heavyweight, Serializable, RpcCodec<TargetFramework> {
+        String targetFramework;
+
+        @Builder.Default
+        List<PackageReference> packageReferences = emptyList();
+
+        /**
+         * The transitive closure of NuGet packages resolved for this target framework.
+         * Referenced projects are not packages and are reported in {@link #projectReferences}.
+         */
+        @Builder.Default
+        List<ResolvedPackage> resolvedPackages = emptyList();
+
+        /**
+         * The transitive closure of projects referenced for this target framework.
+         */
+        @Builder.Default
+        List<ProjectReference> projectReferences = emptyList();
+
+        @Override
+        public void rpcSend(TargetFramework after, RpcSendQueue q) {
+            q.getAndSend(after, TargetFramework::getTargetFramework);
+            q.getAndSendList(after, TargetFramework::getPackageReferences,
+                    PackageReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+            q.getAndSendListAsRef(after, TargetFramework::getResolvedPackages,
+                    rp -> rp.getName() + "@" + rp.getResolvedVersion(),
+                    rp -> rp.rpcSend(rp, q));
+            q.getAndSendListAsRef(after, TargetFramework::getProjectReferences,
+                    ProjectReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+        }
+
+        @Override
+        public TargetFramework rpcReceive(TargetFramework before, RpcReceiveQueue q) {
+            return before
+                    .withTargetFramework(q.receive(before.targetFramework))
+                    .withPackageReferences(q.receiveList(before.packageReferences,
+                            pr -> pr.rpcReceive(pr, q)))
+                    .withResolvedPackages(q.receiveList(before.resolvedPackages,
+                            rp -> rp.rpcReceive(rp, q)))
+                    .withProjectReferences(q.receiveList(before.projectReferences,
+                            pr -> pr.rpcReceive(pr, q)));
+        }
+    }
+
+    /**
+     * A declared NuGet package reference from the .csproj or Directory.Packages.props.
+     * Tracks both the raw (requested) and MSBuild-evaluated (resolved) version,
+     * enabling recipes to decide whether to update a property or a literal.
+     */
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class PackageReference implements Serializable, RpcCodec<PackageReference> {
+        String include;
+
+        @Nullable
+        String requestedVersion;
+
+        @Nullable
+        String resolvedVersion;
+
+        @Override
+        public void rpcSend(PackageReference after, RpcSendQueue q) {
+            q.getAndSend(after, PackageReference::getInclude);
+            q.getAndSend(after, PackageReference::getRequestedVersion);
+            q.getAndSend(after, PackageReference::getResolvedVersion);
+        }
+
+        @Override
+        public PackageReference rpcReceive(PackageReference before, RpcReceiveQueue q) {
+            return before
+                    .withInclude(q.receive(before.include))
+                    .withRequestedVersion(q.receive(before.requestedVersion))
+                    .withResolvedVersion(q.receive(before.resolvedVersion));
+        }
+    }
+
+    /**
+     * A resolved NuGet package from the restore dependency graph, carrying
+     * the full per-target-framework asset information from the NuGet {@code LockFile}
+     * (produced by an in-process {@code PackageSpec}/{@code RestoreRunner} restore).
+     * Asset lists hold package-relative paths with {@code _._} placeholder entries stripped,
+     * so an empty list means "the package provides no assets of that kind".
+     */
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class ResolvedPackage implements Heavyweight, Serializable, RpcCodec<ResolvedPackage> {
+        String name;
+
+        String resolvedVersion;
+
+        @Builder.Default
+        List<ResolvedPackage> dependencies = emptyList();
+
+        int depth;
+
+        /**
+         * Library type from the lock file. Always "package" in markers that model referenced
+         * projects as {@link ProjectReference}s; "project" only in markers built before that.
+         */
+        @Builder.Default
+        String type = "package";
+
+        /**
+         * Compile-time assemblies (lib/ref), lock file {@code compile} section.
+         */
+        @Builder.Default
+        List<String> compileAssemblies = emptyList();
+
+        /**
+         * Runtime assemblies, lock file {@code runtime} section.
+         */
+        @Builder.Default
+        List<String> runtimeAssemblies = emptyList();
+
+        /**
+         * .NET Framework in-box assembly names, lock file {@code frameworkAssemblies} section.
+         */
+        @Builder.Default
+        List<String> frameworkAssemblies = emptyList();
+
+        /**
+         * MSBuild props/targets imports, lock file {@code build} section.
+         */
+        @Builder.Default
+        List<String> buildFiles = emptyList();
+
+        /**
+         * MSBuild imports for the outer multi-targeting build, lock file {@code buildMultiTargeting} section.
+         */
+        @Builder.Default
+        List<String> buildMultiTargetingFiles = emptyList();
+
+        /**
+         * PackageReference-style shared content, lock file {@code contentFiles} section.
+         */
+        @Builder.Default
+        List<String> contentFiles = emptyList();
+
+        /**
+         * RID-specific assets, lock file {@code runtimeTargets} section.
+         */
+        @Builder.Default
+        List<String> runtimeTargets = emptyList();
+
+        /**
+         * Satellite resource assemblies, lock file {@code resource} section.
+         */
+        @Builder.Default
+        List<String> resourceAssemblies = emptyList();
+
+        /**
+         * Roslyn analyzer assemblies, derived from the package file list (analyzers/**.dll).
+         */
+        @Builder.Default
+        List<String> analyzerAssemblies = emptyList();
+
+        /**
+         * Package ships install.ps1/uninstall.ps1/init.ps1 (not executed under PackageReference).
+         */
+        boolean hasInstallScripts;
+
+        /**
+         * Package ships XDT/.transform config transforms (not applied under PackageReference).
+         */
+        boolean hasXdtTransforms;
+
+        /**
+         * Package ships a legacy content/ folder (ignored under PackageReference).
+         */
+        boolean hasLegacyContentFolder;
+
+        /**
+         * Declared dependency version range per child package id, lock file {@code dependencies} section.
+         */
+        @Builder.Default
+        Map<String, String> dependencyRanges = emptyMap();
+
+        @Override
+        public void rpcSend(ResolvedPackage after, RpcSendQueue q) {
+            q.getAndSend(after, ResolvedPackage::getName);
+            q.getAndSend(after, ResolvedPackage::getResolvedVersion);
+            q.getAndSendListAsRef(after, ResolvedPackage::getDependencies,
+                    dep -> dep.getName() + "@" + dep.getResolvedVersion(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSend(after, ResolvedPackage::getDepth);
+            q.getAndSend(after, ResolvedPackage::getType);
+            sendStringList(q, after, ResolvedPackage::getCompileAssemblies);
+            sendStringList(q, after, ResolvedPackage::getRuntimeAssemblies);
+            sendStringList(q, after, ResolvedPackage::getFrameworkAssemblies);
+            sendStringList(q, after, ResolvedPackage::getBuildFiles);
+            sendStringList(q, after, ResolvedPackage::getBuildMultiTargetingFiles);
+            sendStringList(q, after, ResolvedPackage::getContentFiles);
+            sendStringList(q, after, ResolvedPackage::getRuntimeTargets);
+            sendStringList(q, after, ResolvedPackage::getResourceAssemblies);
+            sendStringList(q, after, ResolvedPackage::getAnalyzerAssemblies);
+            q.getAndSend(after, ResolvedPackage::isHasInstallScripts);
+            q.getAndSend(after, ResolvedPackage::isHasXdtTransforms);
+            q.getAndSend(after, ResolvedPackage::isHasLegacyContentFolder);
+            // Send map as parallel lists: keys then values. Instances materialized by the RPC
+            // layer bypass the constructor, so the map can be null despite @Builder.Default.
+            sendStringList(q, after, rp -> rp.dependencyRanges == null ?
+                    new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.keySet()));
+            sendStringList(q, after, rp -> rp.dependencyRanges == null ?
+                    new ArrayList<>() : new ArrayList<>(rp.dependencyRanges.values()));
+        }
+
+        private static void sendStringList(RpcSendQueue q, ResolvedPackage after,
+                                           java.util.function.Function<ResolvedPackage, List<String>> selector) {
+            q.getAndSendList(after, selector, s -> s, s -> q.getAndSend(s, x -> x));
+        }
+
+        private static List<String> receiveStringList(RpcReceiveQueue q, List<String> before) {
+            return q.receiveList(before, s -> q.<String, String>receiveAndGet(s, x -> x));
+        }
+
+        @Override
+        public ResolvedPackage rpcReceive(ResolvedPackage before, RpcReceiveQueue q) {
+            ResolvedPackage result = before
+                    .withName(q.receive(before.name))
+                    .withResolvedVersion(q.receive(before.resolvedVersion))
+                    .withDependencies(q.receiveList(before.dependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withDepth(q.receive(before.depth))
+                    .withType(q.receive(before.type))
+                    .withCompileAssemblies(receiveStringList(q, before.compileAssemblies))
+                    .withRuntimeAssemblies(receiveStringList(q, before.runtimeAssemblies))
+                    .withFrameworkAssemblies(receiveStringList(q, before.frameworkAssemblies))
+                    .withBuildFiles(receiveStringList(q, before.buildFiles))
+                    .withBuildMultiTargetingFiles(receiveStringList(q, before.buildMultiTargetingFiles))
+                    .withContentFiles(receiveStringList(q, before.contentFiles))
+                    .withRuntimeTargets(receiveStringList(q, before.runtimeTargets))
+                    .withResourceAssemblies(receiveStringList(q, before.resourceAssemblies))
+                    .withAnalyzerAssemblies(receiveStringList(q, before.analyzerAssemblies))
+                    .withHasInstallScripts(q.receive(before.hasInstallScripts))
+                    .withHasXdtTransforms(q.receive(before.hasXdtTransforms))
+                    .withHasLegacyContentFolder(q.receive(before.hasLegacyContentFolder));
+            // Receive parallel lists and zip into map. The before instance can be an RPC-materialized
+            // skeleton whose map is null despite @Builder.Default.
+            Map<String, String> beforeRanges = before.dependencyRanges == null ? emptyMap() : before.dependencyRanges;
+            List<String> rangeKeys = receiveStringList(q, new ArrayList<>(beforeRanges.keySet()));
+            List<String> rangeValues = receiveStringList(q, new ArrayList<>(beforeRanges.values()));
+            Map<String, String> ranges = new LinkedHashMap<>();
+            if (rangeKeys != null && rangeValues != null) {
+                for (int i = 0; i < rangeKeys.size() && i < rangeValues.size(); i++) {
+                    ranges.put(rangeKeys.get(i), rangeValues.get(i));
+                }
+            }
+            return result.withDependencyRanges(ranges);
+        }
+    }
+
+    /**
+     * A project-to-project reference from the restore dependency graph. A referenced project is
+     * compiled from source alongside this one rather than consumed as a NuGet package, so it is
+     * modelled as its own kind of graph node with edges to the packages and further projects it
+     * brings in.
+     */
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class ProjectReference implements Serializable, RpcCodec<ProjectReference> {
+        /**
+         * Path to the referenced project file, relative to the referencing project's directory.
+         */
+        String include;
+
+        /**
+         * The referenced project's name in the restore graph, which is its assembly name.
+         */
+        @Nullable
+        String name;
+
+        /**
+         * Shortest distance from the project owning this marker: 0 for a project it references
+         * directly, higher for one reached only through another project reference.
+         */
+        int depth;
+
+        /**
+         * Projects this one references in turn.
+         */
+        @Builder.Default
+        List<ProjectReference> projectReferences = emptyList();
+
+        /**
+         * NuGet packages this project depends on directly. Instances are shared with the
+         * owning {@link TargetFramework#resolvedPackages}.
+         */
+        @Builder.Default
+        List<ResolvedPackage> resolvedPackages = emptyList();
+
+        @Override
+        public void rpcSend(ProjectReference after, RpcSendQueue q) {
+            q.getAndSend(after, ProjectReference::getInclude);
+            q.getAndSend(after, ProjectReference::getName);
+            q.getAndSend(after, ProjectReference::getDepth);
+            q.getAndSendListAsRef(after, ProjectReference::getProjectReferences,
+                    ProjectReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+            q.getAndSendListAsRef(after, ProjectReference::getResolvedPackages,
+                    rp -> rp.getName() + "@" + rp.getResolvedVersion(),
+                    rp -> rp.rpcSend(rp, q));
+        }
+
+        @Override
+        public ProjectReference rpcReceive(ProjectReference before, RpcReceiveQueue q) {
+            return before
+                    .withInclude(q.receive(before.include))
+                    .withName(q.receive(before.name))
+                    .withDepth(q.receive(before.depth))
+                    .withProjectReferences(q.receiveList(before.projectReferences,
+                            pr -> pr.rpcReceive(pr, q)))
+                    .withResolvedPackages(q.receiveList(before.resolvedPackages,
+                            rp -> rp.rpcReceive(rp, q)));
+        }
+    }
+
+    /**
+     * An MSBuild property value with provenance tracking.
+     * Recipes use the definedIn path to determine which file to edit
+     * when updating a property value.
+     */
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class PropertyValue implements Serializable, RpcCodec<PropertyValue> {
+        String value;
+
+        @Nullable
+        Path definedIn;
+
+        @Override
+        public void rpcSend(PropertyValue after, RpcSendQueue q) {
+            q.getAndSend(after, PropertyValue::getValue);
+            q.getAndSend(after, p -> {
+                Path path = p.getDefinedIn();
+                return path == null ? null : path.toString();
+            });
+        }
+
+        @Override
+        public PropertyValue rpcReceive(PropertyValue before, RpcReceiveQueue q) {
+            return before
+                    .withValue(q.receive(before.value))
+                    .withDefinedIn(q.<Path, String>receiveAndGet(
+                            before.definedIn, s -> s == null ? null : Paths.get(s)));
+        }
+    }
+
+    /**
+     * A NuGet package source from nuget.config.
+     * Analogous to MavenRepository in the Maven/Gradle ecosystems.
+     */
+    @Value
+    @With
+    @Builder
+    @AllArgsConstructor
+    public static class PackageSource implements Serializable, RpcCodec<PackageSource> {
+        /**
+         * The key/name of the package source (e.g., "nuget.org", "mycompany-feed").
+         */
+        String key;
+
+        /**
+         * The NuGet V3 service index URL
+         * (e.g., "https://api.nuget.org/v3/index.json").
+         */
+        String url;
+
+        @Override
+        public void rpcSend(PackageSource after, RpcSendQueue q) {
+            q.getAndSend(after, PackageSource::getKey);
+            q.getAndSend(after, PackageSource::getUrl);
+        }
+
+        @Override
+        public PackageSource rpcReceive(PackageSource before, RpcReceiveQueue q) {
+            return before
+                    .withKey(q.receive(before.key))
+                    .withUrl(q.receive(before.url));
+        }
+    }
+}

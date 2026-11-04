@@ -32,11 +32,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.MavenSettingsAutoLoadingExtension.withMavenCentralMirror;
 
 class ResolvedPomTest implements RewriteTest {
 
@@ -306,7 +310,7 @@ class ResolvedPomTest implements RewriteTest {
                 assertThat(pluginManagement).hasSize(1);
                 Plugin plugin = pluginManagement.getFirst();
                 assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
-                ObjectMapper objectMapper = new ObjectMapper();
+                var objectMapper = new ObjectMapper();
                 assertThat(plugin.getExecutions())
                   .hasSize(2)
                   .containsExactlyInAnyOrder(
@@ -467,7 +471,7 @@ class ResolvedPomTest implements RewriteTest {
             createJarFile(localRepository);
 
             List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace)));
             ctx.setRepositories(List.of(mavenLocal));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
@@ -493,7 +497,7 @@ class ResolvedPomTest implements RewriteTest {
             createJarFile(localRepository2);
 
             List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace)));
             ctx.setRepositories(List.of(mavenLocal, mavenLocal2));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
@@ -521,99 +525,90 @@ class ResolvedPomTest implements RewriteTest {
         @Test
         void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
-            createJarFile(localRepository);
-            createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
+            createJarFile(localRepository, "com.some", "some-artifact", "1");
 
-            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
-            ctx.setRepositories(List.of(mavenLocal));
-            ctx.setResolutionListener(new ResolutionEventListener() {
-                @Override
-                public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
-                    List<Object> list = new ArrayList<>();
-                    list.add(gav);
-                    list.add(attemptedUris);
-                    list.add(containing);
-                    downloadErrorArgs.add(list);
-                }
-            });
-
-            String father = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.example</groupId>
-                <artifactId>father</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-                <packaging>pom</packaging>
-                <modules>
-                  <module>childA</module>
-                  <module>childB</module>
-                </modules>
-                <dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.some</groupId>
-                          <artifactId>some-artifact</artifactId>
-                          <version>1</version>
-                      </dependency>
-                  </dependencies>
-                </dependencyManagement>
-              </project>
-              """;
-            String childA = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.example</groupId>
-                  <artifactId>father</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-                </parent>
-                <artifactId>childA</artifactId>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.openrewrite.test</groupId>
-                            <artifactId>lib</artifactId>
-                            <version>1.0</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                      <groupId>com.some</groupId>
-                      <artifactId>some-artifact</artifactId>
-                    </dependency>
-                </dependencies>
-              </project>
-              """;
-            String childB = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.example</groupId>
-                  <artifactId>father</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-                </parent>
-                <artifactId>childB</artifactId>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.some</groupId>
-                            <artifactId>some-artifact</artifactId>
-                            <scope>compile</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-              </project>
-              """;
+            MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(mavenLocal)));
 
             rewriteRun(
               spec -> spec.executionContext(ctx),
-              pomXml(father, spec -> spec.path("pom.xml")),
-              pomXml(childA, spec -> spec.path("childA/pom.xml")),
-              pomXml(childB, spec -> spec.path("childB/pom.xml").afterRecipe(doc -> {
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>lib</module>
+                      <module>app</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                          <version>1</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """
+              ),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>lib</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.some</groupId>
+                                <artifactId>some-artifact</artifactId>
+                                <scope>compile</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.path("lib/pom.xml")
+              ),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.example</groupId>
+                                <artifactId>lib</artifactId>
+                                <version>1.0.0-SNAPSHOT</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                        </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("app/pom.xml").afterRecipe(doc -> {
                     ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     String version = pom.getManagedVersion("com.some", "some-artifact", null, null);
                     // Assert that version is not null!
@@ -629,8 +624,8 @@ class ResolvedPomTest implements RewriteTest {
         MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
         createJarFile(localRepository, "com.some", "some-artifact", "1");
 
-        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
-          .setRepositories(List.of(mavenLocal));
+        MavenExecutionContextView ctx = withMavenCentralMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(List.of(mavenLocal)));
 
         rewriteRun(
           spec -> spec.executionContext(ctx),
@@ -927,4 +922,134 @@ class ResolvedPomTest implements RewriteTest {
           .knownToExist(true)
           .build();
     }
+
+    @Test
+    void dependencyResolution() {
+        // A minimal, fully synthetic dependency graph exercising every interesting case for scope-bucket
+        // membership without a large, real-world transitive closure to enumerate:
+        //   app -[compile]-> lib -[runtime]-> runtime-transitive   (a transitive dependency that is
+        //                                                            "runtime" in its own pom, reached
+        //                                                            beneath a "compile" root)
+        //   app -[provided]-> provided-leaf   (a direct "provided" dependency also belongs on the
+        //                                      compile and test classpaths, but not runtime)
+        //   app -[runtime]->  runtime-leaf
+        //   app -[test]->     test-leaf
+        rewriteRun(
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>lib</artifactId>
+                  <version>1</version>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>provided-leaf</artifactId>
+                  <version>1</version>
+                  <scope>provided</scope>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>runtime-leaf</artifactId>
+                  <version>1</version>
+                  <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>test-leaf</artifactId>
+                  <version>1</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+            """,
+            spec -> spec.path("pom.xml").afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(coordinates(resolution, Scope.Compile)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:provided-leaf:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Provided)).isEqualTo(Set.of(
+                  "com.example:provided-leaf:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Runtime)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:runtime-leaf:1",
+                  "com.example:runtime-transitive:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Test)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:provided-leaf:1",
+                  "com.example:runtime-leaf:1",
+                  "com.example:runtime-transitive:1",
+                  "com.example:test-leaf:1"
+                ));
+            })
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>lib</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>runtime-transitive</artifactId>
+                  <version>1</version>
+                  <scope>runtime</scope>
+                </dependency>
+              </dependencies>
+            </project>
+            """,
+            spec -> spec.path("lib/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>runtime-transitive</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("runtime-transitive/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>provided-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("provided-leaf/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>runtime-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("runtime-leaf/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>test-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("test-leaf/pom.xml")
+          )
+        );
+    }
+
+    private static Set<String> coordinates(MavenResolutionResult resolution, Scope scope) {
+        return resolution.getDependencies().get(scope).stream()
+          .map(d -> d.getGav().toString())
+          .collect(Collectors.toCollection(TreeSet::new));
+    }
+
 }

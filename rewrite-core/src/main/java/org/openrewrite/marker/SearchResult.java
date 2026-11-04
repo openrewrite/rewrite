@@ -32,6 +32,11 @@ import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
 
+/**
+ * Designates a particular LST element as matching some recipe's search criteria.
+ * These are printed as comments in unit tests, but in actual recipe runs are kept separate from changes.
+ * If you want to add a comment to an LST element, use {@link  org.openrewrite.trait.Comments}.
+ */
 @RequiredArgsConstructor
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -76,12 +81,12 @@ public final class SearchResult implements Marker, RpcCodec<SearchResult> {
      *
      * @param delimiter The delimiter to use when merging descriptions.
      */
+    @SuppressWarnings("ConstantValue")
     @Contract("null, _, _ -> null; !null, _, _ -> !null")
     @Incubating(since = "8.0.0")
     public static <T extends Tree> @Nullable T mergingFound(@Nullable T t, String description, String delimiter) {
         Objects.requireNonNull(delimiter, "delimiter must not be null");
         if (t == null) {
-            //noinspection ConstantConditions
             return null;
         }
         return t.withMarkers(t.getMarkers().computeByType(new SearchResult(randomId(), description),

@@ -195,6 +195,7 @@ describe('visiting YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd
@@ -241,6 +242,7 @@ describe('visiting YAML', () => {
             id: randomId(),
             prefix: "",
             markers: emptyMarkers,
+            directives: [],
             explicit: false,
             block: scalar,
             end: documentEnd

@@ -49,11 +49,21 @@ public class ProtoParser implements Parser {
                         Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
                                 CharStreams.fromString(sourceStr))));
 
+                        ForwardingErrorListener errorListener = new ForwardingErrorListener(input.getPath(), ctx);
                         parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                        parser.addErrorListener(errorListener);
 
-                        if (sourceStr.contains("proto3")) {
-                            // Pending Proto3 support, the best we can do is plain text & not skip files
+                        Protobuf2Parser.ProtoContext protoCtx = parser.proto();
+                        Protobuf2Parser.SyntaxContext syntaxCtx = protoCtx.syntax();
+                        if (protoCtx.edition() != null ||
+                            (syntaxCtx != null &&
+                             (syntaxCtx.stringLiteral() == null ||
+                              syntaxCtx.stringLiteral().StringLiteral() == null ||
+                              syntaxCtx.stringLiteral().StringLiteral().getText().contains("proto3")))) {
+                            // Pending Proto3 and editions support, the best we can do is plain text & not
+                            // skip files; also fall back to plain text when the dialect can't be parsed.
+                            // An editions file trips the Proto2 grammar throughout, so the dialect is
+                            // settled before the error guard below.
                             return PlainText.builder()
                                     .sourcePath(path)
                                     .charsetName(is.getCharset().name())
@@ -63,13 +73,21 @@ public class ProtoParser implements Parser {
                                     .build();
                         }
 
+                        ProtoParsingException syntaxError = errorListener.getFirstError();
+                        if (syntaxError != null) {
+                            // ANTLR resynchronizes past what it cannot match and the visitor sees only
+                            // error nodes there, so continuing would yield a document that prints back
+                            // like its input while holding none of it
+                            return ParseError.build(this, input, relativeTo, ctx, syntaxError);
+                        }
+
                         Proto.Document document = new ProtoParserVisitor(
                                 path,
                                 input.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
-                        ).visitProto(parser.proto());
+                        ).visitProto(protoCtx);
                         parsingListener.parsed(input, document);
                         return requirePrintEqualsInput(document, input, relativeTo, ctx);
                     } catch (Throwable t) {
@@ -98,6 +116,8 @@ public class ProtoParser implements Parser {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 
+        private @Nullable ProtoParsingException firstError;
+
         private ForwardingErrorListener(Path sourcePath, ExecutionContext ctx) {
             this.sourcePath = sourcePath;
             this.ctx = ctx;
@@ -106,8 +126,16 @@ public class ProtoParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new ProtoParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
+            ProtoParsingException error = new ProtoParsingException(sourcePath,
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e);
+            if (firstError == null) {
+                firstError = error;
+            }
+            ctx.getOnError().accept(error);
+        }
+
+        public @Nullable ProtoParsingException getFirstError() {
+            return firstError;
         }
     }
 

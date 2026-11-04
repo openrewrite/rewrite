@@ -15,21 +15,18 @@
  */
 package org.openrewrite.xml;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.format.RemoveTrailingWhitespaceVisitor;
 
 public class RemoveTrailingWhitespace extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove trailing whitespace";
-    }
+    @Getter
+    final String displayName = "Remove trailing whitespace";
 
-    @Override
-    public String getDescription() {
-        return "Remove any extra trailing whitespace from the end of each line.";
-    }
+    @Getter
+    final String description = "Remove any extra trailing whitespace from the end of each line.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -28,15 +29,11 @@ import org.openrewrite.xml.tree.Xml;
 public class ExplicitDependencyVersion extends Recipe {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Add explicit dependency versions";
-    }
+    @Getter
+    final String displayName = "Add explicit dependency versions";
 
-    @Override
-    public String getDescription() {
-        return "Add explicit dependency versions to POMs for reproducibility, as the `LATEST` and `RELEASE` version keywords are deprecated.";
-    }
+    @Getter
+    final String description = "Add explicit dependency versions to POMs for reproducibility, as the `LATEST` and `RELEASE` version keywords are deprecated.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -47,7 +44,7 @@ public class ExplicitDependencyVersion extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isDependencyTag() || isManagedDependencyTag()) {
                     String versionValue = getResolutionResult().getPom().getValue(t.getChildValue("version").orElse(null));
-                    if ("LATEST".equals(versionValue) || "RELEASE".equals(versionValue)) {
+                    if ("LATEST".equalsIgnoreCase(versionValue) || "RELEASE".equalsIgnoreCase(versionValue)) {
                         String groupId = getResolutionResult().getPom().getValue(t.getChildValue("groupId").orElse(null));
                         String artifactId = getResolutionResult().getPom().getValue(t.getChildValue("artifactId").orElse(null));
                         if (groupId != null && artifactId != null) {

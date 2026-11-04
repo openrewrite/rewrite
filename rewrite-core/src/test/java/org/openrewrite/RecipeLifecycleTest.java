@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -41,6 +42,7 @@ import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -350,21 +352,24 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarativeInTests() {
-        rewriteRun(spec -> spec.recipeFromYaml("""
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.recipe
-              displayName: Test Recipe
-              description: Test Recipe.
-              recipeList:
-                - org.openrewrite.NoArgRecipe:
-                    foo: bar
-              """,
-            "test.recipe"
-          ),
-          text("Hi", "NoArgRecipeHi")
-        );
+    void canNotCallImperativeRecipeWithUnnecessaryArgsFromDeclarative() {
+        assertThatExceptionOfType(AssertionError.class)
+          .isThrownBy(() -> rewriteRun(spec -> spec.recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Test Recipe
+                description: Test Recipe.
+                recipeList:
+                  - org.openrewrite.NoArgRecipe:
+                      foo: bar
+                """,
+              "test.recipe"
+            ),
+            text("Hi", "NoArgRecipeHi")
+          ))
+          .withMessageContaining("org.openrewrite.NoArgRecipe.foo")
+          .withMessageContaining("is not an option of this recipe, which takes no options");
     }
 
     @Test
@@ -479,15 +484,11 @@ class RecipeLifecycleTest implements RewriteTest {
 
 @SuppressWarnings("unused") // referenced in yaml
 class DefaultConstructorRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "DefaultConstructorRecipe";
-    }
+    @Getter
+    final String displayName = "DefaultConstructorRecipe";
 
-    @Override
-    public String getDescription() {
-        return "DefaultConstructorRecipe.";
-    }
+    @Getter
+    final String description = "DefaultConstructorRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -506,15 +507,11 @@ class DefaultConstructorRecipe extends Recipe {
 @NoArgsConstructor // referenced in yaml
 @SuppressWarnings("unused")
 class NoArgRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "NoArgRecipe";
-    }
+    @Getter
+    final String displayName = "NoArgRecipe";
 
-    @Override
-    public String getDescription() {
-        return "NoArgRecipe.";
-    }
+    @Getter
+    final String description = "NoArgRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

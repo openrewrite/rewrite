@@ -1,0 +1,189 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Moderne Proprietary. Only for use by Moderne customers under the terms of a commercial contract.
+ */
+package org.openrewrite.python.trait;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.trait.Trait;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Trait for Python dependency files (pyproject.toml, requirements.txt, etc.).
+ * Use {@link org.openrewrite.python.internal.PyProjectHelper#extractPackageName(String)}
+ * for PEP 508 package name extraction.
+ */
+
+public interface PythonDependencyFile extends Trait<SourceFile> {
+
+    PythonResolutionResult getMarker();
+
+    /**
+     * Upgrade version constraints for dependencies in the specified scope.
+     *
+     * @param upgrades  package name → new version
+     * @param scope     the scope to upgrade in, or {@code null} to upgrade in all scopes
+     * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Add dependencies to the specified scope.
+     *
+     * @param additions package name → version constraint (e.g. {@code "2.0"} or {@code ">=2.0"})
+     * @param scope     the TOML scope (e.g. {@code "project.optional-dependencies"},
+     *                  {@code "dependency-groups"}), or {@code null} for the default
+     *                  ({@code [project].dependencies})
+     * @param groupName required when scope is {@code "project.optional-dependencies"}
+     *                  or {@code "dependency-groups"}, otherwise {@code null}
+     */
+    PythonDependencyFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Pin transitive dependencies using the strategy appropriate for this file's
+     * package manager. For pyproject.toml: uv uses {@code [tool.uv].constraint-dependencies},
+     * PDM uses {@code [tool.pdm.overrides]}, and other managers add a direct dependency.
+     * For requirements.txt: appends the dependency.
+     *
+     * @param pins      package name → version constraint
+     * @param scope     the scope to look for transitive dependencies in, or {@code null} to search all scopes
+     * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Remove dependencies from the specified scope.
+     *
+     * @param packageNames package names to remove
+     * @param scope        the scope to remove from, or {@code null} to remove from all scopes
+     * @param groupName    required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Change a dependency to a different package.
+     *
+     * @param oldPackageName the current package name
+     * @param newPackageName the new package name
+     * @param newVersion     optional new version constraint, or {@code null} to preserve the original
+     * @param scope          the scope to change in, or {@code null} to change in all scopes
+     * @param groupName      required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Add search result markers for vulnerable dependencies.
+     *
+     * @param packageMessages package name → vulnerability description message
+     * @param scope           the scope to search in, or {@code null} to search all scopes
+     * @param groupName       required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx);
+
+    /**
+     * Rewrite a PEP 508 dependency spec with a new version constraint.
+     * Changes only the version token, preserving the requirement's original
+     * whitespace, extras, and environment marker; returns {@code spec} unchanged
+     * when the version is already the target (ignoring formatting), so no edit is
+     * made for a whitespace-only difference. The version is normalized via
+     * {@link PyProjectHelper#normalizeVersionConstraint(String)}, so both
+     * {@code "2.31.0"} and {@code ">=2.31.0"} are accepted.
+     */
+    static String rewritePep508Spec(String spec, String packageName, String newVersion) {
+        int nameEnd = packageName.length();
+
+        // Skip extras like [security]
+        if (nameEnd < spec.length() && spec.charAt(nameEnd) == '[') {
+            int extrasEnd = spec.indexOf(']', nameEnd);
+            if (extrasEnd >= 0) {
+                nameEnd = extrasEnd + 1;
+            }
+        }
+
+        int semiIdx = spec.indexOf(';', nameEnd);
+        int constraintEnd = semiIdx >= 0 ? semiIdx : spec.length();
+        String prefix = spec.substring(0, nameEnd);
+        String constraint = spec.substring(nameEnd, constraintEnd);
+        String marker = semiIdx >= 0 ? spec.substring(semiIdx) : "";
+        String newConstraint = PyProjectHelper.normalizeVersionConstraint(newVersion);
+
+        // No change when the version is already the target, ignoring whitespace.
+        if (constraint.replaceAll("\\s+", "").equals(newConstraint)) {
+            return spec;
+        }
+
+        // Same operator, single clause: swap only the version, keeping all whitespace.
+        // java.util.regex.Matcher is qualified to avoid the trait's own nested Matcher.
+        java.util.regex.Matcher current = SINGLE_CLAUSE.matcher(constraint.trim());
+        java.util.regex.Matcher target = SINGLE_CLAUSE.matcher(newConstraint);
+        if (current.matches() && target.matches() && current.group(1).equals(target.group(1))) {
+            int versionStart = constraint.indexOf(current.group(1)) + current.group(1).length();
+            while (versionStart < constraint.length() && Character.isWhitespace(constraint.charAt(versionStart))) {
+                versionStart++;
+            }
+            return prefix + constraint.substring(0, versionStart) + target.group(2) + marker;
+        }
+
+        // Otherwise keep the leading whitespace before the constraint and emit the new one.
+        int lead = 0;
+        while (lead < constraint.length() && Character.isWhitespace(constraint.charAt(lead))) {
+            lead++;
+        }
+        return prefix + constraint.substring(0, lead) + newConstraint + marker;
+    }
+
+    Pattern SINGLE_CLAUSE = Pattern.compile("(===|==|>=|<=|!=|~=|>|<)\\s*(\\S+)");
+
+    /**
+     * Look up a value in a map by normalizing the lookup key per PEP 503.
+     * This allows callers to pass non-normalized package names.
+     */
+    static @Nullable String getByNormalizedName(Map<String, String> map, String name) {
+        String normalized = PythonResolutionResult.normalizeName(name);
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            if (PythonResolutionResult.normalizeName(entry.getKey()).equals(normalized)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update the resolved dependency versions in a marker; see
+     * {@link PythonResolutionLinker#updateResolvedVersions} for the contract.
+     */
+    static PythonResolutionResult updateResolvedVersions(
+            PythonResolutionResult marker, Map<String, String> versionUpdates) {
+        return PythonResolutionLinker.updateResolvedVersions(marker, versionUpdates);
+    }
+
+    class Matcher extends SimpleTraitMatcher<PythonDependencyFile> {
+        private final RequirementsFile.Matcher reqMatcher = new RequirementsFile.Matcher();
+        private final PyProjectFile.Matcher pyprojectMatcher = new PyProjectFile.Matcher();
+        private final PipfileFile.Matcher pipfileMatcher = new PipfileFile.Matcher();
+
+        @Override
+        protected @Nullable PythonDependencyFile test(Cursor cursor) {
+            PythonDependencyFile r = reqMatcher.test(cursor);
+            if (r != null) {
+                return r;
+            }
+            r = pyprojectMatcher.test(cursor);
+            if (r != null) {
+                return r;
+            }
+            return pipfileMatcher.test(cursor);
+        }
+    }
+}

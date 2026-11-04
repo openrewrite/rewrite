@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {isSourceFile, Tree} from "../../tree";
+import {Cursor, isSourceFile, Tree} from "../../tree";
 import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
 import {extractSourcePath, withMetrics} from "./metrics";
 
 export const enum MarkerPrinter {
     DEFAULT = "DEFAULT",
+    SEARCH_MARKERS_ONLY = "SEARCH_MARKERS_ONLY",
     FENCED = "FENCED",
     SANITIZED = "SANITIZED"
 }
 
 export class Print {
+    /**
+     * @param cursor The ids of what encloses a tree that is not a source file, from its parent outward.
+     */
     constructor(private readonly treeId: UUID,
                 private readonly sourceFileType: string,
-                readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
+                readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT,
+                readonly cursor?: string[]) {
     }
 
     static handle(connection: rpc.MessageConnection,
                   getObject: (id: string, sourceFileType: string) => any,
+                  getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
                   logger?: rpc.Logger,
                   metricsCsv?: string): void {
         connection.onRequest(
@@ -46,14 +52,12 @@ export class Print {
                     if (logger) {
                         logger.log("Printing " + (isSourceFile(tree) ? tree.sourcePath : `tree of type ${tree.kind} in ${context.target}`));
                     }
-                    const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
-                    let result: string;
+                    const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter ?? MarkerPrinter.DEFAULT]);
                     if (isSourceFile(tree)) {
-                        result = await printer(tree).print(tree, out);
-                    } else {
-                        result = await printer(request.sourceFileType).print(tree, out);
+                        return printer(tree).print(tree, out);
                     }
-                    return result;
+                    const cursor = request.cursor ? await getCursor(request.cursor, request.sourceFileType) : undefined;
+                    return printer(request.sourceFileType).print(tree, out, cursor);
                 }
             )
         );

@@ -21,9 +21,13 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
+import org.openrewrite.yaml.internal.YamlTreeShapeValidationService;
+import org.openrewrite.yaml.service.YamlCommentService;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
@@ -41,6 +45,7 @@ public interface Yaml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptYaml(v.adapt(YamlVisitor.class), p);
     }
 
@@ -94,8 +99,9 @@ public interface Yaml extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Yaml.Documents withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
@@ -135,6 +141,17 @@ public interface Yaml extends Tree {
             return new YamlPrinter<>();
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new YamlCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new YamlTreeShapeValidationService();
+            }
+            return SourceFileWithReferences.super.service(service);
+        }
+
         @Nullable
         @NonFinal
         transient SoftReference<References> references;
@@ -155,6 +172,14 @@ public interface Yaml extends Tree {
 
         String prefix;
         Markers markers;
+
+        /**
+         * Optional list of directives that precede this document.
+         * Directives include %YAML and %TAG.
+         */
+        @Nullable
+        List<Directive> directives;
+
         boolean explicit;
         Block block;
         End end;
@@ -170,6 +195,7 @@ public interface Yaml extends Tree {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
+                    directives == null ? null : directives.stream().map(Directive::copyPaste).collect(toList()),
                     explicit,
                     block.copyPaste(),
                     end.copyPaste()
@@ -209,6 +235,54 @@ public interface Yaml extends Tree {
         }
     }
 
+    /**
+     * Represents a YAML directive, such as %YAML or %TAG.
+     * <p>
+     * Examples:
+     * <pre>
+     * %YAML 1.2
+     * %TAG !yaml! tag:yaml.org,2002:
+     * </pre>
+     *
+     * @see <a href="https://yaml.org/spec/1.2/spec.html#id2781553">YAML Directives</a>
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Directive implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        String prefix;
+        Markers markers;
+
+        /**
+         * The content of the directive after the '%' character.
+         * For example, "YAML 1.2" or "TAG !yaml! tag:yaml.org,2002:".
+         */
+        String value;
+
+        /**
+         * Whitespace/content after the directive value, typically a newline.
+         */
+        String suffix;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitDirective(this, p);
+        }
+
+        @Override
+        public Directive copyPaste() {
+            return new Directive(randomId(), prefix, Markers.EMPTY, value, suffix);
+        }
+
+        @Override
+        public String toString() {
+            return "Yaml.Directive(%" + value + ")";
+        }
+    }
+
     interface Block extends Yaml {
         /**
          * @return A new deep copy of this block with different IDs.
@@ -237,6 +311,13 @@ public interface Yaml extends Tree {
         @Nullable
         Tag tag;
 
+        /**
+         * For FOLDED/LITERAL scalars this includes the chomp indicator, header newline,
+         * indented body, and trailing whitespace bounding the next sibling; the Lombok-generated
+         * {@code withValue} cannot safely rewrite a block scalar's body. Use the
+         * {@code org.openrewrite.yaml.trait.BlockScalar} trait to mutate the body without
+         * clobbering the block envelope.
+         */
         String value;
 
         public enum Style {
@@ -441,7 +522,6 @@ public interface Yaml extends Tree {
              * Set to true when this entry is part of a sequence like:
              * - 1
              * - 2
-             *
              * And false when this entry is part of a sequence like:
              * [1, 2]
              */

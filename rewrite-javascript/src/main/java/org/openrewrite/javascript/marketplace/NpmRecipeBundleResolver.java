@@ -35,18 +35,27 @@ public class NpmRecipeBundleResolver implements RecipeBundleResolver {
         return "npm";
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
+        RecipeBundle resolved = bundle;
         if (Files.exists(pkgPath)) {
-            response = rpc.installRecipes(pkgPath.toFile());
+            Path absolute = pkgPath.toAbsolutePath().normalize();
+            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
+            resolved = new RecipeBundle(bundle.getPackageEcosystem(), absolute.toString(),
+                    bundle.getRequestedVersion(), bundle.getVersion(), bundle.getTeam());
+            response = rpc.installRecipes(absolute.toFile());
         } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getEffectiveVersion());
         }
         if (response.getVersion() != null) {
-            bundle.setVersion(response.getVersion());
+            resolved = resolved.withVersion(response.getVersion());
         }
-        return new NpmRecipeBundleReader(bundle, rpc);
+        return new NpmRecipeBundleReader(resolved, rpc);
     }
 }

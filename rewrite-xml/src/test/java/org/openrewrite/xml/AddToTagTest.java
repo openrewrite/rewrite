@@ -143,6 +143,102 @@ class AddToTagTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotAddSemanticallyEqualDuplicate() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean\"/>")));
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <beans>
+                <bean id="myBean"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddDuplicateIgnoringAttributeOrder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new AddToTagVisitor<>(x.getRoot(),
+                          Xml.Tag.build("<bean class=\"C\" id=\"myBean\"/>")));
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <beans>
+                <bean id="myBean" class="C"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addsSemanticallyEqualDuplicateWhenAllowDuplicatesTrue() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  if (x.getRoot().getChildren().size() == 1) {
+                      doAfterVisit(new AddToTagVisitor<>(x.getRoot(),
+                              Xml.Tag.build("<bean id=\"myBean\"/>"), true));
+                  }
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <beans>
+                <bean id="myBean"/>
+              </beans>
+              """,
+            """
+              <beans>
+                <bean id="myBean"/>
+                <bean id="myBean"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addsWhenChildrenShareNameButDifferentAttributes() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean2\"/>")));
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <beans>
+                <bean id="myBean"/>
+              </beans>
+              """,
+            """
+              <beans>
+                <bean id="myBean"/>
+                <bean id="myBean2"/>
+              </beans>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1392")
     @Test
     void preserveNonTagContent() {

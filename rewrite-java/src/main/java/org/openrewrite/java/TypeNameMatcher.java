@@ -142,7 +142,7 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                         pattern.regionMatches(lastPartStart, simpleName, 0, lastPartLength);
             } else {
                 // Has wildcards - use pattern matching on the substring
-                return simpleName.matches(pattern.substring(lastPartStart).replace("*", ".*"));
+                return matchesPattern(pattern, simpleName, lastPartStart, 0);
             }
         }
         return false;
@@ -156,9 +156,10 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
 
             if (tIdx >= tLength) {
                 while (pIdx < pLength) {
-                    if (p == '*') {
+                    char pc = pattern.charAt(pIdx);
+                    if (pc == '*') {
                         pIdx++;
-                    } else if (p == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
+                    } else if (pc == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
                         pIdx += 2;
                     } else {
                         return false;
@@ -192,17 +193,22 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                 return false;
 
             } else if (p == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
+                // `..` spans whole segments, so it starts at a segment boundary and so does the rest of the pattern
+                if (tIdx > 0 && !isSegmentSeparator(text.charAt(tIdx))) {
+                    return false;
+                }
                 pIdx += 2;
                 if (pIdx >= pLength) {
                     return true;
                 }
 
-                if (pattern.charAt(pIdx) == '*') {
+                if (pattern.charAt(pIdx) == '*' && pIdx + 1 >= pLength) {
                     return true;
                 }
 
                 while (tIdx <= tLength) {
-                    if (matchesPattern(pattern, text, pIdx, tIdx)) {
+                    if ((tIdx == 0 || isSegmentSeparator(text.charAt(tIdx - 1))) &&
+                        matchesPattern(pattern, text, pIdx, tIdx)) {
                         return true;
                     }
                     tIdx++;
@@ -210,7 +216,7 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                 return false;
 
             } else if (p == '.') {
-                if (text.charAt(tIdx) != '.' && text.charAt(tIdx) != '$') {
+                if (!isSegmentSeparator(text.charAt(tIdx))) {
                     return false;
                 }
                 pIdx++;
@@ -226,6 +232,10 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
         }
 
         return tIdx >= tLength;
+    }
+
+    private static boolean isSegmentSeparator(char c) {
+        return c == '.' || c == '$';
     }
 
     @Override

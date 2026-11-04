@@ -7,7 +7,15 @@ plugins {
 
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
 }
+
+val javaTckClasses = javaTck.incoming.artifactView {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
+}.files
 
 dependencies {
     api(project(":rewrite-core"))
@@ -16,8 +24,6 @@ dependencies {
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
-    implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
@@ -60,7 +66,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -75,7 +81,7 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
-                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
+                        testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }
@@ -83,6 +89,26 @@ testing {
             }
         }
     }
+}
+
+// Keep the Test tasks' @Classpath fingerprint stable across CI runs. In this module the
+// only consumers of runtimeClasspath are :test and :compatibilityTest (compileJava uses
+// compileClasspath / ABI-only normalization and is unaffected). The convention plugin's
+// info-broker writes build-varying entries (Build-Date, Change, Build-Number, ...) into
+// MANIFEST.MF and META-INF/<project>.properties of every consumed JAR; none of META-INF
+// is a real input for the TCK's parser tests, so drop the whole directory from the
+// fingerprint and let the build cache hit when only those metadata bytes have changed.
+normalization {
+    runtimeClasspath {
+        metaInf {
+            ignoreCompletely()
+        }
+    }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
 }
 
 tasks.named("check") {

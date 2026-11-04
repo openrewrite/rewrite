@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
+import {isIdentifier, isLiteral, isSpace, J, TextComment, Type} from '../../java';
 import {JS} from "../tree";
+import {Marker, Markers} from "../../markers";
 
 /**
  * Union type for all tree node types that the reconciler handles.
@@ -53,12 +54,33 @@ function isVisitableNode(value: { kind: string }): value is VisitableNode {
 }
 
 /**
+ * Whether a marker is one the parser derives from the source text, which therefore follows the formatted text.
+ */
+function isSyntaxMarker(marker: Marker): boolean {
+    switch (marker.kind) {
+        case J.Markers.Semicolon:
+        case J.Markers.TrailingComma:
+        case J.Markers.OmitParentheses:
+        case JS.Markers.Optional:
+        case JS.Markers.NonNullAssertion:
+        case JS.Markers.Generator:
+        case JS.Markers.DelegatedYield:
+        case JS.Markers.FunctionDeclaration:
+        case JS.Markers.Computed:
+            return true;
+        default:
+            return false;
+    }
+}
+
+/**
  * A visitor that reconciles whitespace from a formatted tree into the original tree.
  * Walks both trees in parallel and copies whitespace (prefix, before, after) from
  * the formatted tree to the original.
  *
  * The result preserves the original AST's structure, types, and markers while
- * applying the formatted tree's whitespace.
+ * applying the formatted tree's whitespace. Only the markers that stand for syntax, such as
+ * semicolons and trailing commas, follow the formatted tree.
  *
  * When a target subtree is specified, the reconciler only applies whitespace changes
  * to that subtree and its descendants, leaving surrounding code unchanged.
@@ -163,7 +185,9 @@ export class WhitespaceReconciler {
 
         // Space nodes - copy when reconciling, don't recurse
         if (isSpace(original)) {
-            return this.shouldReconcile() ? formatted : original;
+            if (!this.shouldReconcile()) return original;
+            if (isSpace(formatted) && this.spacesEqual(original, formatted as J.Space)) return original;
+            return formatted;
         }
 
         // Track entering target subtree (using referential equality)
@@ -195,7 +219,7 @@ export class WhitespaceReconciler {
 
     /**
      * Visit all properties of a tree node (J, RightPadded, LeftPadded, Container).
-     * Copies Space values and markers when reconciling, visits everything else.
+     * Copies Space values and reconciles markers when reconciling, visits everything else.
      *
      * Note: The return type may differ from the input type in cases of semantic
      * equivalence (e.g., Identifier↔Literal with quoteProps), but will always
@@ -244,9 +268,24 @@ export class WhitespaceReconciler {
             const originalValue = (original as Record<string, unknown>)[key];
             const formattedValue = (formatted as Record<string, unknown>)[key];
 
-            // Space values and markers: copy from formatted when reconciling
-            if ((isSpace(originalValue)) || key === 'markers') {
+            if (key === 'markers') {
+                if (this.shouldReconcile()) {
+                    const markers = this.reconcileMarkers(originalValue as Markers, formattedValue as Markers);
+                    if (!this.compatible) return original;
+                    if (markers !== originalValue) {
+                        result = { ...result, markers } as VisitableNode;
+                    }
+                }
+                continue;
+            }
+
+            // Space values: copy from formatted when reconciling
+            if (isSpace(originalValue)) {
                 if (this.shouldReconcile() && formattedValue !== originalValue) {
+                    // Check structural equality to avoid unnecessary new objects
+                    if (isSpace(formattedValue) && this.spacesEqual(originalValue, formattedValue as J.Space)) {
+                        continue;
+                    }
                     result = { ...result, [key]: formattedValue } as VisitableNode;
                 }
                 continue;
@@ -291,10 +330,59 @@ export class WhitespaceReconciler {
     }
 
     /**
+     * Keeps the original's markers, except the syntax markers, which follow the formatted tree: one Prettier
+     * removed is dropped, one it added is taken, and one on both sides keeps its id and takes the formatted whitespace.
+     */
+    private reconcileMarkers(original: Markers, formatted: Markers): Markers {
+        if (original?.markers === undefined || formatted?.markers === undefined) {
+            return original;
+        }
+
+        const unmatched = formatted.markers.filter(isSyntaxMarker);
+        const merged: Marker[] = [];
+        for (const marker of original.markers) {
+            if (!isSyntaxMarker(marker)) {
+                merged.push(marker);
+                continue;
+            }
+            const i = unmatched.findIndex(m => m.kind === marker.kind);
+            if (i >= 0) {
+                merged.push(this.visitNode(marker as unknown as VisitableNode, unmatched[i] as unknown as VisitableNode) as unknown as Marker);
+                unmatched.splice(i, 1);
+            }
+        }
+        merged.push(...unmatched);
+
+        if (merged.length === original.markers.length && merged.every((m, i) => m === original.markers[i])) {
+            return original;
+        }
+        return {...original, markers: merged};
+    }
+
+    /**
      * Check if we should apply whitespace changes at the current position.
      */
     private shouldReconcile(): boolean {
         return this.reconcileState === 'reconciling';
+    }
+
+    /**
+     * Structurally compare two Space objects for equality.
+     * Currently only TextComment has additional properties (text, multiline);
+     * if new comment types are added, extend the comparison here.
+     */
+    private spacesEqual(a: J.Space, b: J.Space): boolean {
+        if (a.whitespace !== b.whitespace) return false;
+        if (a.comments.length !== b.comments.length) return false;
+        for (let i = 0; i < a.comments.length; i++) {
+            const ca = a.comments[i], cb = b.comments[i];
+            if (ca.kind !== cb.kind || ca.suffix !== cb.suffix) return false;
+            if (ca.kind === J.Kind.TextComment) {
+                const ta = ca as TextComment, tb = cb as TextComment;
+                if (ta.text !== tb.text || ta.multiline !== tb.multiline) return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -328,6 +416,10 @@ export class WhitespaceReconciler {
         original: J.Identifier | J.Literal,
         formatted: J.Identifier | J.Literal
     ): J.Identifier | J.Literal {
+        // A literal's type follows from how it is written, so an identifier's is not the literal's
+        if (isLiteral(formatted)) {
+            return formatted;
+        }
         const result: Record<string, unknown> = { ...formatted };
 
         // Preserve type attribution - both Identifier and Literal have `type`

@@ -18,8 +18,11 @@ package org.openrewrite.java.service;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.RemoveImport;
+import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.J;
 
@@ -32,6 +35,24 @@ public class ImportService {
                                                @Nullable String alias,
                                                boolean onlyIfReferenced) {
         return new AddImport<>(packageName, typeName, member,  alias, onlyIfReferenced);
+    }
+
+    public <P> JavaVisitor<P> removeImportVisitor(String fullyQualifiedName) {
+        return new RemoveImport<>(fullyQualifiedName);
+    }
+
+    public TreeVisitor<?, ExecutionContext> removeUnusedImportsVisitor() {
+        return new RemoveUnusedImports().getVisitor();
+    }
+
+    /**
+     * Whether the language keeps its imports among the statements rather than in
+     * {@link org.openrewrite.java.tree.JavaSourceFile#getImports()}. Such a language exposes no
+     * {@link J.Import}, so callers that would otherwise walk that list have to route the edit
+     * through this service instead.
+     */
+    public boolean usesStatementBasedImports() {
+        return false;
     }
 
     public <J2 extends J> JavaVisitor<ExecutionContext> shortenAllFullyQualifiedTypeReferences() {

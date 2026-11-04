@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -38,25 +39,17 @@ import static java.util.Collections.singleton;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "End files with a single newline";
-    }
+    @Getter
+    final String displayName = "End files with a single newline";
 
-    @Override
-    public String getDescription() {
-        return "Some tools work better when files end with an empty line.";
-    }
+    @Getter
+    final String description = "Some tools work better when files end with an empty line.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S113");
-    }
+    @Getter
+    final Set<String> tags = singleton("RSPEC-S113");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(1);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(1);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -73,6 +66,9 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
                         eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                         List<Comment> comments = eof.getComments();
                         if (comments.isEmpty()) {
+                            if (isEffectivelyEmpty(cu)) {
+                                return cu;
+                            }
                             return cu.withEof(Space.format(lineEnding));
                         } else {
                             return cu.withEof(cu.getEof().withComments(ListUtils.mapLast(comments, it -> it.withSuffix(lineEnding))));
@@ -81,6 +77,15 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
                     return cu;
                 }
                 return (J) tree;
+            }
+
+            private boolean isEffectivelyEmpty(JavaSourceFile cu) {
+                return cu.getPackageDeclaration() == null &&
+                       cu.getImports().isEmpty() &&
+                       cu.getClasses().isEmpty() &&
+                       cu.getPrefix().getComments().isEmpty() &&
+                       cu.getPrefix().getWhitespace().isEmpty() &&
+                       cu.getEof().getWhitespace().isEmpty();
             }
         };
     }

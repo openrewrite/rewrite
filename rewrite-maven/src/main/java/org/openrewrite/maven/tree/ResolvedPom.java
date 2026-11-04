@@ -24,6 +24,7 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -53,7 +54,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
         "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects"})
 @Getter
 @Builder
-public class ResolvedPom {
+public class ResolvedPom implements Heavyweight {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
@@ -163,9 +164,9 @@ public class ResolvedPom {
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
-        requestedDependencies = ListUtils.map(requestedDependencies,
+        requestedDependencies = ListUtils.filter(requestedDependencies,
                 d -> uniqueDependencies.add(
-                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
+                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())));
         return this;
     }
 
@@ -540,16 +541,17 @@ public class ResolvedPom {
 
         private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
+            boolean fromAncestor = pomAncestry.size() > 1;
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());
-                    mergePlugins(profile.getPlugins());
+                    mergePluginManagement(profile.getPluginManagement(), fromAncestor);
+                    mergePlugins(profile.getPlugins(), fromAncestor);
                 }
             }
 
-            mergePluginManagement(pom.getPluginManagement());
-            mergePlugins(pom.getPlugins());
+            mergePluginManagement(pom.getPluginManagement(), fromAncestor);
+            mergePlugins(pom.getPlugins(), fromAncestor);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -572,7 +574,28 @@ public class ResolvedPom {
         }
 
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
-            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion rawGav = pom.getParent().getGav();
+            if (rawGav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + rawGav);
+            }
+
+            // When the parent version contains unresolved property placeholders like
+            // ${project.version}, the properties needed to resolve it may only be available
+            // from the parent itself (see MavenXpp3Reader §4.0.0, "Inherited" on <version>).
+            // Try to find the parent in the reactor first using the raw GAV before attempting
+            // property resolution. MavenPomDownloader.download() checks the reactor (exact GAV
+            // match, property-merged match, and relative-path match) before going remote, so
+            // the exception is only thrown when the parent is genuinely not a local module.
+            if (rawGav.getVersion().contains("${")) {
+                try {
+                    return downloader.download(rawGav,
+                            pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                } catch (MavenDownloadingException ignored) {
+                    // Parent not found in reactor with raw GAV, fall through to property resolution
+                }
+            }
+
+            GroupArtifactVersion gav = getValues(rawGav);
             if (gav.getVersion() == null) {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
@@ -778,12 +801,12 @@ public class ResolvedPom {
             );
         }
 
-        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins, boolean fromAncestor) {
             Map<PluginKey, Plugin> pluginMap = new HashMap<>();
             plugins.forEach(p -> pluginMap.put(getPluginKey(p), p));
 
             for (Plugin incomingPlugin : incomingPlugins) {
-                if ("false".equals(incomingPlugin.getInherited())) {
+                if (fromAncestor && "false".equals(incomingPlugin.getInherited())) {
                     continue;
                 }
                 Plugin plugin = pluginMap.get(getPluginKey(incomingPlugin));
@@ -796,25 +819,25 @@ public class ResolvedPom {
             }
         }
 
-        private void mergePlugins(List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (plugins == null || plugins.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     plugins = new ArrayList<>();
                 }
-                mergePlugins(plugins, incomingPlugins);
+                mergePlugins(plugins, incomingPlugins, fromAncestor);
             }
         }
 
-        private void mergePluginManagement(List<Plugin> incomingPlugins) {
+        private void mergePluginManagement(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (pluginManagement == null || pluginManagement.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     pluginManagement = new ArrayList<>();
                 }
-                mergePlugins(pluginManagement, incomingPlugins);
+                mergePlugins(pluginManagement, incomingPlugins, fromAncestor);
             }
         }
 
@@ -901,30 +924,6 @@ public class ResolvedPom {
             );
         }
 
-        private ResolvedManagedDependency mergeProperties(ResolvedManagedDependency child, ResolvedManagedDependency parent) {
-            return new ResolvedManagedDependency(
-                    child.getGav().withVersion(child.getVersion() != null ? child.getVersion() : parent.getVersion()),
-                    child.getScope() != null ? child.getScope() : parent.getScope(),
-                    child.getType() != null ? child.getType() : parent.getType(),
-                    child.getClassifier() != null ? child.getClassifier() : parent.getClassifier(),
-                    // For exclusions, merge child and parent lists if both exist, otherwise take non-empty one
-                    mergeExclusions(child.getExclusions(), parent.getExclusions()),
-                    child.getRequested(), // Child's requested info always wins
-                    child.getRequestedBom() != null ? child.getRequestedBom() : parent.getRequestedBom(),
-                    child.getBomGav() != null ? child.getBomGav() : parent.getBomGav()
-            );
-        }
-
-        /**
-         * Merges exclusion lists, preferring child when both are present
-         */
-        private List<GroupArtifact> mergeExclusions(@Nullable List<GroupArtifact> childExclusions, @Nullable List<GroupArtifact> parentExclusions) {
-            if (childExclusions != null && !childExclusions.isEmpty()) {
-                return childExclusions;
-            }
-            return parentExclusions != null ? parentExclusions : emptyList();
-        }
-
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
                 Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
@@ -945,34 +944,40 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        managedDependencyMap.compute(createDependencyManagementKey(managed), (key, existing) -> {
-                            if (existing == null) {
-                                return managed;
-                            }
-                            return mergeProperties(existing, managed);
-                        });
+                        managedDependencyMap.putIfAbsent(createDependencyManagementKey(managed), managed);
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
+                    GroupArtifactVersion groupArtifactVersion = getValues(defined.getGav());
+                    String gavVersion = groupArtifactVersion.getVersion();
+                    if ("LATEST".equalsIgnoreCase(gavVersion) || "RELEASE".equalsIgnoreCase(gavVersion)) {
+                        MavenMetadata.Versioning versioning = downloader.downloadMetadata(groupArtifactVersion, ResolvedPom.this, repositories).getVersioning();
+                        if ("LATEST".equalsIgnoreCase(gavVersion)) {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getLatest());
+                        } else {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getRelease());
+                        }
+                    }
+                    final GroupArtifactVersion finalGav = groupArtifactVersion;
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
+                            .dependencyManagement(defined.withGav(finalGav), pom);
 
-                    ResolvedManagedDependency resolvedDefined = new ResolvedManagedDependency(
-                            getValues(defined.getGav()),
-                            defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
-                            getValue(defined.getType()),
-                            getValue(defined.getClassifier()),
-                            ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
-                            defined,
-                            null,
-                            null
-                    );
-                    managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null || existing.getBomGav() != null) {
-                            return resolvedDefined;
+                    managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
+                        if (existing != null && existing.getBomGav() == null) {
+                            return existing;
                         }
-                        return mergeProperties(existing, resolvedDefined);
+
+                        return new ResolvedManagedDependency(
+                                finalGav,
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
+                                getValue(defined.getType()),
+                                getValue(defined.getClassifier()),
+                                ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
+                                defined,
+                                null,
+                                null
+                        );
                     });
                 }
             }
@@ -993,18 +998,39 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+    }
+
+    /**
+     * Resolves the requested dependencies in the given scope without downloading their transitive closure.
+     * Each returned {@link ResolvedDependency} has an empty {@code dependencies} list. This allows callers who only
+     * need the direct coordinates (for example to re-resolve after a version mutation) to avoid the cost of
+     * transitive POM downloads.
+     */
+    public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+    }
+
+    private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
+                                                           boolean resolveTransitives,
+                                                           MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
+
+        // Tracks the dependency that included each resolved dependency, so that an effective exclusion can be
+        // attributed to the dependency that declared it rather than to the deepest dependency whose direct child
+        // happened to match the exclusion glob (exclusions are propagated down the transitive chain).
+        Map<ResolvedDependency, ResolvedDependency> includedByMap = new IdentityHashMap<>();
 
         Map<GroupArtifact, DependencyAndDependent> rootDependencies = new LinkedHashMap<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.transitiveOf(scope) == scope) {
+            if (dScope.isDirectlyIncludedIn(scope)) {
                 // For direct dependencies that are duplicated, last declaration wins
                 // TODO: We could introduce a ResolutionStrategy to handle this differently for Gradle which uses highest version
                 rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
@@ -1063,7 +1089,7 @@ public class ResolvedPom {
                             MavenExecutionContextView.view(ctx)
                                     .getResolutionListener()
                                     .clear();
-                            return resolveDependencies(scope, requirements, downloader, ctx);
+                            return doResolveDependencies(scope, requirements, resolveTransitives, downloader, ctx);
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
@@ -1123,11 +1149,16 @@ public class ResolvedPom {
                             includedBy.unsafeSetDependencies(new ArrayList<>());
                         }
                         includedBy.getDependencies().add(resolved);
+                        includedByMap.put(resolved, includedBy);
                     }
 
                     if (dd.getScope().transitiveOf(scope) == scope) {
                         dependencies.add(resolved);
                     } else {
+                        continue;
+                    }
+
+                    if (!resolveTransitives) {
                         continue;
                     }
 
@@ -1152,10 +1183,21 @@ public class ResolvedPom {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
                                         matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
-                                    if (resolved.getEffectiveExclusions().isEmpty()) {
-                                        resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
+                                    // Exclusions are propagated down the transitive chain, so the dependency whose
+                                    // direct child matched the exclusion may be deeper than the dependency that
+                                    // actually declared it. Attribute the effective exclusion to the declaring
+                                    // dependency so callers can find it on the dependency that owns the exclusion.
+                                    ResolvedDependency declaredOn = resolved;
+                                    for (ResolvedDependency ancestor = includedByMap.get(resolved);
+                                         ancestor != null && ancestor.getRequested().getExclusions() != null &&
+                                                 ancestor.getRequested().getExclusions().contains(exclusion);
+                                         ancestor = includedByMap.get(ancestor)) {
+                                        declaredOn = ancestor;
                                     }
-                                    resolved.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
+                                    if (declaredOn.getEffectiveExclusions().isEmpty()) {
+                                        declaredOn.unsafeSetEffectiveExclusions(new ArrayList<>());
+                                    }
+                                    declaredOn.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
                                     continue nextDependency;
                                 }
                             }
@@ -1179,7 +1221,13 @@ public class ResolvedPom {
                         }
                     }
                 } catch (MavenDownloadingException e) {
-                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    String type = dd.getDependency().getType();
+                    if (type != null && !"jar".equals(type) && !"ejb".equals(type)) {
+                        // Non-classpath artifacts may lack a POM; skip like Maven does
+                        ctx.getOnError().accept(e);
+                    } else {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    }
                 }
             }
 

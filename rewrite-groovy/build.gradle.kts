@@ -7,21 +7,23 @@ plugins {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class) {
+        val test = getByName<JvmTestSuite>("test") {
             useJUnitJupiter()
         }
 
         register<JvmTestSuite>("groovy2Test") {
-            configurations.getByName("groovy2TestRuntimeClasspath") {
-                resolutionStrategy {
-                    force("org.codehaus.groovy:groovy:2.5.22")
-                }
-            }
-
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
+            }
+
+            // Replace Groovy 4.x (org.apache.groovy) with Groovy 2.x (org.codehaus.groovy)
+            configurations.named("groovy2TestRuntimeClasspath") {
+                exclude(group = "org.apache.groovy")
+            }
+            configurations.named("groovy2TestRuntimeOnly") {
+                dependencies.add(project.dependencies.create("org.codehaus.groovy:groovy:2.5.22"))
             }
 
             targets {
@@ -44,12 +46,10 @@ java {
 dependencies {
     api(project(":rewrite-java"))
 
-    implementation("org.codehaus.groovy:groovy:latest.release")
+    implementation("org.apache.groovy:groovy:4.+")
 
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
-
-    api("io.micrometer:micrometer-core:1.9.+")
 
     api("org.jetbrains:annotations:latest.release")
 
@@ -59,7 +59,8 @@ dependencies {
     testImplementation(project(":rewrite-java-test"))
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
-    testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
+    testRuntimeOnly("org.apache.groovy:groovy-all:4.+")
+    testRuntimeOnly("org.spockframework:spock-core:2.4-groovy-4.0")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 

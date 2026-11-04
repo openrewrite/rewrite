@@ -2,59 +2,68 @@ from __future__ import annotations
 
 import traceback
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
-from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
+from dataclasses import dataclass
+from rewrite.utils import lst_dataclass
+from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any, Self
 from uuid import UUID
 
 if TYPE_CHECKING:
     from .parser import Parser
     from .visitor import Cursor
 
-from .utils import random_id, list_map
+from .utils import id_to_int, random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
-    @property
-    @abstractmethod
-    def id(self) -> UUID:
-        ...
+    __slots__ = ()
 
-    def replace(self, **kwargs) -> 'Marker':
-        """Replace fields on this marker using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+    # Like Tree, the id is stored as a 128-bit int in `_id` on concrete markers;
+    # `id` reconstructs a UUID lazily and eq/hash compare the raw int.
+    @property
+    def id(self) -> UUID:
+        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+
+    # `_id` is on the public positional constructor surface, so callers may pass
+    # a `uuid.UUID`; the dataclass `__init__` of every concrete marker calls this
+    # inherited hook to normalise it to the internal int form. A None id passes
+    # through untouched: the RPC receiver constructs all-None placeholders (see
+    # `make_dataclass_factory`) and fills the id in later.
+    def __post_init__(self):
+        if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+            object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
+
+    def replace(self, **kwargs) -> Self:
+        """Replace fields on this marker, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return ''
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Marker, other).id
+            return self._id == cast(Marker, other)._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
 
 M = TypeVar('M', bound=Marker)
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Markers:
-    _id: UUID
+    _id: int | UUID
 
     @property
     def id(self) -> UUID:
-        return self._id
+        return UUID(int=self._id)  # _id stored as int internally; public API stays UUID
+
+    def __post_init__(self):
+        # Normalise `uuid.UUID` ids from external callers to the internal int form.
+        # None passes through: the RPC receiver constructs all-None placeholders.
+        if self._id is not None and type(self._id) is not int:
+            object.__setattr__(self, '_id', id_to_int(self._id))
 
     _markers: List[Marker]
 
@@ -63,18 +72,8 @@ class Markers:
         return self._markers
 
     def replace(self, **kwargs) -> 'Markers':
-        """Replace fields on this Markers instance using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Markers instance, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def find_first(self, cls: Type[M]) -> Optional[M]:
         for marker in self.markers:
@@ -95,31 +94,45 @@ class Markers:
         """
         return self.replace(markers=list_map(lambda m: remap_fn(m) if isinstance(m, cls) else m, self.markers))
 
+    def add(self, marker: Marker) -> Markers:
+        """Append ``marker``, or return this instance if an equal marker is already present."""
+        if marker in self.markers:
+            return self
+        return self.replace(markers=self.markers + [marker])
+
     EMPTY: ClassVar[Markers]
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Markers, other).id
+            return self._id == cast(Markers, other)._id
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)
+
+    _LAST_EMPTY: ClassVar[Optional[Markers]] = None
 
     @classmethod
-    def build(cls, id: UUID, markers: List[Marker]) -> Markers:
-        return Markers(id, markers)
+    def build(cls, id: int | UUID, markers: List[Marker]) -> Markers:
+        """Marker-free nodes share one instance, and so one id, on the sending
+        side; the last empty Markers stands in whenever that id comes round."""
+        if markers:
+            return Markers(id, markers)
+        key = id if type(id) is int else id_to_int(id)
+        cached = cls._LAST_EMPTY
+        if cached is not None and cached._id == key:
+            return cached
+        cached = Markers(key, markers)
+        cls._LAST_EMPTY = cached
+        return cached
 
 
 Markers.EMPTY = Markers(random_id(), [])
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class SearchResult(Marker):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
     _description: Optional[str]
 
@@ -127,14 +140,203 @@ class SearchResult(Marker):
     def description(self) -> Optional[str]:
         return self._description
 
+    # As in Java, equality ignores the id, so `Markers.add` keeps one SearchResult per description.
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, SearchResult) and self._description == other._description
 
-@dataclass(frozen=True, eq=False)
-class UnknownJavaMarker(Marker):
-    _id: UUID
+    def __hash__(self) -> int:
+        return hash(self._description)
+
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        return comment_wrapper("" if self._description is None else f"({self._description})")
+
+    @staticmethod
+    def found(tree: Any, description: Optional[str] = None) -> Any:
+        """Add a :class:`SearchResult` marker to ``tree``.
+
+        Mirrors Java's ``org.openrewrite.marker.SearchResult.found(tree)``:
+        returns a new tree (different identity from the input) carrying a
+        fresh :class:`SearchResult` marker, or ``tree`` itself when it already
+        carries one with this description. Returns ``None`` unchanged so
+        callers can safely chain through nullable trees.
+
+        Used by search recipes and search-as-precondition visitors to
+        signal "this tree matched"; the wrapping :class:`Check` interprets
+        the identity flip as the gate matching.
+        """
+        if tree is None:
+            return None
+        return tree.replace(_markers=tree.markers.add(SearchResult(random_id(), description)))
+
+
+class Markup(Marker, ABC):
+    """
+    Base class for markup markers that provide visual indicators (warnings, errors, info, debug).
+
+    Markup markers are used to annotate code with messages that can be displayed
+    in various ways depending on the tooling.
+    """
+    __slots__ = ()
+
 
     @property
-    def id(self) -> UUID:
-        return self._id
+    @abstractmethod
+    def message(self) -> str:
+        """The primary message to display."""
+        ...
+
+    @property
+    @abstractmethod
+    def detail(self) -> Optional[str]:
+        """Additional detail, shown in verbose mode."""
+        ...
+
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        if verbose and self.detail is not None:
+            return comment_wrapper(f"({self.detail})")
+        return comment_wrapper(f"({self.message})")
+
+    @staticmethod
+    def warn(message: str, detail: Optional[str] = None) -> 'MarkupWarn':
+        """Create a warning markup marker."""
+        return MarkupWarn(random_id(), message, detail)
+
+    @staticmethod
+    def error(message: str, detail: Optional[str] = None) -> 'MarkupError':
+        """Create an error markup marker."""
+        return MarkupError(random_id(), message, detail)
+
+    @staticmethod
+    def info(message: str, detail: Optional[str] = None) -> 'MarkupInfo':
+        """Create an info markup marker."""
+        return MarkupInfo(random_id(), message, detail)
+
+    @staticmethod
+    def debug(message: str, detail: Optional[str] = None) -> 'MarkupDebug':
+        """Create a debug markup marker."""
+        return MarkupDebug(random_id(), message, detail)
+
+
+@lst_dataclass
+class MarkupWarn(Markup):
+    """Warning markup marker for deprecations and other warnings."""
+    _id: int | UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@lst_dataclass
+class MarkupError(Markup):
+    """Error markup marker for errors and issues."""
+    _id: int | UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@lst_dataclass
+class MarkupInfo(Markup):
+    """Info markup marker for informational messages."""
+    _id: int | UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@lst_dataclass
+class MarkupDebug(Markup):
+    """Debug markup marker for debugging information."""
+    _id: int | UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, slots=True)
+class RecipeThatMadeChanges:
+    """One frame of a :class:`RecipesThatMadeChanges` stack: how the recipe is named, how it was
+    configured, and what it is worth.
+    """
+
+    _name: str
+
+    _display_name: Optional[str] = None
+
+    _instance_name: Optional[str] = None
+
+    # Configured option values. Python never interprets them.
+    _options: Optional[Dict[str, Any]] = None
+
+    _estimated_effort_per_occurrence_millis: Optional[int] = None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def display_name(self) -> Optional[str]:
+        return self._display_name
+
+    @property
+    def instance_name(self) -> Optional[str]:
+        return self._instance_name
+
+    @property
+    def options(self) -> Optional[Dict[str, Any]]:
+        return self._options
+
+    @property
+    def estimated_effort_per_occurrence_millis(self) -> Optional[int]:
+        return self._estimated_effort_per_occurrence_millis
+
+
+@lst_dataclass
+class RecipesThatMadeChanges(Marker):
+    """Records which recipe stacks changed a source file. Python holds the stacks without
+    interpreting them, so a marker served to this peer returns to the host intact.
+    """
+
+    _id: int | UUID
+
+    _recipes: Optional[List[List[RecipeThatMadeChanges]]]
+
+    @property
+    def recipes(self) -> Optional[List[List[RecipeThatMadeChanges]]]:
+        return self._recipes
+
+
+@lst_dataclass
+class UnknownJavaMarker(Marker):
+    _id: int | UUID
 
     _data: Dict[str, Any]
 
@@ -143,7 +345,7 @@ class UnknownJavaMarker(Marker):
         return self._data
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class ParseExceptionResult(Marker):
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult:
@@ -151,11 +353,7 @@ class ParseExceptionResult(Marker):
         return cls(random_id(), type(parser).__name__, exc_type.__name__,
                    ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
 
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
     _parser_type: str
 
@@ -174,3 +372,9 @@ class ParseExceptionResult(Marker):
     @property
     def message(self) -> str:
         return self._message
+
+    _tree_type: Optional[str] = None
+
+    @property
+    def tree_type(self) -> Optional[str]:
+        return self._tree_type

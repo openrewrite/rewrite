@@ -25,9 +25,15 @@ public class JavaTypeCache implements Cloneable {
 
     AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
 
+    @Nullable JavaTypeCache base;
+
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
-        return (T) typeCache.search(getKeyBytes(signature));
+        T result = (T) typeCache.search(getKeyBytes(signature));
+        if (result == null && base != null) {
+            return base.get(signature);
+        }
+        return result;
     }
 
     public void put(String signature, Object o) {
@@ -36,17 +42,29 @@ public class JavaTypeCache implements Cloneable {
 
     public void clear() {
         typeCache.clear();
+        // base is intentionally NOT cleared — it may be shared
     }
 
     @Override
     public JavaTypeCache clone() {
         try {
             JavaTypeCache clone = (JavaTypeCache) super.clone();
-            clone.typeCache = this.typeCache.copy();
+            clone.base = this;
+            clone.typeCache = new AdaptiveRadixTree<>();
             return clone;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Create a new cache with the given base for read-through lookups.
+     * Writes go to the new cache's overlay; reads fall through to the base on miss.
+     */
+    public static JavaTypeCache withBase(JavaTypeCache base) {
+        JavaTypeCache cache = new JavaTypeCache();
+        cache.base = base;
+        return cache;
     }
 
     private static final @Nullable Field STRING_VALUE;
@@ -54,24 +72,23 @@ public class JavaTypeCache implements Cloneable {
     private static final boolean USE_REFLECTION;
 
     static {
-        Field value;
-        Field coder;
+        Field value = null;
+        Field coder = null;
         boolean hasCompactStrings = false;
 
         try {
-            // requires: --add-opens java.base/java.lang=ALL-UNNAMED
-            value = String.class.getDeclaredField("value");
-            value.setAccessible(true);
-
-            try {
+            // Java 17+ allows this only with --add-opens java.base/java.lang=ALL-UNNAMED. Java 9 to 16 also allow it
+            // under --illegal-access=permit (their default up to 15) with a warning, and Module.isOpen reports
+            // java.lang open in both cases, so those versions skip it.
+            String javaVersion = System.getProperty("java.specification.version", "");
+            if (!javaVersion.startsWith("1.") && Integer.parseInt(javaVersion) >= 17) {
+                value = String.class.getDeclaredField("value");
+                value.setAccessible(true);
                 coder = String.class.getDeclaredField("coder");
                 coder.setAccessible(true);
                 Field compactStrings = String.class.getDeclaredField("COMPACT_STRINGS");
                 compactStrings.setAccessible(true);
                 hasCompactStrings = compactStrings.getBoolean(null);
-            } catch (NoSuchFieldException e) {
-                // Java 8 - field doesn't exist
-                coder = null;
             }
         } catch (Exception e) {
             value = null;
@@ -84,7 +101,7 @@ public class JavaTypeCache implements Cloneable {
     }
 
     /**
-     * For ASCII and Latin-1 strings this operation is allocation-free.
+     * On Java 17+ with java.lang opened, this operation is allocation-free for ASCII and Latin-1 strings.
      */
     static byte[] getKeyBytes(String s) {
         // Try to get internal representation first

@@ -217,7 +217,7 @@ class FieldAccessTest implements RewriteTest {
                       JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                       assertThat(fieldType).isNotNull();
                       assertThat(fieldType.getName()).isEqualTo("MIN_VALUE");
-                      assertThat(fieldType.getType().toString()).isEqualTo("kotlin.Int");
+                      assertThat(fieldType.getType().toString()).isEqualTo("int");
                       if (fieldType.getOwner() != null) {
                           assertThat(fieldType.getOwner().toString()).isEqualTo("kotlin.Int$Companion");
                       }

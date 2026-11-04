@@ -19,13 +19,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.IsNullSafe;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KotlinTypeUtils;
 
 import java.time.Duration;
 import java.util.Set;
@@ -50,19 +52,14 @@ public class EqualsMethodUsage extends Recipe {
                "languages like Java, where `==` means reference equality and `!=` means reference inequality.\n" +
                "The `==` and `!=` operators are a more concise and elegant way to test structural equality than calling a function.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S6519");
-    }
+    Set<String> tags = singleton("RSPEC-S6519");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(3);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(3);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new KotlinVisitor<ExecutionContext>() {
+        // `equals` can be a non-override overload on any type, so match it on any receiver.
+        return Preconditions.check(new UsesMethod<>("*..* equals(..)"), new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitUnary(J.Unary unary, ExecutionContext ctx) {
                 unary = (J.Unary) super.visitUnary(unary, ctx);
@@ -90,11 +87,16 @@ public class EqualsMethodUsage extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method,
                                            ExecutionContext ctx) {
                 method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                // Don't transform safe-call method invocations (obj?.equals(other)) because
+                // they have different null semantics than obj == other:
+                // - obj?.equals(other) returns Boolean? (null if obj is null)
+                // - obj == other returns Boolean (false if obj is null)
                 if ("equals".equals(method.getSimpleName()) &&
                     method.getMethodType() != null &&
                     method.getArguments().size() == 1 &&
-                    TypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
-                    method.getSelect() != null
+                    KotlinTypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
+                    method.getSelect() != null &&
+                    !method.getMarkers().findFirst(IsNullSafe.class).isPresent()
                 ) {
                     Expression lhs = method.getSelect();
                     Expression rhs = method.getArguments().get(0);
@@ -105,7 +107,7 @@ public class EqualsMethodUsage extends Recipe {
                 }
                 return method;
             }
-        };
+        });
     }
 
     @SuppressWarnings("all")

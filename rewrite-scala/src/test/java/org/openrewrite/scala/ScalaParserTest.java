@@ -1,0 +1,310 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.scala;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.ParseWarning;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.tree.S;
+import org.openrewrite.tree.ParseError;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ScalaParserTest {
+
+    @Test
+    void parseSimpleValDeclaration() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = """
+            val x = 42
+            """;
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isNotInstanceOf(ParseError.class);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        assertThat(cu.getStatements()).hasSize(1);
+    }
+
+    @Test
+    void parseSimpleObject() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = """
+            object HelloWorld {
+              def main(args: Array[String]): Unit = {
+                println("Hello, World!")
+              }
+            }
+            """;
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        // For now, we expect this to fail since we haven't implemented object parsing yet
+        // This test documents the expected behavior once implemented
+    }
+
+    @Test
+    void parseWithPackage() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = """
+            package com.example
+            
+            val message = "Hello"
+            """;
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        assertThat(cu.getPackageDeclaration()).isNotNull();
+    }
+
+    @Test
+    void packageDuplicationIssue() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = "package com.example\n\nval x = 42";
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        
+        // Check the package declaration
+        assertThat(cu.getPackageDeclaration()).isNotNull();
+        assertThat(cu.getPackageDeclaration().getExpression().toString())
+            .as("Package expression should be 'com.example'")
+            .isEqualTo("com.example");
+        
+        // Check the statements
+        assertThat(cu.getStatements())
+            .as("Should have exactly 1 statement (the val declaration)")
+            .hasSize(1);
+        
+        // Print diagnostics to see what's happening
+        System.out.println("Package: " + cu.getPackageDeclaration().getExpression());
+        System.out.println("Number of statements: " + cu.getStatements().size());
+        for (int i = 0; i < cu.getStatements().size(); i++) {
+            System.out.println("Statement " + i + ": " + cu.getStatements().get(i).getClass().getSimpleName());
+        }
+        
+        // Print the full source to see if there's duplication
+        System.out.println("\nFull printed source:");
+        System.out.println(cu.printTrimmed());
+    }
+    
+    @Test
+    void parseSimpleForLoop() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = """
+            object Test {
+              def main(args: Array[String]): Unit = {
+                val nums = List(1, 2, 3)
+                for (n <- nums) println(n)
+              }
+            }
+            """;
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isNotInstanceOf(ParseError.class);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        
+        // Print the whole structure first to debug
+        System.out.println("\nFull parsed structure:");
+        System.out.println(cu.printTrimmed());
+        
+        assertThat(cu.getStatements()).hasSize(1);
+        
+        // The only statement should be the object declaration
+        assertThat(cu.getStatements().get(0)).isInstanceOf(J.ClassDeclaration.class);
+        
+        J.ClassDeclaration objectDecl = (J.ClassDeclaration) cu.getStatements().get(0);
+        assertThat(objectDecl.getSimpleName()).isEqualTo("Test");
+        
+        // Get the object body - all the content is likely Unknown for now
+        J.Block objectBody = objectDecl.getBody();
+        assertThat(objectBody.getStatements()).isNotEmpty();
+        
+        // Methods are now J.MethodDeclaration — the for loop is inside the method body
+        // Verify the structure contains the method and its body has the for loop
+        String printed = cu.printTrimmed();
+        assertThat(printed)
+            .as("Parsed structure should contain the for loop")
+            .contains("for")
+            .contains("nums");
+    }
+    
+    // @Test  // TODO: Enable once method declarations are fully implemented
+    void parseForLoopWithBlock() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = """
+            object Test {
+              def run(): Unit = {
+                val items = Array("a", "b", "c")
+                for (item <- items) {
+                  println(item)
+                  println(item.toUpperCase)
+                }
+              }
+            }
+            """;
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isNotInstanceOf(ParseError.class);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        assertThat(cu.getStatements()).hasSize(1);
+        
+        // The only statement should be the object declaration
+        assertThat(cu.getStatements().get(0)).isInstanceOf(J.ClassDeclaration.class);
+        
+        J.ClassDeclaration objectDecl = (J.ClassDeclaration) cu.getStatements().get(0);
+        
+        // Get the run method
+        J.Block objectBody = objectDecl.getBody();
+        J.MethodDeclaration runMethod = null;
+        for (Statement stmt : objectBody.getStatements()) {
+            if (stmt instanceof J.MethodDeclaration) {
+                J.MethodDeclaration method = (J.MethodDeclaration) stmt;
+                if ("run".equals(method.getSimpleName())) {
+                    runMethod = method;
+                    break;
+                }
+            }
+        }
+        
+        assertThat(runMethod).isNotNull();
+        assertThat(runMethod.getBody()).isNotNull();
+        
+        // Check the run method body
+        J.Block runBody = runMethod.getBody();
+        assertThat(runBody.getStatements()).hasSize(2);
+        
+        // Second statement should be a ForEachLoop
+        assertThat(runBody.getStatements().get(1)).isInstanceOf(J.ForEachLoop.class);
+        
+        J.ForEachLoop forLoop = (J.ForEachLoop) runBody.getStatements().get(1);
+        
+        // Check the body is a block
+        assertThat(forLoop.getBody()).isInstanceOf(J.Block.class);
+        J.Block block = (J.Block) forLoop.getBody();
+        assertThat(block.getStatements()).hasSize(2);
+    }
+
+    @Test
+    void reusedCompilerDoesNotSeeTheSourcesOfEarlierParses() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder().reuseCompiler(true);
+        builder.build().parse("package p.q\n\nclass Earlier\n").collect(Collectors.toList());
+
+        // when
+        List<SourceFile> parsed = builder.build()
+          .parse("class Later {\n  val e: p.q.Earlier = null\n}\n")
+          .collect(Collectors.toList());
+
+        // then
+        assertThat(parsed.get(0).getMarkers().findAll(ParseWarning.class))
+          .as("The package and class an earlier parse defined must not resolve")
+          .anyMatch(w -> w.getMessage().contains("Not found: p"));
+    }
+
+    @Test
+    void clonesOfABuilderDoNotShareTypes() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder();
+        builder.clone().build().parse("class Box\n").collect(Collectors.toList());
+
+        // when
+        S.CompilationUnit cu = (S.CompilationUnit) builder.clone().build()
+          .parse("class Box extends java.util.ArrayList[String]\n").collect(Collectors.toList()).get(0);
+
+        // then
+        J.ClassDeclaration box = (J.ClassDeclaration) cu.getStatements().get(0);
+        assertThat(box.getType().getSupertype().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+    }
+
+    @Test
+    void doesNotLeakTempDirectories() throws Exception {
+        // given
+        Path tmpRoot = Paths.get(System.getProperty("java.io.tmpdir"));
+        Set<Path> before = listRewriteScalaTempDirs(tmpRoot);
+
+        // when
+        ScalaParser parser = ScalaParser.builder().build();
+        List<SourceFile> parsed = parser.parse("val x = 42\n").collect(Collectors.toList());
+
+        // then
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+
+        // Other test JVMs on this machine continuously create and delete their own
+        // rewrite-scala temp dirs, so waiting for the directory listing to become
+        // empty never converges. Instead take the candidates once and wait for each
+        // of them to disappear: theirs are removed when their compile finishes,
+        // while a directory genuinely leaked by our parse persists.
+        Set<Path> candidates = listRewriteScalaTempDirs(tmpRoot);
+        candidates.removeAll(before);
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (!candidates.isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(250);
+            candidates.removeIf(p -> !Files.exists(p));
+        }
+        assertThat(candidates)
+          .as("Parsing should not leak any rewrite-scala temp directories")
+          .isEmpty();
+    }
+
+    private static Set<Path> listRewriteScalaTempDirs(Path tmpRoot) throws IOException {
+        try (Stream<Path> entries = Files.list(tmpRoot)) {
+            return entries
+              .filter(Files::isDirectory)
+              .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
+              .collect(Collectors.toCollection(HashSet::new));
+        }
+    }
+}

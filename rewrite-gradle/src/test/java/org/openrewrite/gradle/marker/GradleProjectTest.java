@@ -45,6 +45,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class GradleProjectTest implements RewriteTest {
 
@@ -79,6 +80,70 @@ class GradleProjectTest implements RewriteTest {
     }
 
     @Test
+    void capturesDependencyExcludeRules() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.apache.httpcomponents", "httpclient", "4.5.13"),
+            "implementation",
+            (original, updated) -> assertThat(original.getConfiguration("implementation").getRequested())
+              .filteredOn(dep -> "httpclient".equals(dep.getArtifactId()))
+              .singleElement()
+              .satisfies(dep -> assertThat(dep.getExclusions()).containsExactlyInAnyOrder(
+                new GroupArtifact("commons-logging", "commons-logging"),
+                new GroupArtifact("commons-codec", "*")))
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude group: "commons-logging", module: "commons-logging"
+                      exclude group: "commons-codec"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reResolutionPreservesDependencyExcludeRules() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.apache.httpcomponents", "httpclient", "4.5.14"),
+            "implementation",
+            (original, updated) -> {
+                assertThat(original.getConfiguration("compileClasspath").getResolved())
+                  .noneMatch(dep -> "commons-logging".equals(dep.getArtifactId()));
+                assertThat(updated.getConfiguration("compileClasspath").getResolved())
+                  .anyMatch(dep -> "httpclient".equals(dep.getArtifactId()) && "4.5.14".equals(dep.getVersion()))
+                  .noneMatch(dep -> "commons-logging".equals(dep.getArtifactId()));
+            }
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude group: "commons-logging", module: "commons-logging"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void repositoryWithCredentials() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
@@ -87,6 +152,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -132,6 +198,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -180,6 +247,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -223,6 +291,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -584,6 +653,39 @@ class GradleProjectTest implements RewriteTest {
     }
 
     @Test
+    void addOrUpdateConstraintsLeavesAnIdenticalConstraintAlone() {
+        Map<String, List<GroupArtifactVersion>> constraint = Map.of("implementation",
+          List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2")));
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              public Tree visit(Tree tree, ExecutionContext ctx) {
+                  GradleProject once = tree.getMarkers().findFirst(GradleProject.class).orElseThrow()
+                    .addOrUpdateConstraints(constraint, ctx);
+                  assertThat(once.addOrUpdateConstraints(constraint, ctx)).isSameAs(once);
+                  return tree;
+              }
+          })),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+                  }
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeConstraint() {
         rewriteRun(
           spec -> spec.recipe(new RemoveConstraint(
@@ -683,8 +785,8 @@ class GradleProjectTest implements RewriteTest {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class UpgradeDependencyInMarker extends Recipe {
 
@@ -716,8 +818,8 @@ class UpgradeDependencyInMarker extends Recipe {
 }
 
 @EqualsAndHashCode(callSuper = false)
-@Value
 @SuppressWarnings("NullableProblems")
+@Value
 class RemoveDependency extends Recipe {
 
     List<GroupArtifact> gas;
@@ -752,8 +854,8 @@ class RemoveDependency extends Recipe {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class ChangeConstraint extends Recipe {
 
@@ -779,8 +881,8 @@ class ChangeConstraint extends Recipe {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class RemoveConstraint extends Recipe {
 

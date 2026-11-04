@@ -258,7 +258,12 @@ public class VersionRequirement {
         VersionSpec hardRequirement = nearestHardRequirement.versionSpec;
         Version latest = null;
         for (String availableVersion : availableVersions.call()) {
-            Version version = new Version(availableVersion);
+            Version version;
+            try {
+                version = new Version(availableVersion);
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
 
             if ((hardRequirement instanceof DynamicVersion && ((DynamicVersion) hardRequirement).matches(version)) ||
                 (hardRequirement instanceof RangeSet && ((RangeSet) hardRequirement).matches(version))) {

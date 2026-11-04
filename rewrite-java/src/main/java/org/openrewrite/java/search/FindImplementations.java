@@ -38,7 +38,8 @@ public class FindImplementations extends Recipe {
 
     String description = "Find class declarations which implement the specified type. " +
                "If the specified type is a class, its subclasses will be matched. " +
-               "If the specified type is an interface, classes which implement it will be matched.";
+               "If the specified type is an interface, classes which implement it will be matched. " +
+               "Anonymous classes, lambdas, and method references implementing the specified type are also matched.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -51,6 +52,34 @@ public class FindImplementations extends Recipe {
                     cd = SearchResult.found(cd);
                 }
                 return cd;
+            }
+
+            @Override
+            public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                J.NewClass n = super.visitNewClass(newClass, ctx);
+                // Only an anonymous class body is an implementation; a plain constructor invocation is not.
+                if (n.getBody() != null && TypeUtils.isAssignableTo(typeName, n.getType())) {
+                    n = SearchResult.found(n);
+                }
+                return n;
+            }
+
+            @Override
+            public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                J.Lambda l = super.visitLambda(lambda, ctx);
+                if (TypeUtils.isAssignableTo(typeName, l.getType())) {
+                    l = SearchResult.found(l);
+                }
+                return l;
+            }
+
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+                J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+                if (TypeUtils.isAssignableTo(typeName, m.getType())) {
+                    m = SearchResult.found(m);
+                }
+                return m;
             }
         };
     }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import static java.util.Objects.requireNonNull;
 
 public class TabsAndIndents extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Tabs and indents";
-    }
+    @Getter
+    final String displayName = "Tabs and indents";
 
-    @Override
-    public String getDescription() {
-        return "Format tabs and indents in Java code.";
-    }
+    @Getter
+    final String description = "Format tabs and indents in Java code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -159,6 +160,24 @@ class PreconditionsTest implements RewriteTest {
           )),
           other("hello", "~~(recipe)~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛")
         );
+    }
+
+    @Test
+    void andOrNotExposeStructure() {
+        TreeVisitor<?, ExecutionContext> a = contains("a");
+        TreeVisitor<?, ExecutionContext> b = contains("b");
+
+        TreeVisitor<?, ExecutionContext> and = Preconditions.and(a, b);
+        assertThat(and).isInstanceOf(Preconditions.And.class);
+        assertThat(((Preconditions.And) and).getVisitors()).containsExactly(a, b);
+
+        TreeVisitor<?, ExecutionContext> or = Preconditions.or(a, b);
+        assertThat(or).isInstanceOf(Preconditions.Or.class);
+        assertThat(((Preconditions.Or) or).getVisitors()).containsExactly(a, b);
+
+        TreeVisitor<?, ExecutionContext> not = Preconditions.not(a);
+        assertThat(not).isInstanceOf(Preconditions.Not.class);
+        assertThat(((Preconditions.Not) not).getVisitor()).isSameAs(a);
     }
 
     Recipe recipe(TreeVisitor<?, ExecutionContext> applicability) {

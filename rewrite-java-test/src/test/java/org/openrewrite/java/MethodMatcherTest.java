@@ -42,6 +42,19 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 class MethodMatcherTest implements RewriteTest {
 
     @Test
+    void declaringTypeMatchPrefix() {
+        // The literal prefix is everything in the declaring-type pattern up to the first wildcard.
+        assertThat(new MethodMatcher("java.util.List add(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.List");
+        assertThat(new MethodMatcher("java.util.List *(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.List");
+        // The package separator before the `..` wildcard is retained, since every match's FQN has it.
+        assertThat(new MethodMatcher("java.util..* *(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.");
+        assertThat(new MethodMatcher("com.*.Bar foo(..)").getDeclaringTypeMatchPrefix()).isEqualTo("com.");
+        // A leading wildcard yields no usable prefix.
+        assertThat(new MethodMatcher("* *(..)").getDeclaringTypeMatchPrefix()).isNull();
+        assertThat(new MethodMatcher("*..* *(..)").getDeclaringTypeMatchPrefix()).isNull();
+    }
+
+    @Test
     void invalidMethodMatcher() {
         Validated<String> validate = MethodMatcher.validate("com.google.common.collect.*");
         assertThat(validate.isValid()).isFalse();
@@ -184,6 +197,18 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void singleWildcardTypeExcludesSubPackages() {
+        MethodMatcher singlePackage = new MethodMatcher("java.util.* *(..)");
+        assertTrue(singlePackage.matchesTargetType(build("java.util.List")));
+        assertTrue(singlePackage.matchesTargetType(build("java.util.Map$Entry")));
+        assertFalse(singlePackage.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+
+        MethodMatcher withSubPackages = new MethodMatcher("java.util..* *(..)");
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.List")));
+        assertTrue(withSubPackages.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
+    }
+
+    @Test
     void packagePrefixWithArrayDimensions() {
         JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
         assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*[])").matches(
@@ -202,7 +227,7 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void varargsMatchesArrayType() {
         // Varargs parameters (String...) are represented as Array types (String[]) in JavaType
-        JavaType.Array stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
+        var stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
 
         // Pattern with varargs should match Array type
         assertTrue(new MethodMatcher("com.example.Foo bar(String...)").matches(
@@ -213,6 +238,19 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
             null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void typedArgumentMatchesAUnionWhoseMembersBesidesNullAllMatch() {
+        var optionalString = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Null));
+        assertTrue(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(optionalString), emptyList(), emptyList(), emptyList(), null)));
+
+        var stringOrInt = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Int));
+        assertFalse(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringOrInt), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -283,6 +321,24 @@ class MethodMatcherTest implements RewriteTest {
         void matchUnknownTypesRejectsStaticSelectMismatch() {
             var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
             assertFalse(new MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsQualifiedCallOnAnotherType() {
+            var mi = asMethodInvocation("com.example.Assertions.assertTrue(true);", """
+              package com.example;
+              public class Assertions {
+                  public static void assertTrue(boolean condition) {
+                  }
+              }
+              """);
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesOnAField() {
+            var mi = asMethodInvocation("this.helper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.MyHelper doSomething(boolean)").matches(mi, true));
         }
 
         @Test
@@ -461,14 +517,14 @@ class MethodMatcherTest implements RewriteTest {
         // Test that patterns with both .. and ... are allowed (not rejected)
         // Note: The actual matching logic for mixed patterns is complex and would need more work
         assertDoesNotThrow(() -> {
-            MethodMatcher matcher = new MethodMatcher("com.example.Test foo(.., String...)");
+            var matcher = new MethodMatcher("com.example.Test foo(.., String...)");
             // At minimum, the pattern should be parseable without throwing
             assertNotNull(matcher);
         });
 
         // Pattern with arguments before and after ..
         assertDoesNotThrow(() -> {
-            MethodMatcher matcher = new MethodMatcher("com.example.Test foo(int, .., String...)");
+            var matcher = new MethodMatcher("com.example.Test foo(int, .., String...)");
             assertNotNull(matcher);
         });
     }
@@ -617,7 +673,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void matchesInnerClassWithDotPattern() {
             // Pattern with . should match types with $
-            MethodMatcher matcher = new MethodMatcher("java.util.Map.Entry get*()");
+            var matcher = new MethodMatcher("java.util.Map.Entry get*()");
 
             // Should match binary name with $
             assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
@@ -630,7 +686,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void matchesInnerClassWithDollarPattern() {
             // Pattern with $ should also work
-            MethodMatcher matcher = new MethodMatcher("java.util.Map$Entry get*()");
+            var matcher = new MethodMatcher("java.util.Map$Entry get*()");
 
             assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
             assertTrue(matcher.matches(newMethodType("java.util.Map.Entry", "getKey")));
@@ -639,7 +695,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void matchesInnerClassWithWildcardPattern() {
             // Wildcard patterns should work with inner classes
-            MethodMatcher matcher = new MethodMatcher("*..*Entry get*()");
+            var matcher = new MethodMatcher("*..*Entry get*()");
 
             assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
             assertTrue(matcher.matches(newMethodType("java.util.Map.Entry", "getValue")));
@@ -649,7 +705,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void matchesNestedInnerClasses() {
             // Test deeply nested inner classes
-            MethodMatcher matcher = new MethodMatcher("com.example.Outer.Middle.Inner method()");
+            var matcher = new MethodMatcher("com.example.Outer.Middle.Inner method()");
 
             // Should match various representations
             assertTrue(matcher.matches(newMethodType("com.example.Outer$Middle$Inner", "method")));
@@ -662,7 +718,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void innerClassWildcardSuffix() {
             // Pattern like *Entry should only match simple class names without package separators
-            MethodMatcher matcher = new MethodMatcher("*Entry get*()");
+            var matcher = new MethodMatcher("*Entry get*()");
 
             // Should match simple class name
             assertTrue(matcher.matches(newMethodType("SomeEntry", "getValue")));
@@ -673,7 +729,7 @@ class MethodMatcherTest implements RewriteTest {
             assertFalse(matcher.matches(newMethodType("com.example.Entry", "getKey")));
 
             // Pattern with .. should match inner classes
-            MethodMatcher packageMatcher = new MethodMatcher("*..*Entry get*()");
+            var packageMatcher = new MethodMatcher("*..*Entry get*()");
             assertTrue(packageMatcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
         }
     }
@@ -683,7 +739,7 @@ class MethodMatcherTest implements RewriteTest {
         @Test
         void preservesMethodNameWildcards() {
             // Test that toString() preserves method name patterns
-            MethodMatcher matcher = new MethodMatcher("java.util.Map$Entry get*()");
+            var matcher = new MethodMatcher("java.util.Map$Entry get*()");
             assertEquals("java.util.Map$Entry get*()", matcher.toString());
 
             // Test with various method name patterns
@@ -747,7 +803,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
@@ -783,7 +839,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
@@ -856,19 +912,19 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void multiDimensionalArrayMatching() {
         // Test 1D array
-        JavaType.Array stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
+        var stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
             null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Test 2D array
-        JavaType.Array stringArray2D = new JavaType.Array(null, stringArray, null);
+        var stringArray2D = new JavaType.Array(null, stringArray, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[][])").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
             null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
 
         // Test 3D array
-        JavaType.Array stringArray3D = new JavaType.Array(null, stringArray2D, null);
+        var stringArray3D = new JavaType.Array(null, stringArray2D, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[][][])").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
             null, null, List.of(stringArray3D), emptyList(), emptyList(), emptyList(), null)));
@@ -888,8 +944,8 @@ class MethodMatcherTest implements RewriteTest {
     void varargsWithArrayElementType() {
         // Varargs with array element type: int[]...
         // In JavaType, this is represented as Array(Array(int))
-        JavaType.Array intArray = new JavaType.Array(null, JavaType.Primitive.Int, null);
-        JavaType.Array intArrayArray = new JavaType.Array(null, intArray, null);
+        var intArray = new JavaType.Array(null, JavaType.Primitive.Int, null);
+        var intArrayArray = new JavaType.Array(null, intArray, null);
 
         // Pattern int[]... should match Array(Array(int))
         assertTrue(new MethodMatcher("com.example.Foo bar(int[]...)").matches(
@@ -902,7 +958,7 @@ class MethodMatcherTest implements RewriteTest {
             null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Test with parameters before varargs: foo(int, int[]...)
-        JavaType.Array stringArrayArray = new JavaType.Array(null,
+        var stringArrayArray = new JavaType.Array(null,
           new JavaType.Array(null, JavaType.Primitive.String, null), null);
         assertTrue(new MethodMatcher("com.example.Foo bar(int, String[]...)").matches(
           new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
@@ -986,9 +1042,9 @@ class MethodMatcherTest implements RewriteTest {
 
     @Test
     void varargsMatcherValidatesVarargsArgumentTypes() {
-        MethodMatcher matcher = new MethodMatcher("org.springframework.core.env.Environment acceptsProfiles(java.lang.String...)");
+        var matcher = new MethodMatcher("org.springframework.core.env.Environment acceptsProfiles(java.lang.String...)");
 
-        JavaType.Method correctMethod = new JavaType.Method(
+        var correctMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.core.env.Environment"),
           "acceptsProfiles",
@@ -998,7 +1054,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertTrue(matcher.matches(correctMethod), "Should match method with String varargs");
 
-        JavaType.Method zeroArgsMethod = new JavaType.Method(
+        var zeroArgsMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.core.env.Environment"),
           "acceptsProfiles",
@@ -1008,7 +1064,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertTrue(matcher.matches(zeroArgsMethod), "Should match method with zero varargs (varargs can be empty)");
 
-        JavaType.Method multipleArgsMethod = new JavaType.Method(
+        var multipleArgsMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.core.env.Environment"),
           "acceptsProfiles",
@@ -1018,7 +1074,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertTrue(matcher.matches(multipleArgsMethod), "Should match method with multiple String arguments");
 
-        JavaType.Method wrongTypeMethod = new JavaType.Method(
+        var wrongTypeMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.core.env.Environment"),
           "acceptsProfiles",
@@ -1028,7 +1084,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertFalse(matcher.matches(wrongTypeMethod), "Should NOT match method when varargs argument is wrong type (int instead of String)");
 
-        JavaType.Method mixedArgsMethod = new JavaType.Method(
+        var mixedArgsMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.core.env.Environment"),
           "acceptsProfiles",
@@ -1042,9 +1098,9 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void wildcardVarargsWithTrailingParameter() {
         // Pattern: get*Record*(.., long) means "any method starting with 'get' containing 'Record', any number of args, followed by long"
-        MethodMatcher matcher = new MethodMatcher("org.springframework.kafka.test.utils.KafkaTestUtils get*Record*(.., long)");
+        var matcher = new MethodMatcher("org.springframework.kafka.test.utils.KafkaTestUtils get*Record*(.., long)");
 
-        JavaType.Method correctMethod = new JavaType.Method(
+        var correctMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.kafka.test.utils.KafkaTestUtils"),
           "getRecords",
@@ -1054,7 +1110,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertTrue(matcher.matches(correctMethod), "Should match getRecords(Consumer, long)");
 
-        JavaType.Method wrongLastParamMethod = new JavaType.Method(
+        var wrongLastParamMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.kafka.test.utils.KafkaTestUtils"),
           "getRecords",
@@ -1064,7 +1120,7 @@ class MethodMatcherTest implements RewriteTest {
         );
         assertFalse(matcher.matches(wrongLastParamMethod), "Should NOT match getRecords(Consumer, int) - last param must be long");
 
-        JavaType.Method noArgsMethod = new JavaType.Method(
+        var noArgsMethod = new JavaType.Method(
           null, 1L,
           build("org.springframework.kafka.test.utils.KafkaTestUtils"),
           "getRecords",

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class HasSourceSetTest implements RewriteTest {
 
@@ -55,6 +56,47 @@ class HasSourceSetTest implements RewriteTest {
                 /*~~>*/class Test {
                 }
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void mainResources() {
+        rewriteRun(
+          spec -> spec.recipe(new HasSourceSet("main")),
+          srcMainResources(
+            text(
+              "app.name=test",
+              "~~>app.name=test",
+              spec -> spec.path("application.properties")
+            )
+          )
+        );
+    }
+
+    @Test
+    void resourcesNotMatchedByMain() {
+        rewriteRun(
+          spec -> spec.recipe(new HasSourceSet("main")),
+          srcTestResources(
+            text(
+              "app.name=test",
+              spec -> spec.path("application.properties")
+            )
+          )
+        );
+    }
+
+    @Test
+    void resources() {
+        rewriteRun(
+          spec -> spec.recipe(new HasSourceSet("test")),
+          srcTestResources(
+            text(
+              "app.name=test",
+              "~~>app.name=test",
+              spec -> spec.path("application.properties")
             )
           )
         );

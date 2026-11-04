@@ -195,6 +195,64 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendMultiLineYamlMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "name: new-item\nversion: 1.0",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+              """,
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+                  - name: new-item
+                    version: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultiLineYamlMappingWithIndentation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "item:\n  name: new-item",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+              """,
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+                  - item:
+                      name: new-item
+              """
+          )
+        );
+    }
+
+    @Test
     void appendToSequenceOfNameValuePairMatchExistingValuesInAnyOrder() {
         rewriteRun(
           spec -> spec
@@ -407,11 +465,9 @@ class AppendToSequenceTest implements RewriteTest {
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs
                   value: "name: \\"env-var-2\\"\\n    value: \\"value-2\\""
-                  fileMatcher: devops/deploy/dev-vars.yaml
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs
                   value: "name: \\"env-var-3\\"\\n    value: \\"value-3\\""
-                  fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
           yaml(
             """

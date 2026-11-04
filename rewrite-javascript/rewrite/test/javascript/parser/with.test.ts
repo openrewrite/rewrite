@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {javascript} from "../../../src/javascript";
+import {javascript, typescript} from "../../../src/javascript";
 
 describe('with mapping', () => {
     const spec = new RecipeSpec();
@@ -51,6 +51,18 @@ describe('with mapping', () => {
                 } catch (e) {
                 }
             `)
+        ));
+
+    // TypeScript reports `with` as a strict-mode error, which says the code is illegal there
+    // rather than unrepresentable, so the parser maps it like any other statement.
+    test('with statement in a TypeScript source', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                 with (0) {
+                     console.log("aaa");
+                 }
+             `)
         ));
 
     test('with statement with empty body', () =>

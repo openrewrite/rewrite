@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture} from "../../../src/javascript";
+import {capture, pattern} from "../../../src/javascript";
 
 describe('variadic capture basic functionality', () => {
     test('regular capture is not variadic', () => {
@@ -32,28 +32,30 @@ describe('variadic capture basic functionality', () => {
         expect(options?.max).toBeUndefined();
     });
 
-    test('variadic with min/max bounds', () => {
+    test('variadic bounds are carried through, named or not', () => {
         const args = capture({ variadic: { min: 1, max: 3 } });
         expect(args.isVariadic()).toBe(true);
+        expect(args.getVariadicOptions()?.min).toBe(1);
+        expect(args.getVariadicOptions()?.max).toBe(3);
 
-        const options = args.getVariadicOptions();
-        expect(options?.min).toBe(1);
-        expect(options?.max).toBe(3);
-    });
-
-    test('variadic with all options', () => {
-        const args = capture({ name: 'args',
-            variadic: { min: 2, max: 5 }
-        });
-
-        const options = args.getVariadicOptions();
-        expect(options?.min).toBe(2);
-        expect(options?.max).toBe(5);
+        const named = capture({ name: 'args', variadic: { min: 2, max: 5 } });
+        expect(named.getVariadicOptions()?.min).toBe(2);
+        expect(named.getVariadicOptions()?.max).toBe(5);
     });
 
     test('unnamed variadic capture', () => {
         const args = capture({ variadic: true });
         expect(args.isVariadic()).toBe(true);
         expect(args.getName()).toMatch(/^unnamed_\d+$/);
+    });
+
+    test('a pattern collects the variadic capture it interpolates', () => {
+        const args = capture({ name: 'args', variadic: true });
+        const pat = pattern`foo(${args})`;
+
+        expect(pat.captures).toHaveLength(1);
+        const firstCapture = pat.captures[0] as typeof args;
+        expect(firstCapture.getName()).toBe('args');
+        expect(firstCapture.isVariadic()).toBe(true);
     });
 });

@@ -242,7 +242,7 @@ describe('variable declaration mapping', () => {
             `)
         ));
 
-    test.skip('variable declaration with decorator', () =>
+    test('variable declaration with decorator', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
@@ -253,7 +253,24 @@ describe('variable declaration mapping', () => {
             `)
         ));
 
-    test.each([
+    test('decorators of a variable statement', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                @a /*1*/ export /*2*/ @b /*3*/ const c = 1;
+                @d let e = 1, f = 2;`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const names = (annotations: J.Annotation[]) => annotations.map(a => (a.annotationType as J.Identifier).simpleName);
+                const single = cu.statements[0].element as J.VariableDeclarations;
+                expect(names(single.leadingAnnotations)).toEqual(["a"]);
+                expect(single.modifiers.map(m => names(m.annotations))).toEqual([[], ["b"]]);
+
+                const scoped = cu.statements[1].element as JS.ScopedVariableDeclarations;
+                expect(scoped.modifiers.map(m => names(m.annotations))).toEqual([["d"]]);
+            }
+        }));
+
+    test.for([
         "const c =  function(): number { return 116; };",
         "const c =  136;",
         "const c =  (1 > 0) ? 116 : 119;"

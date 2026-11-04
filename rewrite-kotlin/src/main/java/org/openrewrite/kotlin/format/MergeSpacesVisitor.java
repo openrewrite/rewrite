@@ -17,21 +17,32 @@ package org.openrewrite.kotlin.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.marker.TypeReferencePrefix;
+import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Visit K types.
  */
 public class MergeSpacesVisitor extends KotlinVisitor<Object> {
+
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
+
+    public MergeSpacesVisitor(WrappingAndBracesStyle wrappingAndBracesStyle) {
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+    }
 
     @Override
     public J visitCompilationUnit(K.CompilationUnit cu, @Nullable Object ctx) {
@@ -65,6 +76,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         K.AnnotatedExpression ae = annotatedExpression;
         ae = ae.withMarkers(visitMarkers(ae.getMarkers(), newAnnotatedExpression.getMarkers()));
         ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), (index, a) -> visitAndCast(a, newAnnotatedExpression.getAnnotations().get(index))));
+        ae = ae.withExpression(visitAndCast(ae.getExpression(), newAnnotatedExpression.getExpression()));
         Expression temp = (Expression) visitExpression(ae, newAnnotatedExpression);
         if (!(temp instanceof K.AnnotatedExpression)) {
             return temp;
@@ -185,6 +197,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
+    public J visitExpressionStatement(K.ExpressionStatement expressionStatement, @Nullable Object ctx) {
+        if (expressionStatement == ctx || !(ctx instanceof K.ExpressionStatement)) {
+            return expressionStatement;
+        }
+
+        K.ExpressionStatement newExpressionStatement = (K.ExpressionStatement) ctx;
+        return expressionStatement.withExpression(visitAndCast(expressionStatement.getExpression(), newExpressionStatement.getExpression()));
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, @Nullable Object ctx) {
         if (functionType == ctx || !(ctx instanceof K.FunctionType)) {
             return functionType;
@@ -196,6 +218,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         f = f.withMarkers(visitMarkers(f.getMarkers(), newFunctionType.getMarkers()));
         f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newFunctionType.getLeadingAnnotations().get(index))));
         f = f.withModifiers(ListUtils.map(f.getModifiers(), (index, e) -> visitAndCast(e, newFunctionType.getModifiers().get(index))));
+        f = f.withContextParameters(visitAndCast(f.getContextParameters(), newFunctionType.getContextParameters()));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), newFunctionType.getReceiver()));
         if (f.getPadding().getParameters() != null) {
             f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, newFunctionType.getPadding().getParameters()));
@@ -248,6 +271,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         K.MethodDeclaration m = methodDeclaration;
         m = m.withMarkers(visitMarkers(m.getMarkers(), newMethodDeclaration.getMarkers()));
         m = m.withMethodDeclaration(visitAndCast(m.getMethodDeclaration(), newMethodDeclaration.getMethodDeclaration()));
+        m = m.withContextParameters(visitAndCast(m.getContextParameters(), newMethodDeclaration.getContextParameters()));
         return m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), newMethodDeclaration.getTypeConstraints()));
     }
 
@@ -265,6 +289,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return m.withAnnotations(visitContainer(m.getAnnotations(), newMultiAnnotationType.getAnnotations()));
     }
 
+    @Override
     @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, @Nullable Object ctx) {
         if (property == ctx || !(ctx instanceof K.Property)) {
@@ -284,6 +309,8 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
         pr = pr.getPadding().withVariableDeclarations(visitRightPadded(pr.getPadding().getVariableDeclarations(), newProperty.getPadding().getVariableDeclarations()));
         pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), newProperty.getPadding().getReceiver()));
+        pr = pr.withBackingField(visitAndCast(pr.getBackingField(), newProperty.getBackingField()));
+        pr = pr.withContextParameters(visitAndCast(pr.getContextParameters(), newProperty.getContextParameters()));
         return pr.withAccessors(visitContainer(pr.getAccessors(), newProperty.getAccessors()));
     }
 
@@ -330,6 +357,16 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             s = (K.SpreadArgument) temp;
         }
         return s.withExpression(visitAndCast(s.getExpression(), newSpreadArgument.getExpression()));
+    }
+
+    @Override
+    public J visitStatementExpression(K.StatementExpression statementExpression, @Nullable Object ctx) {
+        if (statementExpression == ctx || !(ctx instanceof K.StatementExpression)) {
+            return statementExpression;
+        }
+
+        K.StatementExpression newStatementExpression = (K.StatementExpression) ctx;
+        return statementExpression.withStatement(visitAndCast(statementExpression.getStatement(), newStatementExpression.getStatement()));
     }
 
     @Override
@@ -382,6 +419,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         } else {
             k = (K.This) temp;
         }
+        k = k.withLabel(visitAndCast(k.getLabel(), newAThis.getLabel()));
         return k.withType(visitType(k.getType(), newAThis.getType()));
     }
 
@@ -477,6 +515,19 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
+    public J visitContextParameters(K.ContextParameters contextParameters, @Nullable Object ctx) {
+        if (contextParameters == ctx || !(ctx instanceof K.ContextParameters)) {
+            return contextParameters;
+        }
+
+        K.ContextParameters newContextParameters = (K.ContextParameters) ctx;
+        K.ContextParameters c = contextParameters;
+        c = c.withPrefix(visitSpace(c.getPrefix(), KSpace.Location.CONTEXT_PARAMETERS_PREFIX, newContextParameters.getPrefix()));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newContextParameters.getMarkers()));
+        return c.withParameters(visitContainer(c.getParameters(), KContainer.Location.CONTEXT_PARAMETERS, newContextParameters.getParameters()));
+    }
+
+    @Override
     public J visitWhenBranch(K.WhenBranch whenBranch, @Nullable Object ctx) {
         if (whenBranch == ctx || !(ctx instanceof K.WhenBranch)) {
             return whenBranch;
@@ -493,6 +544,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             w = (K.WhenBranch) temp;
         }
         w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, newWhenBranch.getPadding().getExpressions()));
+        w = w.getPadding().withGuard(visitRightPadded(w.getPadding().getGuard(), newWhenBranch.getPadding().getGuard()));
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, newWhenBranch.getPadding().getBody()));
     }
 
@@ -623,16 +675,32 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, @Nullable Object ctx) {
-        if (marker == ctx || !(ctx instanceof Marker)) {
-            return (M) marker;
+    public Markers visitMarkers(@Nullable Markers markers, @Nullable Object ctx) {
+        if (markers == null || markers == ctx || !(ctx instanceof Markers)) {
+            return markers == null ? Markers.EMPTY : markers;
         }
+        Markers newMarkers = (Markers) ctx;
+        TrailingComma newTrailingComma = newMarkers.findFirst(TrailingComma.class).orElse(null);
+        if (newTrailingComma != null && !markers.findFirst(TrailingComma.class).isPresent()) {
+            // Wrapping may introduce a trailing comma, which is formatting rather than content
+            return markers.add(newTrailingComma);
+        }
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
+            if (marker instanceof TrailingComma && newTrailingComma != null) {
+                TrailingComma t = (TrailingComma) marker;
+                return t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, newTrailingComma.getSuffix()));
+            }
+            return marker;
+        }));
+    }
 
-        Marker newMarker = (Marker) ctx;
-        if (marker instanceof TypeReferencePrefix && newMarker instanceof TypeReferencePrefix) {
-            return super.visitMarker(newMarker, ((TypeReferencePrefix) newMarker).getPrefix());
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, Object o) {
+        if (o instanceof J.Block && !(tree instanceof J.Block)) {
+            //Wrapping can introduce blocks
+            return super.visit((J.Block) o, o);
         }
-        return super.visitMarker(marker, newMarker);
+        return super.visit(tree, o);
     }
 
     @Override
@@ -642,6 +710,11 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
+        if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && space.getWhitespace().contains("\n")) {
+            if (newSpace.getWhitespace().contains("\n")) {
+                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
+            }
+        }
         if (space == null) {
             return newSpace;
         }
@@ -650,25 +723,42 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
+        Space finalNewSpace = newSpace;
         return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
+            Comment newComment = finalNewSpace.getComments().get(index);
             if (comment instanceof Javadoc.DocComment) {
                 Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
-                if (!(newSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
+                if (!(newComment instanceof Javadoc.DocComment)) {
                     return docComment;
                 }
-                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
+                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newComment;
                 comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
                     if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
                     }
-                    return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
+                    String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
+                    if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
+                        if (newMargin.contains("\n")) {
+                            return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
+                        } else {
+                            return jdoc;
+                        }
+                    }
+                    return ((Javadoc.LineBreak) jdoc).withMargin(newMargin);
                 }));
             } else if (comment instanceof TextComment) {
-                if (newSpace.getComments().get(index) instanceof TextComment) {
-                    comment = ((TextComment) comment).withText(((TextComment) newSpace.getComments().get(index)).getText());
+                if (newComment instanceof TextComment) {
+                    comment = ((TextComment) comment).withText(((TextComment) newComment).getText());
                 }
             }
-            return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && comment.getSuffix().contains("\n")) {
+                if (newComment.getSuffix().contains("\n")) {
+                    return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
+                } else {
+                    return comment;
+                }
+            }
+            return comment.withSuffix(newComment.getSuffix());
         }));
     }
 
@@ -1419,7 +1509,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         J.Literal l = literal;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LITERAL_PREFIX, newLiteral.getPrefix()));
         l = l.withMarkers(visitMarkers(l.getMarkers(), newLiteral.getMarkers()));
-        Expression temp = (Expression) visitExpression(l, newLiteral);
+        Expression temp = (Expression) visitExpression(l.withValue(newLiteral.getValue()).withValueSource(newLiteral.getValueSource()), newLiteral); // for text blocks indentation, we use the new literal's value
         if (!(temp instanceof J.Literal)) {
             return temp;
         }
@@ -1689,10 +1779,11 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));
@@ -2155,5 +2246,23 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
+    }
+
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return (S) style.applyDefaults();
+        }
+        return null;
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 }

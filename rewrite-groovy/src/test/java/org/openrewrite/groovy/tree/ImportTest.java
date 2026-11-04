@@ -16,13 +16,44 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class ImportTest implements RewriteTest {
+
+    @Test
+    void nestedImportAttributesEachClassSegment() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.Map.Entry
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess entry = (J.FieldAccess) cu.getImports().get(0).getQualid();
+                J.FieldAccess map = (J.FieldAccess) entry.getTarget();
+                J.FieldAccess util = (J.FieldAccess) map.getTarget();
+                J.Identifier java = (J.Identifier) util.getTarget();
+
+                // Each class segment carries its own resolved type; package segments carry none.
+                assertThat(TypeUtils.asFullyQualified(entry.getType()))
+                  .as("leaf 'Entry'").isNotNull()
+                  .extracting(JavaType.FullyQualified::getFullyQualifiedName).isEqualTo("java.util.Map$Entry");
+                assertThat(TypeUtils.asFullyQualified(map.getType()))
+                  .as("'Map'").isNotNull()
+                  .extracting(JavaType.FullyQualified::getFullyQualifiedName).isEqualTo("java.util.Map");
+                assertThat(util.getType()).as("package segment 'util'").isNull();
+                assertThat(java.getType()).as("package segment 'java'").isNull();
+            })
+          )
+        );
+    }
+
     @Test
     void classImport() {
         rewriteRun(

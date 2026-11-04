@@ -19,14 +19,23 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -123,6 +132,77 @@ class GradleParserTest implements RewriteTest {
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
                 var d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5270")
+    @Test
+    void develocityExtensionIsTypeAttributed() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.19.2'
+              }
+              develocity {
+                  server = 'https://dev.example.com/'
+                  buildScan {
+                      publishing.onlyIf { false }
+                  }
+                  buildCache {
+                      remote(develocity.buildCache) {
+                          enabled = true
+                      }
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var declaringTypes = new ArrayList<String>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        JavaType.Method type = method.getMethodType();
+                        declaringTypes.add(method.getSimpleName() + ": " +
+                                           (type == null ? null : type.getDeclaringType().getFullyQualifiedName()));
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(declaringTypes).contains(
+                  "develocity: RewriteSettings",
+                  "buildScan: DevelocitySpec",
+                  "onlyIf: com.gradle.develocity.agent.gradle.scan.BuildScanPublishingConfiguration",
+                  "buildCache: org.gradle.api.initialization.Settings"
+                );
+                assertThat(FindMethods.find(cu, "org.gradle.api.initialization.Settings plugins(..)", true)).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "tasks.register('report')",
+      "tasks.named('report')",
+      "tasks.create('report')",
+      "task('report')",
+      "task(name: 'report')"
+    })
+    void taskConfigurationBlockIsTypeAttributed(String declaration) {
+        rewriteRun(
+          buildGradle(
+            """
+              %s {
+                  dependsOn 'check'
+                  doLast {
+                      println 'done'
+                  }
+              }
+              """.formatted(declaration),
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task dependsOn(..)", true)).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task doLast(..)", true)).isNotEmpty();
             })
           )
         );
@@ -276,8 +356,19 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
+    void kotlinDslWithUnresolvedCallableReference() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }
+              """
+          )
+        );
+    }
+
+    @Test
     void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -299,7 +390,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -321,7 +412,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -346,7 +437,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -389,7 +480,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -406,7 +497,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -423,7 +514,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -443,7 +534,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -461,7 +552,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -485,7 +576,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -512,7 +603,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -536,7 +627,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -558,10 +649,41 @@ class GradleParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 
-    @ParameterizedTest
+    @Issue("https://github.com/openrewrite/rewrite/pull/8301")
+    @Test
+    void cloneIsolatesGroovyAndKotlinTypeCaches() throws Exception {
+        GradleParser.Builder shared = GradleParser.builder()
+          .groovyParser(GroovyParser.builder())
+          .kotlinParser(KotlinParser.builder());
+
+        GradleParser.Builder cloneA = (GradleParser.Builder) shared.clone();
+        GradleParser.Builder cloneB = (GradleParser.Builder) shared.clone();
+
+        assertThat(cloneA.groovyParser)
+          .isNotSameAs(shared.groovyParser)
+          .isNotSameAs(cloneB.groovyParser);
+        assertThat(cloneA.kotlinParser)
+          .isNotSameAs(shared.kotlinParser)
+          .isNotSameAs(cloneB.kotlinParser);
+
+        assertThat(typeCacheOf(cloneA.groovyParser))
+          .isNotSameAs(typeCacheOf(shared.groovyParser))
+          .isNotSameAs(typeCacheOf(cloneB.groovyParser));
+        assertThat(typeCacheOf(cloneA.kotlinParser))
+          .isNotSameAs(typeCacheOf(shared.kotlinParser))
+          .isNotSameAs(typeCacheOf(cloneB.kotlinParser));
+    }
+
+    private static JavaTypeCache typeCacheOf(Object parserBuilder) throws Exception {
+        Field field = parserBuilder.getClass().getDeclaredField("typeCache");
+        field.setAccessible(true);
+        return (JavaTypeCache) field.get(parserBuilder);
+    }
+
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(
           Parser.Input.fromString(groovy)
         ), null, new InMemoryExecutionContext());

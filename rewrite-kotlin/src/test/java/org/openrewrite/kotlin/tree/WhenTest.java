@@ -306,15 +306,14 @@ class WhenTest implements RewriteTest {
                   else -> ""
               }
               """,
-              spec -> spec.afterRecipe(cu -> {
+              spec -> spec.afterRecipe(cu ->
                   assertThat(cu.getStatements()).satisfiesExactly(
                       stmt -> {
                           var x = (J.VariableDeclarations) stmt;
                           var initializer = (K.When) x.getVariables().getFirst().getInitializer();
                           assertThat(initializer.getSelector().getTree()).isInstanceOf(J.VariableDeclarations.class);
                       }
-                  );
-              })
+                  ))
           )
         );
     }

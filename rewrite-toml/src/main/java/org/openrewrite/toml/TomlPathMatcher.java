@@ -17,6 +17,7 @@ package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
@@ -97,26 +98,17 @@ public class TomlPathMatcher {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
                 TomlKey key = kv.getKey();
                 if (key instanceof Toml.Identifier) {
-                    String keyName = ((Toml.Identifier) key).getName();
-                    Cursor parent = current.getParent();
-                    while (parent != null) {
-                        Object parentValue = parent.getValue();
-                        if (parentValue instanceof Toml.Table) {
-                            Toml.Table table = (Toml.Table) parentValue;
-                            if (table.getName() != null) {
-                                String tableName = table.getName().getName();
-                                // Split dotted names: [tool.poetry]
-                                String[] parts = tableName.split("\\.");
-                                for (int i = parts.length - 1; i >= 0; i--) {
-                                    path.add(0, parts[i].trim());
-                                }
-                            }
-                            break;
-                        }
-                        parent = parent.getParent();
+                    path.add(0, ((Toml.Identifier) key).getName());
+                }
+            } else if (value instanceof Toml.Table) {
+                Toml.Table table = (Toml.Table) value;
+                Toml.Identifier tableName = table.getName();
+                if (tableName != null) {
+                    String name = tableName.getName();
+                    String[] parts = name.split("\\.");
+                    for (int i = parts.length - 1; i >= 0; i--) {
+                        path.add(0, parts[i].trim());
                     }
-                    path.add(keyName);
-                    return path;
                 }
             }
 
@@ -141,9 +133,10 @@ public class TomlPathMatcher {
         while (i < path.length()) {
             if (path.charAt(i) == '"' || path.charAt(i) == '\'') {
                 char quote = path.charAt(i);
-                int end = path.indexOf(quote, i + 1);
+                int end = closingQuote(path, i);
                 if (end != -1) {
-                    parts.add(path.substring(i + 1, end));
+                    String quoted = path.substring(i + 1, end);
+                    parts.add(quote == '"' ? TomlString.decodeBasic(quoted, false) : quoted);
                     i = end + 1;
                     if (i < path.length() && path.charAt(i) == '.') {
                         i++; // Skip dot after quote
@@ -183,6 +176,20 @@ public class TomlPathMatcher {
         return result;
     }
 
+    // a basic-string segment can hold an escaped quote, a literal-string one cannot
+    private static int closingQuote(String path, int open) {
+        char quote = path.charAt(open);
+        for (int i = open + 1; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c == '\\' && quote == '"') {
+                i++;
+            } else if (c == quote) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static class PathSegment {
         final @Nullable String literal;
         final boolean isSingleWildcard;
@@ -194,9 +201,18 @@ public class TomlPathMatcher {
             this.isSingleWildcard = isSingleWildcard;
             this.isDoubleWildcard = isDoubleWildcard;
 
-            if (literal != null && !isSingleWildcard && !isDoubleWildcard) {
-                String regex = literal.replace("*", ".*").replace("?", ".");
-                this.pattern = Pattern.compile("^" + regex + "$");
+            if (literal != null && (literal.indexOf('*') >= 0 || literal.indexOf('?') >= 0)) {
+                StringBuilder regex = new StringBuilder();
+                int start = 0;
+                for (int i = 0; i < literal.length(); i++) {
+                    char c = literal.charAt(i);
+                    if (c == '*' || c == '?') {
+                        regex.append(Pattern.quote(literal.substring(start, i))).append(c == '*' ? ".*" : ".");
+                        start = i + 1;
+                    }
+                }
+                regex.append(Pattern.quote(literal.substring(start)));
+                this.pattern = Pattern.compile(regex.toString(), Pattern.DOTALL);
             } else {
                 this.pattern = null;
             }

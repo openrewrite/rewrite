@@ -104,12 +104,7 @@ public class ChangeTagAttribute extends Recipe {
                     return attribute;
                 }
 
-                return attribute.withValue(
-                        new Xml.Attribute.Value(attribute.getId(),
-                                "",
-                                attribute.getMarkers(),
-                                attribute.getValue().getQuote(),
-                                changedValue));
+                return attribute.withValue(attribute.getValue().withValue(changedValue));
             }
         };
     }

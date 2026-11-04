@@ -17,6 +17,6 @@ package org.openrewrite.yaml.style;
 
 public class YamlDefaultStyles {
     public static IndentsStyle indents() {
-        return new IndentsStyle(2);
+        return new IndentsStyle(2, true);
     }
 }

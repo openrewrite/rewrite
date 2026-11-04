@@ -28,6 +28,9 @@ public class JavaWhitespaceValidationService implements WhitespaceValidationServ
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                // Descend into comments first so that whitespace of J elements embedded in Javadoc
+                // (e.g. the type references inside `{@link ...}`) is validated as well.
+                space = super.visitSpace(space, loc, ctx);
                 if (!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }

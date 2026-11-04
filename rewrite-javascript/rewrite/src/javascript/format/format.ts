@@ -17,8 +17,8 @@ import {JS} from "../tree";
 import {JavaScriptVisitor} from "../visitor";
 import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
 import {create as produce, Draft} from "mutative";
-import {Cursor, isScope, Tree} from "../../tree";
-import {BlankLinesStyle, getStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
+import {Cursor, isScope, isSourceFile, Tree} from "../../tree";
+import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
 import {NamedStyles} from "../../style";
 import {produceAsync} from "../../visitor";
 import {Generator} from "../markers";
@@ -26,6 +26,7 @@ import {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 import {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
 import {MinimumViableSpacingVisitor} from "./minimum-viable-spacing-visitor";
 import {applyPrettierFormatting, getPrettierStyle} from "./prettier-format";
+import {AsyncLocalStorage} from "node:async_hooks";
 
 export {TabsAndIndentsVisitor} from "./tabs-and-indents-visitor";
 export {NormalizeWhitespaceVisitor} from "./normalize-whitespace-visitor";
@@ -47,6 +48,31 @@ export const autoFormat = async <J2 extends J, P>(
 ): Promise<J2> =>
     (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
 
+/** `j` re-indented to the style of the file `parent` leads to, with its other whitespace as it is. */
+export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor): Promise<J2> => {
+    const styleSource = (isSourceFile(j) ? j : parent?.firstEnclosing(isSourceFile)) ?? j;
+    const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource) as TabsAndIndentsStyle;
+    const prettierStyle = getPrettierStyle(j, parent);
+    const style = prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents;
+    return await new TabsAndIndentsVisitor(style).visit(j, p, parent) as J2;
+}
+
+/**
+ * Hears about each request to auto-format a tree made while it listens, so that a test harness can check that a
+ * recipe formats only what it changed.
+ */
+export interface FormattingListener {
+    /** AutoformatVisitor calls this before it formats `tree`, stopping after `stopAfter` when it is given. */
+    onFormat(tree: Tree, stopAfter: Tree | undefined, cursor: Cursor | undefined): void;
+}
+
+const formattingListener = new AsyncLocalStorage<FormattingListener>();
+
+/** Runs `run`, telling `listener` about the formatting it requests. */
+export function listenToFormatting<T>(listener: FormattingListener, run: () => Promise<T>): Promise<T> {
+    return formattingListener.run(listener, run);
+}
+
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *
@@ -55,8 +81,9 @@ export const autoFormat = async <J2 extends J, P>(
  * 2. Styles from source file markers (NamedStyles)
  * 3. IntelliJ defaults
  *
- * When a PrettierStyle is present (either in the styles array or as a marker on the source file),
- * Prettier is used for formatting. Otherwise, built-in formatting visitors are used.
+ * A PrettierStyle, in the styles array or as a marker on the source file, formats through Prettier.
+ * The built-in visitors lay out a generated subtree Prettier cannot carry back, and any file
+ * without such a style.
  */
 export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     private readonly styles?: NamedStyles<string>[];
@@ -67,20 +94,28 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     async visit<R extends J>(tree: Tree, p: P, cursor?: Cursor): Promise<R | undefined> {
-        // Check for PrettierStyle in styles array or as marker on source file
-        // If found, delegate entirely to Prettier (skip other formatting visitors)
+        formattingListener.getStore()?.onFormat(tree, this.stopAfter, cursor);
         const prettierStyle = getPrettierStyle(tree, cursor, this.styles);
         if (prettierStyle) {
-            return applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            const formatted = await applyPrettierFormatting(tree as R, prettierStyle, p, cursor, this.stopAfter);
+            if (formatted !== undefined) {
+                return formatted;
+            }
         }
+
+        // Style markers live on the source file, which is `tree` itself only when a whole file is being formatted
+        const styleSource = (isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile)) ?? tree;
+        const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource, this.styles) as TabsAndIndentsStyle;
+        const spaces = getStyle(StyleKind.SpacesStyle, styleSource, this.styles) as SpacesStyle;
 
         const visitors = [
             new NormalizeWhitespaceVisitor(this.stopAfter),
             new MinimumViableSpacingVisitor(this.stopAfter),
-            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, tree, this.styles) as BlankLinesStyle, this.stopAfter),
-            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, tree, this.styles) as WrappingAndBracesStyle, this.stopAfter),
-            new SpacesVisitor(getStyle(StyleKind.SpacesStyle, tree, this.styles) as SpacesStyle, this.stopAfter),
-            new TabsAndIndentsVisitor(getStyle(StyleKind.TabsAndIndentsStyle, tree, this.styles) as TabsAndIndentsStyle, this.stopAfter),
+            new BlankLinesVisitor(getStyle(StyleKind.BlankLinesStyle, styleSource, this.styles) as BlankLinesStyle, this.stopAfter),
+            new WrappingAndBracesVisitor(getStyle(StyleKind.WrappingAndBracesStyle, styleSource, this.styles) as WrappingAndBracesStyle, this.stopAfter),
+            new SpacesVisitor(prettierStyle ? spacesFrom(prettierStyle, spaces) : spaces, this.stopAfter),
+            new TabsAndIndentsVisitor(
+                prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents, this.stopAfter),
         ]
 
         let t: R | undefined = tree as R;
@@ -93,6 +128,22 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 
         return t;
     }
+}
+
+/** The brace spacing a Prettier configuration states, over the style the rest of the spacing comes from. */
+function spacesFrom(prettierStyle: PrettierStyle, fallback: SpacesStyle): SpacesStyle {
+    // Prettier's default, in force for a configuration that does not name it
+    const bracketSpacing = prettierStyle.config.bracketSpacing !== false;
+    return {...fallback, within: {...fallback.within, objectLiteralBraces: bracketSpacing, es6ImportExportBraces: bracketSpacing}};
+}
+
+/** The widths a Prettier configuration states, over the style the rest of the layout comes from. */
+function tabsAndIndentsFrom(prettierStyle: PrettierStyle, fallback: TabsAndIndentsStyle): TabsAndIndentsStyle {
+    const config = prettierStyle.config;
+    // Prettier's defaults, in force for a configuration that names neither
+    const tabWidth = typeof config.tabWidth === 'number' ? config.tabWidth : 2;
+    const useTabCharacter = config.useTabs === true;
+    return {...fallback, useTabCharacter, tabSize: tabWidth, indentSize: tabWidth, continuationIndent: tabWidth};
 }
 
 export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
@@ -222,16 +273,15 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
+        if (this.cursor.value?.kind === J.Kind.TypeParameter) {
+            return ret;
+        }
         return produce(ret, draft => {
             if (draft.elements.length > 0) {
                 // Apply beforeComma rule to all elements except the last
                 // (last element's after is before closing bracket, not a comma)
                 for (let i = 0; i < draft.elements.length - 1; i++) {
-                    const afterWs = draft.elements[i].after.whitespace;
-                    // Preserve newlines - only adjust when on same line
-                    if (!afterWs.includes("\n")) {
-                        draft.elements[i].after.whitespace = this.style.other.beforeComma ? " " : "";
-                    }
+                    this.spaceAfterRightPaddedDraft(draft.elements[i], this.style.other.beforeComma);
                 }
             }
             if (draft.elements.length > 1) {
@@ -280,11 +330,19 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         })
     }
 
+    protected async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitExportSpecifier(exportSpecifier, p) as JS.ExportSpecifier;
+        return produce(ret, draft => {
+            // `type` is separated from the name it qualifies by that name's own prefix
+            draft.specifier.prefix.whitespace = draft.typeOnly.element ? " " : "";
+        });
+    }
+
     protected async visitForLoop(forLoop: J.ForLoop, p: P): Promise<J | undefined> {
         const ret = await super.visitForLoop(forLoop, p) as J.ForLoop;
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
-            draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
+            draft.control.init.forEach((oneInit, index) => {
                 if (oneInit.element.kind === J.Kind.VariableDeclarations) {
                     const vd = oneInit.element as Draft<J.VariableDeclarations>;
                     if (vd.modifiers && vd.modifiers.length > 0) {
@@ -293,8 +351,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 }
                 oneInit.after.whitespace = "";
                 this.spaceBeforeRightPaddedElementDraft(oneInit, index === 0 ? this.style.within.forParentheses : true);
-                return oneInit;
-            }));
+            });
             if (draft.control.condition) {
                 draft.control.condition.element.prefix.whitespace = " ";
                 draft.control.condition.after.whitespace = this.style.other.beforeForSemicolon ? " " : "";
@@ -322,14 +379,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+        // Mutative detects same-value assignments and returns the original reference
+        // when nothing actually changed, so no guard function is needed.
         return produce(ret, draft => {
             if (draft.importClause) {
-                // Space after 'import' keyword:
-                // - If there's a default import (name), space goes in importClause.prefix
-                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
-                // - If only namedBindings (no default, no type), space goes in namedBindings.prefix (importClause.prefix is empty)
-                const hasDefaultImport = !!draft.importClause.name;
-                draft.importClause.prefix.whitespace = (hasDefaultImport || draft.importClause.typeOnly) ? " " : "";
+                // Space after 'import' keyword always goes on importClause.prefix.
+                // The parser is consistent here: both ImportClause and NamedBindings share
+                // the same trivia span, but ImportClause consumes it first.
+                draft.importClause.prefix.whitespace = " ";
                 if (draft.importClause.name) {
                     // For import equals declarations (import X = Y), use assignment spacing
                     // For regular imports (import X from 'Y'), no space after name
@@ -338,24 +395,30 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    // Space before namedBindings - always needed
-                    draft.importClause.namedBindings.prefix.whitespace = " ";
+                    // `type`, or a default name and its comma, stands between keyword and bindings
+                    const afterClause = draft.importClause.name || draft.importClause.typeOnly ? " " : "";
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
-                        // Check if this is a multi-line import (any element's prefix has a newline)
+                        // For named imports the space before `{` sits in the container, as the parser
+                        // writes it; a newline there is layout, which spacing does not decide
+                        if (!ni.prefix.whitespace.includes("\n") && !ni.elements.before.whitespace.includes("\n")) {
+                            ni.prefix.whitespace = "";
+                            ni.elements.before.whitespace = afterClause;
+                        }
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
-                            // Single-line: adjust brace spacing
-                            ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
-                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                            const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
+                            ni.elements.elements[0].element.prefix.whitespace = braceSpace;
+                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = braceSpace;
                         } else {
                             // Multi-line: apply beforeComma rule to last element's after (for trailing commas)
-                            // If it has only spaces (no newline), it's the space before a trailing comma
-                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after.whitespace;
-                            if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
-                                ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.other.beforeComma ? " " : "";
+                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after;
+                            if (!lastAfter.whitespace.includes("\n") && lastAfter.whitespace.trim() === "") {
+                                lastAfter.whitespace = this.style.other.beforeComma ? " " : "";
                             }
                         }
+                    } else if (afterClause) {
+                        draft.importClause.namedBindings.prefix.whitespace = afterClause;
                     }
                 }
             }
@@ -364,6 +427,15 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.moduleSpecifier.element.prefix.whitespace = draft.importClause ? " " : "";
             }
         })
+    }
+
+    protected async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, p: P): Promise<J | undefined> {
+        const ret = await super.visitImportSpecifier(importSpecifier, p) as JS.ImportSpecifier;
+        return produce(ret, draft => {
+            // The specifier's leading space is the brace and comma rules'; this is the
+            // gap between `type` and the name, which the name's own prefix carries
+            draft.specifier.prefix.whitespace = draft.importType.element ? " " : "";
+        });
     }
 
     protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {
@@ -589,9 +661,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 const hasConstraint = constraintType.element.kind !== J.Kind.Empty;
                 const hasDefault = defaultType.element.kind !== J.Kind.Empty;
 
+                if (hasDefault && !defaultType.element.prefix.whitespace.includes("\n")) {
+                    defaultType.element.prefix.whitespace = this.style.aroundOperators.assignment ? " " : "";
+                }
                 if (hasConstraint) {
-                    // Space before '=' for default type (in the `after` of constraint type)
-                    if (hasDefault && !constraintType.after.whitespace.includes("\n")) {
+                    if (!hasDefault) {
+                        this.spaceAfterRightPaddedDraft(constraintType, this.style.other.beforeComma);
+                    } else if (!constraintType.after.whitespace.includes("\n")) {
+                        // Space before '=' for default type (in the `after` of constraint type)
                         constraintType.after.whitespace = this.style.aroundOperators.assignment ? " " : "";
                     }
                 } else if (hasDefault) {
@@ -751,6 +828,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
         const v = await super.visitVariableDeclarations(multiVariable, p) as J.VariableDeclarations;
+        if (v.leadingAnnotations.length === 0) {
+            return v;
+        }
         const parent = this.cursor.parentTree()?.value;
         if (parent?.kind === J.Kind.Block) {
             return produce(v, draft => {
@@ -769,6 +849,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J.MethodDeclaration> {
         const m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+        if (m.leadingAnnotations.length === 0) {
+            return m;
+        }
         return produce(m, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
             if (draft.leadingAnnotations.length > 0) {
@@ -789,21 +872,29 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const e = await super.visitElse(elsePart, p) as J.If.Else;
         const hasBody = e.body.element.kind === J.Kind.Block || e.body.element.kind === J.Kind.If;
 
-        return produce(e, draft => {
-            if (hasBody) {
-                const shouldHaveNewline = this.style.ifStatement.elseOnNewLine;
-                const hasNewline = draft.prefix.whitespace.includes("\n");
+        if (!hasBody) {
+            return e;
+        }
+
+        const shouldHaveNewline = this.style.ifStatement.elseOnNewLine;
+        const hasNewline = e.prefix.whitespace.includes("\n");
+        if ((shouldHaveNewline && !hasNewline) || (!shouldHaveNewline && hasNewline)) {
+            return produce(e, draft => {
                 if (shouldHaveNewline && !hasNewline) {
                     draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
-                } else if (!shouldHaveNewline && hasNewline) {
+                } else {
                     draft.prefix.whitespace = "";
                 }
-            }
-        });
+            });
+        }
+        return e;
     }
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J.ClassDeclaration> {
         const j = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+        if (j.leadingAnnotations.length === 0) {
+            return j;
+        }
         return produce(j, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
             if (draft.leadingAnnotations.length > 0) {
@@ -821,61 +912,75 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
-        return produce(b, draft => {
-            const parentKind = this.cursor.parent?.value.kind;
+        const parentKind = this.cursor.parent?.value.kind;
 
-            // Check if this is a "simple" block (empty or contains only a single J.Empty)
-            const isSimpleBlock = draft.statements.length === 0 ||
-                (draft.statements.length === 1 && draft.statements[0].element.kind === J.Kind.Empty);
+        // Check if this is a "simple" block (empty or contains only a single J.Empty)
+        const isSimpleBlock = b.statements.length === 0 ||
+            (b.statements.length === 1 && b.statements[0].element.kind === J.Kind.Empty);
 
-            // Helper to format block on one line
-            const formatOnOneLine = () => {
-                // Format as {} - remove any newlines from end whitespace
-                if (draft.end.whitespace.includes("\n")) {
-                    draft.end.whitespace = draft.end.whitespace.replace(/\n\s*/g, "");
-                }
-                // Also remove newlines from statement padding if there's a J.Empty
-                if (draft.statements.length === 1) {
-                    if (draft.statements[0].element.prefix.whitespace.includes("\n")) {
-                        draft.statements[0].element.prefix.whitespace = "";
-                    }
-                    if (draft.statements[0].after.whitespace.includes("\n")) {
-                        draft.statements[0].after.whitespace = "";
-                    }
-                }
-            };
-
-            // Object literals and type literals: always format empty ones as {} on single line
-            if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
-                if (isSimpleBlock) {
-                    formatOnOneLine();
-                }
-                return;
+        // Object literals and type literals: always format empty ones as {} on single line
+        if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
+            if (isSimpleBlock && this.blockIsMultiLine(b)) {
+                return produce(b, draft => {
+                    this.formatBlockOnOneLine(draft);
+                });
             }
+            return b;
+        }
 
-            if (isSimpleBlock) {
-                // Determine which style option applies based on parent
-                const isMethodOrFunctionBody = parentKind === J.Kind.Lambda ||
-                    parentKind === J.Kind.MethodDeclaration;
-                const keepInOneLine = isMethodOrFunctionBody
-                    ? this.style.keepWhenReformatting.simpleMethodsInOneLine
-                    : this.style.keepWhenReformatting.simpleBlocksInOneLine;
+        if (isSimpleBlock) {
+            const isMethodOrFunctionBody = parentKind === J.Kind.Lambda ||
+                parentKind === J.Kind.MethodDeclaration;
+            const keepInOneLine = isMethodOrFunctionBody
+                ? this.style.keepWhenReformatting.simpleMethodsInOneLine
+                : this.style.keepWhenReformatting.simpleBlocksInOneLine;
 
-                if (keepInOneLine) {
-                    formatOnOneLine();
-                } else {
-                    // Format with newline between { and }
-                    if (!draft.end.whitespace.includes("\n")) {
-                        draft.end = this.withNewlineSpace(draft.end);
-                    }
+            if (keepInOneLine) {
+                if (this.blockIsMultiLine(b)) {
+                    return produce(b, draft => {
+                        this.formatBlockOnOneLine(draft);
+                    });
                 }
             } else {
-                // Non-simple blocks: ensure closing brace is on its own line
-                if (!draft.end.whitespace.includes("\n") && !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n")) {
-                    draft.end = this.withNewlineSpace(draft.end);
+                if (!b.end.whitespace.includes("\n")) {
+                    return produce(b, draft => {
+                        draft.end = this.withNewlineSpace(draft.end);
+                    });
                 }
             }
-        });
+        } else {
+            // Non-simple blocks: ensure closing brace is on its own line
+            if (!b.end.whitespace.includes("\n") && !b.statements[b.statements.length - 1].after.whitespace.includes("\n")) {
+                return produce(b, draft => {
+                    draft.end = this.withNewlineSpace(draft.end);
+                });
+            }
+        }
+
+        return b;
+    }
+
+    private blockIsMultiLine(b: J.Block): boolean {
+        if (b.end.whitespace.includes("\n")) return true;
+        if (b.statements.length === 1) {
+            if (b.statements[0].element.prefix.whitespace.includes("\n")) return true;
+            if (b.statements[0].after.whitespace.includes("\n")) return true;
+        }
+        return false;
+    }
+
+    private formatBlockOnOneLine(draft: Draft<J.Block>): void {
+        if (draft.end.whitespace.includes("\n")) {
+            draft.end.whitespace = draft.end.whitespace.replace(/\n\s*/g, "");
+        }
+        if (draft.statements.length === 1) {
+            if (draft.statements[0].element.prefix.whitespace.includes("\n")) {
+                draft.statements[0].element.prefix.whitespace = "";
+            }
+            if (draft.statements[0].after.whitespace.includes("\n")) {
+                draft.statements[0].after.whitespace = "";
+            }
+        }
     }
 
     protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
@@ -1034,7 +1139,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             } else if (parent?.kind === J.Kind.Block && grandparent?.kind !== J.Kind.NewClass && grandparent?.kind !== JS.Kind.TypeLiteral ||
                       (parent?.kind === JS.Kind.CompilationUnit && (parent! as JS.CompilationUnit).statements[0].element.id != draft.id) ||
                       (parent?.kind === J.Kind.Case && this.isInsideCaseStatements(parent as J.Case, draft))) {
-                if (draft.kind != J.Kind.Case) {
+                if (draft.kind != J.Kind.Case && !this.opensCaseBody(parent, draft)) {
                     this.ensurePrefixHasNewLine(draft);
                 }
             }
@@ -1064,6 +1169,12 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
      * Check if a statement is inside a Case's statements container or body,
      * not inside the caseLabels container.
      */
+    /** A block that opens a case's statements stays on the line of its label, as in `case X: {`. */
+    private opensCaseBody(parent: J | undefined, statement: J): boolean {
+        return parent?.kind === J.Kind.Case && statement.kind === J.Kind.Block &&
+            (parent as J.Case).statements.elements[0]?.element.id === statement.id;
+    }
+
     private isInsideCaseStatements(caseNode: J.Case, statement: J): boolean {
         // Check if statement is in the statements container
         if (caseNode.statements.elements.some(s => s.element.id === statement.id)) {
@@ -1100,7 +1211,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         }
     }
 
-    private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
+    private ensurePrefixHasNewLine(node: Draft<J>) {
         if (!node.prefix) return;
 
         // Check if newline already exists in the effective last whitespace

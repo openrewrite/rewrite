@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -142,6 +142,16 @@ public interface XMLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitElement(XMLParser.ElementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#voidClose}.
+	 * @param ctx the parse tree
+	 */
+	void enterVoidClose(XMLParser.VoidCloseContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#voidClose}.
+	 * @param ctx the parse tree
+	 */
+	void exitVoidClose(XMLParser.VoidCloseContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link XMLParser#jspdirective}.
 	 * @param ctx the parse tree

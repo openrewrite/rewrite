@@ -23,6 +23,7 @@ from rewrite import (
     categorize,
     get_recipe_category,
     activate,
+    Recipe,
 )
 from rewrite.python.recipes import RemovePass, Cleanup
 
@@ -159,6 +160,48 @@ class TestActivate:
         assert python_cat is not None
 
 
+class _UnregisteredRecipe(Recipe):
+    @property
+    def name(self): return "org.openrewrite.python.test.Unregistered"
+    @property
+    def display_name(self): return "Unregistered"
+    @property
+    def description(self): return "A recipe not registered in the marketplace."
+
+
+class _CrossModuleRecipeList(Recipe):
+    @property
+    def name(self): return "org.openrewrite.python.test.CrossModuleRecipeList"
+    @property
+    def display_name(self): return "Cross-module recipe list"
+    @property
+    def description(self): return "A recipe that delegates to an unregistered sub-recipe."
+    def recipe_list(self):
+        return [_UnregisteredRecipe()]
+
+
+class TestInstallSubRecipes:
+    """Tests for cross-module sub-recipe installation during PrepareRecipe."""
+
+    def test_sub_recipes_installed_on_prepare(self):
+        """Preparing a recipe auto-installs its sub-recipes so they can be prepared later."""
+        import rewrite.rpc.server as server
+
+        # given
+        marketplace = RecipeMarketplace()
+        marketplace.install(_CrossModuleRecipeList, Python)
+        saved = server._marketplace
+        server._marketplace = marketplace
+        try:
+            # when
+            server.handle_prepare_recipe({'id': 'org.openrewrite.python.test.CrossModuleRecipeList'})
+
+            # then
+            server.handle_prepare_recipe({'id': 'org.openrewrite.python.test.Unregistered'})
+        finally:
+            server._marketplace = saved
+
+
 class TestPythonCategory:
     """Tests for the Python category constant."""
 
@@ -172,3 +215,146 @@ class TestPythonCategory:
         assert len(Cleanup) == 2
         assert Cleanup[0].display_name == "Python"
         assert Cleanup[1].display_name == "Cleanup"
+
+
+class _PkgARecipe(Recipe):
+    @property
+    def name(self): return "org.openrewrite.test.pkga.RecipeA"
+    @property
+    def display_name(self): return "Recipe A"
+    @property
+    def description(self): return "Owned by package A."
+
+
+class _PkgBRecipe(Recipe):
+    @property
+    def name(self): return "org.openrewrite.test.pkgb.RecipeB"
+    @property
+    def display_name(self): return "Recipe B"
+    @property
+    def description(self): return "Owned by package B."
+
+
+class TestPerPackageAttribution:
+    """Regression tests for the over-attribution bug.
+
+    Before the fix, a singleton marketplace was shared across all installs and
+    GetMarketplace returned everything in it. Installing a non-recipe package
+    (e.g., a visualization-only pip package) would still report every built-in
+    ``org.openrewrite.python.*`` recipe as belonging to that package.
+    These tests pin the per-distribution scoping so each package's install
+    response carries only the recipes its own entry points activated.
+    """
+
+    def setup_method(self):
+        import rewrite.rpc.server as server
+        from rewrite.discovery import RecipeAttribution
+
+        # Reset module state so tests don't bleed into each other.
+        self._saved_marketplace = server._marketplace
+        self._saved_attribution = server._attribution
+        server._marketplace = RecipeMarketplace()
+        server._attribution = RecipeAttribution()
+
+    def teardown_method(self):
+        import rewrite.rpc.server as server
+
+        server._marketplace = self._saved_marketplace
+        server._attribution = self._saved_attribution
+
+    def test_get_marketplace_attributes_each_recipe_to_its_package(self, monkeypatch):
+        """Installing pkg-a then pkg-b: each GetMarketplace row carries its own package."""
+        import rewrite.rpc.server as server
+
+        def fake_import_and_activate(name, marketplace, local_path=None):
+            # Simulate the activate(marketplace) call each entry point would make.
+            if name == "pkg-a":
+                marketplace.install(_PkgARecipe, Python)
+            elif name == "pkg-b":
+                marketplace.install(_PkgBRecipe, Python)
+
+        monkeypatch.setattr(server, "_import_and_activate_package", fake_import_and_activate)
+
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
+
+        # Each row carries its origin packageName, so the host attributes each recipe to the
+        # package that actually contributed it instead of the single requested bundle.
+        package_of = {r["descriptor"]["name"]: r["packageName"]
+                      for r in server.handle_get_marketplace({})}
+
+        assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
+        assert package_of["org.openrewrite.test.pkgb.RecipeB"] == "pkg-b"
+
+    def test_noop_install_does_not_inherit_other_packages_recipes(self, monkeypatch):
+        """A visualization-only pip package (no recipes) must not be assigned others' recipes.
+
+        pkg-a contributed recipes earlier; pkg-b is a no-op (no openrewrite.recipes entry
+        point). Installing pkg-b must NOT inherit pkg-a's recipes.
+        """
+        import rewrite.rpc.server as server
+
+        def fake_import_and_activate(name, marketplace, local_path=None):
+            if name == "pkg-a":
+                marketplace.install(_PkgARecipe, Python)
+            # pkg-b is intentionally a no-op.
+
+        monkeypatch.setattr(server, "_import_and_activate_package", fake_import_and_activate)
+
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
+        b_response = server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
+
+        # pkg-b contributed nothing, so no GetMarketplace row is attributed to it, and pkg-a's
+        # recipe keeps its own attribution.
+        assert b_response["recipesInstalled"] == 0
+        package_of = {r["descriptor"]["name"]: r["packageName"]
+                      for r in server.handle_get_marketplace({})}
+        assert package_of["org.openrewrite.test.pkga.RecipeA"] == "pkg-a"
+        assert "pkg-b" not in package_of.values()
+
+    def test_get_marketplace_filters_by_package_name(self, monkeypatch):
+        """GetMarketplace with packageName returns only that package's recipes."""
+        import rewrite.rpc.server as server
+
+        def fake_import_and_activate(name, marketplace, local_path=None):
+            if name == "pkg-a":
+                marketplace.install(_PkgARecipe, Python)
+            elif name == "pkg-b":
+                marketplace.install(_PkgBRecipe, Python)
+
+        monkeypatch.setattr(server, "_import_and_activate_package", fake_import_and_activate)
+
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-a"}})
+        server.handle_install_recipes({"recipes": {"packageName": "pkg-b"}})
+
+        # Filter by pkg-a
+        rows_a = server.handle_get_marketplace({"packageName": "pkg-a"})
+        assert {r["descriptor"]["name"] for r in rows_a} == {"org.openrewrite.test.pkga.RecipeA"}
+
+        # Filter by pkg-b
+        rows_b = server.handle_get_marketplace({"packageName": "pkg-b"})
+        assert {r["descriptor"]["name"] for r in rows_b} == {"org.openrewrite.test.pkgb.RecipeB"}
+
+        # No filter still returns everything for callers that want the full marketplace.
+        rows_all = server.handle_get_marketplace({})
+        assert {r["descriptor"]["name"] for r in rows_all} == {
+            "org.openrewrite.test.pkga.RecipeA",
+            "org.openrewrite.test.pkgb.RecipeB",
+        }
+
+    def test_package_name_normalization(self, monkeypatch):
+        """Hyphen/underscore variants resolve to the same package."""
+        import rewrite.rpc.server as server
+
+        def fake_import_and_activate(name, marketplace, local_path=None):
+            if name in ("openrewrite-migrate-python", "openrewrite_migrate_python"):
+                marketplace.install(_PkgARecipe, Python)
+
+        monkeypatch.setattr(server, "_import_and_activate_package", fake_import_and_activate)
+
+        # Install with hyphen form.
+        server.handle_install_recipes({"recipes": {"packageName": "openrewrite-migrate-python"}})
+
+        # Query with underscore form.
+        rows = server.handle_get_marketplace({"packageName": "openrewrite_migrate_python"})
+        assert {r["descriptor"]["name"] for r in rows} == {"org.openrewrite.test.pkga.RecipeA"}

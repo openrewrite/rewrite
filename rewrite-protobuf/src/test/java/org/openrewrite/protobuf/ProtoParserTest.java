@@ -16,9 +16,11 @@
 package org.openrewrite.protobuf;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.tree.ParseError;
 
 import java.util.List;
 
@@ -30,6 +32,43 @@ class ProtoParserTest implements RewriteTest {
     void noNullsForProto3Files() {
         List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";").toList();
         assertThat(sources).singleElement().isInstanceOf(PlainText.class);
+    }
+
+    @Test
+    void editionsFallsBackToPlainTextDespiteSyntaxErrors() {
+        List<SourceFile> sources = ProtoParser.builder().build().parse(
+          """
+            edition = "2023";
+            import option "a/b.proto";
+            option features.enforce_naming_style = STYLE_LEGACY;
+            """
+        ).toList();
+        assertThat(sources).singleElement().isInstanceOf(PlainText.class);
+    }
+
+    @Test
+    void syntaxErrorIsAParseError() {
+        List<SourceFile> sources = ProtoParser.builder().build().parse(
+          """
+            syntax = "proto2";
+            message MyMessage {
+              bogus 1 to 2;
+            }
+            """
+        ).toList();
+        assertThat(sources).singleElement()
+                .isInstanceOf(ParseError.class)
+                .extracting(s -> s.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getExceptionType())
+                .isEqualTo("ProtoParsingException");
+    }
+
+    @Test
+    void malformedSyntaxDoesNotThrowNPE() {
+        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = proto2;").toList();
+        assertThat(sources).singleElement().satisfiesAnyOf(
+                s -> assertThat(s).isInstanceOf(PlainText.class),
+                s -> assertThat(s).isInstanceOf(ParseError.class)
+        );
     }
 
     @Test

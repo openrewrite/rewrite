@@ -19,7 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -96,6 +99,107 @@ class ChangeTagValueVisitorTest implements RewriteTest {
                   <version>
                       3.0
                   </version>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNothingIfScopeIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  doAfterVisit(new ChangeTagValueVisitor<>(null, "3.0"));
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                  <version>
+                      2.0
+                  </version>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesTagIfValueIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                  List<? extends Content> rootContent = x.getRoot().getContent();
+                  Xml.Tag firstTag = rootContent != null && !rootContent.isEmpty() ? (Xml.Tag) rootContent.getFirst() : null;
+                  doAfterVisit(new ChangeTagValueVisitor<>(firstTag, null));
+                  return super.visitDocument(x, ctx);
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                  <version>
+                      2.0
+                  </version>
+              </dependency>
+              """,
+            """
+              <dependency>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void withValueOnEmptyElement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlIsoVisitor<>() {
+              @Override
+              public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  Xml.Tag t = super.visitTag(tag, ctx);
+                  return "dependency".equals(t.getName()) ? t.withChildValue("version", "2.0") : t;
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                  <version></version>
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <version>2.0</version>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
+    void withersReturnSameTreeForUnchangedValues() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlIsoVisitor<>() {
+              @Override
+              public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  Xml.Tag t = super.visitTag(tag, ctx);
+                  return "dependency".equals(t.getName()) ? t.withChildValue("version", "2.0") : t;
+              }
+
+              @Override
+              public Xml.JspDirective visitJspDirective(Xml.JspDirective jspDirective, ExecutionContext ctx) {
+                  return super.visitJspDirective(jspDirective, ctx).withType("page");
+              }
+          })),
+          xml(
+            """
+              <%@ page language="java" %>
+              <dependency>
+                  <version>2.0</version>
               </dependency>
               """
           )

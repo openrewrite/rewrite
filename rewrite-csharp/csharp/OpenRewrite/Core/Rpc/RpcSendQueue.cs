@@ -1,0 +1,417 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+using System.Collections.Concurrent;
+using Rewrite.Core.Rpc;
+using static OpenRewrite.Core.Rpc.RpcObjectData;
+using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
+
+namespace OpenRewrite.Core.Rpc;
+
+public class RpcSendQueue
+{
+    /// <summary>
+    /// Overrides for C# types whose Java names don't follow the convention.
+    /// Key: C# type, Value: Java fully-qualified class name.
+    /// <para>
+    /// Concurrent because process-wide: registration happens on whichever thread first loads a
+    /// recipe bundle, while <see cref="ToJavaTypeName"/> reads it from every send queue in
+    /// parallel. A plain <c>Dictionary</c> here corrupts its internal buckets under a concurrent
+    /// write, which surfaces as spurious <c>IndexOutOfRangeException</c>s on unrelated reads.
+    /// </para>
+    /// </summary>
+    private static readonly ConcurrentDictionary<Type, string> JavaTypeNameOverrides = new();
+
+    public static void RegisterJavaTypeName(Type csharpType, string javaTypeName)
+    {
+        JavaTypeNameOverrides[csharpType] = javaTypeName;
+    }
+
+    private readonly int _batchSize;
+    private readonly List<RpcObjectData> _batch;
+    private readonly Action<List<RpcObjectData>> _drain;
+    private readonly RpcRefs _refs;
+    private readonly string? _sourceFileType;
+    private readonly bool _trace;
+    private readonly IRpcCodec? _treeCodec;
+
+    private object? _before;
+
+    public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
+                        RpcRefs refs, string? sourceFileType, bool trace,
+                        IRpcCodec? treeCodec = null)
+    {
+        _batchSize = batchSize;
+        _batch = new List<RpcObjectData>(batchSize);
+        _drain = drain;
+        _refs = refs;
+        _sourceFileType = sourceFileType;
+        _trace = trace;
+        _treeCodec = treeCodec;
+    }
+
+    /// <summary>
+    /// Finds the codec for a value: self-codecs (like Markers) first,
+    /// then the injected tree codec for tree nodes.
+    /// </summary>
+    private IRpcCodec? GetCodecFor(object val)
+    {
+        if (val is IRpcCodec selfCodec) return selfCodec;
+        if (val is Marker) return null; // Markers without IRpcCodec are serialized as plain values
+        if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
+        return null;
+    }
+
+    public void Put(RpcObjectData rpcObjectData)
+    {
+        _batch.Add(rpcObjectData);
+        if (_batch.Count == _batchSize)
+        {
+            Flush();
+        }
+    }
+
+    public void Flush()
+    {
+        if (_batch.Count == 0) return;
+        _drain(new List<RpcObjectData>(_batch));
+        _batch.Clear();
+    }
+
+    public void GetAndSend<T, U>(T parent, Func<T, U?> value)
+    {
+        GetAndSend(parent, value, (Action<U>?)null);
+    }
+
+    public void GetAndSend<T, U>(T parent, Func<T, U?> value, Action<U>? onChange)
+    {
+        var after = value(parent);
+        if (_before != null)
+        {
+            var before = value((T)_before);
+            Send(after, before, onChange == null || after == null ? null : () => onChange(after));
+        }
+        else
+        {
+            // No previous state. Pass null as before to Send so that non-null values
+            // are sent as ADD. Using default(U) when _before is null causes value types
+            // (e.g., bool) to get a non-null default (false), which incorrectly makes
+            // Send emit CHANGE instead of ADD, breaking the Java receiver.
+            Send<object?>(after, null, onChange == null || after == null ? null : () => onChange(after!));
+        }
+    }
+
+    public void GetAndSendListAsRef<T, U>(T? parent,
+                                           Func<T, IList<U>?> values,
+                                           Func<U, object> id,
+                                           Action<U>? onChange) where T : class
+    {
+        GetAndSendList(parent, values, id, onChange, true);
+    }
+
+    public void GetAndSendList<T, U>(T? parent,
+                                      Func<T, IList<U>?> values,
+                                      Func<U, object> id,
+                                      Action<U>? onChange) where T : class
+    {
+        GetAndSendList(parent, values, id, onChange, false);
+    }
+
+    private void GetAndSendList<T, U>(T? parent,
+                                       Func<T, IList<U>?> values,
+                                       Func<U, object> id,
+                                       Action<U>? onChange,
+                                       bool asRef) where T : class
+    {
+        var after = parent == null ? null : values(parent);
+        var before = _before == null ? null : values((T)_before);
+        SendList(after, before, id, onChange, asRef);
+    }
+
+    public void Send<T>(T? after, T? before, Action? onChange)
+    {
+        var afterVal = Reference.GetValue<object>(after);
+        var beforeVal = Reference.GetValue<object>(before);
+
+        if (ReferenceEquals(beforeVal, afterVal) ||
+            (beforeVal != null && beforeVal.GetType().IsValueType && beforeVal.Equals(afterVal)))
+        {
+            Put(new RpcObjectData { State = NO_CHANGE });
+        }
+        else if (afterVal is System.Collections.IList && beforeVal is System.Collections.IList)
+        {
+            // The concrete list implementation class (e.g. List<T> vs T[]) is irrelevant
+            // to the diff: two non-null lists always diff as CHANGE, because SendList
+            // emits positions into the before list while the receiver's ADD path starts
+            // from an empty one.
+            SendChange(afterVal, beforeVal, onChange);
+        }
+        else if (beforeVal == null || (afterVal != null && afterVal.GetType() != beforeVal.GetType()))
+        {
+            Add(after!, onChange);
+        }
+        else if (afterVal == null)
+        {
+            Put(new RpcObjectData { State = DELETE });
+        }
+        else if (after is Reference)
+        {
+            // A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+            // instance may be aliased by any number of other slots and source files. A CHANGE would
+            // be applied to that shared instance in place, corrupting every alias, so the new value
+            // is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+            Add(after!, onChange);
+        }
+        else
+        {
+            SendChange(afterVal, beforeVal, onChange);
+        }
+    }
+
+    private void SendChange(object afterVal, object beforeVal, Action? onChange)
+    {
+        var afterCodec = GetCodecFor(afterVal);
+        // Without an onChange callback or codec, no property messages follow, so the
+        // value must travel inline or the receiver keeps the stale object
+        Put(new RpcObjectData
+        {
+            State = CHANGE,
+            ValueType = GetValueType(afterVal),
+            Value = onChange == null && afterCodec == null ? afterVal : null
+        });
+        DoChange(afterVal, beforeVal, onChange, afterCodec);
+    }
+
+    internal void SendList<T>(IList<T>? after, IList<T>? before,
+                              Func<T, object> id, Action<T>? onChange, bool asRef)
+    {
+        Send(after, before, () =>
+        {
+            if (after == null)
+                throw new InvalidOperationException("A DELETE event should have been sent.");
+
+            var positions = PutListPositions(after, before, id);
+
+            for (int i = 0; i < after.Count; i++)
+            {
+                var anAfter = after[i];
+                var beforePos = positions == null ? AddedListItem : positions[i];
+                Action? onChangeRun = onChange == null ? null : () => onChange(anAfter);
+
+                if (beforePos == AddedListItem)
+                {
+                    if (anAfter == null)
+                    {
+                        Put(new RpcObjectData { State = DELETE });
+                    }
+                    else
+                    {
+                        Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
+                    }
+                }
+                else
+                {
+                    var aBefore = before![beforePos];
+                    if (ReferenceEquals(aBefore, anAfter))
+                    {
+                        Put(new RpcObjectData { State = NO_CHANGE });
+                    }
+                    else if (anAfter == null)
+                    {
+                        Put(new RpcObjectData { State = DELETE });
+                    }
+                    else if (asRef || aBefore == null || anAfter.GetType() != aBefore.GetType())
+                    {
+                        // Type changed, or a ref-deduplicated item, which is always re-added
+                        // rather than CHANGEd (see Send)
+                        Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
+                    }
+                    else
+                    {
+                        SendChange(anAfter, aBefore, onChangeRun);
+                    }
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Emits the positions message and returns the same positions for the caller to walk,
+    /// or null when every element is new.
+    /// </summary>
+    private List<int>? PutListPositions<T>(IList<T> after, IList<T>? before, Func<T, object> id)
+    {
+        if (before == null || before.Count == 0)
+        {
+            // Every element is an addition, so the positions are a constant that needs
+            // neither an index map nor a key computed per element.
+            var added = new List<int>(after.Count);
+            for (int i = 0; i < after.Count; i++)
+            {
+                added.Add(AddedListItem);
+            }
+            Put(new RpcObjectData { State = CHANGE, Value = added });
+            return null;
+        }
+
+        var beforeIdx = new Dictionary<object, int>(before.Count);
+        for (int i = 0; i < before.Count; i++)
+        {
+            beforeIdx[id(before[i])] = i;
+        }
+
+        var positions = new List<int>(after.Count);
+        foreach (var t in after)
+        {
+            positions.Add(beforeIdx.TryGetValue(id(t), out var beforePos) ? beforePos : AddedListItem);
+        }
+
+        Put(new RpcObjectData { State = CHANGE, Value = positions });
+        return positions;
+    }
+
+    private void Add(object after, Action? onChange)
+    {
+        var afterVal = Reference.GetValueNonNull<object>(after);
+        int? refValue = null;
+
+        if (after is Reference)
+        {
+            if (_refs.TryGetValue(afterVal, out var existingRef))
+            {
+                Put(new RpcObjectData { State = ADD, Ref = existingRef });
+                return;
+            }
+            refValue = _refs.NextId();
+            _refs[afterVal] = refValue.Value;
+        }
+
+        var afterCodec = GetCodecFor(afterVal);
+        Put(new RpcObjectData
+        {
+            State = ADD,
+            ValueType = GetValueType(afterVal),
+            Value = onChange == null && afterCodec == null ? afterVal : null,
+            Ref = refValue
+        });
+        DoChange(afterVal, null, onChange, afterCodec);
+    }
+
+    private void DoChange(object? after, object? before, Action? onChange, IRpcCodec? afterCodec)
+    {
+        var lastBefore = _before;
+        _before = before;
+        try
+        {
+            if (onChange != null)
+            {
+                if (after != null)
+                {
+                    onChange();
+                }
+            }
+            else if (afterCodec != null && after != null)
+            {
+                afterCodec.RpcSend(after, this);
+            }
+        }
+        finally
+        {
+            _before = lastBefore;
+        }
+    }
+
+    private static string? GetValueType(object? after)
+    {
+        if (after == null) return null;
+
+        var type = after.GetType();
+        if (type.IsPrimitive || type.IsArray ||
+            (type.Namespace != null && type.Namespace.StartsWith("System")) ||
+            type == typeof(Guid) ||
+            typeof(System.Collections.IEnumerable).IsAssignableFrom(type))
+        {
+            return null;
+        }
+
+        if (type.IsEnum)
+        {
+            return null;
+        }
+
+        if (after is UnknownMarker unknown)
+        {
+            return unknown.JavaType ?? GenericMarker;
+        }
+
+        // a marker Java has no type for still has to arrive there as a marker
+        return ToJavaTypeName(type) ?? (after is Marker and not IRpcCodec ? GenericMarker : null);
+    }
+
+    /// <summary>
+    /// The Java type that carries a marker Java has no type of its own for.
+    /// </summary>
+    internal const string GenericMarker = "org.openrewrite.rpc.RpcMarker";
+
+    /// <summary>
+    /// Maps a C# type to its equivalent Java type name for RPC protocol compatibility.
+    /// Uses namespace-based conventions to derive the Java class name.
+    /// </summary>
+    internal static string? ToJavaTypeName(Type type)
+    {
+        // Check explicit overrides first
+        if (JavaTypeNameOverrides.TryGetValue(type, out var overrideName))
+            return overrideName;
+
+        var name = type.Name;
+
+        // Strip generic arity suffix (e.g., JRightPadded`1 → JRightPadded)
+        var backtick = name.IndexOf('`');
+        if (backtick >= 0) name = name[..backtick];
+
+        // Handle nested types: Outer+Inner → Outer$Inner
+        if (type.IsNested && type.DeclaringType != null)
+        {
+            var outerName = ToJavaTypeName(type.DeclaringType);
+            return outerName != null ? outerName + "$" + name : null;
+        }
+
+        return type.Namespace switch
+        {
+            "OpenRewrite.Java" => name switch
+            {
+                "JRightPadded" or "JLeftPadded" or "JContainer" or "JavaType" =>
+                    $"org.openrewrite.java.tree.{name}",
+                _ => $"org.openrewrite.java.tree.J${name}",
+            },
+            "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
+            "OpenRewrite.Xml" => $"org.openrewrite.xml.tree.Xml${name}",
+            "OpenRewrite.Core" => name switch
+            {
+                "Markers" => "org.openrewrite.marker.Markers",
+                "SearchResult" => "org.openrewrite.marker.SearchResult",
+                "RecipesThatMadeChanges" => "org.openrewrite.marker.RecipesThatMadeChanges",
+                "RecipeThatMadeChanges" => "org.openrewrite.marker.RecipeThatMadeChanges",
+                "Markup" => "org.openrewrite.marker.Markup",
+                "Space" => "org.openrewrite.java.tree.Space",
+                "TextComment" => "org.openrewrite.java.tree.TextComment",
+                "Checksum" => "org.openrewrite.Checksum",
+                "FileAttributes" => "org.openrewrite.FileAttributes",
+                _ => null,
+            },
+            _ => null
+        };
+    }
+}

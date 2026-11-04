@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -48,7 +49,7 @@ public class ExtractInterface {
                 JavaSourceFile c = (JavaSourceFile) requireNonNull(tree);
 
                 String pkg = c.getPackageDeclaration() == null ? "" :
-                        Arrays.stream(c.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
+                        Arrays.stream(PackageNameUtils.getPackageName(c.getPackageDeclaration()).split("\\."))
                                 .map(subpackage -> "..")
                                 .collect(joining("/", "../", "/"));
 
@@ -73,8 +74,8 @@ public class ExtractInterface {
             J.ClassDeclaration c = classDecl;
 
             c = c.withKind(J.ClassDeclaration.Kind.Type.Interface);
-            c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(), s ->
-                    s instanceof J.MethodDeclaration ? s : null)));
+            c = c.withBody(c.getBody().withStatements(ListUtils.filter(c.getBody().getStatements(), s ->
+                    s instanceof J.MethodDeclaration)));
             c = c.withName(c.getName().withSimpleName(fullyQualifiedInterfaceName.substring(
                     fullyQualifiedInterfaceName.lastIndexOf('.') + 1
             )));
@@ -93,10 +94,10 @@ public class ExtractInterface {
             }
 
             return method
-                    .withModifiers(ListUtils.map(method.getModifiers(), m ->
-                            m.getType() == J.Modifier.Type.Public ||
+                    .withModifiers(ListUtils.filter(method.getModifiers(), m ->
+                            !(m.getType() == J.Modifier.Type.Public ||
                             m.getType() == J.Modifier.Type.Final ||
-                            m.getType() == J.Modifier.Type.Native ? null : m))
+                            m.getType() == J.Modifier.Type.Native)))
                     .withBody(null);
         }
     }

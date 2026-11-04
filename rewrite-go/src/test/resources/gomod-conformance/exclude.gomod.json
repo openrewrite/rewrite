@@ -1,0 +1,14 @@
+{
+  "modulePath": "example.com/withexclude",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [
+    {"modulePath": "github.com/x/y", "version": "v1.0.0", "indirect": false}
+  ],
+  "replaces": [],
+  "excludes": [
+    {"modulePath": "github.com/bad", "version": "v0.0.1"}
+  ],
+  "retracts": [],
+  "resolvedDependencies": []
+}

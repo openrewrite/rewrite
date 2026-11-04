@@ -19,7 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.DataTableDescriptor;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecipeMarketplaceReaderTest {
 
@@ -286,6 +289,558 @@ class RecipeMarketplaceReaderTest {
         int zebraIndex = header.indexOf("zebra");
 
         assertThat(authorIndex).isLessThan(zebraIndex);
+    }
+
+    @Test
+    void writerSortsRecipeRowsAlphabetically() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.Zeta,Search,Java,maven,org.example:rewrite-java
+          org.example.Alpha,Search,Maven,maven,org.example:rewrite-maven
+          org.example.Beta,Cleanup,Java,maven,org.example:rewrite-java
+          """);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        List<String> recipeRows = writtenCsv.lines()
+          .skip(1)
+          .toList();
+
+        assertThat(recipeRows).isSorted();
+    }
+
+    @Test
+    void recipeInMultipleCategoriesHasSeparateListingInstances() {
+        // Distinct listing instances are what encode multi-category membership, so a recipe
+        // that works for two languages is filed under both.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,category2,ecosystem,packageName
+          org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,JavaScript,maven,org.openrewrite:rewrite-java
+          """);
+
+        // getAllRecipes() returns a deduplicated set (by recipe name)
+        assertThat(marketplace.getAllRecipes()).hasSize(1);
+
+        // But the recipe exists in both Java and JavaScript categories
+        RecipeMarketplace.Category java = findCategory(marketplace.getRoot(), "Java");
+        RecipeMarketplace.Category javascript = findCategory(marketplace.getRoot(), "JavaScript");
+
+        assertThat(java.getCategories()).extracting("displayName").containsExactly("ChangeMethodName");
+        assertThat(javascript.getCategories()).extracting("displayName").containsExactly("ChangeMethodName");
+
+        RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
+        RecipeListing jsListing = findCategory(javascript, "ChangeMethodName").getRecipes().getFirst();
+
+        assertThat(javaListing).isNotSameAs(jsListing);
+        assertThat(javaListing.getBundle()).isSameAs(jsListing.getBundle());
+    }
+
+    @Test
+    void bundlesAreInternedPerEcosystemAndPackage() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1,category2
+          maven,org.openrewrite:rewrite-java,LATEST,8.70.0,org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,Java
+          maven,org.openrewrite:rewrite-java,LATEST,8.70.0,org.openrewrite.java.ChangeMethodName,Change method name,ChangeMethodName,JavaScript
+          """);
+
+        RecipeMarketplace.Category java = findCategory(marketplace.getRoot(), "Java");
+        RecipeMarketplace.Category js = findCategory(marketplace.getRoot(), "JavaScript");
+        RecipeListing javaListing = findCategory(java, "ChangeMethodName").getRecipes().getFirst();
+        RecipeListing jsListing = findCategory(js, "ChangeMethodName").getRecipes().getFirst();
+
+        assertThat(javaListing).isNotSameAs(jsListing);
+        assertThat(javaListing.getBundle()).isSameAs(jsListing.getBundle());
+
+        assertThat(marketplace.getBundles()).hasSize(1);
+        assertThat(marketplace.bundleFor("maven", "org.openrewrite:rewrite-java"))
+                .isSameAs(javaListing.getBundle());
+    }
+
+    @Test
+    void nullLiteralVersionIsTreatedAsNull() {
+        // When a CSV contains the literal string "null" for version/requestedVersion,
+        // the reader should treat it as null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,requestedVersion,version
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java,null,null
+          """);
+
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        RecipeBundle bundle = listing.getBundle();
+        assertThat(bundle.getRequestedVersion()).isNull();
+        assertThat(bundle.getVersion()).isNull();
+    }
+
+    @Test
+    void roundTripPreservesNullVersions() {
+        // Create a marketplace with null versions, write to CSV, read back,
+        // and verify versions remain null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java
+          """);
+
+        // Verify initial state has null versions
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        assertThat(listing.getBundle().getVersion()).isNull();
+        assertThat(listing.getBundle().getRequestedVersion()).isNull();
+
+        // Round-trip through CSV
+        @Language("csv") String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing rtListing = roundTripped.getAllRecipes().iterator().next();
+        assertThat(rtListing.getBundle().getVersion()).isNull();
+        assertThat(rtListing.getBundle().getRequestedVersion()).isNull();
+    }
+
+    @Test
+    void mergePreservesMetadata() {
+        // Source marketplace has a recipe with metadata in "Java" category
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.TestRecipe,Test Recipe,A test recipe,Java,maven,org.example:test,abc123
+          """);
+
+        // Verify metadata was read
+        RecipeListing sourceRecipe = source.getAllRecipes().iterator().next();
+        assertThat(sourceRecipe.getMetadata().get("embedding")).isEqualTo("abc123");
+
+        // Target marketplace also has a recipe in "Java" (overlapping category)
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.OtherRecipe,Other Recipe,Another recipe,Java,maven,org.example:other,xyz789
+          """);
+
+        // Merge source into target — both have "Java" category so this exercises
+        // the recursive merge path where withMarketplace() is called
+        target.merge(source);
+
+        // Verify both recipes exist and metadata is preserved
+        RecipeListing mergedTest = target.findRecipe("org.example.TestRecipe");
+        assertThat(mergedTest).isNotNull();
+        assertThat(mergedTest.getMetadata().get("embedding"))
+          .as("Metadata should be preserved through merge when categories overlap")
+          .isEqualTo("abc123");
+
+        RecipeListing mergedOther = target.findRecipe("org.example.OtherRecipe");
+        assertThat(mergedOther).isNotNull();
+        assertThat(mergedOther.getMetadata().get("embedding")).isEqualTo("xyz789");
+    }
+
+    @Test
+    void mergeShadowsACollidingNameRatherThanDroppingIt() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:near,1.0.0,1.0.0,com.foo.Bar,Near,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:far,2.0.0,2.0.0,com.foo.Bar,Far,Java
+          """);
+
+        nearest.merge(farther);
+
+        assertThat(nearest.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .isEqualTo("org.example:near");
+        assertThat(nearest.getAllRecipes())
+                .as("The projection resolves one listing per name")
+                .hasSize(1);
+
+        nearest.uninstall("maven", "org.example:near");
+
+        assertThat(nearest.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .as("The shadowed listing was stored, so it resolves without reinstalling its bundle")
+                .isEqualTo("org.example:far");
+    }
+
+    @Test
+    void anInstalledCoordinateBlocksEveryListingAFartherVersionOffers() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,2.0.0,2.0.0,com.foo.Kept,Kept,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Kept,Kept,Java
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Dropped,Dropped,Java
+          """);
+
+        assertThat(nearest.merge(farther)).isEmpty();
+        assertThat(nearest.findRecipe("com.foo.Dropped"))
+                .as("A recipe the nearer version removed stays removed; the older version does not resurrect it")
+                .isNull();
+        assertThat(nearest.bundleFor("maven", "org.example:lib").getVersion()).isEqualTo("2.0.0");
+    }
+
+    @Test
+    void mergingTheSameMarketplaceTwiceAddsNothing() {
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,Java
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        assertThat(target.merge(source)).hasSize(1);
+        assertThat(target.merge(source)).isEmpty();
+        assertThat(target.getAllRecipes()).hasSize(1);
+    }
+
+    @Test
+    void mergeLandsEveryCategoryOfABundleNotOnlyTheFirst() {
+        // Interning registers a bundle as its first listing lands, so the already-installed
+        // check has to read a snapshot: a live one would block the bundle's own later
+        // categories. A generated marketplace is exactly this shape -- one bundle, many
+        // categories, and one recipe filed under two of them.
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,Java
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Baz,Baz,JavaScript
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Bar,Bar,JavaScript
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        target.merge(source);
+
+        assertThat(target.getCategories()).extracting("displayName")
+                .containsExactlyInAnyOrder("Java", "JavaScript");
+        assertThat(findCategory(target.getRoot(), "Java").getRecipes())
+                .extracting(RecipeListing::getName).containsExactly("com.foo.Bar");
+        assertThat(findCategory(target.getRoot(), "JavaScript").getRecipes())
+                .extracting(RecipeListing::getName)
+                .containsExactlyInAnyOrder("com.foo.Bar", "com.foo.Baz");
+    }
+
+    @Test
+    void aWhollyBlockedSubtreeGraftsNoEmptyCategories() {
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,2.0.0,2.0.0,com.foo.Bar,Bar,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:lib,1.0.0,1.0.0,com.foo.Baz,Baz,Python
+          """);
+
+        target.merge(farther);
+
+        assertThat(target.getRoot().getCategories())
+                .extracting(RecipeMarketplace.Category::getDisplayName)
+                .containsExactly("Java");
+    }
+
+    @Test
+    void aShadowedListingSurvivesACsvRoundTrip() {
+        RecipeMarketplace nearest = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:near,1.0.0,1.0.0,com.foo.Bar,Near,Java
+          """);
+        RecipeMarketplace farther = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:far,2.0.0,2.0.0,com.foo.Bar,Far,Java
+          """);
+        nearest.merge(farther);
+
+        RecipeMarketplace reloaded = new RecipeMarketplaceReader()
+                .fromCsv(new RecipeMarketplaceWriter().toCsv(nearest));
+
+        assertThat(reloaded.getBundles())
+                .extracting(RecipeBundle::getPackageName)
+                .containsExactly("org.example:far", "org.example:near");
+        assertThat(reloaded.findRecipe("com.foo.Bar").getBundle().getPackageName())
+                .as("The writer sorts rows by coordinate, so precedence within one marketplace " +
+                    "survives reload as a property of the coordinate rather than of install order")
+                .isEqualTo("org.example:far");
+    }
+
+    @Test
+    void mergeCategoriesCaseInsensitive() {
+        // Simulates the real-world scenario where rewrite-java defines category "AI"
+        // and rewrite-ai defines category "ai" -- these should merge into one category
+        RecipeMarketplace marketplace1 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.openrewrite.java.ai.ClassDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.ai.MethodDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          """);
+
+        RecipeMarketplace marketplace2 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          io.moderne.ai.FindAgentsInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          io.moderne.ai.FindLibrariesInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          """);
+
+        marketplace1.merge(marketplace2);
+
+        assertThat(marketplace1.getRoot().getCategories())
+          .as("AI and ai should merge into a single category")
+          .hasSize(1);
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getRecipes()).hasSize(4);
+        // The first-seen casing wins
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
+    @Test
+    void mergeDoesNotAliasCategoryBranches() {
+        // Regression: when the target lacks a category that the source has, merge
+        // must deep-copy the branch rather than aliasing the source's Category
+        // instance. Otherwise later mutations to the target's tree mutate the
+        // source as well, and when the source is a cached marketplace shared
+        // across requests, concurrent readers iterate while a writer mutates,
+        // producing ConcurrentModificationException.
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.SourceRecipe,Inner,Outer,maven,org.example:source
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        target.merge(source);
+
+        RecipeMarketplace.Category sourceOuter = findCategory(source.getRoot(), "Outer");
+        RecipeMarketplace.Category targetOuter = findCategory(target.getRoot(), "Outer");
+        assertThat(targetOuter).isNotSameAs(sourceOuter);
+        assertThat(findCategory(targetOuter, "Inner")).isNotSameAs(findCategory(sourceOuter, "Inner"));
+
+        // Mutate the target by merging an overlay that overlaps the same path.
+        // If the target's branches were aliased to source, this would also mutate source.
+        RecipeMarketplace overlay = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.OverlayRecipe,Inner,Outer,maven,org.example:overlay
+          """);
+        target.merge(overlay);
+
+        assertThat(findCategory(sourceOuter, "Inner").getRecipes())
+          .as("Source category must not be mutated by changes to merge target")
+          .extracting(RecipeListing::getName)
+          .containsExactly("org.example.SourceRecipe");
+
+        assertThat(findCategory(targetOuter, "Inner").getRecipes())
+          .extracting(RecipeListing::getName)
+          .containsExactlyInAnyOrder("org.example.SourceRecipe", "org.example.OverlayRecipe");
+    }
+
+    @Test
+    void installCategoriesCaseInsensitive() {
+        // When installing recipes via CSV where one uses "AI" and another uses "ai"
+        // in the same category position, they should land in the same category
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.example.Recipe1,AI,maven,org.example:test1
+          org.example.Recipe2,ai,maven,org.example:test2
+          """);
+
+        assertThat(marketplace.getRoot().getCategories())
+          .as("AI and ai should be treated as the same category during install")
+          .hasSize(1);
+        assertThat(marketplace.getRoot().getCategories().getFirst().getRecipes()).hasSize(2);
+        // The first-seen casing wins
+        assertThat(marketplace.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
+    @Test
+    void versionColumnsAreOmittedWhenNoListingHasAVersion() {
+        // The shape of a generated inner recipes.csv: identity, but nothing resolved yet.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,name,displayName,category1
+          yaml,recipes/team.yml,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,name,");
+    }
+
+    @Test
+    void aGeneratedInnerCsvCarriesNoVersionColumns() {
+        // MavenRecipeMarketplaceGenerator stamps "" rather than null for both versions, so the
+        // contract has to hold for blank as well as absent.
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        marketplace.install(new RecipeListing(marketplace, "com.foo.Bar", "Bar", "Bar does a thing.",
+                null, List.of(), List.of(), 1,
+                new RecipeBundle("maven", "org.example:a", "", "", null)), List.of());
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,name,");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow())
+                .startsWith("maven,org.example:a,com.foo.Bar,");
+    }
+
+    @Test
+    void versionColumnsAreEmittedWhenAnyListingHasAVersion() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:a,LATEST,1.0.0,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,requestedVersion,version,name,");
+    }
+
+    @Test
+    void aRequestedVersionAloneStillEmitsTheVersionColumns() {
+        // Gating on the resolved version alone would silently drop this row's requestedVersion.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,requestedVersion,version,name,displayName,category1
+          maven,org.example:a,LATEST,,com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv.lines().findFirst().orElseThrow())
+                .startsWith("ecosystem,packageName,requestedVersion,version,name,");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow())
+                .startsWith("maven,org.example:a,LATEST,,com.foo.Bar,");
+    }
+
+    @Test
+    void nullIdentityWritesEmptyCellsNotNullLiterals() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1
+          com.foo.Bar,Bar,Java
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        assertThat(csv).doesNotContain("null");
+        assertThat(csv.lines().skip(1).findFirst().orElseThrow()).startsWith(",,com.foo.Bar,");
+    }
+
+    @Test
+    void identityColumnsAreOptional() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category1
+          com.foo.Bar,Bar,Bar does a thing.,Java
+          """);
+
+        RecipeListing listing = marketplace.findRecipe("com.foo.Bar");
+        assertThat(listing).isNotNull();
+        assertThat(listing.getBundle().getPackageEcosystem()).isNull();
+        assertThat(listing.getBundle().getPackageName()).isNull();
+    }
+
+    @Test
+    void mergeRejectsAMarketplaceWhoseBundlesAreUnidentified() {
+        RecipeMarketplace inner = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category1
+          com.foo.Bar,Bar,Bar does a thing.,Java
+          """);
+
+        assertThatThrownBy(() -> new RecipeMarketplace().merge(inner))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("com.foo.Bar")
+          .hasMessageContaining("bound to a resolved bundle");
+    }
+
+    @Test
+    void identityColumnsAreAllOrNothing() {
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,name,displayName,category1
+          maven,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("com.foo.Bar")
+          .hasMessageContaining("only 'ecosystem'");
+
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          packageName,name,displayName,category1
+          org.example:lib,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("only 'packageName'");
+    }
+
+    @Test
+    void blankIdentityCellCountsAsAbsent() {
+        // The reader normalizes a blank cell to null, so a populated ecosystem beside an empty
+        // packageName is exactly-one, not both.
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,name,displayName,category1
+          maven,,com.foo.Bar,Bar,Java
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("only 'ecosystem'");
+    }
+
+    @Test
+    void writerPersistsRawVersionNotEffectiveVersion() {
+        // An unresolved bundle (version=null, requestedVersion=">=1.0") must write an empty
+        // version cell. The writer must not persist getEffectiveVersion()'s fallback -- doing so
+        // would make a read-back bundle's "resolved" version look like a dynamic constraint.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,ecosystem,packageName,requestedVersion
+          com.foo.Bar,Bar,Java,maven,org.example:lib,>=1.0
+          """);
+
+        String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        String[] columns = csv.lines().skip(1).findFirst().orElseThrow().split(",", -1);
+
+        assertThat(columns[2]).as("requestedVersion column").isEqualTo(">=1.0");
+        assertThat(columns[3]).as("version column").isEmpty();
+    }
+
+    @Test
+    void equalityIsIdentityOnly() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:lib", "LATEST", "1.0.0", null);
+        RecipeBundle b = new RecipeBundle("maven", "org.example:lib", null, "2.0.0", "team");
+
+        assertThat(a).isEqualTo(b);
+        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        assertThat(a).isNotEqualTo(new RecipeBundle("pip", "org.example:lib", null, "1.0.0", null));
+    }
+
+    @Test
+    void withVersionReturnsACopy() {
+        RecipeBundle a = new RecipeBundle("maven", "org.example:lib", "LATEST", null, null);
+        RecipeBundle b = a.withVersion("1.0.0");
+
+        assertThat(b).isNotSameAs(a);
+        assertThat(a.getVersion()).isNull();
+        assertThat(b.getVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void effectiveVersionFallsBackToRequestedVersionButVersionDoesNot() {
+        RecipeBundle unresolved = new RecipeBundle("maven", "org.example:lib", "LATEST", null, null);
+        RecipeBundle resolved = unresolved.withVersion("1.0.0");
+
+        assertThat(unresolved.getVersion()).isNull();
+        assertThat(resolved.getVersion()).isEqualTo("1.0.0");
+
+        assertThat(unresolved.getEffectiveVersion()).isEqualTo("LATEST");
+        assertThat(resolved.getEffectiveVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void roundTripDoesNotMigrateRequestedVersionIntoVersionColumn() {
+        // An unresolved bundle (version=null, requestedVersion set) must survive
+        // read -> write -> read without the constraint leaking into the version column.
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,category1,ecosystem,packageName,requestedVersion
+          com.foo.Bar,Bar,Java,maven,org.example:lib,>=1.0
+          """);
+
+        String firstCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(firstCsv);
+        String secondCsv = new RecipeMarketplaceWriter().toCsv(roundTripped);
+
+        RecipeBundle bundle = roundTripped.findRecipe("com.foo.Bar").getBundle();
+        assertThat(bundle.getRequestedVersion()).isEqualTo(">=1.0");
+        assertThat(bundle.getVersion()).isNull();
+        assertThat(secondCsv).isEqualTo(firstCsv);
+    }
+
+    @Test
+    void nameIsStillRequired() {
+        assertThatThrownBy(() -> new RecipeMarketplaceReader().fromCsv("""
+          ecosystem,packageName,displayName
+          maven,org.example:lib,Bar
+          """))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("name");
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {

@@ -31,6 +31,8 @@ import org.openrewrite.maven.tree.MavenRepository;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @SuppressWarnings("unused")
 public class ToolingApiOpenRewriteModelPlugin implements Plugin<Project> {
@@ -60,6 +62,14 @@ public class ToolingApiOpenRewriteModelPlugin implements Plugin<Project> {
                 org.openrewrite.gradle.marker.GradleProject gradleProject = GradleProjectBuilder.gradleProject(project);
                 byte[] gradleProjectBytes = mapper.writeValueAsBytes(gradleProject);
 
+                Map<String, byte[]> gradleProjectsByPath = new LinkedHashMap<>();
+                gradleProjectsByPath.put(project.getPath(), gradleProjectBytes);
+                for (Project p : project.getRootProject().getAllprojects()) {
+                    if (!p.getPath().equals(project.getPath())) {
+                        gradleProjectsByPath.put(p.getPath(), mapper.writeValueAsBytes(GradleProjectBuilder.gradleProject(p)));
+                    }
+                }
+
                 byte[] gradleSettingsBytes = null;
                 if (GradleVersion.current().compareTo(GradleVersion.version("4.4")) >= 0 &&
                     (new File(project.getProjectDir(), "settings.gradle").exists() ||
@@ -67,7 +77,7 @@ public class ToolingApiOpenRewriteModelPlugin implements Plugin<Project> {
                     GradleSettings gradleSettings = GradleSettingsBuilder.gradleSettings(((DefaultGradle) project.getGradle()).getSettings());
                     gradleSettingsBytes = mapper.writeValueAsBytes(gradleSettings);
                 }
-                return new OpenRewriteModelImpl(gradleProjectBytes, gradleSettingsBytes);
+                return new OpenRewriteModelImpl(gradleProjectBytes, gradleProjectsByPath, gradleSettingsBytes);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to serialize Gradle model to JSON", e);
             }

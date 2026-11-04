@@ -52,8 +52,7 @@ public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
     transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
-    private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final Function<Object, Set<GroupArtifactVersion>> EMPTY = gav -> new HashSet<>();
 
     @Option(displayName = "Group pattern",
@@ -200,15 +199,18 @@ public class DependencyInsight extends Recipe {
                         continue;
                     }
                     String configName = c.getName();
+                    List<ResolvedDependency> roots = new ArrayList<>();
                     for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
                         if (!resolvedDependency.isDirect()) {
                             continue;
                         }
-                        matches.collect(configName, resolvedDependency, dependencyMatcher,
-                                (matched, path) -> {
-                                    dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>())
-                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(configName, path);
-                                });
+                        roots.add(resolvedDependency);
+                        matches.collect(configName, resolvedDependency, dependencyMatcher, null);
+                    }
+                    Map<ResolvedGroupArtifactVersion, DependencyGraph> graphs =
+                            DependencyGraph.build(configName, roots, dependencyMatcher);
+                    if (!graphs.isEmpty()) {
+                        dependencyPathsByConfiguration.computeIfAbsent(configName, __ -> new HashMap<>()).putAll(graphs);
                     }
                 }
             }

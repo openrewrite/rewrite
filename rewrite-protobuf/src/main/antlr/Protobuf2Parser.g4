@@ -3,7 +3,7 @@ parser grammar Protobuf2Parser;
 options { tokenVocab=Protobuf2Lexer; }
 
 proto
-  : syntax? (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
+  : (syntax | edition)? (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
   ;
 
 stringLiteral
@@ -17,6 +17,10 @@ identOrReserved
 
 syntax
   : SYNTAX ASSIGN stringLiteral SEMI
+  ;
+
+edition
+  : EDITION ASSIGN stringLiteral SEMI
   ;
 
 importStatement
@@ -52,6 +56,7 @@ topLevelDef
 
 ident
   : Ident
+  | reservedWord
   ;
 
 message
@@ -62,8 +67,12 @@ messageField
   : (OPTIONAL | REQUIRED | REPEATED) field
   ;
 
+group
+  : (OPTIONAL | REQUIRED | REPEATED) GROUP ident ASSIGN IntegerLiteral messageBody
+  ;
+
 messageBody
-  : LBRACE (messageField | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | emptyStatement)* RBRACE
+  : LBRACE (messageField | group | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | extensions | emptyStatement)* RBRACE
   ;
 
 extend
@@ -79,7 +88,7 @@ enumBody
   ;
 
 enumField
-  : ident ASSIGN MINUS? IntegerLiteral optionList? SEMI
+  : ident ASSIGN (MINUS? IntegerLiteral | NumericLiteral) optionList? SEMI
   ;
 
 service
@@ -106,12 +115,16 @@ reserved
   : RESERVED (ranges | fieldNames) SEMI
   ;
 
+extensions
+  : EXTENSIONS ranges SEMI
+  ;
+
 ranges
   : range (COMMA range)*
   ;
 
 range
-  : IntegerLiteral (TO IntegerLiteral)?
+  : IntegerLiteral (TO (IntegerLiteral | MAX))?
   ;
 
 fieldNames
@@ -164,16 +177,51 @@ keyType
   | STRING
   ;
 
+// Protobuf does not reserve its keywords: every keyword is also an identifier,
+// so any of them may be spelled where an identifier is (e.g. `optional string group = 8;`
+// or `optional bool optional = 5;`, both common in real-world .proto files). The
+// lexer tokenizes each keyword distinctly, so they are re-admitted as identifiers
+// here. See https://protobuf.com/docs/language-spec#identifiers-and-keywords.
 reservedWord
-  : MESSAGE
+  : BOOL
+  | BYTES
+  | DOUBLE
+  | EDITION
+  | ENUM
+  | EXTEND
+  | EXTENSIONS
+  | FIXED32
+  | FIXED64
+  | FLOAT
+  | GROUP
+  | IMPORT
+  | INT32
+  | INT64
+  | MAP
+  | MAX
+  | MESSAGE
+  | ONEOF
   | OPTION
+  | OPTIONAL
   | PACKAGE
+  | PUBLIC
+  | REPEATED
+  | REQUIRED
+  | RESERVED
+  | RETURNS
+  | RPC
   | SERVICE
+  | SFIXED32
+  | SFIXED64
+  | SINT32
+  | SINT64
   | STREAM
   | STRING
   | SYNTAX
+  | TO
+  | UINT32
+  | UINT64
   | WEAK
-  | RPC
   ;
 
 /*

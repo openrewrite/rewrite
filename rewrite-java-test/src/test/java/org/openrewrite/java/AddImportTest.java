@@ -408,6 +408,24 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedByStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", null, true))),
+          java(
+            """
+              import java.util.List;
+
+              import static java.util.Collections.*;
+
+              class A {
+                  List<String> list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addImportInsertsNewMiddleBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
@@ -1648,6 +1666,47 @@ class AddImportTest implements RewriteTest {
                   DataType d2 = DataType.TYPE_2;
                   DataType d1 = DataType.TYPE_1;
                   A a;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7178")
+    @Test
+    void addImportWithInflowOrdering() {
+        rewriteRun(
+          importLayout(
+            "java.util.Properties", null,
+            ImportLayoutStyle.builder()
+              .importAllOthersInflow()
+          ),
+          java(
+            """
+              import java.util.List;
+              import java.util.Optional;
+              import static java.util.Optional.ofNullable;
+              import java.util.Scanner;
+
+              public class Test {
+                  List l;
+                  Optional o;
+                  Object n = ofNullable(null);
+                  Scanner s;
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.Optional;
+              import static java.util.Optional.ofNullable;
+              import java.util.Properties;
+              import java.util.Scanner;
+
+              public class Test {
+                  List l;
+                  Optional o;
+                  Object n = ofNullable(null);
+                  Scanner s;
               }
               """
           )

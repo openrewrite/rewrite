@@ -17,7 +17,8 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {YamlVisitor} from "./visitor";
 import {printTag, Yaml} from "./tree";
 import {Cursor} from "../tree";
-import {Markers} from "../markers";
+import {findMarker, Markers} from "../markers";
+import "./markers"; // Ensures Yaml.Markers is defined
 
 class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
@@ -35,6 +36,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     protected async visitDocument(document: Yaml.Document, p: PrintOutputCapture): Promise<Yaml | undefined> {
         await this.beforeSyntax(document, p);
+        for (const directive of document.directives) {
+            await this.visit(directive, p);
+        }
         if (document.explicit) {
             p.append("---");
         }
@@ -42,6 +46,15 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.visit(document.end, p);
         this.afterSyntax(document, p);
         return document;
+    }
+
+    protected async visitDirective(directive: Yaml.Directive, p: PrintOutputCapture): Promise<Yaml | undefined> {
+        await this.beforeSyntax(directive, p);
+        p.append('%');
+        p.append(directive.value);
+        p.append(directive.suffix);
+        this.afterSyntax(directive, p);
+        return directive;
     }
 
     protected async visitDocumentEnd(end: Yaml.DocumentEnd, p: PrintOutputCapture): Promise<Yaml | undefined> {
@@ -56,6 +69,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.beforeSyntax(mapping, p);
         if (mapping.anchor) {
             await this.visit(mapping.anchor, p);
+        }
+        if (mapping.tag) {
+            await this.visit(mapping.tag, p);
         }
         if (mapping.openingBracePrefix !== undefined) {
             p.append(mapping.openingBracePrefix);
@@ -76,7 +92,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.beforeSyntax(entry, p);
         await this.visit(entry.key, p);
         p.append(entry.beforeMappingValueIndicator);
-        p.append(':');
+        if (!findMarker(entry, Yaml.Markers.OmitColon)) {
+            p.append(':');
+        }
         await this.visit(entry.value, p);
         this.afterSyntax(entry, p);
         return entry;
@@ -84,11 +102,11 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
     protected async visitScalar(scalar: Yaml.Scalar, p: PrintOutputCapture): Promise<Yaml | undefined> {
         await this.beforeSyntax(scalar, p);
-        if (scalar.tag) {
-            await this.visit(scalar.tag, p);
-        }
         if (scalar.anchor) {
             await this.visit(scalar.anchor, p);
+        }
+        if (scalar.tag) {
+            await this.visit(scalar.tag, p);
         }
         switch (scalar.style) {
             case Yaml.ScalarStyle.DOUBLE_QUOTED:
@@ -122,6 +140,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.beforeSyntax(sequence, p);
         if (sequence.anchor) {
             await this.visit(sequence.anchor, p);
+        }
+        if (sequence.tag) {
+            await this.visit(sequence.tag, p);
         }
         if (sequence.openingBracketPrefix !== undefined) {
             p.append(sequence.openingBracketPrefix);

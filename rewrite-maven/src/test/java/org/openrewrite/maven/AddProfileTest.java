@@ -29,7 +29,7 @@ class AddProfileTest implements RewriteTest {
     @Test
     void addProfileToPom() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
@@ -69,7 +69,7 @@ class AddProfileTest implements RewriteTest {
     @Test
     void preExistingOtherProfile() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
@@ -122,7 +122,7 @@ class AddProfileTest implements RewriteTest {
     @Test
     void preExistingMatchingProfile() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
             "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
           pomXml(
             """
@@ -168,6 +168,37 @@ class AddProfileTest implements RewriteTest {
         );
     }
 
+
+    @Test
+    void preExistingIdenticalProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
+          pomXml(
+            """
+              <project>
+                <groupId>group</groupId>
+                <artifactId>artifact</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>myprofile</id>
+                    <activation>
+                      <foo>foo</foo>
+                    </activation>
+                    <properties>
+                      <bar>bar</bar>
+                    </properties>
+                    <build>
+                      <param>value</param>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
 
     @Test
     void notAPom() {

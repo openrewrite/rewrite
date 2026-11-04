@@ -27,7 +27,6 @@ import org.openrewrite.test.RewriteTest;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -81,20 +80,20 @@ class RenameVariableTest implements RewriteTest {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if ("A".equals(classDecl.getSimpleName())) {
-                    List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
+                    List<J.VariableDeclarations> variableDecls = new ArrayList<>(classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
-                      .collect(toList());
+                      .toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
+                            classDecl.getBody().getStatements().stream()
                             .filter(J.MethodDeclaration.class::isInstance)
                             .map(J.MethodDeclaration.class::cast)
                             .flatMap(it -> it.getParameters().stream())
                             .filter(J.VariableDeclarations.class::isInstance)
                             .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                            .toList()
                         );
                     }
 
@@ -976,6 +975,159 @@ class RenameVariableTest implements RewriteTest {
               class A {
                 FooBarBaz fooBarBaz = new FooBarBaz();
                 Class<?> clazz = FooBarBaz.class;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/902")
+    @Test
+    void doNotRenameMethodReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameTypeCast() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Object get(Object o) { return (Foo) o; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Object get(Object o) { return (Foo) o; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameInstanceOf() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  boolean isFoo(Object o) { return o instanceof Foo; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  boolean isFoo(Object o) { return o instanceof Foo; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameArrayReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Foo[] all() { return new Foo[0]; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Foo[] all() { return new Foo[0]; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameAnnotatedReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target(ElementType.TYPE_USE)
+              @interface Marker {}
+              class A {
+                  private Foo Foo;
+                  @Marker Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """,
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target(ElementType.TYPE_USE)
+              @interface Marker {}
+              class A {
+                  private Foo foo;
+                  @Marker Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameAnnotationType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
+              @interface Foo {}
+              class A {
+                  private Object Foo;
+                  @Foo Object get() { return Foo; }
+              }
+              """,
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
+              @interface Foo {}
+              class A {
+                  private Object foo;
+                  @Foo Object get() { return foo; }
               }
               """
           )

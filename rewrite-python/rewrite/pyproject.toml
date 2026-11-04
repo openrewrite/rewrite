@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,36 +7,45 @@ name = "openrewrite"
 description = "OpenRewrite automated refactoring for Python."
 version = "0.0.0"  # Updated dynamically during release
 authors = [{ name = "Moderne Inc.", email = "support@moderne.io" }]
-license = { text = "Moderne Source Available License" }
+license = "LicenseRef-Moderne-Source-Available"
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Code Generators",
     "Topic :: Software Development :: Quality Assurance",
     "Typing :: Typed",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "cbor2>=5.6.5",
     "more_itertools>=10.0.0",
-    "pytype>=2024.1.1; python_version < '3.13'",
+    "ty-types>=0.0.84",  # Type inference CLI for Python type attribution
+    "parso>=0.7.1,<0.8",  # Python 2/3 parser with CST support (0.8+ dropped Python 2.7 grammar)
+    # RPC frame encoding. Declared only where orjson publishes a wheel, as elsewhere pip would need
+    # a Rust toolchain to build it. The RPC codec falls back to the stdlib json module without it.
+    "orjson>=3.10; platform_python_implementation == 'CPython' and (platform_machine == 'x86_64' or platform_machine == 'aarch64' or platform_machine == 'arm64' or platform_machine == 'AMD64' or platform_machine == 'ARM64')",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "pip",
     "pytest>=8.0.0",
-    "mypy>=1.0.0",
+    "pytest-timeout>=2.0.0",
+    "tox>=4.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+    "ty==0.0.84",  # Pinned: tests/test_generated_stubs.py asserts its diagnostics
 ]
 publish = [
     "build>=1.0.0",
-    "twine>=5.0.0",
+    "twine>=6.1.0",
+]
+# Continuous profiling for production recipe-worker subprocesses; the RPC
+# server's _init_pyroscope() is a no-op when this isn't installed.
+profiling = [
+    "pyroscope-io>=0.8.0",
 ]
 
 [project.urls]
@@ -48,6 +57,9 @@ Issues = "https://github.com/openrewrite/rewrite/issues"
 [project.entry-points."openrewrite.recipes"]
 openrewrite = "rewrite:activate"
 
+[project.scripts]
+rewrite-python-types = "rewrite.python.type_report:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["rewrite", "rewrite.*"]
@@ -57,22 +69,46 @@ include = ["rewrite", "rewrite.*"]
 
 [tool.black]
 line-length = 120
-target-version = ["py310", "py311", "py312"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
+[tool.ty.environment]
+python-version = "3.12"
+root = ["src"]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.rules]
+# Ignored rules (ty limitations with the visitor-pattern architecture).
+# Counts are approximate and reflect ty 0.0.84.
+# - invalid-argument-type: ~820 errors from generic TypeVar / `Self` variance in
+#   visitor and padding methods (e.g. visit_and_cast's `Type[T]` parameter,
+#   accept_*() narrowing `Self` to the concrete subclass). The `Self` case is
+#   tracked upstream as https://github.com/astral-sh/ty/issues/2255
+# - unresolved-reference: ~8 nested JavaType kinds naming JavaType as their base
+#   inside its own body. A runtime-only placeholder resolves the name there. The
+#   generated stubs name the real base.
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
+
+[tool.tox]
+# Run version-specific tests: `tox -e py313`
+# Runs all tests; version-gated tests (e.g. tests/python/py313/) are
+# automatically skipped on incompatible Python versions via conftest.py.
+env_list = ["py311", "py312", "py313"]
+
+[tool.tox.env_run_base]
+deps = ["pytest>=8.0.0", "pytest-timeout>=2.0.0", "ty==0.0.84"]
+commands = [["pytest", "tests/", "-v", "--timeout=60"]]

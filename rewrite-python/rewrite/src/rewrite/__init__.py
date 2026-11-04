@@ -9,15 +9,23 @@ except ImportError:
 
 from .category import CategoryDescriptor, LOWEST_PRECEDENCE, DEFAULT_PRECEDENCE, HIGHEST_PRECEDENCE
 from .decorators import categorize, get_recipe_category
-from .discovery import discover_recipes, discover_decorated_recipes_in_module
+from .discovery import (
+    discover_recipes,
+    discover_decorated_recipes_in_module,
+    RecipeAttribution,
+    RecipeName,
+    NormalizedDistName,
+)
 from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
     RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
+from .heavyweight import Heavyweight
 from .marketplace import RecipeMarketplace, Python
 from .recipe import Recipe, ScanningRecipe, option, OptionDescriptor, RecipeDescriptor
 from .markers import *
 from .parser import *
 from .result import *
 from .style import *
+from .preconditions import Check, CompositePrecondition, Preconditions, RecipeCheck, RecipeRef
 from .tree import Checksum, FileAttributes, SourceFile, Tree, PrintOutputCapture, PrinterFactory
 from .utils import random_id, list_find, list_map, list_map_last
 from .visitor import Cursor, TreeVisitor
@@ -53,9 +61,17 @@ __all__ = [
     # Recipe
     'Recipe',
     'ScanningRecipe',
+    'Heavyweight',
     'option',
     'OptionDescriptor',
     'RecipeDescriptor',
+
+    # Preconditions
+    'Check',
+    'CompositePrecondition',
+    'Preconditions',
+    'RecipeCheck',
+    'RecipeRef',
 
     # Categories and Marketplace
     'CategoryDescriptor',
@@ -68,12 +84,20 @@ __all__ = [
     'get_recipe_category',
     'discover_recipes',
     'discover_decorated_recipes_in_module',
+    'RecipeAttribution',
+    'RecipeName',
+    'NormalizedDistName',
     'activate',
 
     # Markers
     'Marker',
     'Markers',
     'SearchResult',
+    'Markup',
+    'MarkupWarn',
+    'MarkupError',
+    'MarkupInfo',
+    'MarkupDebug',
     'UnknownJavaMarker',
     'ParseExceptionResult',
 
@@ -103,9 +127,29 @@ def activate(marketplace: RecipeMarketplace) -> None:
         marketplace: The RecipeMarketplace to install recipes into
     """
     from rewrite.decorators import get_recipe_category
-    from rewrite.python.recipes import RemovePass
+    from rewrite.python.recipes import (
+        RemovePass,
+        ChangeImport,
+        ChangeType,
+        ChangeMethodName,
+        ChangePackage,
+        DeleteMethodArgument,
+        ReorderMethodArguments,
+        AddLiteralMethodArgument,
+    )
 
-    # Install all Python recipes with their categories
-    category = get_recipe_category(RemovePass)
-    if category is not None:
-        marketplace.install(RemovePass, category)
+    for recipe_class in [
+        RemovePass,
+        ChangeImport,
+        ChangeType,
+        ChangeMethodName,
+        ChangePackage,
+        DeleteMethodArgument,
+        ReorderMethodArguments,
+        AddLiteralMethodArgument,
+    ]:
+        category = get_recipe_category(recipe_class)
+        if category is not None:
+            marketplace.install(recipe_class, category)
+        else:
+            marketplace.install(recipe_class, Python)

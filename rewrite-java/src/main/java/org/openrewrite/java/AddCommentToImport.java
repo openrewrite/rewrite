@@ -17,17 +17,15 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.TextComment;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.trait.Comments;
+import org.openrewrite.trait.Comments.Placement;
 
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -70,26 +68,18 @@ public class AddCommentToImport extends Recipe {
                     foundImport = true;
                     String prefixWhitespace = anImport.getPrefix().getWhitespace();
                     Matcher newlineMatcher = Pattern.compile("\\R").matcher(comment.trim());
+                    String adjustedPrefixWhitespace = prefixWhitespace.isEmpty() ? lineSeparator() : prefixWhitespace;
                     String newCommentText = comment.trim()
-                            .replaceAll("\\R", prefixWhitespace + " * ")
+                            .replaceAll("\\R", adjustedPrefixWhitespace + " * ")
                             .replace("*/", "*");
                     String formattedCommentText = newlineMatcher.find() ? lineSeparator() + " * " + newCommentText + lineSeparator() + " " : " " + newCommentText + " ";
-                    if (doesNotHaveComment(formattedCommentText, anImport.getComments())) {
-                        TextComment textComment = new TextComment(true, formattedCommentText, prefixWhitespace, Markers.EMPTY);
-                        return autoFormat(anImport.withComments(ListUtils.concat(anImport.getComments(), textComment)), ctx);
-                    }
+                    // The trait is idempotent (an equivalent existing comment is left alone) and
+                    // auto-formats the result. An empty import prefix (top of file) needs an explicit
+                    // line-separator suffix so the comment lands on its own line above.
+                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), anImport))
+                            .multilineComment(formattedCommentText, Placement.BEFORE, adjustedPrefixWhitespace);
                 }
                 return super.visitImport(anImport, ctx);
-            }
-
-            private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
-                for (Comment c : comments) {
-                    if (c instanceof TextComment &&
-                            lookFor.trim().equals(((TextComment) c).getText().trim())) {
-                        return false;
-                    }
-                }
-                return true;
             }
         };
     }

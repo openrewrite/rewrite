@@ -17,6 +17,7 @@ package org.openrewrite.python.tree;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
@@ -32,11 +33,24 @@ class YieldTest implements RewriteTest {
       "yield  x, y",
       "yield x , y",
       "yield x,  y",
+    })
+    void yieldStatement(String arg) {
+        rewriteRun(python(
+          """
+            def foo():
+                %s
+            """.formatted(arg)
+        ));
+    }
+
+    @ParameterizedTest
+    @Python3Only
+    @ValueSource(strings = {
       "yield from x",
       "yield  from x",
       "yield from  x",
     })
-    void yieldStatement(String arg) {
+    void yieldFromStatement(String arg) {
         rewriteRun(python(
           """
             def foo():
@@ -53,11 +67,24 @@ class YieldTest implements RewriteTest {
 //      "yield  x, y",
 //      "yield x , y",
 //      "yield x,  y",
+    })
+    void yieldExpression(String arg) {
+        rewriteRun(python(
+          """
+            def foo():
+                it = (%s)
+            """.formatted(arg)
+        ));
+    }
+
+    @ParameterizedTest
+    @Python3Only
+    @ValueSource(strings = {
       "yield from x",
       "yield  from x",
       "yield from  x",
     })
-    void yieldExpression(String arg) {
+    void yieldFromExpression(String arg) {
         rewriteRun(python(
           """
             def foo():

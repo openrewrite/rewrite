@@ -15,25 +15,58 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 
 import java.util.List;
 
-@Value
+@Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class DataTableDescriptor {
 
     @EqualsAndHashCode.Include
-    String name;
+    private final String name;
 
     @NlsRewrite.DisplayName
-    String displayName;
+    private final String displayName;
+
+    @Nullable
+    private final String instanceName;
 
     @NlsRewrite.Description
-    String description;
+    private final String description;
+
+    @Nullable
+    private final String group;
 
     @EqualsAndHashCode.Include
-    List<ColumnDescriptor> columns;
+    private final List<ColumnDescriptor> columns;
+
+    @JsonCreator
+    public DataTableDescriptor(
+            @JsonProperty("name") String name,
+            @JsonProperty("displayName") String displayName,
+            @JsonProperty("instanceName") @Nullable String instanceName,
+            @JsonProperty("description") String description,
+            @JsonProperty("group") @Nullable String group,
+            @JsonProperty("columns") List<ColumnDescriptor> columns) {
+        this.name = name;
+        this.displayName = displayName;
+        this.instanceName = instanceName;
+        this.description = description;
+        this.group = group;
+        this.columns = columns;
+    }
+
+    /**
+     * The instance name for this data table. Falls back to {@link #displayName}
+     * when not explicitly set.
+     */
+    public String getInstanceName() {
+        return instanceName != null ? instanceName : displayName;
+    }
 }

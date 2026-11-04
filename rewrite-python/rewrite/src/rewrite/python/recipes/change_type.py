@@ -1,0 +1,85 @@
+# Copyright 2025 the original author or authors.
+#
+# Licensed under the Moderne Source Available License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://docs.moderne.io/licensing/moderne-source-available-license
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+ChangeType recipe for Python that delegates to Java's ChangeType.
+
+This recipe changes type references from one fully qualified name to another,
+handling all the complexities of type attribution and imports.
+"""
+from dataclasses import dataclass, field
+
+from rewrite import Recipe, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
+from rewrite.rpc.rpc_recipe import RpcRecipe
+
+
+@categorize(Python)
+@dataclass
+class ChangeType(Recipe):
+    """
+    Change a type reference from one fully qualified name to another.
+
+    This recipe delegates to Java's org.openrewrite.java.ChangeType recipe,
+    which handles all the complexities of:
+    - Finding type references in code
+    - Updating imports
+    - Updating type attribution
+
+    Example:
+        ChangeType(
+            old_fully_qualified_type_name="ast.Num",
+            new_fully_qualified_type_name="ast.Constant"
+        )
+    """
+
+    old_fully_qualified_type_name: str = field(default="", metadata=option(
+        display_name="Old fully-qualified type name",
+        description="Fully-qualified class name of the original type.",
+        example="ast.Num"
+    ))
+
+    new_fully_qualified_type_name: str = field(default="", metadata=option(
+        display_name="New fully-qualified type name",
+        description="Fully-qualified class name of the replacement type.",
+        example="ast.Constant"
+    ))
+
+    ignore_definition: bool = field(default=False, metadata=option(
+        display_name="Ignore type definition",
+        description="When set to True, the definition of the old type will be left untouched. "
+                    "This is useful when you're renaming the type itself.",
+        required=False
+    ))
+
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.python.ChangeType"
+
+    @property
+    def display_name(self) -> str:
+        return "Change type"
+
+    @property
+    def description(self) -> str:
+        return "Change a type reference from one fully qualified name to another."
+
+    def recipe_list(self) -> list[Recipe]:
+        return [RpcRecipe(
+            "org.openrewrite.java.ChangeType",
+            oldFullyQualifiedTypeName=self.old_fully_qualified_type_name,
+            newFullyQualifiedTypeName=self.new_fully_qualified_type_name,
+            ignoreDefinition=self.ignore_definition,
+        )]

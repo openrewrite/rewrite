@@ -22,16 +22,46 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
 public class RecipeScheduler {
+    private static final ThreadLocal<@Nullable ExecutionContext> CURRENT_CONTEXT = new ThreadLocal<>();
+
+    /**
+     * The context of the recipe run executing on this thread, or {@code null} outside a recipe run.
+     */
+    @Incubating(since = "8.94.0")
+    public static @Nullable ExecutionContext currentContext() {
+        return CURRENT_CONTEXT.get();
+    }
+
+    @Nullable
+    private Supplier<Cursor> rootCursorProvider;
+
+    /**
+     * Set a provider for the root cursor used in each recipe cycle.
+     * The provider is called once per cycle to create a fresh root cursor.
+     * This allows injecting shared state (e.g., a type cache provider) that will be
+     * visible to all visitors and template parsers during the cycle.
+     * <p>
+     * If not set, a default root cursor is created with {@code new Cursor(null, Cursor.ROOT_VALUE)}.
+     *
+     * @param provider supplies a configured root cursor for each cycle
+     * @return this scheduler for chaining
+     */
+    public RecipeScheduler rootCursorProvider(Supplier<Cursor> provider) {
+        this.rootCursorProvider = provider;
+        return this;
+    }
 
     public RecipeRun scheduleRun(Recipe recipe,
                                  LargeSourceSet sourceSet,
@@ -42,7 +72,7 @@ public class RecipeScheduler {
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
             return new RecipeRun(
                     after.getChangeset(),
-                    ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
+                    DataTableExecutionContextView.view(ctx).getDataTableStore()
             );
         } finally {
             Path workingDirectoryRoot = ctx.getMessage(WORKING_DIRECTORY_ROOT);
@@ -62,6 +92,7 @@ public class RecipeScheduler {
 
         LargeSourceSet after = sourceSet;
 
+        CURRENT_CONTEXT.set(ctxWithWatch);
         try {
             for (int i = 1; i <= maxCycles; i++) {
                 if (ctx.getMessage(PANIC) != null) {
@@ -71,10 +102,11 @@ public class RecipeScheduler {
                 // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
                 // single source applicable tests so that data can be shared at the root (especially for caching
                 // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
-                Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+                Cursor rootCursor = rootCursorProvider != null
+                        ? rootCursorProvider.get()
+                        : new Cursor(null, Cursor.ROOT_VALUE);
                 try {
-                    RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                            recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
+                    RecipeRunCycle<LargeSourceSet> cycle = createRecipeRunCycle(recipe, i, rootCursor, ctxWithWatch, recipeRunStats, searchResults, sourceFileResults, errorsTable);
                     ctxWithWatch.putCycle(cycle);
                     after.beforeCycle(i == maxCycles);
 
@@ -85,15 +117,7 @@ public class RecipeScheduler {
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
 
-                    boolean anyRecipeCausingAnotherCycle = false;
-                    for (Recipe madeChanges : cycle.getMadeChangesInThisCycle()) {
-                        if (madeChanges.causesAnotherCycle()) {
-                            anyRecipeCausingAnotherCycle = true;
-                        }
-                    }
-
-                    if (i >= minCycles &&
-                        (cycle.getMadeChangesInThisCycle().isEmpty() || !anyRecipeCausingAnotherCycle)) {
+                    if (i >= minCycles && !cycle.isCausesAnotherCycle()) {
                         after.afterCycle(true);
                         break;
                     }
@@ -111,10 +135,16 @@ public class RecipeScheduler {
                 }
             }
         } finally {
+            CURRENT_CONTEXT.remove();
             recipeRunStats.flush(ctx);
             recursiveOnComplete(recipe, ctxWithWatch);
         }
         return after;
+    }
+
+    protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(Recipe recipe, int cycle, Cursor rootCursor, WatchableExecutionContext ctxWithWatch, RecipeRunStats recipeRunStats, SearchResults searchResults, SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+        return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
     }
 
     private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {

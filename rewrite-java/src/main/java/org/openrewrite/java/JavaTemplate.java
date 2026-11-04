@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
@@ -30,6 +31,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -39,6 +41,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Collections.addAll;
+import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
@@ -105,24 +108,68 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @CheckReturnValue
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
+        return doApply(scope, coordinates, true, parameters);
+    }
+
+    <J2 extends J> J2 applyWithoutFormatting(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
+        return doApply(scope, coordinates, false, parameters);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <J2 extends J> J2 doApply(Cursor scope, JavaCoordinates coordinates, boolean autoFormat, Object... parameters) {
         if (!(scope.getValue() instanceof J)) {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
 
-        Substitutions substitutions = substitutions(parameters);
+        Substitutions substitutions = substitutions(withoutCommentsOfReplacedTree(coordinates, parameters));
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
+        JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
+                substitutedTemplate, coordinates, autoFormat);
+
         //noinspection ConstantConditions
-        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+        J2 result = (J2) extension
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
 
+        if (!extension.isSubstituted()) {
+            throw new IllegalStateException(unmatchedCoordinatesMessage(scope, coordinates));
+        }
+
         return result != scope.getValue() && result instanceof Expression ?
-                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                (J2) substitutions.maybeParenthesize((Expression) result, scope) :
                 result;
+    }
+
+    /**
+     * The replacement keeps the prefix of the tree it replaces, comments included, so that tree passed back in as a
+     * parameter must not bring the same comments along a second time.
+     */
+    private static Object[] withoutCommentsOfReplacedTree(JavaCoordinates coordinates, Object[] parameters) {
+        if (coordinates.getMode() != JavaCoordinates.Mode.REPLACEMENT) {
+            return parameters;
+        }
+        Object[] params = parameters.clone();
+        for (int i = 0; i < params.length; i++) {
+            if (params[i] instanceof J && ((J) params[i]).getId().equals(coordinates.getTree().getId())) {
+                J replaced = (J) params[i];
+                params[i] = replaced.withPrefix(replaced.getPrefix().withComments(emptyList()));
+            }
+        }
+        return params;
+    }
+
+    private static String unmatchedCoordinatesMessage(Cursor scope, JavaCoordinates coordinates) {
+        Tree target = coordinates.getTree();
+        return "JavaTemplate coordinates were never matched, so the template was not applied: " +
+               target.getClass().getName() + " (id=" + target.getId() + ") at " +
+               coordinates.getSpaceLocation() + " in " + coordinates.getMode() + " mode.\n" +
+               "The `scope` cursor pointed at " + scope.getValue().getClass().getName() + ".\n" +
+               "Either the targeted element is not reachable from `scope`, or it is not dispatched to a visitor " +
+               "method and therefore can never be matched.";
     }
 
     protected Substitutions substitutions(Object[] parameters) {
@@ -166,6 +213,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

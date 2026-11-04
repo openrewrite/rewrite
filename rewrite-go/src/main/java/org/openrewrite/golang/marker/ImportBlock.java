@@ -1,0 +1,60 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.golang.marker;
+
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
+
+import java.util.UUID;
+
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
+@Value
+@With
+public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
+    UUID id;
+    boolean closePrevious;
+    Space before;
+    boolean grouped;
+    Space groupedBefore;
+
+    @Override
+    public void rpcSend(ImportBlock after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, ImportBlock::isClosePrevious);
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
+        q.getAndSend(after, ImportBlock::isGrouped);
+        q.getAndSend(after, x -> spaceRef(x.getGroupedBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
+    }
+
+    @Override
+    public ImportBlock rpcReceive(ImportBlock before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withClosePrevious(q.receive(before.isClosePrevious()))
+                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)))
+                .withGrouped(q.receive(before.isGrouped()))
+                .withGroupedBefore(q.receive(before.getGroupedBefore(), space -> new JavaReceiver().visitSpace(space, q)));
+    }
+}

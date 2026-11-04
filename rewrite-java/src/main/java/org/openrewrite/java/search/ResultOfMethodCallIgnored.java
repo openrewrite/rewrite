@@ -24,6 +24,10 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Set;
+
+import static java.util.Collections.singleton;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ResultOfMethodCallIgnored extends Recipe {
@@ -46,6 +50,8 @@ public class ResultOfMethodCallIgnored extends Recipe {
 
     String description = "Find locations where the result of the method call is being ignored.";
 
+    Set<String> tags = singleton("RSPEC-S6809");
+
     @Override
     public Validated<Object> validate() {
         return super.validate().and(MethodMatcher.validate(methodPattern));
@@ -54,7 +60,7 @@ public class ResultOfMethodCallIgnored extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -65,6 +71,6 @@ public class ResultOfMethodCallIgnored extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 }

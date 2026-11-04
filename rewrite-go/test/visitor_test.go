@@ -1,0 +1,101 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
+)
+
+type deletingVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *deletingVisitor) VisitReturn(ret *java.Return, p any) java.J {
+	return nil // delete the return statement
+}
+
+func TestVisitorReturningNilDoesNotPanic(t *testing.T) {
+	src := "package main\n\nfunc foo() int {\n\treturn 1\n}\n"
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", src)
+	require.NoError(t, err, "parse error")
+
+	v := visitor.Init(&deletingVisitor{})
+	// This should not panic even though VisitReturn returns nil.
+	result := v.Visit(cu, nil)
+	require.NotNil(t, result, "visitor returned nil for compilation unit")
+}
+
+type importCountingVisitor struct {
+	visitor.GoVisitor
+	count int
+}
+
+func (v *importCountingVisitor) VisitImport(imp *java.Import, p any) java.J {
+	v.count++
+	return imp
+}
+
+func TestVisitorVisitsImports(t *testing.T) {
+	src := "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n}\n"
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", src)
+	require.NoError(t, err, "parse error")
+
+	v := visitor.Init(&importCountingVisitor{})
+	v.Visit(cu, nil)
+	assert.Equal(t, 2, v.count, "expected 2 imports visited")
+}
+
+type identCountingVisitor struct {
+	visitor.GoVisitor
+	names []string
+}
+
+func (v *identCountingVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	v.names = append(v.names, ident.Name)
+	return ident
+}
+
+func TestVisitorVisitsPackageDecl(t *testing.T) {
+	// "main" appears as the package name and as the function name.
+	// Without visiting PackageDecl, only the function name would be found.
+	src := "package pkg\n\nfunc foo() {\n}\n"
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", src)
+	require.NoError(t, err, "parse error")
+
+	v := visitor.Init(&identCountingVisitor{})
+	v.Visit(cu, nil)
+
+	found := false
+	for _, name := range v.names {
+		if name == "pkg" {
+			found = true
+			break
+		}
+	}
+	assert.Truef(t, found, "visitor did not visit package decl identifier 'pkg'; visited: %v", v.names)
+}

@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
@@ -28,12 +30,19 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.markSourceSetDirty;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.srcMainJava;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -330,6 +339,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
           java(
             """
               package org.openrewrite.internal;
@@ -563,6 +573,126 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    /**
+     * A null {@code recursive} means non-recursive, and it means that for every source kind and
+     * regardless of what else the source happens to reference. Before this was pinned down, a null
+     * {@code recursive} was read as non-recursive by the precondition but as recursive by the
+     * visitor, so a subpackage type was renamed only when the same file also referenced a type
+     * sitting directly in {@code oldPackageName}.
+     */
+    @Nested
+    class NullRecursiveDefaultsToNonRecursive {
+
+        private static final JavaParser.Builder<?, ?> cucumber = JavaParser.fromJavaVersion().dependsOn(
+          """
+            package cucumber.api.java;
+            public @interface Before {}
+            """,
+          """
+            package cucumber.api.java.en;
+            public @interface Given {}
+            """
+        );
+
+        @Test
+        void nullRecursiveIsNonRecursiveForEverySourceKind() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", null))
+                .parser(cucumber),
+              // Only a subpackage type: untouched.
+              java(
+                """
+                  import cucumber.api.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              // Both: the type directly in the old package moves, the subpackage one stays put.
+              java(
+                """
+                  import cucumber.api.java.Before;
+                  import cucumber.api.java.en.Given;
+
+                  class B {
+                      @Before
+                      void before() {}
+
+                      @Given
+                      void given() {}
+                  }
+                  """,
+                """
+                  import io.cucumber.java.Before;
+                  import cucumber.api.java.en.Given;
+
+                  class B {
+                      @Before
+                      void before() {}
+
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              properties(
+                """
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application.properties")
+              ),
+              properties(
+                """
+                  before=cucumber.api.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                """
+                  before=io.cucumber.java.Before
+                  given=cucumber.api.java.en.Given
+                  """,
+                spec -> spec.path("application-extra.properties")
+              )
+            );
+        }
+
+        @Test
+        void recursiveOptsIntoSubpackagesForEverySourceKind() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangePackage("cucumber.api.java", "io.cucumber.java", true))
+                .parser(cucumber),
+              java(
+                """
+                  import cucumber.api.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """,
+                """
+                  import io.cucumber.java.en.Given;
+
+                  class A {
+                      @Given
+                      void given() {}
+                  }
+                  """
+              ),
+              properties(
+                """
+                  given=cucumber.api.java.en.Given
+                  """,
+                """
+                  given=io.cucumber.java.en.Given
+                  """,
+                spec -> spec.path("application.properties")
+              )
+            );
+        }
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
     void typeParameter() {
@@ -661,6 +791,178 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void changePackageExpandsStarImportWhenItWouldCreateAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api", "hibernate-validator");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api", "hibernate-validator"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.NotNull;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changePackageExpandsStarImportWhenSourceSetIsDirty() {
+        // Classpath shows no ambiguity — only the validation API is on the classpath — but the
+        // source set has been marked dirty by an earlier in-run dependency mutation. The recipe
+        // must not rely on the stale classpath and should fall back to the safe path: expand the star.
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api");
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api"))
+                  .executionContext(ctx)
+                  .beforeRecipe(addTypesToSourceSet("main", emptyList(), classpath)),
+          mavenProject("demo",
+            srcMainJava(
+              java(
+                """
+                  package xyz;
+
+                  import javax.validation.constraints.*;
+                  import org.hibernate.validator.constraints.*;
+
+                  class A {
+                      @NotNull
+                      private String someField;
+                  }
+                  """,
+                """
+                  package xyz;
+
+                  import jakarta.validation.constraints.NotNull;
+                  import org.hibernate.validator.constraints.*;
+
+                  class A {
+                      @NotNull
+                      private String someField;
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void expandedPackageStarDoesNotImportNestedTypes() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("before.api", "after.api", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package before.api; public interface FilterRegistration { interface Dynamic {} }",
+              "package before.api; public interface ServletRegistration { interface Dynamic {} }"))
+            .executionContext(ctx),
+          mavenProject("demo",
+            srcMainJava(
+              java(
+                """
+                  import java.util.*;
+                  import before.api.*;
+
+                  class A {
+                      FilterRegistration.Dynamic filter;
+                      ServletRegistration.Dynamic servlet;
+                      List<String> names;
+                  }
+                  """,
+                """
+                  import java.util.*;
+                  import after.api.FilterRegistration;
+                  import after.api.ServletRegistration;
+
+                  class A {
+                      FilterRegistration.Dynamic filter;
+                      ServletRegistration.Dynamic servlet;
+                      List<String> names;
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void changePackagePreservesStarImportWhenNoAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """
+            )
           )
         );
     }
@@ -1794,6 +2096,30 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void changePackageInYamlOfHyphenatedProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.springframework.boot.actuate.autoconfigure.security.servlet",
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet", null)),
+          yaml(
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            spec -> spec.path("application-disable-security.yml")
+          )
+        );
+    }
+
+    @Test
     void innerType() {
         rewriteRun(
           spec -> spec.recipes(
@@ -1827,6 +2153,44 @@ class ChangePackageTest implements RewriteTest {
                   Y foo();
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.before", "com.after", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.before;
+                  
+                  public class A { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.before.A;
+              
+              class X extends A { }
+              """,
+            """
+              package app;
+              
+              import com.after.A;
+              
+              class X extends A { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
+            )
           )
         );
     }
@@ -1874,4 +2238,160 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkFullyQualifiedReferenceUpdated() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.Test} for details.
+               */
+              public class Bar {}
+              """,
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.Test} for details.
+               */
+              public class Bar {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkRecursivePackageReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.internal;
+              public class Baz {}
+              """,
+            """
+              package org.openrewrite.test.internal;
+              public class Baz {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.internal.Baz}
+               */
+              public class Qux {}
+              """,
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.internal.Baz}
+               */
+              public class Qux {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkAlreadyUsingNewPackageUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.test;
+              public class Existing {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.Existing} for details.
+               */
+              public class Ref {}
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            "org.foo.MyImpl\n",
+            "org.bar.MyImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileMultipleEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            """
+              # Service provider implementations
+              org.foo.MyImplA
+              org.foo.sub.MyImplB
+              org.other.Unrelated
+              """,
+            """
+              # Service provider implementations
+              org.bar.MyImplA
+              org.bar.sub.MyImplB
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileNonRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", false)),
+          text(
+            """
+              org.foo.MyImplA
+              org.foo.sub.MyImplB
+              """,
+            """
+              org.bar.MyImplA
+              org.foo.sub.MyImplB
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileContentOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            "org.foo.MyImpl\n",
+            "org.bar.MyImpl\n",
+            spec -> spec.path("META-INF/services/org.other.SomeInterface")
+          )
+        );
+    }
+
 }

@@ -103,8 +103,8 @@ import static org.openrewrite.xml.Assertions.xml;
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/6314")
+    @Test
     void removeOnlyElementMatchingTextPredicate() {
         rewriteRun(
           spec -> spec.recipe(new RemoveXmlTag("/test/foo[text()='bar']", null)),
@@ -126,8 +126,8 @@ import static org.openrewrite.xml.Assertions.xml;
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/6314")
+    @Test
     void removeOnlyElementMatchingLocalNameAndTextPredicate() {
         rewriteRun(
           spec -> spec.recipe(new RemoveXmlTag("/test/*[local-name()='foo' and text()='bar']", null)),

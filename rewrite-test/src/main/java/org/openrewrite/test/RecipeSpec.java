@@ -37,14 +37,16 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-@SuppressWarnings("UnusedReturnValue")
 @Getter
+@SuppressWarnings("UnusedReturnValue")
 public class RecipeSpec {
     public static Supplier<RecipeSpec> DEFAULTS = RecipeSpec::new;
 
@@ -87,8 +89,15 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    /**
+     * @deprecated Use {@link #recipeQualityValidation}'s {@link RecipeQualityValidation#types}.
+     */
+    @Deprecated
     @Nullable
     TypeValidation afterTypeValidation;
+
+    @Nullable
+    RecipeQualityValidation recipeQualityValidation;
 
     boolean serializationValidation = true;
 
@@ -105,6 +114,22 @@ public class RecipeSpec {
 
     @Nullable
     RecipePrinter recipePrinter;
+
+    @Nullable
+    RewriteRunner runner;
+
+    /**
+     * Selects how the recipe is executed for this run. The default is
+     * {@link RewriteRunner#IN_PROCESS}; pass an alternative (e.g. a moderne-cli
+     * runner) to exercise the same test through an out-of-process backend.
+     * <p>
+     * Resolution order: per-call spec runner &gt; per-class
+     * {@link RewriteTest#runner()} &gt; {@link RewriteRunner#IN_PROCESS}.
+     */
+    public RecipeSpec runner(RewriteRunner runner) {
+        this.runner = runner;
+        return this;
+    }
 
     /**
      * Configuration that applies to all source file inputs.
@@ -191,6 +216,9 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * The cycles to run, by default one more than {@link #expectedCyclesThatMakeChanges(int)} and at least two.
+     */
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
         return this;
@@ -209,9 +237,15 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E> RecipeSpec dataTable(Class<E> rowType, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
-                if (dataTableListEntry.getKey().getType().equals(rowType)) {
-                    List<E> rows = run.getDataTableRows(dataTableListEntry.getKey().getName());
+            DataTableStore store = run.getDataTableStore();
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getType().equals(rowType)) {
+                    List<E> rows;
+                    try (Stream<?> stream = store.getRows(dt.getName(), dt.getGroup())) {
+                        @SuppressWarnings("unchecked")
+                        List<E> typed = (List<E>) stream.collect(toList());
+                        rows = typed;
+                    }
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -219,7 +253,7 @@ public class RecipeSpec {
                 }
             }
             String message = "No data table found with row type: " + rowType;
-            Set<DataTable<?>> tables = run.getDataTables().keySet();
+            Collection<DataTable<?>> tables = store.getDataTables();
             if (!tables.isEmpty()) {
                 message += "\nFound data tables row type(s): " + tables.stream()
                         .map(it -> it.getType().getName().replace("$", "."))
@@ -238,9 +272,19 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec dataTableAsCsv(String name, String expect) {
         afterRecipe(run -> {
-            DataTable<?> dataTable = run.getDataTable(name);
+            DataTableStore store = run.getDataTableStore();
+            DataTable<?> dataTable = null;
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getName().equals(name)) {
+                    dataTable = dt;
+                    break;
+                }
+            }
             assertThat(dataTable).isNotNull();
-            List<E> rows = run.getDataTableRows(name);
+            List<?> rows;
+            try (Stream<?> stream = store.getRows(dataTable.getName(), dataTable.getGroup())) {
+                rows = stream.collect(toList());
+            }
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()
                     .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
@@ -268,10 +312,6 @@ public class RecipeSpec {
         return this;
     }
 
-    int getCycles() {
-        return cycles == null ? 2 : cycles;
-    }
-
     int getExpectedCyclesThatMakeChanges(int cycles) {
         return expectedCyclesThatMakeChanges == null ? cycles - 1 :
                 expectedCyclesThatMakeChanges;
@@ -282,8 +322,21 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * @deprecated Use {@link #recipeQualityValidation(RecipeQualityValidation)} with
+     * {@link RecipeQualityValidation#types}.
+     */
+    @Deprecated
     public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
         this.afterTypeValidation = typeValidation;
+        return this;
+    }
+
+    /**
+     * Checks of how the recipe behaves and what it produces, including the type attribution of its output.
+     */
+    public RecipeSpec recipeQualityValidation(RecipeQualityValidation recipeQualityValidation) {
+        this.recipeQualityValidation = recipeQualityValidation;
         return this;
     }
 

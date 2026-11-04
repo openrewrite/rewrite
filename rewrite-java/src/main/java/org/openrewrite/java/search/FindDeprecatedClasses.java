@@ -73,7 +73,7 @@ public class FindDeprecatedClasses extends Recipe {
         TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern,
                 Boolean.TRUE.equals(matchInherited));
 
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
@@ -88,7 +88,15 @@ public class FindDeprecatedClasses extends Recipe {
                 }
                 return cu;
             }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+        };
+
+        // When a type pattern is provided, also require a matching type use so the recipe
+        // only runs on source files that reference it.
+        if (typeMatcher != null) {
+            precondition = Preconditions.and(new UsesType<>(typePattern, true), precondition);
+        }
+
+        return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null) {

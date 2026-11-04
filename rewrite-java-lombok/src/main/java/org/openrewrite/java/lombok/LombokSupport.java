@@ -20,17 +20,38 @@ import org.openrewrite.internal.ReflectionUtils;
 
 import javax.annotation.processing.Processor;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 
 public class LombokSupport {
 
+    private static @Nullable ClassLoader cachedParserClassLoader;
+    private static @Nullable ClassLoader cachedShadowClassLoader;
+
     public static @Nullable Processor createLombokProcessor(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        ClassLoader lombokShadowLoader = shadowClassLoader(parserClassLoader);
+        if (lombokShadowLoader == null) {
+            return null;
+        }
+        return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+    }
+
+    /**
+     * Like Lombok's own launcher, keep one {@code ShadowClassLoader} rather than loading, verifying and
+     * JIT-compiling all of Lombok's classes again for every parser.
+     */
+    private static synchronized @Nullable ClassLoader shadowClassLoader(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        if (parserClassLoader == cachedParserClassLoader) {
+            return cachedShadowClassLoader;
+        }
+
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", parserClassLoader)) {
@@ -77,20 +98,54 @@ public class LombokSupport {
                     Class.forName("java.util.List"));
             shadowLoaderConstructor.setAccessible(true);
 
+            // Wrap parserClassLoader to prevent ShadowClassLoader from scanning every jar
+            // on the parent classpath. ShadowClassLoader.getResources() iterates over all
+            // parent resources and calls isPartOfShadowSuffix() on each URL, which opens
+            // each jar as a ZipInputStream and reads every entry — extremely slow for large
+            // classpaths. By returning empty resource enumerations from the parent, the
+            // ShadowClassLoader relies solely on its override jars (set via
+            // shadow.override.lombok) which already contain everything Lombok needs.
+            // Class loading still delegates normally through the parent chain.
+            ClassLoader resourceFilteredParent = new ResourceFilteredClassLoader(parserClassLoader);
+
             ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                    parserClassLoader,
+                    resourceFilteredParent,
                     "lombok",
                     null,
                     emptyList(),
                     singletonList("lombok.patcher.Symbols")
             );
-            return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+            cachedParserClassLoader = parserClassLoader;
+            cachedShadowClassLoader = lombokShadowLoader;
+            return lombokShadowLoader;
         } finally {
             if (oldValue != null) {
                 System.setProperty("shadow.override.lombok", oldValue);
             } else {
                 System.clearProperty("shadow.override.lombok");
             }
+        }
+    }
+
+    /**
+     * A classloader that delegates class loading to its parent but returns empty results
+     * for resource enumeration. This prevents Lombok's {@code ShadowClassLoader} from
+     * scanning every jar on the classpath via {@code ZipInputStream} when filtering
+     * parent resources in {@code getResources()}.
+     */
+    static class ResourceFilteredClassLoader extends ClassLoader {
+        ResourceFilteredClassLoader(ClassLoader parent) {
+            super(parent);
+        }
+
+        @Override
+        public Enumeration<URL> getResources(String name) throws IOException {
+            return emptyEnumeration();
+        }
+
+        @Override
+        public @Nullable URL getResource(String name) {
+            return null;
         }
     }
 }

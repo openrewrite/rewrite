@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -32,7 +33,12 @@ class AddPlatformDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core", "lombok"));
+          .parser(JavaParser.fromJavaVersion().classpath(
+            "junit-jupiter-api",
+            "guava",
+            "jackson-databind",
+            "jackson-core",
+            "lombok"));
     }
 
     @Language("java")
@@ -45,7 +51,7 @@ class AddPlatformDependencyTest implements RewriteTest {
             }
       """;
 
-    @CsvSource({
+    @ValueSource(strings = {
       "implementation",
       "compileOnly",
       "runtimeOnly",
@@ -84,7 +90,7 @@ class AddPlatformDependencyTest implements RewriteTest {
             )));
     }
 
-    @CsvSource({
+    @ValueSource(strings = {
       "implementation",
       "compileOnly",
       "runtimeOnly",

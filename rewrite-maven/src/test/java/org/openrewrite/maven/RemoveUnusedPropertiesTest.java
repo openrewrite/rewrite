@@ -16,12 +16,15 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.java.Assertions.srcMainResources;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -164,9 +167,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void requiresCyclesForCascadingRemovals() {
+    void removesCascadingUnusedPropertiesInOneCycle() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           pomXml(
             """
               <project>
@@ -174,10 +176,14 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
+                <description>${release}</description>
 
                 <properties>
-                  <foo>xyz</foo>
-                  <bar>${foo}</bar>
+                  <a>xyz</a>
+                  <b>${a}</b>
+                  <c>${b}</c>
+                  <major>1</major>
+                  <release>${major}.0</release>
                 </properties>
 
               </project>
@@ -188,9 +194,85 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
+                <description>${release}</description>
+
+                <properties>
+                  <major>1</major>
+                  <release>${major}.0</release>
+                </properties>
 
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void removesCascadeAcrossParentAndChild() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <foo>x</foo>
+                  <used>y</used>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <used>y</used>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <description>${baz}</description>
+                  <properties>
+                    <bar>${foo}</bar>
+                    <baz>${used}</baz>
+                  </properties>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <description>${baz}</description>
+                  <properties>
+                    <baz>${used}</baz>
+                  </properties>
+                </project>
+                """
+            )
           )
         );
     }
@@ -318,7 +400,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 </parent>
 
                 <properties>
-                  <gson.version>2.11.0</gson.version>
+                  <gson.version>${gson.release}</gson.version>
+                  <gson.release>2.11.0</gson.release>
                 </properties>
 
               </project>
@@ -838,6 +921,128 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   </project>
                   """
               )
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6687")
+    @Test
+    void removesUnusedPropertiesInSinglePomWithResourceFilteringEnabled() {
+        rewriteRun(
+          pomXml(
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <properties>
+                <junk>junk</junk>
+              </properties>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """,
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 20, threadMode = SEPARATE_THREAD)
+    void customPatternDoesNotBacktrackOverLongResourceLines() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveUnusedProperties(".*powermock.*")),
+          mavenProject("my-project",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <properties>
+                    <powermock.version>2.0.9</powermock.version>
+                  </properties>
+
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("@x${x".repeat(50_000) + "\n${powermock.version}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void customPatternKeepsPropertyPrecededByAnotherUsageOnSameLine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveUnusedProperties(".*powermock.*")),
+          mavenProject("my-project",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <properties>
+                    <powermock.version>2.0.9</powermock.version>
+                  </properties>
+
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("${a} ${powermock.version} @b@ @powermock.version@")
             )
           )
         );

@@ -37,6 +37,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
          public B(int n) {}
          public static void foo(String s) {}
          public static void foo(java.util.List<?> l) {}
+         public static void bar(int... ns) {}
       }
       """;
 
@@ -102,6 +103,17 @@ class DeleteMethodArgumentTest implements RewriteTest {
     }
 
     @Test
+    void deleteVarargsArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteMethodArgument("B bar(int...)", 1)),
+          java(
+            "public class A {{ B.bar(0, 1); }}",
+            "public class A {{ B.bar(0); }}"
+          )
+        );
+    }
+
+    @Test
     void deleteConstructorArgument() {
         rewriteRun(
           spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0)),
@@ -133,7 +145,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeleteMethodArgument("B foo(String)", 0)),
           java(
-            "public class A {{ B.foo(null); }}",
+            "public class A {{ B.foo((String) null); }}",
             "public class A {{ B.foo(); }}"
           )
         );

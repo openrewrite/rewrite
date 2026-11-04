@@ -30,13 +30,13 @@ import {
     prettierFormat,
     prettierStyle,
     PrettierStyle,
-    typescript
-} from "../../../src/javascript";
+    typescript,
+    sourceFileCache} from "../../../src/javascript";
 import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import {json} from "../../../src/json";
 import {text} from "../../../src/text";
-import {J, Statement} from "../../../src/java";
-import {randomId, TreePrinters} from "../../../src";
+import {J, Statement, TrailingComma} from "../../../src/java";
+import {findMarker, foundSearchResult, MarkersKind, randomId, SearchResult, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
 import * as path from "path";
 import * as fsp from "fs/promises";
@@ -59,6 +59,25 @@ describe('AutoformatVisitor with Prettier', () => {
 `)
             // @formatter:on
         )
+    });
+
+    test('a file Prettier cannot format keeps its own layout', async () => {
+        // A parser Prettier has no plugin for is what makes it throw over the whole file
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new AutoformatVisitor(undefined,
+            [prettierStyle(randomId(), {parser: 'no-such-parser'})]));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const x   =   1+2
+
+
+
+                const  y=3`)
+        );
+        expect(warn).toHaveBeenCalledWith('Prettier formatting failed:',
+            expect.objectContaining({message: expect.stringContaining('no-such-parser')}));
     });
 
     test('subtree formatting with Prettier applies Prettier defaults', async () => {
@@ -105,6 +124,33 @@ describe('AutoformatVisitor with Prettier', () => {
                 function third() {
                     console.log("third");
                 }
+                `
+            )
+            // @formatter:on
+        )
+    });
+
+    test('a statement Prettier is told to ignore keeps its own layout', async () => {
+        const visitor = new class extends JavaScriptVisitor<any> {
+            override async visitImportDeclaration(jsImport: any, p: any): Promise<any> {
+                return await autoFormat(jsImport, p, undefined, this.cursor.parent, [defaultPrettierStyle]);
+            }
+        }();
+
+        const testSpec = new RecipeSpec();
+        testSpec.recipe = fromVisitor(visitor);
+        // Reconciling Prettier's answer replaces nodes whether or not it moved any whitespace
+        testSpec.allowEmptyDiff = true;
+
+        return testSpec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                const z = 1;
+
+                // prettier-ignore
+                import {a,   b} from 'x';
                 `
             )
             // @formatter:on
@@ -244,7 +290,7 @@ describe('AutoformatVisitor with Prettier', () => {
 
 describe('Prettier eof handling', () => {
     test('Prettier adds trailing newline via eof', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         // Parse code without trailing newline
         const sourceFile = await parser.parseOne({
@@ -267,7 +313,7 @@ describe('Prettier eof handling', () => {
     });
 
     test('no double newline when original already has trailing newline', async () => {
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
 
         // Parse code WITH trailing newline
         const sourceFile = await parser.parseOne({
@@ -294,7 +340,7 @@ describe('Prettier eof handling', () => {
 describe('Prettier marker reconciliation', () => {
     test('Prettier adds Semicolon marker when adding semicolon', async () => {
         // Parse code WITHOUT a semicolon
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const sourceFile = await parser.parseOne({
             sourcePath: 'test.ts',
             text: 'const x = 1'  // No semicolon
@@ -321,7 +367,7 @@ describe('Prettier marker reconciliation', () => {
 
     test('Prettier preserves Semicolon marker when present', async () => {
         // Parse code WITH a semicolon
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const sourceFile = await parser.parseOne({
             sourcePath: 'test.ts',
             text: 'const x = 1;'  // Has semicolon
@@ -342,7 +388,74 @@ describe('Prettier marker reconciliation', () => {
         const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(formattedHasSemicolon).toBe(true);
     });
+
+    test('markers that are not syntax survive formatting', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parsed = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x=1'
+        }) as JS.CompilationUnit;
+        const customMarker = {kind: 'test.CustomMarker', id: randomId()};
+        const statement = parsed.statements[0];
+        const sourceFile = {
+            ...parsed,
+            markers: {...parsed.markers, markers: [...parsed.markers.markers, customMarker]},
+            statements: [{...statement, element: foundSearchResult(statement.element, 'found')}]
+        } as JS.CompilationUnit;
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true});
+
+        // then
+        expect(await TreePrinters.print(formatted)).toBe('/*~~(found)~~>*/const x = 1;\n');
+        expect(findMarker(formatted, 'test.CustomMarker' as any)).toBe(customMarker);
+        const searchResult = findMarker(formatted.statements[0].element, MarkersKind.SearchResult) as SearchResult;
+        expect(searchResult?.description).toBe('found');
+    });
+
+    test('a syntax marker keeps its id while taking Prettier whitespace', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const o = {\n  a: 1,\n  b: 2 ,\n}'
+        }) as JS.CompilationUnit;
+        const originalTrailingComma = trailingCommaOf(sourceFile);
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true, trailingComma: 'all'});
+
+        // then
+        expect(await TreePrinters.print(formatted)).toBe('const o = {\n  a: 1,\n  b: 2,\n};\n');
+        expect(trailingCommaOf(formatted).id).toBe(originalTrailingComma.id);
+    });
+
+    test('a structure Prettier changes leaves the attributed original in place', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x: number = (Math.max(1, 2));'
+        }) as JS.CompilationUnit;
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true});
+
+        // then
+        expect(formatted).toBe(sourceFile);
+        const variables = formatted.statements[0].element as J.VariableDeclarations;
+        const initializer = variables.variables[0].element.initializer!.element as J.Parentheses<J.MethodInvocation>;
+        expect(initializer.tree.element.methodType).toBeDefined();
+    });
 });
+
+function trailingCommaOf(cu: JS.CompilationUnit): TrailingComma {
+    const variables = cu.statements[0].element as J.VariableDeclarations;
+    const object = variables.variables[0].element.initializer!.element as J.NewClass;
+    const statements = object.body!.statements;
+    return findMarker(statements[statements.length - 1], J.Markers.TrailingComma) as TrailingComma;
+}
 
 describe('Prettier auto-detection integration', () => {
     // These tests verify that Prettier config is automatically detected from .prettierrc

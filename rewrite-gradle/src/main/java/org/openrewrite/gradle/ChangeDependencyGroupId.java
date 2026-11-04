@@ -19,18 +19,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -76,26 +72,28 @@ public class ChangeDependencyGroupId extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()) {
-                    return cu;
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile sf = (JavaSourceFile) tree;
+                    Optional<GradleProject> maybeGp = sf.getMarkers().findFirst(GradleProject.class);
+                    if (maybeGp.isPresent()) {
+                        gradleProject = maybeGp.get();
+                        J result = super.visit(tree, ctx);
+                        if (result != tree && result instanceof JavaSourceFile) {
+                            JavaSourceFile updated = (JavaSourceFile) result;
+                            return updated.withMarkers(updated.getMarkers().setByType(updateGradleModel(gradleProject, ctx)));
+                        }
+                    }
+                    return sf;
                 }
-
-                gradleProject = maybeGp.get();
-
-                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
-                }
-                return g;
+                return super.visit(tree, ctx);
             }
 
             @Override
@@ -110,36 +108,28 @@ public class ChangeDependencyGroupId extends Recipe {
                         .orElse(m);
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    if (!StringUtils.isBlank(configuration) && configuration.equals(gdc.getName())) {
-                        newNameToConfiguration.put(gdc.getName(), gdc);
-                        continue;
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
+                if (!StringUtils.isBlank(configuration)) {
+                    if (gp.getConfiguration(configuration) == null) {
+                        return gp;
                     }
-
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            return requested.withGav(requested.getGav().withGroupId(newGroupId));
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            return resolved.withGav(resolved.getGav().withGroupId(newGroupId));
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                    return gp.mapConfiguration(configuration,
+                            conf -> conf.mapDependencies(requested -> {
+                                if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                                    return requested.withGav(requested.getGav().withGroupId(newGroupId));
+                                }
+                                return requested;
+                            }, gp.getMavenRepositories(), ctx),
+                            ctx);
                 }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+                return gp.mapConfigurations(
+                        conf -> conf.mapDependencies(requested -> {
+                            if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                                return requested.withGav(requested.getGav().withGroupId(newGroupId));
+                            }
+                            return requested;
+                        }, gp.getMavenRepositories(), ctx),
+                        ctx);
             }
         });
     }

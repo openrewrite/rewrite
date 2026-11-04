@@ -17,11 +17,14 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -39,7 +42,11 @@ class FindTypesTest implements RewriteTest {
     String a1 = """
       package a;
       public class A1 extends Exception {
+          public static final String CONST = "const";
           public static void stat() {}
+          public static class Inner {
+              public static final String INNER_CONST = "innerConst";
+          }
       }
       """;
 
@@ -432,6 +439,183 @@ class FindTypesTest implements RewriteTest {
     }
 
     @Test
+    void staticFieldAccess() {
+        rewriteRun(
+          spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
+            .containsExactly(
+              new TypeUses.Row("B.java", "A1", "a.A1")
+            )),
+          java(
+            """
+              import a.A1;
+              class B {
+                  String s = A1.CONST;
+              }
+              """,
+            """
+              import a.A1;
+              class B {
+                  String s = /*~~>*/A1.CONST;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void staticFieldAccessOnNestedType() {
+        rewriteRun(
+          java(
+            """
+              import a.A1;
+              class B {
+                  String s = A1.Inner.INNER_CONST;
+              }
+              """,
+            """
+              import a.A1;
+              class B {
+                  String s = /*~~>*/A1.Inner.INNER_CONST;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void enclosingTypeOfNestedTypeReference() {
+        rewriteRun(
+          java(
+            """
+              import a.A1;
+              class B {
+                  A1.Inner i;
+              }
+              """,
+            """
+              import a.A1;
+              class B {
+                  /*~~>*/A1.Inner i;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void staticImportIsNotAReference() {
+        rewriteRun(
+          java(
+            """
+              import static a.A1.CONST;
+              class B {
+                  String s = CONST;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void fullyQualifiedStaticFieldAccess() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  String s = a.A1.CONST;
+              }
+              """,
+            """
+              class B {
+                  String s = /*~~>*/a.A1.CONST;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void staticFieldAccessOnDirectlyImportedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("a.A1.Inner", false)),
+          java(
+            """
+              import a.A1.Inner;
+              class B {
+                  String s = Inner.INNER_CONST;
+              }
+              """,
+            """
+              import a.A1.Inner;
+              class B {
+                  String s = /*~~>*/Inner.INNER_CONST;
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void variableNamedLikeItsType() {
+        // `A1.CONST` resolves to the obscuring variable, not the type; the declarator name is matched by the
+        // separate `visitIdentifier` path
+        rewriteRun(
+          java(
+            """
+              import a.A1;
+              class B {
+                  void test() {
+                      A1 A1 = null;
+                      String s = A1.CONST;
+                  }
+              }
+              """,
+            """
+              import a.A1;
+              class B {
+                  void test() {
+                      /*~~>*/A1 /*~~>*/A1 = null;
+                      String s = A1.CONST;
+                  }
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
+    void fieldAccessOnVariableOfMatchingType() {
+        rewriteRun(
+          java(
+            """
+              import a.A1;
+              class B {
+                  void test(A1 a1) {
+                      String s = a1.CONST;
+                  }
+              }
+              """,
+            """
+              import a.A1;
+              class B {
+                  void test(/*~~>*/A1 a1) {
+                      String s = a1.CONST;
+                  }
+              }
+              """
+          ),
+          java(a1)
+        );
+    }
+
+    @Test
     void springXml() {
         rewriteRun(
           spec -> spec.recipe(new FindTypes("a.A1", false)),
@@ -468,6 +652,57 @@ class FindTypesTest implements RewriteTest {
                       </bean>
                   </property>
                 </bean>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedType(String type) {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes(type, false)),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              import a.b.Outer;
+              class Test {
+                  /*~~>*/Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedTypeInSpringXml(String type) {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes(type, false)),
+          xml(
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="testBean" class="a.b.Outer$Inner"/>
+              </beans>
+              """,
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                <bean id="testBean" <!--~~>-->class="a.b.Outer$Inner"/>
               </beans>
               """
           )

@@ -18,11 +18,18 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -33,6 +40,118 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"call() && false", "call() || true", "holder.flag && false",
+      "values[index] || true", "(1 / divisor > 0) && false", "(flag = true) && false",
+      "(call()) && (call())", "(call()) || (call())"})
+    void preservePrimitiveOperandEvaluation(String expression) {
+        rewriteRun(java("class A { boolean flag; int calls; boolean call() { calls++; return true; } " +
+          "boolean f(A holder, boolean[] values, int index, int divisor) { return " + expression + "; } }"));
+    }
+
+    @Test
+    void preserveShortCircuitedPatternBindings() {
+        rewriteRun(java(
+          """
+            class A {
+                void f(Object value) {
+                    if (false && value instanceof String text) {
+                        System.out.println(text.length());
+                    }
+                    if (true || !(value instanceof String text)) {
+                    } else {
+                        System.out.println(text.length());
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void preserveVolatileBooleanRead() {
+        rewriteRun(java("class A { volatile boolean flag; boolean f() { return flag && false; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value",
+      "true ? value : false", "false ? false : value"})
+    void preserveBoxedBooleanUnboxing(String expression) {
+        rewriteRun(java("class A { Object f(Boolean value) { return " + expression + "; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value"})
+    void preserveBooleanBoundUnboxing(String expression) {
+        rewriteRun(java("class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"true ? value : false", "false ? false : value"})
+    void simplifyBooleanBoundReferenceConditional(String expression) {
+        rewriteRun(java(
+          "class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }",
+          "class A { <T extends Boolean> Object f(T value) { return value; } }"
+        ));
+    }
+
+    @Test
+    void preserveBooleanBoundOverloadSelection() {
+        rewriteRun(java(
+          """
+            class A {
+                <T extends Boolean> String f(T value) { return select(value == true); }
+                String select(boolean value) { return "primitive"; }
+                String select(Boolean value) { return "boxed"; }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void preservePrimitiveOverloadSelection() {
+        rewriteRun(java(
+          """
+            class A {
+                String f(Boolean value) { return select(value == true); }
+                String select(boolean value) { return "primitive"; }
+                String select(Boolean value) { return "boxed"; }
+            }
+            """
+        ));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"double,<", "double,>", "double,<=", "double,>=", "float,<", "Float,>=", "Double,>"})
+    void preserveNegatedFloatingComparisons(String type, String operator) {
+        rewriteRun(java("class A { boolean f(%s x, %s y) { return !(x %s y); } }"
+          .formatted(type, type, operator)));
+    }
+
+    @Test
+    void preserveMixedFloatingComparison() {
+        rewriteRun(java("class A { boolean f(int x, double y) { return !(x < y); } }"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"int,<,>=", "Integer,>,<=", "long,<=,>", "Long,>=,<", "char,<,>=", "Byte,>,<="})
+    void stillComplementsIntegralComparisons(String type, String operator, String complement) {
+        rewriteRun(java(
+          "class A { boolean f(%s x, %s y) { return !(x %s y); } }".formatted(type, type, operator),
+          "class A { boolean f(%s x, %s y) { return x %s y; } }".formatted(type, type, complement)
+        ));
+    }
+
+    @Test
+    void preserveFloatingComparisonsInNegatedTernary() {
+        rewriteRun(java(
+          "class A { boolean f(boolean b, double x, double y) { return !(b ? x < y : x >= y); } }",
+          "class A { boolean f(boolean b, double x, double y) { return b ? !(x < y) : !(x >= y); } }"
+        ));
     }
 
     @DocumentExample
@@ -593,6 +712,108 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void nestedTernaryNegation() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? b ? x : y : z);
+                  }
+                  boolean m2(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? x : b ? y : z);
+                  }
+                  boolean m3(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return !(a ? !b ? x : y : z);
+                  }
+                  boolean m4(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? x : y : z;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? !x : !y : !z;
+                  }
+                  boolean m2(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? !x : b ? !y : !z;
+                  }
+                  boolean m3(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? !y : !x : !z;
+                  }
+                  boolean m4(boolean a, boolean b, boolean x, boolean y, boolean z) {
+                      return a ? b ? x : y : z;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void negatedTernaryBranchWrappedInParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, Object o, boolean c) {
+                      return !(a ? o instanceof String : c);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, Object o, boolean c) {
+                      return a ? !(o instanceof String) : !c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void negatedTernaryAsOperandKeepsParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c, boolean d) {
+                      return !(a ? b : c) && d;
+                  }
+                  boolean m2(boolean a, boolean b, boolean c, boolean d) {
+                      return !(a ? b : c) ? c : d;
+                  }
+                  boolean m3(boolean a, boolean b, boolean c, boolean d) {
+                      return d ? !(a ? b : c) : d;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return !!(a ? b : c);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  boolean m1(boolean a, boolean b, boolean c, boolean d) {
+                      return (a ? !b : !c) && d;
+                  }
+                  boolean m2(boolean a, boolean b, boolean c, boolean d) {
+                      return (a ? !b : !c) ? c : d;
+                  }
+                  boolean m3(boolean a, boolean b, boolean c, boolean d) {
+                      return d ? a ? !b : !c : d;
+                  }
+                  boolean m4(boolean a, boolean b, boolean c) {
+                      return a ? b : c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void differentFieldAccesses() {
         rewriteRun(
           java(
@@ -679,41 +900,42 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       "b" != null && "b".isEmpty()                             // false
       "b" != null && !"b".isEmpty()                            // true
 
-      a == null || a.isEmpty() || "" == null || "".isEmpty()   // true
+      a == null || a.isEmpty() || "" == null || "".isEmpty()   // a == null || a.isEmpty() || true
       a == null || a.isEmpty() || "" == null || !"".isEmpty()  // a == null || a.isEmpty()
-      a == null || a.isEmpty() || "" != null && "".isEmpty()   // true
+      a == null || a.isEmpty() || "" != null && "".isEmpty()   // a == null || a.isEmpty() || true
       a == null || a.isEmpty() || "" != null && !"".isEmpty()  // a == null || a.isEmpty()
-      a == null || a.isEmpty() && "" == null || "".isEmpty()   // true
-      a == null || a.isEmpty() && "" == null || !"".isEmpty()  // a == null
+      a == null || a.isEmpty() && "" == null || "".isEmpty()   // a == null || a.isEmpty() && false || true
+      a == null || a.isEmpty() && "" == null || !"".isEmpty()  // a == null || a.isEmpty() && false
       a == null || a.isEmpty() && "" != null && "".isEmpty()   // a == null || a.isEmpty()
-      a == null || a.isEmpty() && "" != null && !"".isEmpty()  // a == null
-      a == null || !a.isEmpty() || "" == null || "".isEmpty()  // true
+      a == null || a.isEmpty() && "" != null && !"".isEmpty()  // a == null || a.isEmpty() && false
+      a == null || !a.isEmpty() || "" == null || "".isEmpty()  // a == null || !a.isEmpty() || true
       a == null || !a.isEmpty() || "" == null || !"".isEmpty() // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() || "" != null && "".isEmpty()  // true
+      a == null || !a.isEmpty() || "" != null && "".isEmpty()  // a == null || !a.isEmpty() || true
       a == null || !a.isEmpty() || "" != null && !"".isEmpty() // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true
-      a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null
+      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // a == null || !a.isEmpty() && false || true
+      a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null || !a.isEmpty() && false
       a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null
+      a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null || !a.isEmpty() && false
 
       a == null || a.isEmpty() || "b" == null || "b".isEmpty()   // a == null || a.isEmpty()
-      a == null || a.isEmpty() || "b" == null || !"b".isEmpty()  // true
+      a == null || a.isEmpty() || "b" == null || !"b".isEmpty()  // a == null || a.isEmpty() || true
       a == null || a.isEmpty() || "b" != null && "b".isEmpty()   // a == null || a.isEmpty()
-      a == null || a.isEmpty() || "b" != null && !"b".isEmpty()  // true
-      a == null || a.isEmpty() && "b" == null || "b".isEmpty()   // a == null
-      a == null || a.isEmpty() && "b" == null || !"b".isEmpty()  // true
-      a == null || a.isEmpty() && "b" != null && "b".isEmpty()   // a == null
+      a == null || a.isEmpty() || "b" != null && !"b".isEmpty()  // a == null || a.isEmpty() || true
+      a == null || a.isEmpty() && "b" == null || "b".isEmpty()   // a == null || a.isEmpty() && false
+      a == null || a.isEmpty() && "b" == null || !"b".isEmpty()  // a == null || a.isEmpty() && false || true
+      a == null || a.isEmpty() && "b" != null && "b".isEmpty()   // a == null || a.isEmpty() && false
       a == null || a.isEmpty() && "b" != null && !"b".isEmpty()  // a == null || a.isEmpty()
       a == null || !a.isEmpty() || "b" == null || "b".isEmpty()  // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() || "b" == null || !"b".isEmpty() // true
+      a == null || !a.isEmpty() || "b" == null || !"b".isEmpty() // a == null || !a.isEmpty() || true
       a == null || !a.isEmpty() || "b" != null && "b".isEmpty()  // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() || "b" != null && !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null
-      a == null || !a.isEmpty() && "b" == null || !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null
+      a == null || !a.isEmpty() || "b" != null && !"b".isEmpty() // a == null || !a.isEmpty() || true
+      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null || !a.isEmpty() && false
+      a == null || !a.isEmpty() && "b" == null || !"b".isEmpty() // a == null || !a.isEmpty() && false || true
+      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null || !a.isEmpty() && false
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
     @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
+    // Retain variable receiver calls conservatively, including their possible exceptions.
     // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
     @ParameterizedTest
     void simplifyLiteralNull(String before, String after) {
@@ -956,5 +1178,50 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void doNotFailOnNumericComparisonWhenLiteralTypeMissing() {
+        rewriteRun(
+          spec -> spec.recipe(new StripLiteralTypesThenSimplify())
+            .expectedCyclesThatMakeChanges(1)
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              class A {
+                  boolean a = 1906 >= 8521;
+              }
+              """
+          )
+        );
+    }
+
+    private static class StripLiteralTypesThenSimplify extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Strip numeric literal types, then simplify boolean expressions";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Mimics a non-Java LST (e.g. an untyped Go constant) where a numeric literal carries no type.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return List.of(
+              toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      if (literal.getValue() instanceof Integer && literal.getType() != null) {
+                          return new J.Literal(literal.getId(), literal.getPrefix(), literal.getMarkers(),
+                            literal.getValue(), literal.getValueSource(), null, null);
+                      }
+                      return literal;
+                  }
+              }),
+              toRecipe(SimplifyBooleanExpressionVisitor::new)
+            );
+        }
     }
 }

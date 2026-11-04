@@ -10,7 +10,8 @@ dependencies {
 
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java"))
-    jmh(project(":rewrite-java-21"))
+    jmh(project(":rewrite-java-25"))
+    jmh(project(":rewrite-javascript"))
     jmh(project(":rewrite-maven"))
     jmh("org.antlr:antlr4-runtime:4.13.2")
     jmh("org.rocksdb:rocksdbjni:10.2.1")
@@ -29,4 +30,10 @@ jmh {
     warmupIterations = 1
     iterations = 1
     duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE
+    val inc = project.findProperty("jmh.includes")?.toString()
+    if (!inc.isNullOrBlank()) {
+        includes = listOf(inc)
+    }
+    failOnError = true
+    profilers = listOf("gc")
 }

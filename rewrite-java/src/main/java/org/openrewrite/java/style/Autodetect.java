@@ -24,7 +24,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -196,8 +195,6 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
         private long accumulateDepthCount = 0;
-        private int multilineAlignedToFirstArgument = 0;
-        private int multilineNotAlignedToFirstArgument = 0;
 
         @Getter
         private int depth = 0;
@@ -275,10 +272,7 @@ public class Autodetect extends NamedStyles {
                     tabSize,
                     tabSize,
                     continuationIndent,
-                    false,
-                    new TabsAndIndentsStyle.MethodDeclarationParameters(
-                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument),
-                    new TabsAndIndentsStyle.RecordComponents(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
+                    false
             );
         }
     }
@@ -293,7 +287,8 @@ public class Autodetect extends NamedStyles {
 
     private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
         Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
-                .filter(entry -> entry.getKey().indentDepth != 0)
+                // A prefix with more tabs than its block depth has a negative delta, from which no tab size can be inferred
+                .filter(entry -> entry.getKey().indentDepth > 0)
                 .flatMap(entry -> entry.getValue().entrySet().stream()
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
@@ -359,29 +354,16 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, IndentStatistics stats) {
             if (method.getParameters().size() > 1) {
-                int alignTo;
-                if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
-                    // Compare to the prefix of the first arg.
-                    alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
-                } else {
-                    String source = method.print(getCursor().getParentOrThrow());
-                    alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
-                }
                 List<Statement> parameters = method.getParameters();
                 for (int i = 1; i < parameters.size(); i++) {
                     if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
-                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
-                            stats.multilineAlignedToFirstArgument++;
-                        } else {
-                            stats.multilineNotAlignedToFirstArgument++;
-                            countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
-                        }
+                        countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
                     }
                 }
             }
             // Visit only those parts of the declaration we're interested in getting indentation info from
             visitStatement(method, stats);
-            ListUtils.map(method.getLeadingAnnotations(), a -> visitAndCast(a, stats));
+            method.getLeadingAnnotations().forEach(a -> visit(a, stats));
             visitContainer(method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, stats);
             visit(method.getBody(), stats);
             return method;
@@ -414,7 +396,7 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations vd, IndentStatistics stats) {
             visitStatement(vd, stats);
-            ListUtils.map(vd.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, stats));
+            vd.getPadding().getVariables().forEach(t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, stats));
             return vd;
         }
 
@@ -487,6 +469,31 @@ public class Autodetect extends NamedStyles {
 //            visitContainer(m.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, stats);
 //            stats.decrementContinuationDepth();
             return m;
+        }
+
+        @Override
+        public J.Literal visitLiteral(J.Literal literal, IndentStatistics stats) {
+            if (literal.getValueSource() != null && literal.getValueSource().startsWith("\"\"\"") && literal.getValueSource().endsWith("\"\"\"")) {
+                boolean onContinuationLine = literal.getPrefix().getWhitespace().contains("\n");
+                if (onContinuationLine) {
+                    countIndents(literal.getPrefix().getWhitespace(), true, stats);
+                    stats.incrementContinuationDepth();
+                }
+                // Count indentation of text block content lines as continuation indents
+                String[] lines = literal.getValueSource().split("\n", -1);
+                for (int i = 1; i < lines.length; i++) {
+                    String line = lines[i];
+                    int nonWs = StringUtils.indexOfNonWhitespace(line);
+                    if (!StringUtils.isBlank(line) && nonWs != -1) {
+                        countIndents("\n" + line.substring(0, nonWs), true, stats);
+                    }
+                }
+                if (onContinuationLine) {
+                    stats.decrementContinuationDepth();
+                }
+                return literal;
+            }
+            return super.visitLiteral(literal, stats);
         }
 
         @Override
@@ -993,17 +1000,25 @@ public class Autodetect extends NamedStyles {
 
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
-                        int count = 0;
+                        String importedTypeName = anImport.getTypeName();
+                        Set<String> staticMembers = new HashSet<>();
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                            if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
-                                count++;
+                            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
+                            if (variable.hasFlags(Flag.Static) &&
+                                owner != null && importedTypeName.equals(owner.getFullyQualifiedName())) {
+                                staticMembers.add(variable.getName());
+                            }
+                        }
+                        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                            if (method.hasFlags(Flag.Static) &&
+                                importedTypeName.equals(method.getDeclaringType().getFullyQualifiedName())) {
+                                staticMembers.add(method.getName());
                             }
                         }
 
                         importLayoutStatistics.minimumFoldedStaticImports = Math.min(
                                 importLayoutStatistics.minimumFoldedStaticImports,
-                                count
+                                staticMembers.size()
                         );
                     } else {
                         Set<String> fqns = new HashSet<>();
@@ -1285,6 +1300,8 @@ public class Autodetect extends NamedStyles {
         int parameterAnnotationsWrapped = 0;
         int localVariableAnnotationsWrapped = 0;
         int enumFieldAnnotationsWrapped = 0;
+        int multilineAlignedToFirstArgument = 0;
+        int multilineNotAlignedToFirstArgument = 0;
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
@@ -1325,9 +1342,9 @@ public class Autodetect extends NamedStyles {
                 );
             }
             return wrappingAndBracesStyle
-                    .withIfStatement(new WrappingAndBracesStyle.IfStatement(
-                            elseOnNewLine > 0)
-                    );
+                    .withMethodDeclarationParameters(wrappingAndBracesStyle.getMethodDeclarationParameters().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
+                    .withRecordComponents(wrappingAndBracesStyle.getRecordComponents().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
+                    .withIfStatement(wrappingAndBracesStyle.getIfStatement().withElseOnNewLine(elseOnNewLine > 0));
         }
 
         private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
@@ -1379,6 +1396,26 @@ public class Autodetect extends NamedStyles {
                     wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
                 } else {
                     wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
+                }
+            }
+            if (method.getParameters().size() > 1) {
+                int alignTo;
+                if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
+                    // Compare to the prefix of the first arg.
+                    alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
+                } else {
+                    String source = method.print(getCursor().getParentOrThrow());
+                    alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
+                }
+                List<Statement> parameters = method.getParameters();
+                for (int i = 1; i < parameters.size(); i++) {
+                    if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
+                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
+                            wrappingAndBracesStatistics.multilineAlignedToFirstArgument++;
+                        } else {
+                            wrappingAndBracesStatistics.multilineNotAlignedToFirstArgument++;
+                        }
+                    }
                 }
             }
             return super.visitMethodDeclaration(method, wrappingAndBracesStatistics);

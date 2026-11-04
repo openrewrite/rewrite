@@ -1,28 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from rewrite.utils import lst_dataclass
 from uuid import UUID
 
 from rewrite import Marker
 from rewrite.java.support_types import Space
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class Semicolon(Marker):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class TrailingComma(Marker):
-    _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
+    _id: int | UUID
 
     _suffix: Space
 
@@ -31,10 +24,7 @@ class TrailingComma(Marker):
         return self._suffix
 
 
-@dataclass(frozen=True, eq=False)
+@lst_dataclass
 class OmitParentheses(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id

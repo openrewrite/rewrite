@@ -1,0 +1,72 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.csharp.rpc;
+
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Response from ParseSolution RPC call.
+ * Contains a list of parsed source file items with their IDs and types.
+ */
+class ParseSolutionResponse {
+    private List<Item> items = new ArrayList<>();
+    private long restoreTimeMs;
+
+    public List<Item> getItems() {
+        return items;
+    }
+
+    public void setItems(List<Item> items) {
+        this.items = items;
+    }
+
+    public long getRestoreTimeMs() {
+        return restoreTimeMs;
+    }
+
+    public void setRestoreTimeMs(long restoreTimeMs) {
+        this.restoreTimeMs = restoreTimeMs;
+    }
+
+    /**
+     * A single parsed source file item.
+     */
+    @Value
+    static class Item {
+        /**
+         * The object ID that can be used to retrieve the parsed source file.
+         */
+        String id;
+
+        /**
+         * The fully qualified class name of the source file type.
+         * Example: org.openrewrite.csharp.tree.Cs$CompilationUnit
+         */
+        String sourceFileType;
+
+        /**
+         * The relative source path. Quark items are built from it locally, and it names the
+         * file in the {@link org.openrewrite.tree.ParseError} substituted for an item that
+         * could not be fetched. Null from a C# peer that predates populating it for every item.
+         */
+        @Nullable
+        String sourcePath;
+    }
+}

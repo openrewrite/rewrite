@@ -1,0 +1,135 @@
+{"header":"glob-parent 5.1.2: every call its own tests (test/index.test.js) make, with its answer; generate/upstream-calls.js generate/upstream/glob-parent.js <checkout> 5.1.2"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["."],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":[".*"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/.*"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/.*/"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["a/.*/b"],"out":"a"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["a*/.*/b"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*/a/b/c"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*/*"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*/*/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**/*"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**/*/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/*.js"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["*.js"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["**/*.js"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["{a,b}"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/{a,b}"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/{a,b}/"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["(a|b)"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/(a|b)"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["./(a|b)"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["a/(b c)"],"out":"a"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["a/(b c)/"],"out":"a/(b c)"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["a/(b c)/d"],"out":"a/(b c)"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/to/*.js"],"out":"path/to"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["/root/path/to/*.js"],"out":"/root/path/to"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["chapter/foo [bar]/"],"out":"chapter"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/[a-z]"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["[a-z]"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/{to,from}"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/(foo bar)/subdir/foo.*"],"out":"path/(foo bar)/subdir"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/!(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/?(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/+(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/*(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/@(to|from)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/!/foo"],"out":"path/!"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/?/foo"],"out":"path/?"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/+/foo"],"out":"path/+"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/*/foo"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/@/foo"],"out":"path/@"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/!/foo/"],"out":"path/!/foo"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/?/foo/"],"out":"path/?/foo"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/+/foo/"],"out":"path/+/foo"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/*/foo/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/@/foo/"],"out":"path/@/foo"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/**/*"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/**/subdir/foo.*"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/subdir/**/foo.js"],"out":"path/subdir"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/!subdir/foo.js"],"out":"path/!subdir"}
+{"test":"test/index.test.js > glob-parent > should strip glob magic to return parent path","fn":"globParent","args":["path/{foo,bar}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\*\\*/subdir/foo.*"],"out":"path/**/subdir"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\[\\*\\]/subdir/foo.*"],"out":"path/[*]/subdir"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\*(a|b)/subdir/foo.*"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\*/(a|b)/subdir/foo.*"],"out":"path/*"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\*\\(a\\|b\\)/subdir/foo.*"],"out":"path/*(a|b)/subdir"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\[foo bar\\]/subdir/foo.*"],"out":"path/[foo bar]/subdir"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\[bar]/"],"out":"path/[bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\[bar]"],"out":"path/[bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["[bar]"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["[bar]/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["./\\[bar]"],"out":"./[bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\[bar]/"],"out":"[bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\!dir/*"],"out":"!dir"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["[bar\\]/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/foo \\[bar]/"],"out":"path/foo [bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["path/\\{foo,bar}/"],"out":"path/{foo,bar}"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\{foo,bar}/"],"out":"{foo,bar}"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\{foo,bar\\}/"],"out":"{foo,bar}"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["{foo,bar\\}/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["foo-\\(bar\\).md"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\[bar]"],"out":"[bar]"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["[bar\\]"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["\\{foo,bar\\}"],"out":"{foo,bar}"}
+{"test":"test/index.test.js > glob-parent > should respect escaped characters","fn":"globParent","args":["{foo,bar\\}"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/{,/,bar/baz,qux}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/\\{,/,bar/baz,qux}/"],"out":"path/{,/,bar/baz,qux}"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/\\{,/,bar/baz,qux\\}/"],"out":"path/{,/,bar/baz,qux}"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["/{,/,bar/baz,qux}/"],"out":"/"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["/\\{,/,bar/baz,qux}/"],"out":"/{,/,bar/baz,qux}"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["{,/,bar/baz,qux}"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["\\{,/,bar/baz,qux\\}"],"out":"{,/,bar/baz,qux}"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["\\{,/,bar/baz,qux}/"],"out":"{,/,bar/baz,qux}"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/foo[a\\/]/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/foo\\[a\\/]/"],"out":"path/foo[a\\/]"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["foo[a\\/]"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["foo\\[a\\/]"],"out":"foo[a\\/]"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/(foo/bar|baz)"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/(foo/bar|baz)/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should respect glob enclosures with embedded separators","fn":"globParent","args":["path/\\(foo/bar|baz)/"],"out":"path/(foo/bar|baz)"}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["path/{../,./,{bar,/baz\\},qux\\}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["path/{../,./,\\{bar,/baz},qux}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["path/\\{../,./,\\{bar,/baz\\},qux\\}/"],"out":"path/{../,./,{bar,/baz},qux}"}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["{../,./,{bar,/baz\\},qux\\}/"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["{../,./,{bar,/baz\\},qux\\}"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["path/{,/,bar/{baz,qux\\}}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should handle nested braces","fn":"globParent","args":["path/{,/,bar/{baz,qux}\\}/"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path"],"out":"."}
+{"test":"test/index.test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo"],"out":"path"}
+{"test":"test/index.test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo/"],"out":"path/foo"}
+{"test":"test/index.test.js > glob-parent > should return parent dirname from non-glob paths","fn":"globParent","args":["path/foo/bar.js"],"out":"path/foo"}
+{"test":"test/index.test.js > glob-parent > should respect disabled auto flip backslashes","fn":"globParent","args":["foo-\\(bar\\).md",{"flipBackslashes":false}],"out":"."}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name","fn":"globParent","args":["js/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a nested glob","fn":"globParent","args":["js/**/test/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a flat file","fn":"globParent","args":["js/test/wow.js"],"out":"js/test"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a flat file","fn":"globParent","args":["js/test/wow.js"],"out":"js/test"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from character class pattern","fn":"globParent","args":["js/t[a-z]st}/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from brace , expansion","fn":"globParent","args":["js/{src,test}/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from brace .. expansion","fn":"globParent","args":["js/test{0..9}/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from extglob","fn":"globParent","args":["js/t+(wo|est)/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a path with non-exglob parens","fn":"globParent","args":["js/t(wo|est)/*.js"],"out":"js"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a path with non-exglob parens","fn":"globParent","args":["js/t/(wo|est)/*.js"],"out":"js/t"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a complex brace glob","fn":"globParent","args":["lib/{components,pages}/**/{test,another}/*.txt"],"out":"lib"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a complex brace glob","fn":"globParent","args":["js/test/**/{images,components}/*.js"],"out":"js/test"}
+{"test":"test/index.test.js > glob2base test patterns > should get a base name from a complex brace glob","fn":"globParent","args":["ooga/{booga,sooga}/**/dooga/{eooga,fooga}"],"out":"ooga"}
+{"test":"test/index.test.js > glob2base test patterns > should not be susceptible to SNYK-JS-GLOBPARENT-1016905","fn":"globParent","args":["{////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////"],"out":"."}
+{"test":"differences","fn":"globParent","args":[""],"out":"."}
+{"test":"differences","fn":"globParent","args":["path/{a,b}/c"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/[a]/b"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/\\*.js"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["path/(a|b"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["a/\\{b}/c"],"out":"a/{b}"}
+{"test":"differences","fn":"globParent","args":["a/[b]"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["{a,b}/"],"out":"."}
+{"test":"differences","fn":"globParent","args":["a/(b|c)/d"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["a/@(b)/c"],"out":"a"}
+{"test":"differences","fn":"globParent","args":["a\\(b/c"],"out":"a(b"}
+{"test":"differences","fn":"globParent","args":["path/!x"],"out":"path"}
+{"test":"differences","fn":"globParent","args":["/"],"out":"/"}
+{"test":"differences","fn":"globParent","args":["//a/*"],"out":"//a"}

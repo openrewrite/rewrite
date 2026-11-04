@@ -1,0 +1,399 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package rpc
+
+import (
+	"encoding/json"
+	"reflect"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+var defaultSender = NewGoSender()
+
+// It tracks refs for deduplication and maintains a "before" state for delta encoding.
+type SendQueue struct {
+	batchSize     int
+	batch         []RpcObjectData
+	drain         func([]RpcObjectData)
+	refs          *ReferenceMap
+	allocatedRefs []referenceAllocation
+	before        any
+}
+
+type referenceAllocation struct {
+	obj any
+	ref int
+}
+
+func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs *ReferenceMap) *SendQueue {
+	return &SendQueue{
+		batchSize: batchSize,
+		batch:     make([]RpcObjectData, 0, batchSize),
+		drain:     drain,
+		refs:      refs,
+	}
+}
+
+// DiscardNewReferences removes references first allocated by this queue. IDs
+// remain monotonic because the receiver may already have seen definitions from
+// an earlier page of a failed transfer.
+func (q *SendQueue) DiscardNewReferences() {
+	for _, allocation := range q.allocatedRefs {
+		q.refs.deleteIfMatches(allocation.obj, allocation.ref)
+	}
+	q.allocatedRefs = nil
+}
+
+func (q *SendQueue) Put(data RpcObjectData) {
+	// Every message reaching the wire is shaped here, which is what lets RpcObjectData
+	// stay a plain tagged struct the encoder writes field by field. Construct sendable
+	// messages only through Put: a whole float marshaled without this reads as an
+	// integer on the far side (see wireNumber).
+	data.Value = wireNumber(data.Value)
+	q.batch = append(q.batch, data)
+	if len(q.batch) == q.batchSize {
+		q.Flush()
+	}
+}
+
+func (q *SendQueue) Flush() {
+	if len(q.batch) == 0 {
+		return
+	}
+	out := make([]RpcObjectData, len(q.batch))
+	copy(out, q.batch)
+	q.drain(out)
+	q.batch = q.batch[:0]
+}
+
+func (q *SendQueue) GetAndSend(parent any, getter func(any) any, onChange func(any)) {
+	after := getter(parent)
+	var before any
+	if q.before != nil {
+		before = getter(q.before)
+	}
+	q.Send(after, before, onChange)
+}
+
+func (q *SendQueue) GetAndSendList(parent any, getter func(any) []any, id func(any) any, onChange func(any)) {
+	q.getAndSendList(parent, getter, id, onChange, false)
+}
+
+func (q *SendQueue) GetAndSendListAsRef(parent any, getter func(any) []any, id func(any) any, onChange func(any)) {
+	q.getAndSendList(parent, getter, id, onChange, true)
+}
+
+func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(any) any, onChange func(any), asRef bool) {
+	var after []any
+	if parent != nil {
+		after = getter(parent)
+	}
+	var before []any
+	if q.before != nil {
+		before = getter(q.before)
+	}
+	q.sendList(after, before, id, onChange, asRef)
+}
+
+func (q *SendQueue) Send(after, before any, onChange func(any)) {
+	after, before = nonNilEmpty(after), nonNilEmpty(before)
+	afterVal := GetValue(after)
+	beforeVal := GetValue(before)
+
+	if sameIdentity(beforeVal, afterVal) {
+		q.Put(RpcObjectData{State: NoChange})
+	} else if isNilValue(beforeVal) || (!isNilValue(afterVal) && !sameType(afterVal, beforeVal)) {
+		q.add(after, onChange)
+	} else if isNilValue(afterVal) {
+		q.Put(RpcObjectData{State: Delete})
+	} else if IsRef(after) {
+		// A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+		// instance may be aliased by any number of other slots and source files. A CHANGE would
+		// be applied to that shared instance in place, corrupting every alias, so the new value
+		// is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+		q.add(after, onChange)
+	} else {
+		vt := getValueType(afterVal)
+		val, skipDoChange := inlineValue(afterVal, onChange, vt)
+		q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
+		if !skipDoChange {
+			q.doChange(afterVal, beforeVal, onChange)
+		}
+	}
+}
+
+// inlineValue computes the Value payload for an ADD/CHANGE message and whether
+// sub-field dispatch must be skipped. A codec-less GenericMarker ships its data
+// map inline — sub-field dispatch would emit nothing for it (sendMarkerCodecFields
+// default case). Other values travel inline when neither an onChange callback nor
+// a value type supplies sub-field messages to reconstruct them from.
+func inlineValue(afterVal any, onChange func(any), vt *string) (val any, skipDoChange bool) {
+	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+		if gm.Data == nil {
+			return map[string]any{}, true
+		}
+		return gm.Data, true
+	}
+	if m, ok := afterVal.(java.Marker); ok && vt != nil && *vt == rpcMarkerJavaType {
+		return rpcMarkerData(m), true
+	}
+	if onChange == nil && vt == nil {
+		return afterVal, false
+	}
+	return nil, false
+}
+
+func (q *SendQueue) sendList(after, before []any, id func(any) any, onChange func(any), asRef bool) {
+	q.Send(anySlice(after), anySlice(before), func(_ any) {
+		if after == nil {
+			return
+		}
+
+		positions := make([]any, len(after))
+		if len(before) == 0 {
+			// Every element is an addition, so the positions are a constant that needs
+			// neither an index map nor a key computed per element.
+			for i := range positions {
+				positions[i] = AddedListItem
+			}
+		} else {
+			beforeIdx := make(map[any]int, len(before))
+			for i, b := range before {
+				beforeIdx[id(b)] = i
+			}
+			for i, a := range after {
+				if pos, ok := beforeIdx[id(a)]; ok {
+					positions[i] = pos
+				} else {
+					positions[i] = AddedListItem
+				}
+			}
+		}
+		q.Put(RpcObjectData{State: Change, Value: positions})
+
+		// Send each item
+		for i, a := range after {
+			pos, existed := 0, false
+			if p, ok := positions[i].(int); ok && p != AddedListItem {
+				pos, existed = p, true
+			}
+			var onChangeRun func(any)
+			if onChange != nil {
+				item := a
+				onChangeRun = func(_ any) { onChange(item) }
+			}
+			if !existed {
+				// New item
+				if asRef {
+					q.add(AsRef(a), onChangeRun)
+				} else {
+					q.add(a, onChangeRun)
+				}
+			} else {
+				var aBefore any
+				if before != nil && pos >= 0 {
+					aBefore = before[pos]
+				}
+				if sameIdentity(aBefore, a) {
+					q.Put(RpcObjectData{State: NoChange})
+				} else if asRef || isNilValue(aBefore) || !sameType(a, aBefore) {
+					// Type changed, or a ref-deduplicated item, which is always re-added
+					// rather than CHANGEd (see Send)
+					if asRef {
+						q.add(AsRef(a), onChangeRun)
+					} else {
+						q.add(a, onChangeRun)
+					}
+				} else {
+					vt := getValueType(a)
+					val, skipDoChange := inlineValue(a, onChangeRun, vt)
+					q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
+					if !skipDoChange {
+						q.doChange(a, aBefore, onChangeRun)
+					}
+				}
+			}
+		}
+	})
+}
+
+func (q *SendQueue) add(after any, onChange func(any)) {
+	afterVal := GetValue(after)
+	if isNilValue(afterVal) {
+		panic("add called with nil value")
+	}
+
+	var ref *int
+	if IsRef(after) && isReferenceIdentity(afterVal) {
+		r, existed := q.refs.GetOrCreate(afterVal)
+		if existed {
+			// Already sent - emit pure ref
+			q.Put(RpcObjectData{State: Add, Ref: &r})
+			return
+		}
+		q.allocatedRefs = append(q.allocatedRefs, referenceAllocation{obj: afterVal, ref: r})
+		ref = &r
+	}
+
+	vt := getValueType(afterVal)
+	val, skipDoChange := inlineValue(afterVal, onChange, vt)
+	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
+	if !skipDoChange {
+		q.doChange(afterVal, nil, onChange)
+	}
+}
+
+func (q *SendQueue) doChange(after, before any, onChange func(any)) {
+	lastBefore := q.before
+	q.before = before
+	defer func() { q.before = lastBefore }()
+
+	if onChange != nil && !isNilValue(after) {
+		onChange(after)
+	} else if onChange == nil && !isNilValue(after) && getValueType(after) != nil {
+		if t, ok := after.(java.Tree); ok {
+			defaultSender.Visit(t, q)
+		}
+	}
+}
+
+// nonNilEmpty maps a nil Space or Markers to its shared empty sentinel, which Java expects in place of null.
+func nonNilEmpty(v any) any {
+	if sp, ok := v.(java.Space); ok && sp == nil {
+		return java.EmptySpace
+	}
+	if m, ok := v.(java.Markers); ok && m == nil {
+		return java.EmptyMarkers
+	}
+	return v
+}
+
+func sameIdentity(a, b any) bool {
+	aNil := isNilValue(a)
+	bNil := isNilValue(b)
+	if aNil && bNil {
+		return true
+	}
+	if aNil || bNil {
+		return false
+	}
+	rv1 := reflect.ValueOf(a)
+	rv2 := reflect.ValueOf(b)
+	if rv1.Kind() == reflect.Ptr && rv2.Kind() == reflect.Ptr {
+		return rv1.Pointer() == rv2.Pointer()
+	}
+	// For non-pointer value types, use reflect to safely compare.
+	// Slices are compared by header identity (pointer + length), not content,
+	// because tree visitors always create new slices even for unchanged subtrees.
+	rv1 = reflect.ValueOf(a)
+	rv2 = reflect.ValueOf(b)
+	if rv1.Kind() == reflect.Slice && rv2.Kind() == reflect.Slice {
+		return rv1.Pointer() == rv2.Pointer() && rv1.Len() == rv2.Len()
+	}
+	// For structs with uncomparable fields (e.g., Space containing []Comment),
+	// use DeepEqual to avoid panics.
+	return reflect.DeepEqual(a, b)
+}
+
+func sameType(a, b any) bool {
+	if isNilValue(a) || isNilValue(b) {
+		return false
+	}
+	return reflect.TypeOf(a) == reflect.TypeOf(b)
+}
+
+func anySlice(s []any) any {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+func getValueType(v any) *string {
+	if v == nil {
+		return nil
+	}
+	t := reflect.TypeOf(v)
+	// Exclude primitive types, strings, and slices (matching Java's exclusions)
+	switch t.Kind() {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
+		return nil
+	case reflect.Slice:
+		return nil
+	}
+	if vt, ok := valueTypeMap[t]; ok {
+		return &vt
+	}
+	if m, ok := v.(java.Markup); ok {
+		vt := markupJavaTypes[m.Level]
+		return &vt
+	}
+	// GenericMarker carries the original Java class name
+	if gm, ok := v.(java.GenericMarker); ok && gm.JavaType != "" {
+		return &gm.JavaType
+	}
+	// a marker type a recipe declares has no Java class to arrive as
+	if _, ok := v.(java.Marker); ok {
+		vt := rpcMarkerJavaType
+		return &vt
+	}
+	// Check padding types (Go generics have no reflect.Name())
+	return getValueTypeForPadding(v)
+}
+
+// rpcMarkerJavaType is the Java class that holds a marker Java has no class for.
+const rpcMarkerJavaType = "org.openrewrite.rpc.RpcMarker"
+
+// rpcMarkerData is what Java holds of such a marker: its id, and whatever
+// JSON carries of its fields.
+func rpcMarkerData(m java.Marker) map[string]any {
+	data := map[string]any{}
+	if encoded, err := json.Marshal(m); err == nil {
+		_ = json.Unmarshal(encoded, &data)
+	}
+	id := m.ID().String()
+	for field, value := range data {
+		if value == id {
+			delete(data, field)
+		}
+	}
+	data["id"] = id
+	return data
+}
+
+// markupJavaTypes names the Java class of each Markup level; Java has one class per level.
+var markupJavaTypes = map[java.MarkupLevel]string{
+	java.MarkupDebugLevel: "org.openrewrite.marker.Markup$Debug",
+	java.MarkupInfoLevel:  "org.openrewrite.marker.Markup$Info",
+	java.MarkupWarnLevel:  "org.openrewrite.marker.Markup$Warn",
+	java.MarkupErrorLevel: "org.openrewrite.marker.Markup$Error",
+}
+
+// valueTypeMap maps Go types to their Java class names for RPC wire format.
+var valueTypeMap = map[reflect.Type]string{}
+
+func RegisterValueType(goType reflect.Type, javaClassName string) {
+	valueTypeMap[goType] = javaClassName
+}
+
+// JavaClassName returns the Java class registered for v's Go type, or "" when none is.
+func JavaClassName(v any) string {
+	return valueTypeMap[reflect.TypeOf(v)]
+}

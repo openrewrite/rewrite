@@ -19,12 +19,21 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -44,8 +53,12 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
+    private static final String MAVEN_ARTIFACT_CACHE = "org.openrewrite.maven.artifactCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_UNREACHABLE_ENDPOINTS = "org.openrewrite.maven.unreachableEndpoints";
+    private static final String MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS = "org.openrewrite.maven.authenticationRequiredEndpoints";
+    private static final String MAVEN_THROTTLED_ENDPOINTS = "org.openrewrite.maven.throttledEndpoints";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -66,6 +79,47 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public Duration getResolutionTime() {
         return Duration.ofMillis(getMessage(MAVEN_RESOLUTION_TIME, 0L));
+    }
+
+    /**
+     * Connection endpoints, each a {@code host:port}, that have proven unreachable (a connection-level
+     * failure, as opposed to an HTTP error response) during this execution. Repositories on these
+     * endpoints are skipped for the remainder of the run rather than re-probed for every declaration,
+     * so a single dead repository costs one connection timeout instead of one per artifact. The key is
+     * {@code host:port} rather than the full repository URI because a connection failure occurs before
+     * any path is sent and so is independent of the path; the same dead host declared under different
+     * paths or ids is therefore deduped. The set is concurrent because resolution runs across multiple
+     * threads sharing one execution context.
+     */
+    public Set<String> getUnreachableEndpoints() {
+        return computeMessageIfAbsent(MAVEN_UNREACHABLE_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    /**
+     * The authentication-side counterpart to {@link #getUnreachableEndpoints()}: connection endpoints, each a
+     * {@code host:port}, that challenged an anonymous request and required credentials during this execution.
+     * Once an endpoint is known to require authentication, subsequent requests send credentials preemptively
+     * instead of paying another anonymous round-trip, mirroring the per-session {@code BasicAuthCache} that
+     * Apache Maven Resolver keeps on its HTTP client. As with unreachable endpoints, the key is {@code host:port}
+     * rather than the full URI because the challenge is a property of the endpoint, not the requested path, so the
+     * same host contacted under different paths or ids is deduped. The set is concurrent because resolution runs
+     * across multiple threads sharing one execution context.
+     */
+    public Set<String> getAuthenticationRequiredEndpoints() {
+        return computeMessageIfAbsent(MAVEN_AUTHENTICATION_REQUIRED_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
+    }
+
+    /**
+     * The rate-limiting counterpart to {@link #getUnreachableEndpoints()}: connection endpoints, each a
+     * {@code host:port}, that answered HTTP 429 during this execution, mapped to the instant until which
+     * requests to them are skipped rather than sent. A 429 is transient, so it is never negative-cached; this
+     * map is what keeps every subsequent lookup from re-asking a host that has already said it is throttling.
+     * As with unreachable endpoints, the key is {@code host:port} rather than the full URI because rate limits
+     * are imposed per host, not per path. The map is concurrent because resolution runs across multiple
+     * threads sharing one execution context.
+     */
+    public Map<String, Instant> getThrottledEndpoints() {
+        return computeMessageIfAbsent(MAVEN_THROTTLED_ENDPOINTS, k -> new ConcurrentHashMap<>());
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {
@@ -93,7 +147,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
+        if (mavenSettings != null) {
             return mapMirrors(mavenSettings);
         }
         return getMirrors();
@@ -133,6 +187,53 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public MavenPomCache getPomCache() {
         return (MavenPomCache) getMessages().computeIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
+    }
+
+    public MavenExecutionContextView setArtifactCache(MavenArtifactCache artifactCache) {
+        putMessage(MAVEN_ARTIFACT_CACHE, artifactCache);
+        return this;
+    }
+
+    /**
+     * Get a shared {@link MavenArtifactCache} for this execution context, lazily initializing one
+     * on first access. Defaults to a {@link LocalMavenArtifactCache} at
+     * {@code ~/.rewrite/cache/artifacts}, falling back to a single JVM-lifetime temp directory
+     * if the user home directory is not writable.
+     * <p>
+     * Callers that want to override this (for example, to point at a shared on-disk cache backed
+     * by a persistent volume) can do so via {@link #setArtifactCache(MavenArtifactCache)} before
+     * any recipe visitor resolves artifacts.
+     */
+    public MavenArtifactCache getArtifactCache() {
+        return (MavenArtifactCache) getMessages().computeIfAbsent(MAVEN_ARTIFACT_CACHE, k -> defaultArtifactCache());
+    }
+
+    private static MavenArtifactCache defaultArtifactCache() {
+        try {
+            Path cacheDir = Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts");
+            Files.createDirectories(cacheDir);
+            return new LocalMavenArtifactCache(cacheDir);
+        } catch (Exception e) {
+            return TempArtifactCacheHolder.INSTANCE;
+        }
+    }
+
+    /**
+     * Holds a single JVM-lifetime temp-directory artifact cache, used as a fallback when
+     * {@code ~/.rewrite/cache/artifacts} cannot be created.
+     */
+    private static final class TempArtifactCacheHolder {
+        static final MavenArtifactCache INSTANCE;
+
+        static {
+            try {
+                Path tempDir = Files.createTempDirectory("rewrite-artifact-cache");
+                tempDir.toFile().deleteOnExit();
+                INSTANCE = new LocalMavenArtifactCache(tempDir);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     public MavenExecutionContextView setLocalRepository(MavenRepository localRepository) {

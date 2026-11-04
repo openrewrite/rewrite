@@ -17,6 +17,7 @@ package org.openrewrite.groovy.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,45 @@ class AutoFormatVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AutoFormat());
+    }
+
+    @Test
+    void tupleDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              def parts = "org:lib:1.0".split(":")
+              def (group, artifact, version) = parts
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4531")
+    @Test
+    void preserveSpaceBeforeAsKeywordInCast() {
+        rewriteRun(
+          groovy(
+            """
+              int something = sh(
+                      script: 'echo 1',
+                      returnStatus: true
+              ).trim() as Integer
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4531")
+    @Test
+    void preserveSpaceBeforeAsKeywordInSimpleCast() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = "hallo" as String
+              """
+          )
+        );
     }
 
     @DocumentExample
@@ -56,6 +96,92 @@ class AutoFormatVisitorTest implements RewriteTest {
               package com.intellij.samples
 
               class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedClosureReturnValue() {
+        rewriteRun(
+          groovy(
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find({ key, value -> (key instanceof Pattern && key.matcher(apiType).matches()) })?.value
+              """,
+            """
+              if (convertTemplate == null)
+                  convertTemplate = inTypemap.find { key, value -> (key instanceof Pattern && key.matcher(apiType).matches()) }?.value
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsSingleLineClosureOnOneLine() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+              buildScan {
+              publishing.onlyIf { !it.buildResult.failures.empty }
+              }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.onlyIf { !it.buildResult.failures.empty }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stillWrapsAClosureTheAuthorWroteAcrossLines() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+              buildScan {
+              publishing.onlyIf {
+              !it.buildResult.failures.empty
+              }
+              }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.onlyIf {
+                          !it.buildResult.failures.empty
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapsAClosureWhoseStatementsSpanLines() {
+        rewriteRun(
+          groovy(
+            """
+              develocity {
+                  buildScan { publishing.enabled = true
+                      publishing.onlyIf { true } }
+              }
+              """,
+            """
+              develocity {
+                  buildScan {
+                      publishing.enabled = true
+                      publishing.onlyIf { true }
+                  }
               }
               """
           )
