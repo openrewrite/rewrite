@@ -65,6 +65,45 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void formatChangedControlWithOriginalLoopCursor() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop.Control visitForControl(J.ForLoop.Control control, ExecutionContext ctx) {
+                  J.VariableDeclarations declaration = (J.VariableDeclarations) control.getInit().getFirst();
+                  J.VariableDeclarations.NamedVariable variable = declaration.getVariables().getFirst();
+                  J.Literal initializer = (J.Literal) variable.getInitializer();
+                  if (Integer.valueOf(0).equals(initializer.getValue())) {
+                      declaration = declaration.withVariables(List.of(variable.withInitializer(
+                        initializer.withValue(1).withValueSource("1"))));
+                      control = control.withInit(List.of(declaration));
+                  }
+                  return (J.ForLoop.Control) new AutoFormatVisitor<ExecutionContext>()
+                    .visitNonNull(control, ctx, getCursor().getParentTreeCursor());
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 0;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 1;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void formatMultilineForSubtree() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
