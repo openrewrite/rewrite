@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -186,8 +187,16 @@ final class Pnpm10Profile {
     }
 
     static boolean unsupportedSpecifier(String specifier) {
-        return specifier.contains(":") && !specifier.startsWith("npm:") && !specifier.startsWith("workspace:") &&
-               !specifier.startsWith("catalog:") && !specifier.startsWith("link:");
+        if (specifier.startsWith("workspace:") || specifier.startsWith("catalog:") || specifier.startsWith("link:")) {
+            return false;
+        }
+        try {
+            // npm-package-arg also recognizes protocol-less hosted git and filesystem specs. Registry aliases
+            // must be parsed rather than rejected by their slash (npm:@scope/package@range).
+            return !Spec.resolve("dependency", specifier, "/", Spec.Release.PNPM_2_0_0).isRegistry();
+        } catch (IllegalArgumentException invalid) {
+            return true;
+        }
     }
 
     static String reason(String feature) {

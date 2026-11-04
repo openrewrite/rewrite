@@ -81,6 +81,41 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"owner/repo", "owner/repo#main", "./pkg", "../pkg", "/tmp/pkg"})
+    void refusesNewNonRegistryDependenciesBeforeResolution(String spec) {
+        for (String version : new String[]{"10.0.0", "10.11.0", "10.34.9"}) {
+            PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
+              .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
+              .findFirst().orElseThrow(AssertionError::new);
+            String manifest = "{\"name\":\"test\",\"dependencies\":{\"new-dependency\":\"" + spec + "\"}}";
+            PnpmLockRegenerator.Inputs inputs = PnpmScenarioTest.inputs(scenario, scenario.file("before"),
+              Collections.emptyMap(), version).toBuilder().manifests(Collections.singletonMap("", manifest)).build();
+            Result result = new PnpmLockRegenerator(inputs, new ScenarioRegistry(scenario, "after")).regenerate();
+            assertThat(result.getFailure()).as(version + " " + spec).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+            assertThat(result.getFailure().getDetail()).as(version + " " + spec)
+              .contains("pnpm 10 native profile", spec);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    void keepsSupportedDependencyFormsWithinTheProfile(String version) {
+        PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
+          .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
+          .findFirst().orElseThrow(AssertionError::new);
+        for (String spec : new String[]{"latest", "next", "1.0.0", "^1.0.0", ">=1 <3", "*",
+          "npm:ms@^2", "npm:@scope/package@^1", "workspace:*", "workspace:../pkg", "catalog:",
+          "catalog:default", "link:./pkg"}) {
+            String manifest = "{\"name\":\"test\",\"dependencies\":{\"dependency\":\"" + spec + "\"}}";
+            PnpmLockRegenerator.Inputs inputs = PnpmScenarioTest.inputs(scenario, scenario.file("before"),
+              Collections.emptyMap(), version).toBuilder().manifests(Collections.singletonMap("", manifest)).build();
+            assertThat(Pnpm10Profile.unsupported(inputs, PnpmRelease.of(version)))
+              .as(version + " " + spec).isNull();
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
     void readsNpmrcPeerSettings(String version) {
         PnpmOptions options = PnpmOptions.load(null, "auto-install-peers=false\n", null,
