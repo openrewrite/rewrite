@@ -100,7 +100,7 @@ const pat = pattern({debug: tree => isMethodInvocation(tree) && tree.name.simple
 
 The attempt has a `location` too, so a predicate can pick a line: `(tree, cursor, attempt) => attempt.location?.line === 12`.
 
-In a terminal that shows colours, the mismatch is in inverse video rather than between 👉 and 👈. `FORCE_COLOR` and `NO_COLOR` choose explicitly. `pat.matchWithExplanation(node, cursor)` returns the explanation instead of printing it, and its `report` holds the printed text, for a test to assert on or use as an assertion message.
+In a terminal that shows colours, the mismatch is in inverse video rather than between 👉 and 👈. `FORCE_COLOR` and `NO_COLOR` choose explicitly. `pat.matchWithExplanation(node, cursor)` returns the attempt instead of printing it. Its `explanation` says why it failed, and its `report` holds what debug output would print, without the `[Pattern #N]` prefix and the `called from` line. A test can assert on either, or use `report` as an assertion message.
 
 ### When making changes to JavaScript code
 
