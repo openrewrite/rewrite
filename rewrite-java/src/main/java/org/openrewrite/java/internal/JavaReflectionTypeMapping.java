@@ -276,12 +276,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         });
     }
 
-    /**
-     * Reflection reports a varargs method with the modifier bit {@link Modifier#TRANSIENT} stands for on a field
-     * (the class file's {@code ACC_VARARGS}). A {@link JavaType.Method} says so with {@link Flag#Varargs}, as the
-     * Java parser's type mapping does, which matters most where the two meet in one type cache: a Kotlin source
-     * set maps JDK types through reflection, and the Java parser of the same source set then reads them.
-     */
+    /// Reflection reports varargs as `ACC_VARARGS`, the same bit as [Modifier#TRANSIENT]; map it to
+    /// [Flag#Varargs] as the Java parser does, since both can share one type cache.
     private static long methodFlags(Executable method) {
         long flags = method.getModifiers();
         if (method.isVarArgs()) {
