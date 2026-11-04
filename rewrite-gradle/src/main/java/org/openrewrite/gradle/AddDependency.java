@@ -369,7 +369,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 continue;
             }
             for (ResolvedDependency d : c.getResolved()) {
-                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern)) {
+                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern) &&
+                        !(groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()))) {
                     Version v = new Version(d.getVersion());
                     if (familyVersion == null || v.compareTo(familyVersion) > 0) {
                         familyVersion = v;
