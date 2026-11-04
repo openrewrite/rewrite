@@ -1456,8 +1456,55 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      29.0-jre | 29.0-jre       | com.google.guava:guava
+      30.0-jre | 29.0-jre       | com.google.guava:guava
+      29.0-jre | latest.release | com.google.guava:guava
+      28.0-jre | 29.0-jre       | com.google.guava:guava:29.0-jre
+      """)
+    void addDependencyOmitsVersionManagedByPlatform(String bomVersion, String requestedVersion, String added) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:" + requestedVersion, "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation platform("com.google.guava:guava-bom:%s")
+                }
+                """.formatted(bomVersion),
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation platform("com.google.guava:guava-bom:%s")
+                    implementation "%s"
+                }
+                """.formatted(bomVersion, added)
+            )
+          )
+        );
+    }
+
     @Test
-    void addDependencyWithoutVersionWhenPlatformManagesIt() {
+    void addDependencyWithoutVersionWhenPlatformOnExtendedConfigurationManagesIt() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
           mavenProject("project",
@@ -1475,7 +1522,7 @@ class AddDependencyTest implements RewriteTest {
                 }
 
                 dependencies {
-                    implementation platform("com.google.guava:guava-bom:29.0-jre")
+                    api platform("com.google.guava:guava-bom:29.0-jre")
                 }
                 """,
               """
@@ -1488,7 +1535,8 @@ class AddDependencyTest implements RewriteTest {
                 }
 
                 dependencies {
-                    implementation platform("com.google.guava:guava-bom:29.0-jre")
+                    api platform("com.google.guava:guava-bom:29.0-jre")
+
                     implementation "com.google.guava:guava"
                 }
                 """
@@ -1498,17 +1546,17 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void addDependencyWithoutVersionWhenPlatformManagesNewerVersion() {
+    void addDependencyWithoutVersionWhenPlatformManagesItInKotlinDsl() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
             ),
-            buildGradle(
+            buildGradleKts(
               """
                 plugins {
-                    id 'java-library'
+                    `java-library`
                 }
 
                 repositories {
@@ -1516,12 +1564,12 @@ class AddDependencyTest implements RewriteTest {
                 }
 
                 dependencies {
-                    implementation platform("com.google.guava:guava-bom:30.0-jre")
+                    implementation(platform("com.google.guava:guava-bom:29.0-jre"))
                 }
                 """,
               """
                 plugins {
-                    id 'java-library'
+                    `java-library`
                 }
 
                 repositories {
@@ -1529,90 +1577,8 @@ class AddDependencyTest implements RewriteTest {
                 }
 
                 dependencies {
-                    implementation platform("com.google.guava:guava-bom:30.0-jre")
-                    implementation "com.google.guava:guava"
-                }
-                """
-            )
-          )
-        );
-    }
-
-    @Test
-    void addDependencyWithoutVersionWhenPlatformSatisfiesSelector() {
-        rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:latest.release", "com.google.common.math.IntMath")),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            buildGradle(
-              """
-                plugins {
-                    id 'java-library'
-                }
-
-                repositories {
-                    mavenCentral()
-                }
-
-                dependencies {
-                    implementation platform("com.google.guava:guava-bom:29.0-jre")
-                }
-                """,
-              """
-                plugins {
-                    id 'java-library'
-                }
-
-                repositories {
-                    mavenCentral()
-                }
-
-                dependencies {
-                    implementation platform("com.google.guava:guava-bom:29.0-jre")
-                    implementation "com.google.guava:guava"
-                }
-                """
-            )
-          )
-        );
-    }
-
-    @Test
-    void addDependencyWithVersionWhenPlatformManagesOlderVersion() {
-        rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            buildGradle(
-              """
-                plugins {
-                    id 'java-library'
-                }
-
-                repositories {
-                    mavenCentral()
-                }
-
-                dependencies {
-                    implementation platform("com.google.guava:guava-bom:28.0-jre")
-                }
-                """,
-              """
-                plugins {
-                    id 'java-library'
-                }
-
-                repositories {
-                    mavenCentral()
-                }
-
-                dependencies {
-                    implementation platform("com.google.guava:guava-bom:28.0-jre")
-                    implementation "com.google.guava:guava:29.0-jre"
+                    implementation(platform("com.google.guava:guava-bom:29.0-jre"))
+                    implementation("com.google.guava:guava")
                 }
                 """
             )
