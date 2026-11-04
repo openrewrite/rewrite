@@ -16,7 +16,7 @@
 import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
 import {JS} from '../index';
-import {JavaScriptSemanticComparatorVisitor} from '../comparator';
+import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
 import {CaptureMarker, CaptureStorageValue, PlaceholderUtils, TEMPLATE_MODULE} from './utils';
 import {Capture, CaptureConstraintContext, CaptureMap, DebugLogEntry, MatchExplanation} from './types';
 import {CAPTURE_NAME_SYMBOL} from './capture';
@@ -32,11 +32,19 @@ import {CAPTURE_NAME_SYMBOL} from './capture';
  */
 export interface DebugCallbacks {
     log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => void;
-    setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string, patternElement?: any, targetElement?: any) => void;
-    getExplanation: () => MatchExplanation | undefined;
-    restoreExplanation: (explanation: MatchExplanation) => void;
+    setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
+                     actual: string | Promise<string>, details?: string, patternElement?: any,
+                     targetElement?: any) => void;
+    getExplanation: () => PendingExplanation | undefined;
+    restoreExplanation: (explanation: PendingExplanation) => void;
     clearExplanation: () => void;
 }
+
+/** A match explanation whose expected and actual code may still be printing. */
+export type PendingExplanation = Omit<MatchExplanation, 'expected' | 'actual'> & {
+    expected: string | Promise<string>;
+    actual: string | Promise<string>;
+};
 
 /**
  * Snapshot of matcher state for backtracking.
@@ -45,7 +53,7 @@ export interface DebugCallbacks {
 export interface MatcherState {
     storage: Map<string, CaptureStorageValue>;
     debugState?: {
-        explanation?: MatchExplanation;
+        explanation?: PendingExplanation;
         logLength: number;
     };
 }
@@ -57,6 +65,7 @@ export interface MatcherState {
 export interface MatcherCallbacks {
     handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => Promise<boolean>;
     handleVariadicCapture: (capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]) => Promise<boolean>;
+    getCapture: (name: string) => CaptureStorageValue | undefined;
     saveState: () => MatcherState;
     restoreState: (state: MatcherState) => void;
 
@@ -165,21 +174,16 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 : new Cursor(target);
             this.targetCursor = cursorAtCapturedNode;
             try {
-                // Evaluate constraint with context (cursor + previous captures)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
-                if (captureMarker.constraint && !captureMarker.variadicOptions) {
-                    const context = this.buildConstraintContext(cursorAtCapturedNode);
-                    if (!captureMarker.constraint(target, context)) {
-                        const captureName = captureMarker.captureName || 'unnamed';
-                        const targetKind = (target as any).kind || 'unknown';
-                        return this.constraintFailed(captureName, targetKind) as R;
-                    }
+                if (captureMarker.constraint && !captureMarker.variadicOptions &&
+                    !this.satisfiesConstraint(captureMarker, j as J, target, cursorAtCapturedNode)) {
+                    return this.abort(j) as R;
                 }
 
                 const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
-                    const captureName = captureMarker.captureName || 'unnamed';
-                    return this.captureConflict(captureName) as R;
+                    this.explainCaptureConflict(captureMarker, j as J, [target]);
+                    return this.abort(j) as R;
                 }
                 return j as R;
             } finally {
@@ -208,18 +212,23 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             (j.kind == J.Kind.Identifier && PlaceholderUtils.isCapture(j as J.Identifier));
     }
 
-    /**
-     * Additional specialized abort methods for pattern matching scenarios.
-     */
-
-    protected constraintFailed(captureName: string, targetKind: string) {
-        const pattern = this.cursor?.value as any;
-        return this.abort(pattern, 'constraint-failed', `capture[${captureName}]`, 'constraint satisfied', `constraint failed for ${targetKind}`);
+    /** Whether `target`, the code at `patternElement`'s capture, satisfies the capture's constraint. */
+    protected satisfiesConstraint(marker: CaptureMarker, _patternElement: JTree, target: J | J[],
+                                  cursor: Cursor): boolean {
+        return marker.constraint!(target as any, this.buildConstraintContext(cursor));
     }
 
-    protected captureConflict(captureName: string) {
-        const pattern = this.cursor?.value as any;
-        return this.abort(pattern, 'capture-conflict', `capture[${captureName}]`, 'compatible binding', 'conflicting binding');
+    /** Called where a capture the pattern names twice holds other code than `targets`. Matching ignores it. */
+    protected explainCaptureConflict(_marker: CaptureMarker, _patternElement: JTree, _targets: J[]): void {
+    }
+
+    /** Restores `state` after a failed alternative, keeping why it failed in case no other alternative matches. */
+    private backtrack(state: MatcherState): void {
+        const failure = this.matcher.debug?.getExplanation();
+        this.matcher.restoreState(state);
+        if (failure) {
+            this.matcher.debug!.restoreExplanation(failure);
+        }
     }
 
     /**
@@ -247,19 +256,17 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 : (targetWrapper ? new Cursor(targetWrapper) : new Cursor(targetElement));
             this.targetCursor = cursorAtCapturedNode;
             try {
-                // Evaluate constraint with cursor at the captured node (always defined)
                 // Skip constraint for variadic captures - they're evaluated in matchSequence with the full array
-                if (captureMarker.constraint && !captureMarker.variadicOptions && !captureMarker.constraint(targetElement as J, this.buildConstraintContext(cursorAtCapturedNode))) {
-                    const captureName = captureMarker.captureName || 'unnamed';
-                    const targetKind = (targetElement as J).kind || 'unknown';
-                    return this.constraintFailed(captureName, targetKind);
+                if (captureMarker.constraint && !captureMarker.variadicOptions &&
+                    !this.satisfiesConstraint(captureMarker, right, targetElement as J, cursorAtCapturedNode)) {
+                    return this.abort(right);
                 }
 
                 // Handle the capture with the wrapper - use the element for pattern matching
                 const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
-                    const captureName = captureMarker.captureName || 'unnamed';
-                    return this.captureConflict(captureName);
+                    this.explainCaptureConflict(captureMarker, right, [targetElement as J]);
+                    return this.abort(right);
                 }
                 return right;
             } finally {
@@ -573,14 +580,12 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                     continue;
                 }
 
-                // Evaluate constraint for variadic capture
                 // For variadic captures, constraint receives the entire array of captured elements
                 // The targetCursor points to the parent container (always defined in container matching)
-                if (captureMarker.constraint) {
-                    const cursor = this.targetCursor || new Cursor(targetElements[0]);
-                    if (!captureMarker.constraint(capturedElements as any, this.buildConstraintContext(cursor))) {
-                        continue; // Try next consumption amount
-                    }
+                const constraintCursor = this.targetCursor || new Cursor(targetElements[0]);
+                if (captureMarker.constraint &&
+                    !this.satisfiesConstraint(captureMarker, patternWrapper, capturedElements, constraintCursor)) {
+                    continue; // Try next consumption amount
                 }
 
                 // Save current state for backtracking
@@ -589,8 +594,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // Handle the variadic capture
                 const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
-                    // Restore state and try next amount
                     this.matcher.restoreState(savedState);
+                    this.explainCaptureConflict(captureMarker, patternWrapper, capturedElements);
                     continue;
                 }
 
@@ -604,11 +609,12 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 );
 
                 if (restMatches) {
-                    return true; // Found a valid matching
+                    // Why earlier alternatives failed explains nothing about a match that went on
+                    this.matcher.debug?.clearExplanation();
+                    return true;
                 }
 
-                // Backtrack: restore state and try next amount
-                this.matcher.restoreState(savedState);
+                this.backtrack(savedState);
             }
 
             return false; // No consumption amount worked
@@ -643,7 +649,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
     /**
      * Visit a single element in a sequence during non-variadic matching.
-     * Extracted to allow debug subclass to add path tracking.
      *
      * @param patternWrapper The pattern element
      * @param targetWrapper The target element
@@ -662,9 +667,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         await this.visitRightPadded(patternWrapper, targetWrapper);
 
         if (!this.match) {
-            // Restore state on match failure
             this.match = savedMatch;
-            this.matcher.restoreState(savedState);
+            this.backtrack(savedState);
             return false;
         }
 

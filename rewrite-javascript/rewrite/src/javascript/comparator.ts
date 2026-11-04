@@ -426,17 +426,15 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<JTree> {
         const otherContainer = isContainer ? p as J.Container<T> : undefined;
         const otherElements: J.RightPadded<T>[] = isContainer ? otherContainer!.elements : (p as any);
 
-        // Compare elements array length
-        if (container.elements.length !== otherElements.length) {
-            return this.arrayLengthMismatch<J.Container<T>>('elements');
-        }
-
-        // Push wrappers onto both cursors, then compare each element
+        // Push wrappers onto both cursors first, so that a count mismatch is reported on the container
         const savedCursor = this.cursor;
         const savedTargetCursor = this.targetCursor;
         this.cursor = new Cursor(container, this.cursor);
         this.targetCursor = otherContainer ? new Cursor(otherContainer, this.targetCursor) : this.targetCursor;
         try {
+            if (container.elements.length !== otherElements.length) {
+                return this.arrayLengthMismatch<J.Container<T>>('elements');
+            }
             for (let i = 0; i < container.elements.length; i++) {
                 await this.visitProperty(container.elements[i], otherElements[i]);
                 if (!this.match) return container;

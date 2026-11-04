@@ -27,7 +27,7 @@ import {
     PatternOptions
 } from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
+import {MatcherCallbacks, MatcherState, PatternMatchingComparator, PendingExplanation} from './comparator';
 import {
     CaptureMarker,
     CaptureStorageValue,
@@ -711,7 +711,7 @@ export class Pattern {
             // Match failed - return explanation
             return {
                 matched: false,
-                explanation: matcher.getExplanation(),
+                explanation: await matcher.getExplanation(text => this.replacePlaceholderNames(text)),
                 debugLog: matcher.getDebugLog(),
                 patternCursor: matcher.getPatternCursor(),
                 targetCursor: matcher.getTargetCursor(),
@@ -842,7 +842,7 @@ class Matcher {
     // Debug tracking (Layer 1: Core Instrumentation)
     private readonly debugOptions: DebugOptions;
     private readonly debugLog: DebugLogEntry[] = [];
-    private explanation?: MatchExplanation;
+    private explanation?: PendingExplanation;
     private lastComparator?: PatternMatchingComparator | DebugPatternMatchingComparator;
 
     /**
@@ -995,8 +995,8 @@ class Matcher {
      */
     private setExplanation(
         reason: MatchExplanation['reason'],
-        expected: string,
-        actual: string,
+        expected: string | Promise<string>,
+        actual: string | Promise<string>,
         details?: string,
         patternElement?: any,
         targetElement?: any
@@ -1032,14 +1032,18 @@ class Matcher {
         const matcherCallbacks: MatcherCallbacks = {
             handleCapture: (capture: CaptureMarker, t: J, w?: J.RightPadded<J>) => this.handleCapture(capture, t, w),
             handleVariadicCapture: (capture: CaptureMarker, ts: J[], ws?: J.RightPadded<J>[]) => this.handleVariadicCapture(capture, ts, ws),
+            getCapture: (name: string) => this.storage.get(name),
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state),
             // Debug callbacks (Layer 1) - grouped together, always present or absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
-                setExplanation: (reason: MatchExplanation['reason'], expected: string, actual: string, details?: string, patternElement?: any, targetElement?: any) => this.setExplanation(reason, expected, actual, details, patternElement, targetElement),
+                setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
+                                 actual: string | Promise<string>, details?: string, patternElement?: any,
+                                 targetElement?: any) =>
+                    this.setExplanation(reason, expected, actual, details, patternElement, targetElement),
                 getExplanation: () => this.explanation,
-                restoreExplanation: (explanation: MatchExplanation) => { this.explanation = explanation; },
+                restoreExplanation: (explanation: PendingExplanation) => { this.explanation = explanation; },
                 clearExplanation: () => { this.explanation = undefined; }
             } : undefined
         };
@@ -1209,13 +1213,15 @@ class Matcher {
     }
 
     /**
-     * Gets the explanation for why the match failed.
-     * Part of Layer 2 (Public API).
-     *
-     * @returns The match explanation, or undefined if match succeeded or no explanation available
+     * Why the match failed, once its expected and actual code have printed and `display` has
+     * rewritten the capture placeholders in them.
      */
-    getExplanation(): MatchExplanation | undefined {
-        return this.explanation;
+    async getExplanation(display: (text: string) => string): Promise<MatchExplanation | undefined> {
+        if (!this.explanation) {
+            return undefined;
+        }
+        const [expected, actual] = await Promise.all([this.explanation.expected, this.explanation.actual]);
+        return {...this.explanation, expected: display(expected), actual: display(actual)};
     }
 
     /**
