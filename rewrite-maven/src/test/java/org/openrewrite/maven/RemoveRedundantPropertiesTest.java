@@ -1406,7 +1406,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE))
-              .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+              .executionContext(MavenCentralMirrorExtension.withMavenCentralMirror(
                 MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
                   .setLocalRepository(MavenRepository.builder()
                     .id("local")

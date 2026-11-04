@@ -1506,7 +1506,7 @@ class MavenParserTest implements RewriteTest {
                 """
             ), mavenCtx);
             mavenCtx.setMavenSettings(settings);
-            MavenSettingsAutoLoadingExtension.withMavenCentralMirror(mavenCtx);
+            MavenCentralMirrorExtension.withMavenCentralMirror(mavenCtx);
 
             rewriteRun(
               recipeSpec -> recipeSpec.executionContext(mavenCtx),
