@@ -799,7 +799,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         this.explain('value-mismatch',
             describe(bound).then(code => `${code} (what ${placeholder(marker)} holds already)`),
             describe(targets),
-            'A capture the pattern names twice binds the same code at both places',
+            'A capture the pattern names twice binds the same code at both places.',
             patternElement,
             targets.length === 1 ? targets[0] : this.targetCursor?.value);
     }

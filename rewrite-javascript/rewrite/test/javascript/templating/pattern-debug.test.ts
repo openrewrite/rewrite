@@ -228,7 +228,7 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.reason).toBe('value-mismatch');
         expect(attempt.explanation!.expected).toBe('"log"');
         expect(attempt.explanation!.actual).toBe('"error"');
-        expect(attempt.explanation!.patternElement.simpleName).toBe('log');
+        expect((attempt.explanation!.patternElement as J.Identifier).simpleName).toBe('log');
         expect(attempt.explanation!.targetElement).toBe(node.name);
     });
 
@@ -267,7 +267,7 @@ describe('Pattern Debugging', () => {
 
         expect(attempt.explanation!.expected).toBe('res (what 🪝r holds already)');
         expect(attempt.explanation!.actual).toBe('other');
-        expect(attempt.explanation!.targetElement.simpleName).toBe('other');
+        expect((attempt.explanation!.targetElement as J.Identifier).simpleName).toBe('other');
 
         const args = capture({variadic: true});
         const variadic = pattern`f(${args}) || g(${args})`;
@@ -286,7 +286,7 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.reason).toBe('structural-mismatch');
         expect(attempt.explanation!.expected).toBe('type arguments: number');
         expect(attempt.explanation!.actual).toBe('type arguments: none');
-        expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.Container);
+        expect(attempt.explanation!.patternElement!.kind).toBe(J.Kind.Container);
         expect(attempt.explanation!.targetElement).toBe(node);
     });
 
@@ -375,7 +375,7 @@ describe('Pattern Debugging', () => {
 
         const attempt = await pattern`a.b`.matchWithExplanation(node, undefined!);
 
-        expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.FieldAccess);
+        expect(attempt.explanation!.patternElement!.kind).toBe(J.Kind.FieldAccess);
         expect(attempt.explanation!.targetElement).toBe(node);
         expect(attempt.explanation!.details).toContain('write them in the pattern');
     });
@@ -407,6 +407,8 @@ console.error(42);`,
         expect(attempt.report).toContain('console.👉error👈(42)');
         expect(attempt.report).not.toContain('\x1b');
         expect(attempt.report).not.toContain('[Pattern #');
+        // As an assertion message, it ends before the test runner's own text starts
+        expect(attempt.report!.endsWith('\n')).toBe(true);
     });
 
     test('two kinds with the same name in words show their operators', async () => {

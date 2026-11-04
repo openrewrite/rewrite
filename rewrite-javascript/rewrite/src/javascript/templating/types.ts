@@ -366,7 +366,7 @@ export interface PatternOptions {
     lenientTypeMatching?: boolean;
 
     /**
-     * Prints to stderr why each match attempt of this pattern matched or not, as {@link DebugOption} describes.
+     * Prints to stderr why each match attempt of this pattern matched or not, as {@link DebugSetting} describes.
      * A match() call's own `debug` overrides it, and it overrides the PATTERN_DEBUG=true environment variable.
      *
      * @example
@@ -382,7 +382,7 @@ export interface PatternOptions {
      * const quiet = pattern({debug: false})`import ${x} from ${y}`;
      * ```
      */
-    debug?: DebugOption;
+    debug?: DebugSetting;
 }
 
 /**
@@ -391,14 +391,14 @@ export interface PatternOptions {
  * prints the pattern and the code with the mismatch marked and says why they differ. A successful one
  * marks the captured code. Both name where the code is and where match() was called.
  */
-export type DebugOption = boolean | ((tree: J, cursor: Cursor, attempt: MatchAttemptResult) => boolean);
+export type DebugSetting = boolean | ((tree: J, cursor: Cursor, attempt: MatchAttemptResult) => boolean);
 
 /**
  * Options for individual match() calls.
  */
 export interface MatchOptions {
     /**
-     * Prints to stderr why this call matched or not, as {@link DebugOption} describes.
+     * Prints to stderr why this call matched or not, as {@link DebugSetting} describes.
      * Overrides the pattern's own `debug` and the PATTERN_DEBUG=true environment variable.
      *
      * @example
@@ -410,7 +410,7 @@ export interface MatchOptions {
      * const match = await pattern.match(node, cursor, {debug: false});
      * ```
      */
-    debug?: DebugOption;
+    debug?: DebugSetting;
 }
 
 /**
@@ -566,7 +566,7 @@ export interface TryOnOptions {
     bindings?: Record<string, string>;
 
     /** Prints why each of the rule's patterns matched or not, as {@link PatternOptions.debug} describes. */
-    debug?: DebugOption;
+    debug?: DebugSetting;
 }
 
 /**
@@ -799,10 +799,10 @@ export interface MatchExplanation {
     actual: string;
 
     /** The pattern node where the pattern and the source differ, which debug output marks. */
-    patternElement?: any;
+    patternElement?: J | J.Container<J>;
 
     /** The source node where the pattern and the source differ, which debug output marks. */
-    targetElement?: any;
+    targetElement?: J | J.Container<J>;
 
     /**
      * For constraint failures, details about which constraints failed.
@@ -863,9 +863,7 @@ export interface MatchAttemptResult {
      */
     explanation?: MatchExplanation;
 
-    /**
-     * Debug log entries collected during matching (if debug was enabled).
-     */
+    /** An entry for each capture constraint evaluated during matching, which `DebugOptions` can turn off. */
     debugLog?: DebugLogEntry[];
 
     /** Where the matched code starts in its source file, where the cursor leads to one. */
