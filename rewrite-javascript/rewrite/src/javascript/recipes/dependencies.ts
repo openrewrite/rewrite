@@ -33,6 +33,12 @@ export interface AddDependencyOptions {
     scope?: NpmDependencyScope;
     /** Add only to a `package.json` that declared a package matching one of these globs before the cycle's edits. */
     onlyIfDeclaring?: string[];
+    /**
+     * Add only to a `package.json` that resolves every `name@range` entry, e.g. `react@>=16.9.0 <18`: by the version
+     * its lock resolves, else when the declared constraint admits nothing outside the range. An undeclared package is
+     * taken from the nearest enclosing `package.json` that declares it.
+     */
+    onlyIfResolving?: string[];
 }
 
 /**
