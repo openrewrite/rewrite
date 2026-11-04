@@ -39,8 +39,7 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        // Takes the place of MavenCentralMirrorExtension's customizer, whichever registers first. Were both to run, its
-        // mirror could be added first and make the context look configured, and settings.xml would go unread.
+        // In place of MavenCentralMirrorExtension's customizer, whichever registers first
         RewriteTest.defaultExecutionContextCustomizers.put(
                 MavenCentralMirrorExtension.class,
                 MavenSettingsAutoLoadingExtension::loadMavenSettings);

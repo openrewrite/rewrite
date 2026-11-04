@@ -22,6 +22,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryCredentials;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -30,6 +31,11 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 class MavenCentralMirrorExtensionTest {
 
+    private static final Map<String, String> ENV = Map.of(
+      "MAVEN_CENTRAL_MIRROR_URL", "https://mirror.example.com/maven2/",
+      "MAVEN_CENTRAL_MIRROR_USERNAME", "user",
+      "MAVEN_CENTRAL_MIRROR_PASSWORD", "secret");
+
     @Test
     void mainArtifactRegistersExtensionForAutodetection() {
         assertThat(ServiceLoader.load(Extension.class)).hasAtLeastOneElementOfType(MavenCentralMirrorExtension.class);
@@ -37,13 +43,33 @@ class MavenCentralMirrorExtensionTest {
 
     @Test
     void centralResolvesToMirrorWithItsCredentials() {
-        Map<String, String> env = Map.of(
-          "MAVEN_CENTRAL_MIRROR_URL", "https://mirror.example.com/maven2/",
-          "MAVEN_CENTRAL_MIRROR_USERNAME", "user",
-          "MAVEN_CENTRAL_MIRROR_PASSWORD", "secret");
-        MavenExecutionContextView ctx = MavenCentralMirrorExtension.withMavenCentralMirror(
-          MavenExecutionContextView.view(new InMemoryExecutionContext()), env::get);
+        assertCentralResolvesToMirror(MavenExecutionContextView.view(new InMemoryExecutionContext()));
 
+        assertCentralResolvesToMirror(MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setMavenSettings(new MavenSettings(null, null, null, null, null)));
+    }
+
+    @Test
+    void keepsWhatTheContextSetBesideItsSettings() {
+        MavenRepository localRepository = MavenRepository.builder().id("local").uri("file:///tmp/m2/").build();
+        MavenRepository repository = MavenRepository.builder().id("company").uri("https://repo.example.com/maven2/").build();
+        MavenRepositoryCredentials credentials = new MavenRepositoryCredentials("company", "name", "token");
+        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setMavenSettings(new MavenSettings(null, null, null, null, null), "ci")
+          .setLocalRepository(localRepository)
+          .setRepositories(List.of(repository))
+          .setCredentials(List.of(credentials));
+
+        MavenCentralMirrorExtension.withMavenCentralMirror(ctx, ENV::get);
+
+        assertThat(ctx.getActiveProfiles()).containsExactly("ci");
+        assertThat(ctx.getLocalRepository()).isEqualTo(localRepository);
+        assertThat(ctx.getRepositories()).containsExactly(repository);
+        assertThat(ctx.getCredentials()).contains(credentials);
+    }
+
+    private static void assertCentralResolvesToMirror(MavenExecutionContextView ctx) {
+        MavenCentralMirrorExtension.withMavenCentralMirror(ctx, ENV::get);
         // The two steps MavenPomDownloader takes for each repository
         MavenRepository central = MavenRepositoryCredentials.apply(ctx.getCredentials(ctx.getSettings()),
           MavenRepositoryMirror.apply(ctx.getMirrors(ctx.getSettings()), MAVEN_CENTRAL));

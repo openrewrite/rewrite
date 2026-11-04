@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentralMirror;
-import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 /**
  * Loads {@code ~/.m2/settings.xml} (and {@code $M2_HOME/conf/settings.xml}) into the
@@ -36,23 +35,14 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        // Takes the place of MavenCentralMirrorExtension's customizer, whichever registers first. Were both to run, its
-        // mirror could be added first and make the context look configured, and settings.xml would go unread.
+        // In place of MavenCentralMirrorExtension's customizer, whichever registers first
         RewriteTest.defaultExecutionContextCustomizers.put(
                 MavenCentralMirrorExtension.class,
                 MavenSettingsAutoLoadingExtension::loadMavenSettings);
     }
 
     private static void loadMavenSettings(ExecutionContext ctx) {
-        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        boolean nothingConfigured = mctx.getSettings() == null &&
-                                    mctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&
-                                    mctx.getRepositories().isEmpty() &&
-                                    mctx.getActiveProfiles().isEmpty() &&
-                                    mctx.getMirrors().isEmpty();
-        if (nothingConfigured) {
-            mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
-        }
-        withMavenCentralMirror(mctx);
+        Assertions.customizeExecutionContext(ctx);
+        withMavenCentralMirror(ctx);
     }
 }
