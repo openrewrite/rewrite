@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 import {J} from '../../java';
+import {Cursor} from '../../tree';
+import {isTypePosition} from '../type-position';
 import {JS} from '../index';
 import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
@@ -46,8 +48,26 @@ export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 /** The module of the file every template and pattern parses as. */
 export const TEMPLATE_MODULE = 'template';
 
-/** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
-export function wrapCode(code: string, expression: boolean): string {
+/** How template code is parsed: as statements (`false`), as an expression (`true`), or as a type where it replaces one. */
+export type TemplateSlot = boolean | 'type';
+
+/**
+ * `'type'` where `tree`, at `cursor`, stands in a type position, so template code replacing it parses
+ * as a type: `A | B` is a union there, not a bitwise or. An `extends` or `implements` entry is an
+ * expression with type arguments, which the expression parse already builds.
+ */
+export function typeSlotOf(tree: J, cursor: Cursor | undefined): 'type' | undefined {
+    if (cursor?.value?.id !== tree.id || !isTypePosition(cursor)) {
+        return undefined;
+    }
+    return (cursor.parentTree()?.value as J | undefined)?.kind === J.Kind.ClassDeclaration ? undefined : 'type';
+}
+
+/** Template or pattern code as the body of the wrapper function, in the form its {@link TemplateSlot} parses. */
+export function wrapCode(code: string, expression: TemplateSlot): string {
+    if (expression === 'type') {
+        return `function ${WRAPPER_FUNCTION_NAME}() { type __T = ${code}; }`;
+    }
     return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
 }
 
@@ -351,7 +371,7 @@ export class PlaceholderUtils {
      * @param expression Whether {@link wrapCode} parenthesized the code
      * @returns The extracted AST node
      */
-    static extractFromWrapper(lastStatement: J, contextName: string, expression: boolean = false): J {
+    static extractFromWrapper(lastStatement: J, contextName: string, expression: TemplateSlot = false): J {
         let extracted: J;
 
         // Since we always wrap in function __WRAPPER__() { code }, look for it
@@ -391,7 +411,10 @@ export class PlaceholderUtils {
             extracted = lastStatement;
         }
 
-        return expression && extracted.kind === J.Kind.Parentheses ?
+        if (expression === 'type' && extracted.kind === JS.Kind.TypeDeclaration) {
+            return (extracted as JS.TypeDeclaration).initializer.element;
+        }
+        return expression === true && extracted.kind === J.Kind.Parentheses ?
             (extracted as J.Parentheses<J>).tree.element : extracted;
     }
 }
