@@ -21,7 +21,8 @@
  * - Debug-enabled pattern matching comparator with detailed logging
  */
 
-import {Cursor, randomId, Tree} from '../..';
+import * as path from 'path';
+import {Cursor, isSourceFile, randomId, Tree} from '../..';
 import {Marker, Markers, MarkersKind} from '../../markers';
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from '../../print';
 import {J, Type} from '../../java';
@@ -114,6 +115,51 @@ export function shouldUseEmoji(): boolean {
 
     // Default to emoji (safer fallback for pipes, redirects, etc.)
     return true;
+}
+
+/**
+ * The first frame of `stack` outside this package, as `file:line:column (function)` with `file` relative
+ * to the working directory. The stack's own first frame names the package's root.
+ */
+export function callSite(stack: string | undefined): string | undefined {
+    const frames = (stack ?? '').split('\n')
+        .map(line => /^\s*at (?:async )?(?:(.+?) \()?(?:file:\/\/)?(.+?):(\d+):(\d+)\)?$/.exec(line))
+        .filter((frame): frame is RegExpExecArray => frame !== null);
+    const own = frames[0]?.[2];
+    const rootEnd = own ? own.lastIndexOf('/javascript/templating/') : -1;
+    const root = rootEnd >= 0 ? own!.slice(0, rootEnd + 1) : undefined;
+    const caller = frames.find(([, , file]) => !(root && file.startsWith(root)) && !file.startsWith('node:'));
+    if (!caller) {
+        return undefined;
+    }
+    const [, fn, file, line, column] = caller;
+    return `${path.relative(process.cwd(), file)}:${line}:${column}${fn ? ` (${fn})` : ''}`;
+}
+
+/** Prints only where the marked node starts, as a NUL character. */
+const POSITION_PRINTER: MarkerPrinter = {
+    beforeSyntax: marker => marker instanceof PatternMismatchMarker ? '\0' : '',
+    beforePrefix: () => '',
+    afterSyntax: () => ''
+};
+
+/**
+ * Where `tree` starts in the source file `cursor` leads to, as `path:line:column`. That is the path
+ * alone where the file does not hold `tree` itself, as for a node a visitor built.
+ */
+export async function sourcePosition(tree: J, cursor: Cursor | undefined): Promise<string | undefined> {
+    const sourceFile = isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile);
+    if (!sourceFile) {
+        return undefined;
+    }
+    const marked = await new ElementMarkerVisitor(tree).visit(sourceFile, undefined);
+    const printed = await TreePrinters.printer(sourceFile).print(marked!, new PrintOutputCapture(POSITION_PRINTER));
+    const offset = printed.indexOf('\0');
+    if (offset < 0) {
+        return sourceFile.sourcePath;
+    }
+    const line = printed.slice(0, offset).split('\n').length;
+    return `${sourceFile.sourcePath}:${line}:${offset - printed.lastIndexOf('\n', offset - 1)}`;
 }
 
 /** What a mismatch marker prints before and after the mismatched node. */

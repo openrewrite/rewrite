@@ -366,47 +366,51 @@ export interface PatternOptions {
     lenientTypeMatching?: boolean;
 
     /**
-     * Enable debug logging for this pattern.
-     * When enabled, every match attempt logs to stderr. A failed one prints the pattern and the matched
-     * tree with the mismatch marked and says why they differ. A successful one marks the captured code.
-     *
-     * Can be overridden at the match() call level.
-     * Global debug can be enabled via PATTERN_DEBUG=true environment variable.
-     *
-     * Precedence: match() call > pattern configure() > PATTERN_DEBUG env var
-     *
-     * @default undefined (inherits from environment or match() call)
+     * Prints to stderr why each match attempt of this pattern matched or not, as {@link DebugOption} describes.
+     * A match() call's own `debug` overrides it, and it overrides the PATTERN_DEBUG=true environment variable.
      *
      * @example
      * ```typescript
-     * // Pattern-level debug
-     * const pat = pattern({ debug: true })`console.log(${value})`;
+     * // Every attempt
+     * const pat = pattern({debug: true})`console.log(${value})`;
      *
-     * // Disable debug for a noisy pattern when global debug is on
-     * const noisyPat = pattern({ debug: false })`import ${x} from ${y}`;
+     * // Only attempts on calls named `log`, where a visitor matches the pattern against every call
+     * const onLog = (tree: J) => isMethodInvocation(tree) && tree.name.simpleName === 'log';
+     * const logs = pattern({debug: onLog})`console.log(${value})`;
+     *
+     * // No attempt, even with PATTERN_DEBUG=true
+     * const quiet = pattern({debug: false})`import ${x} from ${y}`;
      * ```
      */
-    debug?: boolean;
+    debug?: DebugOption;
 }
+
+/**
+ * Whether a match attempt prints debug output. `true` prints every attempt and `false` none, and a
+ * predicate decides per attempt from the node, its cursor and how the attempt ended. A failed attempt
+ * prints the pattern and the code with the mismatch marked and says why they differ. A successful one
+ * marks the captured code. Both name where the code is and where match() was called.
+ */
+export type DebugOption = boolean | ((tree: J, cursor: Cursor, attempt: MatchAttemptResult) => boolean);
 
 /**
  * Options for individual match() calls.
  */
 export interface MatchOptions {
     /**
-     * Enable debug logging for this specific match() call.
-     * Overrides pattern-level debug setting and global PATTERN_DEBUG env var.
+     * Prints to stderr why this call matched or not, as {@link DebugOption} describes.
+     * Overrides the pattern's own `debug` and the PATTERN_DEBUG=true environment variable.
      *
      * @example
      * ```typescript
      * // Debug just this call
-     * const match = await pattern.match(node, cursor, { debug: true });
+     * const match = await pattern.match(node, cursor, {debug: true});
      *
      * // Disable debug for this call even if pattern or global debug is on
-     * const match = await pattern.match(node, cursor, { debug: false });
+     * const match = await pattern.match(node, cursor, {debug: false});
      * ```
      */
-    debug?: boolean;
+    debug?: DebugOption;
 }
 
 /**

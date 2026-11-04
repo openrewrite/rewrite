@@ -1,6 +1,7 @@
 import {type MockInstance} from 'vitest';
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
+import {Cursor} from '../../../src';
 
 describe('Pattern Debug Logging', () => {
     let consoleErrorSpy: MockInstance;
@@ -159,6 +160,41 @@ describe('Pattern Debug Logging', () => {
         const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
         const first = lines.findIndex(line => line.endsWith('Matched:  (1,'));
         expect(lines[first + 1]).toMatch(/\] {17}2\)$/);
+    });
+
+    test('a debug predicate chooses the attempts that print', async () => {
+        const seen: boolean[] = [];
+        const pat = pattern({
+            debug: (_tree, _cursor, attempt) => {
+                seen.push(attempt.matched);
+                return !attempt.matched;
+            }
+        })`console.log(${capture('x')})`;
+
+        await pat.match(await parseExpression('console.log(1)'), undefined!);
+        expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+        await pat.match(await parseExpression('console.error(1)'), undefined!);
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        expect(seen).toEqual([true, false]);
+    });
+
+    test('heads each attempt with where the code is and where match() was called', async () => {
+        const gen = parser.parse({
+            text: `foo();
+    console.error(42);`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[1].element;
+        const node = isExpressionStatement(statement) ? statement.expression : statement;
+
+        await pattern`console.log(42)`.match(node, new Cursor(node, new Cursor(cu)), {debug: true});
+
+        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+        const heading = lines.findIndex(line => line.includes('FAILED matching against'));
+        expect(lines[heading]).toMatch(/ at test\.ts:2:5$/);
+        expect(lines[heading + 1]).toMatch(/called from \S*pattern-debug-logging\.test\.ts:\d+:\d+/);
     });
 
     test('an unnamed capture named twice keeps one number', async () => {

@@ -43,11 +43,13 @@ import {TreePrinters} from '../../print';
 import {JS} from '../index';
 import {
     AnsiAwarePrintOutputCapture,
+    callSite,
     DebugPatternMatchingComparator,
     ElementMarkerVisitor,
     mismatchDelimiters,
     PATTERN_DEBUG_MARKER_PRINTER,
-    shouldUseEmoji
+    shouldUseEmoji,
+    sourcePosition
 } from './debug';
 import {dedent, prefixLines} from '../../util';
 import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
@@ -339,24 +341,15 @@ export class Pattern {
      */
     async match(tree: J, cursor: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
         // Three-level precedence: call > pattern > global
-        const debugEnabled =
-            options?.debug !== undefined
-                ? options.debug  // 1. Explicit call-level (true OR false)
-                : (this._options.debug !== undefined
-                    ? this._options.debug  // 2. Explicit pattern-level
-                    : process.env.PATTERN_DEBUG === 'true');  // 3. Global
-
-        if (debugEnabled) {
-            // Use matchWithExplanation and log the result
-            const result = await this.matchWithExplanation(tree, cursor);
-            await this.logMatchResult(tree, cursor, result);
-
-            if (result.matched) {
-                // result.result is the MatchResult class instance
-                return result.result as MatchResult | undefined;
-            } else {
-                return undefined;
+        const debug = options?.debug ?? this._options.debug ?? process.env.PATTERN_DEBUG === 'true';
+        if (debug) {
+            // Taken before the first await, while the caller is still on the stack
+            const caller = callSite(new Error().stack);
+            const attempt = await this.matchWithExplanation(tree, cursor);
+            if (debug === true || debug(tree, cursor, attempt)) {
+                await this.logMatchResult(tree, cursor, attempt, caller);
             }
+            return attempt.matched ? attempt.result as MatchResult : undefined;
         }
 
         // Fast path - no debug
@@ -374,7 +367,8 @@ export class Pattern {
      * Formats and logs the match result to stderr.
      * @private
      */
-    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult): Promise<void> {
+    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult,
+                                 caller: string | undefined): Promise<void> {
         const patternSource = this.getPatternSource();
         const patternId = `Pattern #${this.patternId}`;
         const nodeKind = (tree as any).kind || 'unknown';
@@ -386,10 +380,13 @@ export class Pattern {
 
         // Build the complete match result message
         const lines: string[] = [];
+        const position = await sourcePosition(tree, cursor);
+        const where = position ? ` at ${position}` : '';
+        const calledFrom = caller ? [`[${patternId}]    called from ${caller}`] : [];
 
         if (result.matched) {
             // Success case - result first, then tree with highlighted captures, then capture legend
-            lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}:`);
+            lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}${where}`, ...calledFrom);
 
             // Mark captured elements with numbered markers
             let markedAst = tree;
@@ -454,7 +451,7 @@ export class Pattern {
             }
         } else {
             // Failure case - show both pattern tree and matched tree with markers
-            lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}:`);
+            lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}${where}`, ...calledFrom);
 
             // Add explanation of marker format (only for emoji - ANSI inverse video is self-explanatory)
             if (shouldUseEmoji()) {
@@ -522,10 +519,8 @@ export class Pattern {
                 matchedTreeStr = `(tree printing unavailable: ${e})`;
             }
 
-            const sourcePath = this.getSourcePathFromCursor(targetCursor, tree);
-            const sourcePathStr = sourcePath ? ` (${sourcePath})` : '';
             lines.push(`[${patternId}]`);
-            lines.push(`${redColor}[${patternId}]    Matched tree${sourcePathStr}:${resetColor}`);
+            lines.push(`${redColor}[${patternId}]    Matched tree:${resetColor}`);
             matchedTreeStr.split('\n').forEach(line => lines.push(`${redColor}[${patternId}]       ${line}${resetColor}`));
 
             // Print detailed mismatch information
@@ -551,28 +546,6 @@ export class Pattern {
 
         // Single console.error call with all lines joined
         console.error(lines.join('\n'));
-    }
-
-    /**
-     * Walks up the cursor to find the source file and extract its source path.
-     * @private
-     */
-    private getSourcePathFromCursor(cursor: Cursor | undefined, ast?: J): string | undefined {
-        // First check if the ast node itself is a SourceFile
-        if (ast && typeof ast === 'object' && 'sourcePath' in ast) {
-            return (ast as any).sourcePath;
-        }
-        // Then try walking up the cursor
-        if (!cursor) return undefined;
-        let current: Cursor | undefined = cursor;
-        while (current) {
-            const value = current.value;
-            if (value && typeof value === 'object' && 'sourcePath' in value) {
-                return (value as any).sourcePath;
-            }
-            current = current.parent;
-        }
-        return undefined;
     }
 
     /**
