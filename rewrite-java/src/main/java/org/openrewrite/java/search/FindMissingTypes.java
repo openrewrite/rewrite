@@ -60,8 +60,7 @@ public class FindMissingTypes extends Recipe {
         J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
-            Set<UUID> preexistingSearchResults = new HashSet<>();
-            new JavaIsoVisitor<Set<UUID>>() {
+            Set<UUID> preexistingSearchResults = new JavaIsoVisitor<Set<UUID>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
                     if (marker instanceof SearchResult) {
@@ -69,7 +68,7 @@ public class FindMissingTypes extends Recipe {
                     }
                     return super.visitMarker(marker, ids);
                 }
-            }.visit(j, preexistingSearchResults);
+            }.reduce(j, new HashSet<>());
             new JavaIsoVisitor<List<MissingTypeResult>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
