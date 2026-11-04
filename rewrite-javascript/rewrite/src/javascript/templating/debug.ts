@@ -23,11 +23,12 @@
 
 import {Cursor, randomId, Tree} from '../..';
 import {Marker, Markers, MarkersKind} from '../../markers';
-import {MarkerPrinter, PrintOutputCapture} from '../../print';
-import {J} from '../../java';
-import {JavaScriptVisitor} from '../index';
+import {MarkerPrinter, PrintOutputCapture, TreePrinters} from '../../print';
+import {J, Type} from '../../java';
+import {JavaScriptVisitor, JS} from '../index';
 import {DebugCallbacks, PatternMatchingComparator} from './comparator';
-import {PlaceholderUtils} from './utils';
+import {CaptureMarker, PlaceholderUtils} from './utils';
+import {MatchExplanation} from './types';
 import {JTree} from "../comparator";
 
 // ============================================================================
@@ -322,6 +323,17 @@ export class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
 // Debug Pattern Matching Comparator
 // ============================================================================
 
+/** Whether {@link ElementMarkerVisitor} can mark `value`, which it does for the trees and containers it visits. */
+function isMarkable(value: any): value is JTree {
+    return !!value?.markers && value.kind !== J.Kind.LeftPadded && value.kind !== J.Kind.RightPadded;
+}
+
+async function printCode(nodes: J[]): Promise<string> {
+    const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+    const printed = await Promise.all(nodes.map(async node => (await printer.print(node)).trim()));
+    return printed.join(', ');
+}
+
 export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     private get debug(): DebugCallbacks {
         return this.matcher.debug!;
@@ -345,6 +357,15 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         if (typeof value === 'string') return `"${value}"`;
         if (typeof value === 'number' || typeof value === 'boolean') return String(value);
 
+        if (Type.isType(value)) {
+            return Type.isFullyQualified(value) ?
+                Type.FullyQualified.getFullyQualifiedName(value) :
+                this.formatKind((value as Type).kind);
+        }
+        if (value.kind === J.Kind.LeftPadded || value.kind === J.Kind.RightPadded) {
+            return this.formatValue(value.element);
+        }
+
         // For objects with a kind property (LST nodes)
         if (value && typeof value === 'object' && value.kind) {
             const kind = this.formatKind(value.kind);
@@ -360,33 +381,68 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     }
 
     /**
-     * Override abort to capture explanation when debug is enabled.
-     * Only sets explanation on the first abort call (when this.match is still true).
-     * This preserves the most specific explanation closest to the actual mismatch.
+     * The node a mismatch is shown on. That is `element`, or the element a padding wrapper holds,
+     * where it can be marked, and otherwise the nearest node on `cursor` that can.
      */
+    private markable(element: any, cursor: Cursor | undefined): JTree | undefined {
+        if (element?.kind === J.Kind.LeftPadded || element?.kind === J.Kind.RightPadded) {
+            element = element.element;
+        }
+        if (isMarkable(element)) {
+            return element;
+        }
+        for (let c = cursor; c; c = c.parent) {
+            if (isMarkable(c.value)) {
+                return c.value;
+            }
+        }
+        return undefined;
+    }
+
+    /** Records why matching failed, unless an earlier mismatch already did, and stops the match. */
+    private fail<T>(t: T, reason: MatchExplanation['reason'], expected: string, actual: string, details: string,
+                    patternElement: any, targetElement: any): T {
+        if (this.match) {
+            this.explain(reason, expected, actual, details, patternElement, targetElement);
+        }
+        this.match = false;
+        return t;
+    }
+
+    private explain(reason: MatchExplanation['reason'], expected: string, actual: string, details: string,
+                    patternElement: any, targetElement: any): void {
+        this.debug.setExplanation(reason, expected, actual, details,
+            this.markable(patternElement, this.cursor), this.markable(targetElement, this.targetCursor));
+    }
+
+    private failConstraint<T>(t: T, marker: CaptureMarker, target: J): T {
+        return this.fail(t, 'constraint-failed', `Capture ${marker.captureName} with valid constraint`,
+            `Constraint failed for ${this.formatKind(target.kind)}`, 'Constraint evaluation returned false', t, target);
+    }
+
+    /** Explains a capture the pattern names twice that binds different code the second time. */
+    private async explainBoundCapture(marker: CaptureMarker, patternElement: any, targets: J[]): Promise<void> {
+        const bound = marker.captureName ? this.matcher.saveState().storage.get(marker.captureName) : undefined;
+        if (bound === undefined) {
+            return;
+        }
+        const boundCode = (Array.isArray(bound) ? bound : [bound]).map(b =>
+            b.kind === J.Kind.RightPadded ? (b as J.RightPadded<J>).element : b as J);
+        this.explain('value-mismatch',
+            `${await printCode(boundCode)} (what this capture holds already)`,
+            await printCode(targets),
+            'A capture the pattern names twice binds the same code at both places',
+            patternElement,
+            targets.length === 1 ? targets[0] : this.targetCursor?.value);
+    }
+
+    /** An abort that names no values leaves the explanation to the matcher's generic one. */
     protected override abort<T>(t: T, reason?: string, propertyName?: string, expected?: any, actual?: any): T {
-        // If already aborted, don't overwrite the explanation
-        // The first abort is typically the most specific
-        if (!this.match) {
-            return t;
+        if (reason && (expected !== undefined || actual !== undefined)) {
+            return this.fail(t, reason as MatchExplanation['reason'],
+                this.formatValue(expected), this.formatValue(actual),
+                'Property values do not match', this.cursor?.value, this.targetCursor?.value);
         }
-
-        // If we have context about the mismatch, capture it
-        if (reason && this.debug && (expected !== undefined || actual !== undefined)) {
-            const expectedStr = this.formatValue(expected);
-            const actualStr = this.formatValue(actual);
-
-            this.debug.setExplanation(
-                reason as any,
-                expectedStr,
-                actualStr,
-                'Property values do not match',
-                this.cursor?.value,  // pattern element
-                this.targetCursor?.value  // target element
-            );
-        }
-
-        // Set `this.match = false`
         return super.abort(t, reason, propertyName, expected, actual);
     }
 
@@ -406,6 +462,12 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const target = this.targetCursor?.value as any;
         const expectedValue = (pattern as any)?.[propertyName];
         const actualValue = target?.[propertyName];
+        if ((expectedValue === undefined) !== (actualValue === undefined)) {
+            return this.fail(pattern, 'structural-mismatch',
+                expectedValue === undefined ? 'none' : propertyName,
+                actualValue === undefined ? 'none' : propertyName,
+                `Only one side has ${propertyName}`, pattern, target);
+        }
         return this.abort(pattern, 'structural-mismatch', propertyName, expectedValue, actualValue) as T;
     }
 
@@ -416,81 +478,27 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const actualArray = target?.[propertyName];
         const expectedLen = Array.isArray(expectedArray) ? expectedArray.length : 'not an array';
         const actualLen = Array.isArray(actualArray) ? actualArray.length : 'not an array';
-
-        // For container mismatches, we want to mark the Container itself
-        // Containers have a markers property and can be marked using object identity
-
-        // Store the parent elements in the explanation for precise marker placement
-        this.debug.setExplanation(
-            'array-length-mismatch',
-            String(expectedLen),
-            String(actualLen),
-            `Array length mismatch in ${propertyName}`,
-            pattern,
-            target
-        );
-
-        // Mark this as a match failure
-        this.match = false;
-        return pattern as T;
+        return this.fail(pattern, 'array-length-mismatch', String(expectedLen), String(actualLen),
+            `Array length mismatch in ${propertyName}`, pattern, target);
     }
 
     protected override valueMismatch<T extends JTree>(propertyName?: string, expected?: any, actual?: any): T {
-        const pattern = this.cursor?.value as T;
+        const pattern = this.cursor?.value as any;
         const target = this.targetCursor?.value as any;
+        const path = propertyName ? propertyName.split('.') : [];
+        const at = (node: any, properties: string[]) =>
+            properties.reduce((current, property) => current?.[property], node);
 
-        // Helper to navigate nested property paths
-        const getNestedValue = (obj: any, path: string) => {
-            return path.split('.').reduce((current, prop) => current?.[prop], obj);
-        };
-
-        // Helper to get the parent object (all but last property in path)
-        const getParentObject = (obj: any, path: string) => {
-            const parts = path.split('.');
-            if (parts.length === 1) return obj;
-            return parts.slice(0, -1).reduce((current, prop) => current?.[prop], obj);
-        };
-
-        // If propertyName is provided, navigate to the parent object containing the mismatched property
-        // This gives us the most specific element to mark in debug output
-        if (propertyName) {
-            let patternParent = getParentObject(pattern, propertyName);
-            let targetParent = getParentObject(target, propertyName);
-
-            // Unwrap padded elements (JLeftPadded/JRightPadded) to get the actual element with an id
-            // These wrappers don't have ids and can't be marked
-            const patternKind = (patternParent as JTree)?.kind;
-            const targetKind = (targetParent as JTree)?.kind;
-            const isPatternPadded = patternKind === 'org.openrewrite.java.tree.JLeftPadded' ||
-                                    patternKind === 'org.openrewrite.java.tree.JRightPadded';
-            const isTargetPadded = targetKind === 'org.openrewrite.java.tree.JLeftPadded' ||
-                                   targetKind === 'org.openrewrite.java.tree.JRightPadded';
-
-            if (isPatternPadded) {
-                patternParent = (patternParent as J.LeftPadded<any> | J.RightPadded<any>).element;
-            }
-            if (isTargetPadded) {
-                targetParent = (targetParent as J.LeftPadded<any> | J.RightPadded<any>).element;
-            }
-
-            // Store the parent objects (which contain the mismatched property) in the explanation
-            // This allows precise marker placement on the container of the mismatched value
-            this.debug.setExplanation(
-                'value-mismatch',
-                this.formatValue(expected !== undefined ? expected : getNestedValue(pattern, propertyName)),
-                this.formatValue(actual !== undefined ? actual : getNestedValue(target, propertyName)),
-                'Property values do not match',
-                patternParent,
-                targetParent
-            );
-
-            // Mark this as a match failure
-            this.match = false;
-            return pattern as T;
-        } else {
-            // No property name - compare whole objects
-            return this.abort(pattern, 'value-mismatch', propertyName, pattern, target) as T;
-        }
+        // The mismatch shows on the node holding the property, and a call's method type on the call's name
+        const holder = pattern?.kind === J.Kind.MethodInvocation && path[0] === 'methodType' ?
+            ['name'] : path.slice(0, -1);
+        const describe = (value: any) => path[path.length - 1] === 'declaringType' ?
+            `declared in ${this.formatValue(value)}` : this.formatValue(value);
+        return this.fail(pattern as T, 'value-mismatch',
+            describe(expected !== undefined ? expected : at(pattern, path)),
+            describe(actual !== undefined ? actual : at(target, path)),
+            'Property values do not match',
+            at(pattern, holder), at(target, holder));
     }
 
     override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
@@ -508,14 +516,14 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     const constraintResult = captureMarker.constraint(target, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for capture: ${captureMarker.captureName}`);
-                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(target as JTree).kind}`, `Constraint evaluation returned false`);
-                        return this.abort(j) as R;
+                        return this.failConstraint(j as R, captureMarker, target);
                     }
                     this.debug.log('debug', 'constraint', `Constraint passed for capture: ${captureMarker.captureName}`);
                 }
 
                 const success = await this.matcher.handleCapture(captureMarker, target, undefined);
                 if (!success) {
+                    await this.explainBoundCapture(captureMarker, j, [target]);
                     return this.abort(j) as R;
                 }
                 return j as R;
@@ -590,14 +598,14 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     const constraintResult = captureMarker.constraint(targetElement as J, this.buildConstraintContext(cursorAtCapturedNode));
                     if (!constraintResult) {
                         this.debug.log('info', 'constraint', `Constraint failed for wrapped capture: ${captureMarker.captureName}`);
-                        this.debug.setExplanation('constraint-failed', `Capture ${captureMarker.captureName} with valid constraint`, `Constraint failed for ${(targetElement as any).kind}`, `Constraint evaluation returned false`);
-                        return this.abort(right);
+                        return this.failConstraint(right, captureMarker, targetElement as J);
                     }
                     this.debug.log('debug', 'constraint', `Constraint passed for wrapped capture: ${captureMarker.captureName}`);
                 }
 
                 const success = await this.matcher.handleCapture(captureMarker, targetElement as J, targetWrapper as J.RightPadded<J> | undefined);
                 if (!success) {
+                    await this.explainBoundCapture(captureMarker, right, [targetElement as J]);
                     return this.abort(right);
                 }
                 return right;
@@ -651,65 +659,6 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
 
         return container;
-    }
-
-    /**
-     * Override visitContainerProperty to add path tracking with property context.
-     */
-    protected override async visitContainerProperty<T extends J>(
-        propertyName: string,
-        container: J.Container<T>,
-        otherContainer: J.Container<T>
-    ): Promise<J.Container<T>> {
-        // Get parent from cursor
-        const parent = this.cursor?.value as J;
-
-        // Push path for the property
-        this.formatKind((parent as any)?.kind);
-
-        // Update targetCursor to point to the container so that if there's a mismatch,
-        // the cursor will be on the container itself (for proper marker placement)
-        const savedTargetCursor = this.targetCursor;
-        if (this.targetCursor !== undefined) {
-            this.targetCursor = new Cursor(otherContainer, this.targetCursor);
-        }
-
-        try {
-            await this.visitContainer(container, otherContainer as any);
-            return container;
-        } finally {
-            this.targetCursor = savedTargetCursor;
-        }
-    }
-
-    protected override async visitArrayProperty<T>(
-        parent: J,
-        propertyName: string,
-        array1: T[],
-        array2: T[],
-        visitor: (item1: T, item2: T, index: number) => Promise<void>
-    ): Promise<void> {
-        // Check length mismatch
-        if (array1.length !== array2.length) {
-            this.arrayLengthMismatch(propertyName);
-            return;
-        }
-
-        // Visit each element with index tracking
-        for (let i = 0; i < array1.length; i++) {
-            await visitor(array1[i], array2[i], i);
-            if (!this.match) {
-                return;
-            }
-        }
-    }
-
-    protected override async matchSequence(
-        patternElements: J.RightPadded<J>[],
-        targetElements: J.RightPadded<J>[],
-        filterEmpty: boolean
-    ): Promise<boolean> {
-        return await super.matchSequence(patternElements, targetElements, filterEmpty);
     }
 
     protected override async visitSequenceElement(
@@ -859,6 +808,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 const success = await this.matcher.handleVariadicCapture(captureMarker, capturedElements, capturedWrappers);
                 if (!success) {
                     this.matcher.restoreState(savedState);
+                    await this.explainBoundCapture(captureMarker, patternWrapper, capturedElements);
                     continue;
                 }
 

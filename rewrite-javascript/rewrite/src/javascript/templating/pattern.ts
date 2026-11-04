@@ -53,6 +53,14 @@ import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
 
 
 /**
+ * Printed code without its leading blank lines and trailing whitespace,
+ * and without the indentation all its lines share.
+ */
+function layOut(printed: string): string {
+    return dedent(printed.replace(/^\s*\n/, '')).trimEnd();
+}
+
+/**
  * Builder for creating patterns programmatically.
  * Use when pattern structure is not known at compile time.
  *
@@ -197,7 +205,7 @@ export class Pattern {
         for (const cap of captures) {
             if (cap && typeof cap === 'object' && 'getName' in cap) {
                 const name = (cap as Capture<any> | Any<any>).getName();
-                if (name && name.startsWith('unnamed_')) {
+                if (name && name.startsWith('unnamed_') && !this.unnamedCaptureMapping.has(name)) {
                     this.unnamedCaptureMapping.set(name, `${unnamedIndex}`);
                     unnamedIndex++;
                 }
@@ -403,7 +411,7 @@ export class Pattern {
                 const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 treeStr = await printer.print(markedAst, output);
                 // Replace placeholder names with clean display names
-                treeStr = this.replacePlaceholderNames(treeStr);
+                treeStr = layOut(this.replacePlaceholderNames(treeStr));
             } catch (e) {
                 treeStr = '(tree printing unavailable)';
             }
@@ -461,7 +469,7 @@ export class Pattern {
                 const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 patternTreeStr = await printer.print(patternToPrint, output);
                 // Replace placeholder names with clean display names
-                patternTreeStr = this.replacePlaceholderNames(patternTreeStr);
+                patternTreeStr = layOut(this.replacePlaceholderNames(patternTreeStr));
             } catch (e) {
                 patternTreeStr = `(tree printing unavailable: ${e})`;
             }
@@ -492,7 +500,7 @@ export class Pattern {
                 const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                 matchedTreeStr = await printer.print(treeToPrint, output);
                 // Replace placeholder names with clean display names
-                matchedTreeStr = this.replacePlaceholderNames(matchedTreeStr);
+                matchedTreeStr = layOut(this.replacePlaceholderNames(matchedTreeStr));
             } catch (e) {
                 matchedTreeStr = `(tree printing unavailable: ${e})`;
             }
@@ -541,10 +549,7 @@ export class Pattern {
                                 // Regular element
                                 const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
                                 let subtreeStr = await printer.print(element, output);
-                                subtreeStr = this.replacePlaceholderNames(subtreeStr);
-
-                                // Process multi-line output: trim, dedent, then re-indent with proper alignment
-                                subtreeStr = dedent(subtreeStr.trim());
+                                subtreeStr = layOut(this.replacePlaceholderNames(subtreeStr));
 
                                 // Calculate proper indentation to align continuation lines
                                 // Pattern is: "[Pattern #2]      Label:  content"

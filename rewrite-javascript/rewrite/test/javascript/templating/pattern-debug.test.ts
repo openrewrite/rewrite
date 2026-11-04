@@ -26,7 +26,7 @@ describe('Pattern Debugging', () => {
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[cu.statements.length - 1].element;
         return isExpressionStatement(statement) ? statement.expression : statement;
     }
 
@@ -65,8 +65,8 @@ describe('Pattern Debugging', () => {
                 return false;
             }
         });
-        const pat = pattern`${value}`;
-        const node = await parseExpression('42');
+        const pat = pattern`foo(${value})`;
+        const node = await parseExpression('foo(42)') as J.MethodInvocation;
 
         const result = await pat.matchWithExplanation(node, undefined!);
 
@@ -74,6 +74,7 @@ describe('Pattern Debugging', () => {
         expect(result.explanation).toBeDefined();
         expect(result.explanation!.reason).toBe('constraint-failed');
         expect(result.explanation!.details).toContain('Constraint evaluation returned false');
+        expect(result.explanation!.targetElement).toBe(node.arguments.elements[0].element);
     });
 
     test('debug log contains constraint evaluation entries', async () => {
@@ -99,7 +100,7 @@ describe('Pattern Debugging', () => {
         expect(passedLog).toBeDefined();
     });
 
-    test('path tracking shows location of mismatch in binary expression', async () => {
+    test('a literal mismatch in a binary expression shows both literals', async () => {
         const pat = pattern`x + 42`;
         const node = await parseExpression('x + "wrong"');
 
@@ -218,19 +219,73 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.actual).toBe('2');
     });
 
-    test('value mismatch shows expected and actual values', async () => {
+    test('a method name mismatch marks the names of both calls', async () => {
         const pat = pattern`console.log(42)`;
-        const node = await parseExpression('console.error(42)');
+        const node = await parseExpression('console.error(42)') as J.MethodInvocation;
 
         const attempt = await pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.matched).toBe(false);
-        expect(attempt.explanation).toBeDefined();
-
-        // Should be a value mismatch
         expect(attempt.explanation!.reason).toBe('value-mismatch');
         expect(attempt.explanation!.expected).toBe('"log"');
         expect(attempt.explanation!.actual).toBe('"error"');
+        expect(attempt.explanation!.patternElement.simpleName).toBe('log');
+        expect(attempt.explanation!.targetElement).toBe(node.name);
+    });
+
+    test('a call declared in another module names both modules', async () => {
+        const pat = pattern`isDate(${capture({variadic: true})})`
+            .configure({context: [`import {isDate} from 'node:util/types';`]});
+        const node = await parseExpression(`
+            function isDate(value: unknown): boolean { return false; }
+            isDate(new Date());`);
+
+        const attempt = await pat.matchWithExplanation(node, undefined!);
+
+        expect(attempt.matched).toBe(false);
+        expect(attempt.explanation!.expected).toMatch(/^declared in .*util\/types$/);
+        expect(attempt.explanation!.actual).toMatch(/^declared in test$/);
+    });
+
+    test('an operator mismatch names both operators', async () => {
+        const pat = pattern`${capture('x')} + ${capture('y')}`;
+        const node = await parseExpression('a - b');
+
+        const attempt = await pat.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.expected).toBe('"Addition"');
+        expect(attempt.explanation!.actual).toBe('"Subtraction"');
+        expect(attempt.explanation!.targetElement).toBe(node);
+    });
+
+    test('a capture named twice shows what it already holds', async () => {
+        const r = capture('r');
+        const scalar = pattern`${capture('req')}.map(${r} => ${r}.json())`;
+        const node = await parseExpression('req.map(res => other.json())');
+
+        const attempt = await scalar.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.expected).toContain('res');
+        expect(attempt.explanation!.actual).toBe('other');
+        expect(attempt.explanation!.targetElement.simpleName).toBe('other');
+
+        const args = capture({variadic: true});
+        const variadic = pattern`f(${args}) || g(${args})`;
+        const variadicAttempt = await variadic.matchWithExplanation(await parseExpression('f(a) || g(b)'), undefined!);
+
+        expect(variadicAttempt.explanation!.expected).toContain('a');
+        expect(variadicAttempt.explanation!.actual).toBe('b');
+    });
+
+    test('a pattern that writes out type arguments says the source has none', async () => {
+        const pat = pattern`useState<number>(${capture('x')})`;
+        const node = await parseExpression('useState(0)');
+
+        const attempt = await pat.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.reason).toBe('structural-mismatch');
+        expect(attempt.explanation!.expected).toBe('typeParameters');
+        expect(attempt.explanation!.actual).toBe('none');
     });
 
     test('multi-line element pattern matching works correctly', async () => {

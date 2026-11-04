@@ -143,6 +143,16 @@ describe('Pattern Debug Logging', () => {
         expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{🪝x\}, \$\{🪝y\}\)/))).toBe(true);
     });
 
+    test('an unnamed capture named twice keeps one number', async () => {
+        const args = capture({variadic: true});
+        const pat = pattern({debug: true})`f(${args}) || g(${args})`;
+
+        await pat.match(await parseExpression('f(a) || g(a)'), undefined!);
+
+        const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
+        expect(calls).toContain('[Pattern #' + calls[0].match(/#(\d+)/)![1] + '] f(${🪝1}) || g(${🪝1})');
+    });
+
     test('variadic captures show array format', async () => {
         const args = capture({ variadic: true });
         const pat = pattern({ debug: true })`console.log(${args})`;
@@ -176,5 +186,19 @@ describe('Pattern Debug Logging', () => {
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
         expect(calls.some(c => c.includes('Expected:'))).toBe(true);
         expect(calls.some(c => c.includes('Actual:'))).toBe(true);
+    });
+
+    test('prints the matched tree without the whitespace before it', async () => {
+        const gen = parser.parse({text: 'foo();\n    console.error(42);', sourcePath: 'test.ts'});
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[1].element;
+        const node = isExpressionStatement(statement) ? statement.expression : statement;
+
+        await pattern`console.log(42)`.match(node, undefined!, {debug: true});
+
+        const calls: string[] = consoleErrorSpy.mock.calls.map(c => c[0]);
+        const lines = calls.flatMap(c => c.split('\n'));
+        const header = lines.findIndex(line => line.includes('Matched tree'));
+        expect(lines[header + 1]).toMatch(/\] {7}console\./);
     });
 });
