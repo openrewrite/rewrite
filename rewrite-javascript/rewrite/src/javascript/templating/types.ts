@@ -564,6 +564,9 @@ export interface TryOnOptions {
 
     /** As {@link ApplyOptions.bindings}, for a caller that resolves the modules some other way. */
     bindings?: Record<string, string>;
+
+    /** Prints why each of the rule's patterns matched or not, as {@link PatternOptions.debug} describes. */
+    debug?: DebugOption;
 }
 
 /**

@@ -1,5 +1,14 @@
 import {type MockInstance} from 'vitest';
-import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
+import {
+    capture,
+    isExpressionStatement,
+    JavaScriptParser,
+    JS,
+    pattern,
+    rewrite,
+    sourceFileCache,
+    template
+} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {shouldUseEmoji} from '../../../src/javascript/templating/debug';
@@ -266,6 +275,49 @@ describe('Pattern Debug Logging', () => {
             '    render() {',
             '…'
         ]);
+    });
+
+    test('a long marked node shows its first and last lines', async () => {
+        const pat = pattern`${capture('arr')}.map(${capture('x')} => ${capture('body')})`;
+        const gen = parser.parse({
+            text: `
+            arr.map(function (x) {
+                const a = x + 1;
+                const b = a * 2;
+                const c = b - 3;
+                const d = c / 4;
+                return d;
+            })`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[0].element;
+        const node = isExpressionStatement(statement) ? statement.expression : statement;
+
+        await pat.match(node, new Cursor(node, new Cursor(cu)), {debug: true});
+
+        const lines = printed();
+        const source = lines.slice(lines.findIndex(line => line.endsWith('Source tree:')) + 1);
+        const tree = source.slice(0, source.findIndex(line => line.endsWith(']')));
+        expect(tree.map(line => line.replace(/^\[Pattern #\d+] {7}/, ''))).toEqual([
+            'arr.map(👉function (x) {',
+            '    const a = x + 1;',
+            '…',
+            '    return d;',
+            '}👈)'
+        ]);
+    });
+
+    test('a rewrite rule prints why it does not apply when asked to', async () => {
+        const rule = rewrite(() => ({
+            before: pattern`console.log(${capture('x')})`,
+            after: template`log(${capture('x')})`
+        }));
+        const node = await parseExpression('console.error(1)');
+
+        await rule.tryOn(new Cursor(node), node, {debug: true});
+
+        expect(printed().some(line => line.includes('❌ FAILED matching against'))).toBe(true);
     });
 
     test('a capture of an optional receiver holds its ?', async () => {

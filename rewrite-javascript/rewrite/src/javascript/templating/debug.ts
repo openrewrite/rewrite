@@ -212,7 +212,10 @@ export async function narrowMark(printed: string, element: J, focus: MarkFocus,
         code.slice(end) + printed.slice(at + before.length + code.length + after.length);
 }
 
-/** The lines within one line of a mark, with `…` for each run of two or more lines left out. */
+/**
+ * The lines within one line of a mark, with `…` for each run of two or more lines left out. A mark
+ * over more than six lines keeps its first two and last two.
+ */
 export function aroundMarks(lines: string[], [before, after]: [string, string]): string[] {
     let open = 0;
     const marked = lines.map(line => {
@@ -224,6 +227,16 @@ export function aroundMarks(lines: string[], [before, after]: [string, string]):
         return lines;
     }
     const kept = lines.map((_, i) => marked[i] || marked[i - 1] === true || marked[i + 1] === true);
+    for (let start = 0; start < lines.length; start++) {
+        let end = start;
+        while (end < lines.length && marked[end]) {
+            end++;
+        }
+        if (end - start > 6) {
+            kept.fill(false, start + 2, end - 2);
+        }
+        start = end;
+    }
     const result: string[] = [];
     for (let i = 0; i < lines.length;) {
         let j = i;
@@ -608,6 +621,10 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         if (propertyName === undefined || propertyName === 'elements' && wrapper?.kind === J.Kind.Container) {
             owner = this.cursor?.parent?.value;
             name = owner ? Object.keys(owner).find(key => owner[key] === wrapper) : undefined;
+        } else if (name === 'statements' && wrapper?.kind === J.Kind.Block &&
+            this.cursor?.parent?.value?.kind === J.Kind.NewClass) {
+            // An object literal holds its properties as the statements of a block
+            return 'properties';
         }
         return name ? PROPERTY_WORDS[`${owner?.kind}.${name}`] ?? inWords(name) : 'value';
     }
@@ -699,8 +716,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const pattern = this.cursor?.value as T;
         const target = this.targetCursor?.value as any;
         const label = this.propertyLabel(propertyName);
-        const hint = label === 'arguments' ?
-            'A capture matches one argument. capture({variadic: true}) matches any number of them.' : undefined;
+        const hint = label === 'arguments' || label === 'properties' ?
+            `A capture matches one ${label === 'arguments' ? 'argument' : 'property'}. ` +
+            'capture({variadic: true}) matches any number of them.' : undefined;
         const expected: any[] = at(pattern, propertyName) ?? [];
         const actual: any[] = at(target, propertyName) ?? [];
         // A modifier only one side has is marked, and the other side where it would go
@@ -733,12 +751,17 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         // The mismatch shows on the node holding the property, and a call's method type on the call's name
         const holder = pattern?.kind === J.Kind.MethodInvocation && path[0] === 'methodType' ?
             'name' : path.slice(0, -1).join('.');
-        const describeValue = (value: any) => path[path.length - 1] === 'declaringType' ?
-            `declared in ${this.formatValue(value)}` : this.formatValue(value);
+        const declared = path[path.length - 1] === 'declaringType';
+        const asWritten = (tree: any) => tree?.kind === J.Kind.Literal && (!propertyName || propertyName === 'value') ?
+            tree.valueSource : undefined;
+        const describeValue = (value: any, tree: any) => declared ? `declared in ${this.formatValue(value)}` :
+            asWritten(tree) ?? this.formatValue(value);
+        const note = declared ? 'A pattern matches a call only where it calls the same declaration. ' +
+            'Its context option declares what its own calls refer to.' : undefined;
         return this.fail(pattern as T, 'value-mismatch',
-            describeValue(expected !== undefined ? expected : at(pattern, propertyName)),
-            describeValue(actual !== undefined ? actual : at(target, propertyName)),
-            undefined, at(pattern, holder), at(target, holder));
+            describeValue(expected !== undefined ? expected : at(pattern, propertyName), pattern),
+            describeValue(actual !== undefined ? actual : at(target, propertyName), target),
+            note, at(pattern, holder), at(target, holder));
     }
 
     protected override satisfiesConstraint(marker: CaptureMarker, patternElement: JTree, target: J | J[],

@@ -586,7 +586,9 @@ export class Pattern {
         const patternAst = matcher.getPatternAst()!;
         const focus = matcher.getFocus();
         if (report) {
-            attempt.report = (await this.render(tree, attempt, patternAst, focus, undefined, false)).join('\n');
+            // Without the pattern's number, which depends on how many patterns were created before it
+            const lines = await this.render(tree, attempt, patternAst, focus, undefined, false);
+            attempt.report = lines.map(line => line.replace(/^\[Pattern #\d+] ?/, '')).join('\n');
         }
         return {attempt, patternAst, focus};
     }

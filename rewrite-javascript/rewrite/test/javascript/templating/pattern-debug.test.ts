@@ -244,6 +244,7 @@ describe('Pattern Debugging', () => {
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation!.expected).toMatch(/^declared in .*util\/types$/);
         expect(attempt.explanation!.actual).toMatch(/^declared in test$/);
+        expect(attempt.explanation!.details).toContain('the same declaration');
     });
 
     test('an operator mismatch names both operators', async () => {
@@ -307,6 +308,25 @@ describe('Pattern Debugging', () => {
 
         expect(attempt.explanation!.expected).toBe('1');
         expect(attempt.explanation!.actual).toBe('2');
+    });
+
+    test('an object literal property count names properties and suggests a variadic capture', async () => {
+        const pat = pattern`f({timeout: ${capture('t')}})`;
+
+        const node = await parseExpression('f({timeout: 5, retries: 3})');
+
+        const attempt = await pat.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.expected).toBe('properties: timeout: 🪝t');
+        expect(attempt.explanation!.actual).toBe('properties: timeout: 5, retries: 3');
+        expect(attempt.explanation!.details).toContain('capture({variadic: true})');
+    });
+
+    test('a literal mismatch shows the literals as written', async () => {
+        const attempt = await pattern`f('one')`.matchWithExplanation(await parseExpression(`f('two')`), undefined!);
+
+        expect(attempt.explanation!.expected).toBe(`'one'`);
+        expect(attempt.explanation!.actual).toBe(`'two'`);
     });
 
     test('a modifier only one side has is named', async () => {
@@ -386,6 +406,7 @@ console.error(42);`,
         expect(attempt.report).toContain('Source tree:');
         expect(attempt.report).toContain('console.👉error👈(42)');
         expect(attempt.report).not.toContain('\x1b');
+        expect(attempt.report).not.toContain('[Pattern #');
     });
 
     test('two kinds with the same name in words show their operators', async () => {

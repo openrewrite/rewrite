@@ -88,7 +88,7 @@ It prints the pattern and the source with the mismatch marked, and how they diff
 [Pattern #1]      Note:     A capture the pattern names twice binds the same code at both places
 ```
 
-`pattern({debug: true})` prints every attempt of one pattern, and `PATTERN_DEBUG=true` every attempt of every pattern. A visitor matches a pattern against every node of a kind, so a predicate can choose the attempts worth printing. It receives the node, its cursor and the attempt, including whether it matched:
+`pattern({debug: true})` prints every attempt of one pattern, `rule.tryOn(cursor, node, {debug: true})` every attempt of a `rewrite` rule's patterns, and `PATTERN_DEBUG=true` every attempt of every pattern. A visitor matches a pattern against every node of a kind, so a predicate can choose the attempts worth printing. It receives the node, its cursor and the attempt, including whether it matched:
 
 ```ts
 import {isMethodInvocation} from '@openrewrite/rewrite/java';
