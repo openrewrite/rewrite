@@ -874,17 +874,4 @@ export interface MatchAttemptResult {
      * Debug log entries collected during matching (if debug was enabled).
      */
     debugLog?: DebugLogEntry[];
-
-    /**
-     * Cursors from the comparator (for debug visualization).
-     * @internal
-     */
-    patternCursor?: Cursor;
-    targetCursor?: Cursor;
-
-    /**
-     * The actual pattern AST that was used during matching (for debug visualization).
-     * @internal
-     */
-    patternAst?: any;
 }

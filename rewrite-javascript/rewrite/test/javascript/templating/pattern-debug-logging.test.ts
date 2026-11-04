@@ -2,6 +2,7 @@ import {type MockInstance} from 'vitest';
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
+import {shouldUseEmoji} from '../../../src/javascript/templating/debug';
 
 describe('Pattern Debug Logging', () => {
     let consoleErrorSpy: MockInstance;
@@ -144,24 +145,6 @@ describe('Pattern Debug Logging', () => {
         expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{🪝x\}, \$\{🪝y\}\)/))).toBe(true);
     });
 
-    test('details show the marked part of each tree as it is written', async () => {
-        const pat = pattern`useState<number>(${capture('x')})`;
-
-        await pat.match(await parseExpression('useState(0)'), undefined!, {debug: true});
-
-        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
-        expect(lines.some(line => line.endsWith('Pattern:  <number>'))).toBe(true);
-        expect(lines.some(line => line.endsWith('Matched:  useState(0)'))).toBe(true);
-    });
-
-    test('details keep the lines of a marked part where they stand relative to its first', async () => {
-        await pattern`foo(${capture('a')})`.match(await parseExpression('foo(1,\n    2)'), undefined!, {debug: true});
-
-        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
-        const first = lines.findIndex(line => line.endsWith('Matched:  (1,'));
-        expect(lines[first + 1]).toMatch(/\] {17}2\)$/);
-    });
-
     test('a debug predicate chooses the attempts that print', async () => {
         const seen: boolean[] = [];
         const pat = pattern({
@@ -197,6 +180,40 @@ describe('Pattern Debug Logging', () => {
         expect(lines[heading + 1]).toMatch(/called from \S*pattern-debug-logging\.test\.ts:\d+:\d+/);
     });
 
+    test('captures past the tenth are numbered alike in the tree and the legend', async () => {
+        const c = 'abcdefghijk'.split('').map(name => capture(name));
+        const pat = pattern({debug: true})
+            `f(${c[0]}, ${c[1]}, ${c[2]}, ${c[3]}, ${c[4]}, ${c[5]}, ${c[6]}, ${c[7]}, ${c[8]}, ${c[9]}, ${c[10]})`;
+
+        await pat.match(await parseExpression('f(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)'), undefined!);
+
+        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+        expect(lines.some(line => line.includes('[11]11[11])'))).toBe(true);
+        expect(lines.some(line => line.endsWith('[11] = 🪝k'))).toBe(true);
+    });
+
+    test('NO_COLOR asks for markers, and FORCE_COLOR for colours even then', () => {
+        const names = ['CLAUDECODE', 'NO_COLOR', 'FORCE_COLOR'];
+        const saved = Object.fromEntries(names.map(name => [name, process.env[name]]));
+        try {
+            delete process.env.CLAUDECODE;
+            delete process.env.FORCE_COLOR;
+            process.env.NO_COLOR = '1';
+            expect(shouldUseEmoji()).toBe(true);
+
+            process.env.FORCE_COLOR = '1';
+            expect(shouldUseEmoji()).toBe(false);
+        } finally {
+            for (const [name, value] of Object.entries(saved)) {
+                if (value === undefined) {
+                    delete process.env[name];
+                } else {
+                    process.env[name] = value;
+                }
+            }
+        }
+    });
+
     test('an unnamed capture named twice keeps one number', async () => {
         const args = capture({variadic: true});
         const pat = pattern({debug: true})`f(${args}) || g(${args})`;
@@ -217,7 +234,6 @@ describe('Pattern Debug Logging', () => {
         expect(match).toBeDefined();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        // With the new format, variadic captures are shown in the legend
         expect(calls.some(c => c.includes("Captures:"))).toBe(true);
     });
 
@@ -243,7 +259,11 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('prints the matched tree without the whitespace before it', async () => {
-        const gen = parser.parse({text: 'foo();\n    console.error(42);', sourcePath: 'test.ts'});
+        const gen = parser.parse({
+            text: `foo();
+    console.error(42);`,
+            sourcePath: 'test.ts'
+        });
         const cu = (await gen.next()).value as JS.CompilationUnit;
         const statement = cu.statements[1].element;
         const node = isExpressionStatement(statement) ? statement.expression : statement;

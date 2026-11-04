@@ -109,27 +109,6 @@ export function dedent(s: string): string {
 }
 
 /**
- * Prefixes each line of a multi-line string with the given prefix.
- * Optionally uses a different prefix for the first line.
- *
- * @param str The string to prefix
- * @param prefix The prefix to add to each line (or all lines if firstPrefix not provided)
- * @param firstPrefix Optional different prefix for the first line
- * @returns The prefixed string
- */
-export function prefixLines(str: string, prefix: string, firstPrefix?: string): string {
-    if (!str) return str;
-    const lines = str.split('\n');
-    if (lines.length === 0) return str;
-
-    if (firstPrefix !== undefined) {
-        return lines.map((line, i) => i === 0 ? firstPrefix + line : prefix + line).join('\n');
-    } else {
-        return lines.map(line => prefix + line).join('\n');
-    }
-}
-
-/**
  * A compiled `(original, updates) => merged` builder that names every resulting property in an
  * object literal. V8 sizes a literal's in-object storage to the properties it names, so the merged
  * node keeps its fields inline; the `{...original, ...updates}` spread of a shared, megamorphic

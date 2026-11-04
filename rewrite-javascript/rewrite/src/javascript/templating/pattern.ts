@@ -44,14 +44,14 @@ import {JS} from '../index';
 import {
     AnsiAwarePrintOutputCapture,
     callSite,
+    CaptureHighlightMarker,
     DebugPatternMatchingComparator,
     ElementMarkerVisitor,
-    mismatchDelimiters,
     PATTERN_DEBUG_MARKER_PRINTER,
     shouldUseEmoji,
     sourcePosition
 } from './debug';
-import {dedent, prefixLines} from '../../util';
+import {dedent} from '../../util';
 import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
 
 
@@ -61,22 +61,6 @@ import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
  */
 function layOut(printed: string): string {
     return dedent(printed.replace(/^\s*\n/, '')).trimEnd();
-}
-
-/**
- * The code between the mismatch markers of a printed tree. Its first line keeps the column it
- * starts at while the lines are dedented, so the lines after it keep their indentation relative to it.
- */
-function markedPart(printed: string): string | undefined {
-    const [before, after] = mismatchDelimiters();
-    const start = printed.indexOf(before);
-    const end = printed.lastIndexOf(after);
-    if (start < 0 || end < start) {
-        return undefined;
-    }
-    const column = Array.from(printed.slice(printed.lastIndexOf('\n', start) + 1, start)).length;
-    const part = ' '.repeat(column) + printed.slice(start + before.length, end).replace(/\x1b\[\d*m/g, '');
-    return dedent(part).trimStart();
 }
 
 /**
@@ -345,9 +329,9 @@ export class Pattern {
         if (debug) {
             // Taken before the first await, while the caller is still on the stack
             const caller = callSite(new Error().stack);
-            const attempt = await this.matchWithExplanation(tree, cursor);
+            const {attempt, patternAst} = await this.attempt(tree, cursor);
             if (debug === true || debug(tree, cursor, attempt)) {
-                await this.logMatchResult(tree, cursor, attempt, caller);
+                await this.logMatchResult(tree, cursor, attempt, patternAst, caller);
             }
             return attempt.matched ? attempt.result as MatchResult : undefined;
         }
@@ -364,188 +348,70 @@ export class Pattern {
     }
 
     /**
-     * Formats and logs the match result to stderr.
-     * @private
+     * Prints a match attempt to stderr. A success shows the code with each capture numbered. A failure
+     * shows the pattern and the code with the mismatch marked, and why they differ.
      */
-    private async logMatchResult(tree: J, cursor: Cursor | undefined, result: MatchAttemptResult,
+    private async logMatchResult(tree: J, cursor: Cursor | undefined, attempt: MatchAttemptResult, patternAst: J,
                                  caller: string | undefined): Promise<void> {
-        const patternSource = this.getPatternSource();
-        const patternId = `Pattern #${this.patternId}`;
-        const nodeKind = (tree as any).kind || 'unknown';
-        // Format kind: extract short name (e.g., "org.openrewrite.java.tree.J$Binary" -> "J$Binary")
-        const shortKind = nodeKind.split('.').pop() || nodeKind;
-
-        // First, log the pattern source
-        console.error(`[${patternId}] ${patternSource}`);
-
-        // Build the complete match result message
-        const lines: string[] = [];
+        const prefix = `[Pattern #${this.patternId}]`;
+        const kind = tree.kind.split('.').pop();
         const position = await sourcePosition(tree, cursor);
-        const where = position ? ` at ${position}` : '';
-        const calledFrom = caller ? [`[${patternId}]    called from ${caller}`] : [];
+        console.error(`${prefix} ${this.getPatternSource()}`);
 
-        if (result.matched) {
-            // Success case - result first, then tree with highlighted captures, then capture legend
-            lines.push(`[${patternId}] ✅ SUCCESS matching against ${shortKind}${where}`, ...calledFrom);
-
-            // Mark captured elements with numbered markers
-            let markedAst = tree;
-            const captureNumbers = new Map<number, JTree | JTree[]>();
-
-            if (result.result) {
-                const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
-                if (storage && storage.size > 0) {
-                    // Build map of capture number -> captured element(s)
-                    // Limit to 11 captures (0-10) for emoji display
-                    let captureIndex = 0;
-                    for (const [_, value] of storage) {
-                        if (captureIndex <= 10) {
-                            const extractedValue = (result.result as any).extractElements(value);
-                            captureNumbers.set(captureIndex + 1, extractedValue); // Start from 1
-                            captureIndex++;
-                        }
-                    }
-
-                    // Mark the tree with capture numbers
-                    if (captureNumbers.size > 0) {
-                        try {
-                            const visitor = new ElementMarkerVisitor(captureNumbers);
-                            markedAst = await visitor.visit(tree, undefined) as J;
-                        } catch (markError) {
-                            console.warn(`Failed to mark captures: ${markError}`);
-                        }
-                    }
-                }
-            }
-
-            // Print the marked tree
-            let treeStr: string;
-            try {
-                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
-                treeStr = await printer.print(markedAst, output);
-                // Replace placeholder names with clean display names
-                treeStr = layOut(this.replacePlaceholderNames(treeStr));
-            } catch (e) {
-                treeStr = '(tree printing unavailable)';
-            }
-            treeStr.split('\n').forEach(line => lines.push(`[${patternId}]   ${line}`));
-
-            // Print capture legend
-            if (result.result) {
-                const storage = (result.result as any).storage as Map<string, CaptureStorageValue>;
-                if (storage && storage.size > 0) {
-                    lines.push(`[${patternId}]`);
-                    lines.push(`[${patternId}]   Captures:`);
-
-                    let captureIndex = 0;
-                    for (const [name, _value] of storage) {
-                        if (captureIndex <= 10) {
-                            const displayName = this.unnamedCaptureMapping.get(name) || name;
-                            const emoji = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][captureIndex + 1];
-                            lines.push(`[${patternId}]     ${emoji} = 🪝${displayName}`);
-                            captureIndex++;
-                        }
-                    }
-                }
-            }
-        } else {
-            // Failure case - show both pattern tree and matched tree with markers
-            lines.push(`[${patternId}] ❌ FAILED matching against ${shortKind}${where}`, ...calledFrom);
-
-            // Add explanation of marker format (only for emoji - ANSI inverse video is self-explanatory)
-            if (shouldUseEmoji()) {
-                lines.push(`[${patternId}]    (Mismatched elements are marked with 👉...👈)`);
-            }
-            lines.push(`[${patternId}]`);
-
-            // Get both cursors and explanation from the result
-            const patternCursor = result.patternCursor;
-            const targetCursor = result.targetCursor || cursor;
-            const explanation = result.explanation;
-
-            // Print pattern tree with marker - use the actual pattern AST from matching
-            const patternAst = result.patternAst || await this.getAstPattern();
-            let patternTreeStr: string;
-            try {
-                let markedPattern: J | undefined;
-                // Use explanation's patternElement if available, otherwise fall back to cursor
-                if (explanation?.patternElement || (patternCursor && (patternCursor.value as any)?.id)) {
-                    try {
-                        markedPattern = await this.markElementWithSearchResult(patternAst, patternCursor, explanation, true);
-                    } catch (markError) {
-                        // If marking fails, continue without the marker
-                        console.warn(`Failed to mark pattern tree: ${markError}`);
-                    }
-                }
-                const patternToPrint = markedPattern || patternAst;
-                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
-                patternTreeStr = await printer.print(patternToPrint, output);
-                // Replace placeholder names with clean display names
-                patternTreeStr = layOut(this.replacePlaceholderNames(patternTreeStr));
-            } catch (e) {
-                patternTreeStr = `(tree printing unavailable: ${e})`;
-            }
-
-            const useAnsi = !shouldUseEmoji();
-            const greenColor = useAnsi ? '\x1b[32m' : '';
-            const redColor = useAnsi ? '\x1b[31m' : '';
-            const resetColor = useAnsi ? '\x1b[0m' : '';
-
-            lines.push(`${greenColor}[${patternId}]    Pattern tree:${resetColor}`);
-            patternTreeStr.split('\n').forEach(line => lines.push(`${greenColor}[${patternId}]       ${line}${resetColor}`));
-
-            // Print matched tree with marker
-            let matchedTreeStr: string;
-            try {
-                let markedTree: J | undefined;
-                // Use explanation's targetElement if available, otherwise fall back to cursor
-                if (explanation?.targetElement || (targetCursor && (targetCursor.value as any)?.id)) {
-                    try {
-                        markedTree = await this.markElementWithSearchResult(tree, targetCursor, explanation, false);
-                    } catch (markError) {
-                        // If marking fails, continue without the marker
-                        console.warn(`Failed to mark matched tree: ${markError}`);
-                    }
-                }
-                const treeToPrint = markedTree || tree;
-                const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
-                matchedTreeStr = await printer.print(treeToPrint, output);
-                // Replace placeholder names with clean display names
-                matchedTreeStr = layOut(this.replacePlaceholderNames(matchedTreeStr));
-            } catch (e) {
-                matchedTreeStr = `(tree printing unavailable: ${e})`;
-            }
-
-            lines.push(`[${patternId}]`);
-            lines.push(`${redColor}[${patternId}]    Matched tree:${resetColor}`);
-            matchedTreeStr.split('\n').forEach(line => lines.push(`${redColor}[${patternId}]       ${line}${resetColor}`));
-
-            // Print detailed mismatch information
-            if (explanation) {
-                lines.push(`[${patternId}]`);
-                lines.push(`[${patternId}]    Details:`);
-                lines.push(`[${patternId}]      Reason:   ${explanation.reason}`);
-                lines.push(`[${patternId}]      Expected: ${explanation.expected}`);
-                lines.push(`[${patternId}]      Actual:   ${explanation.actual}`);
-
-                for (const [label, printed] of [['Pattern', patternTreeStr], ['Matched', matchedTreeStr]]) {
-                    const part = markedPart(printed);
-                    if (part !== undefined) {
-                        // Continuation lines align under the first, after "[Pattern #2]      Label:  "
-                        const patternPrefix = `[${patternId}]      `;
-                        const labelPrefix = `${label}:  `;
-                        const continuationPrefix = patternPrefix + ' '.repeat(labelPrefix.length);
-                        lines.push(prefixLines(part, continuationPrefix, patternPrefix + labelPrefix));
-                    }
-                }
-            }
+        const lines = [`${prefix} ${attempt.matched ? '✅ SUCCESS' : '❌ FAILED'} matching against ${kind}` +
+            (position ? ` at ${position}` : '')];
+        if (caller) {
+            lines.push(`${prefix}    called from ${caller}`);
         }
 
-        // Single console.error call with all lines joined
+        if (attempt.matched) {
+            const result = attempt.result as any;
+            const captures = new Map<number, JTree | JTree[]>();
+            const legend: string[] = [];
+            for (const [name, value] of result.storage as Map<string, CaptureStorageValue>) {
+                const number = captures.size + 1;
+                captures.set(number, result.extractElements(value));
+                const displayName = this.unnamedCaptureMapping.get(name) ?? name;
+                legend.push(`${prefix}     ${new CaptureHighlightMarker(number).getEmoji()} = 🪝${displayName}`);
+            }
+            lines.push(...(await this.printMarked(tree, captures)).map(line => `${prefix}   ${line}`));
+            if (legend.length > 0) {
+                lines.push(prefix, `${prefix}   Captures:`, ...legend);
+            }
+        } else {
+            const explanation = attempt.explanation;
+            const [green, red, reset] = shouldUseEmoji() ? ['', '', ''] : ['\x1b[32m', '\x1b[31m', '\x1b[0m'];
+            if (shouldUseEmoji()) {
+                lines.push(`${prefix}    (Mismatched elements are marked with 👉...👈)`);
+            }
+            const colored = (printed: string[], color: string) =>
+                printed.map(line => `${color}${prefix}       ${line}${reset}`);
+            lines.push(prefix, `${green}${prefix}    Pattern tree:${reset}`,
+                ...colored(await this.printMarked(patternAst, explanation?.patternElement), green),
+                prefix, `${red}${prefix}    Matched tree:${reset}`,
+                ...colored(await this.printMarked(tree, explanation?.targetElement), red));
+            if (explanation) {
+                lines.push(prefix, `${prefix}    Details:`,
+                    `${prefix}      Reason:   ${explanation.reason}`,
+                    `${prefix}      Expected: ${explanation.expected}`,
+                    `${prefix}      Actual:   ${explanation.actual}`);
+            }
+        }
         console.error(lines.join('\n'));
+    }
+
+    /** The lines of `tree` as debug output prints them, with `marks` shown on it and captures as `🪝name`. */
+    private async printMarked(tree: J, marks?: JTree | Map<number, JTree | JTree[]>): Promise<string[]> {
+        try {
+            const marker = marks instanceof Map ? new ElementMarkerVisitor(marks) :
+                marks ? new ElementMarkerVisitor(marks) : undefined;
+            const marked = marker ? await marker.visit(tree, undefined) as J : tree;
+            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+            const printed = await printer.print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
+            return layOut(this.replacePlaceholderNames(printed)).split('\n');
+        } catch (e) {
+            return [`(tree printing unavailable: ${e})`];
+        }
     }
 
     /**
@@ -563,34 +429,6 @@ export class Pattern {
         // Replace all remaining __capt_XXX__ with 🪝XXX (for named captures)
         result = result.replace(/__capt_([^_]+(?:_[^_]+)*)__/g, '🪝$1');
         return result;
-    }
-
-    /**
-     * Marks the element at the current cursor position with a SearchResult marker (🟡).
-     * If an explanation with pattern/target elements is provided, marks those specific elements.
-     * @param ast The AST tree to mark
-     * @param cursor The cursor position (used as fallback if no explanation element)
-     * @param explanation The match explanation containing the actual elements to mark
-     * @param isPattern Whether this is the pattern tree (true) or target tree (false)
-     * @private
-     */
-    private async markElementWithSearchResult(ast: J, cursor: Cursor | undefined, explanation?: MatchExplanation, isPattern: boolean = false): Promise<J> {
-        // If we have an explanation, use the specific element from it
-        if (explanation) {
-            const element = isPattern ? explanation.patternElement : explanation.targetElement;
-            if (element) {
-                const visitor = new ElementMarkerVisitor(element);
-                return await visitor.visit(ast, undefined) as J;
-            }
-        }
-
-        // Fallback: mark the element at the cursor (if cursor exists)
-        if (!cursor) return ast;
-        const element = cursor.value;
-        if (!element) return ast;
-
-        const visitor = new ElementMarkerVisitor(element as any);
-        return await visitor.visit(ast, undefined) as J;
     }
 
     /**
@@ -625,20 +463,14 @@ export class Pattern {
     }
 
     /**
-     * Matches a pattern against an AST node with detailed debug information.
-     * Part of Layer 2 (Public API).
-     *
-     * This method always enables debug logging and returns detailed information about
-     * the match attempt, including:
-     * - Whether the pattern matched
-     * - Captured nodes (if matched)
-     * - Explanation of failure (if not matched)
-     * - Debug log entries showing the matching process
+     * Matches like {@link match}, and returns why the pattern did not match rather than printing it.
+     * A failed attempt's `explanation` holds the reason, the expected and actual code, and the pattern
+     * and source nodes where they differ. `debugLog` holds an entry for each capture constraint evaluated.
      *
      * @param tree The AST node to match against
      * @param cursor Cursor at the node's position in a larger tree
-     * @param debugOptions Optional debug options (defaults to all logging enabled)
-     * @returns Detailed result with debug information
+     * @param debugOptions Which entries `debugLog` collects, by default all of them
+     * @returns Whether the pattern matched, with the captures where it did and the explanation where it did not
      *
      * @example
      * const x = capture('x');
@@ -657,40 +489,25 @@ export class Pattern {
         cursor: Cursor,
         debugOptions?: DebugOptions
     ): Promise<MatchAttemptResult> {
-        // Default to full debug logging if not specified
-        const options: DebugOptions = {
-            enabled: true,
-            logComparison: true,
-            logConstraints: true,
-            ...debugOptions
-        };
+        return (await this.attempt(tree, cursor, debugOptions)).attempt;
+    }
 
+    /** The attempt, and the pattern tree it compared, which holds the explanation's pattern element. */
+    private async attempt(tree: J, cursor: Cursor,
+                          debugOptions?: DebugOptions): Promise<{ attempt: MatchAttemptResult, patternAst: J }> {
+        const options: DebugOptions = {enabled: true, logComparison: true, logConstraints: true, ...debugOptions};
         const matcher = new Matcher(this, tree, cursor, options);
-        const success = await matcher.matches();
-
-        if (success) {
-            // Match succeeded - return MatchResult with debug info
-            const storage = (matcher as any).storage;
-            const matchResult = new MatchResult(new Map(storage), () => matcher.patternPrefixes());
-            return {
-                matched: true,
-                result: matchResult,
-                debugLog: matcher.getDebugLog(),
-                patternCursor: matcher.getPatternCursor(),
-                targetCursor: matcher.getTargetCursor(),
-                patternAst: matcher.getPatternAst()
-            };
-        } else {
-            // Match failed - return explanation
-            return {
-                matched: false,
-                explanation: await matcher.getExplanation(text => this.replacePlaceholderNames(text)),
-                debugLog: matcher.getDebugLog(),
-                patternCursor: matcher.getPatternCursor(),
-                targetCursor: matcher.getTargetCursor(),
-                patternAst: matcher.getPatternAst()
-            };
-        }
+        const matched = await matcher.matches();
+        const attempt: MatchAttemptResult = matched ? {
+            matched,
+            result: new MatchResult(new Map((matcher as any).storage), () => matcher.patternPrefixes()),
+            debugLog: matcher.getDebugLog()
+        } : {
+            matched,
+            explanation: await matcher.getExplanation(text => this.replacePlaceholderNames(text)),
+            debugLog: matcher.getDebugLog()
+        };
+        return {attempt, patternAst: matcher.getPatternAst()!};
     }
 }
 
@@ -816,7 +633,6 @@ class Matcher {
     private readonly debugOptions: DebugOptions;
     private readonly debugLog: DebugLogEntry[] = [];
     private explanation?: PendingExplanation;
-    private lastComparator?: PatternMatchingComparator | DebugPatternMatchingComparator;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -1021,12 +837,12 @@ class Matcher {
             } : undefined
         };
 
-        this.lastComparator = this.debugOptions.enabled
+        const comparator = this.debugOptions.enabled
             ? new DebugPatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching)
             : new PatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
-        const result = await this.lastComparator!.compare(pattern, target, undefined, this.cursor);
+        const result = await comparator.compare(pattern, target, undefined, this.cursor);
 
         // If match failed and no explanation was set, provide a generic one
         if (!result && this.debugOptions.enabled && !this.explanation) {
@@ -1197,26 +1013,7 @@ class Matcher {
         return {...this.explanation, expected: display(expected), actual: display(actual)};
     }
 
-    /**
-     * Gets the pattern cursor from the comparator (for debug visualization).
-     * @internal
-     */
-    getPatternCursor(): Cursor | undefined {
-        return (this.lastComparator as any)?.cursor;
-    }
-
-    /**
-     * Gets the target cursor from the comparator (for debug visualization).
-     * @internal
-     */
-    getTargetCursor(): Cursor | undefined {
-        return (this.lastComparator as any)?.targetCursor;
-    }
-
-    /**
-     * Gets the pattern AST that was used during matching (for debug visualization).
-     * @internal
-     */
+    /** The pattern tree the last attempt compared. */
     getPatternAst(): J | undefined {
         return this.patternAst;
     }
@@ -1245,6 +1042,8 @@ class Matcher {
  */
 /**
  * Creates a pattern from a template literal (direct usage).
+ * To see why it does or does not match some code, pass `{debug: true}` to `match()`
+ * or create it with `pattern({debug: true})`, as {@link PatternOptions.debug} describes.
  *
  * @example
  * ```typescript

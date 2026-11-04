@@ -79,42 +79,22 @@ export class CaptureHighlightMarker implements Marker {
 }
 
 /**
- * Determines whether to use emoji markers (👉👈) or ANSI escape codes (inverse video).
- * Returns true for emoji markers, false for ANSI codes.
- *
- * Detection logic:
- * 1. CLAUDECODE env var → emoji (LLM execution context)
- * 2. TTY detected → ANSI codes (terminal with escape code support)
- * 3. No TTY but color indicators present → ANSI codes (e.g., IDE test runners)
- * 4. Otherwise → emoji (safe fallback for pipes, redirects, etc.)
+ * Whether debug output marks mismatches with 👉…👈 rather than colours and inverse video. FORCE_COLOR asks
+ * for colours, and otherwise NO_COLOR and a Claude Code session ask for markers. Then stderr decides where
+ * it is a terminal. A test runner's worker cannot see the terminal, so the terminal's own colour settings
+ * decide.
  */
 export function shouldUseEmoji(): boolean {
-    // Explicit LLM execution (Claude Code)
-    if (process.env.CLAUDECODE === '1') {
-        return true;
-    }
-
-    // TTY explicitly detected → use ANSI codes
-    if (process.stdout.isTTY) {
+    if (process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') {
         return false;
     }
-
-    // TTY detection unavailable but color support indicators present → use ANSI codes
-    // This handles IDE test runners (like IntelliJ IDEA) that support ANSI but don't expose TTY
-    if (process.stdout.isTTY === undefined) {
-        // Check for standard color support indicators
-        const hasColorSupport =
-            process.env.COLORTERM !== undefined ||  // Color terminal indicator
-            (process.env.TERM && process.env.TERM.includes('color')) ||  // Terminal type includes 'color'
-            process.env.FORCE_COLOR !== undefined;  // Standard force-color flag (used by chalk, supports-color, etc.)
-
-        if (hasColorSupport) {
-            return false;  // Use ANSI codes
-        }
+    if (process.env.CLAUDECODE === '1' || process.env.NO_COLOR) {
+        return true;
     }
-
-    // Default to emoji (safer fallback for pipes, redirects, etc.)
-    return true;
+    if (process.stderr.isTTY) {
+        return false;
+    }
+    return !(process.env.COLORTERM || process.env.TERM?.includes('color'));
 }
 
 /**
@@ -160,11 +140,6 @@ export async function sourcePosition(tree: J, cursor: Cursor | undefined): Promi
     }
     const line = printed.slice(0, offset).split('\n').length;
     return `${sourceFile.sourcePath}:${line}:${offset - printed.lastIndexOf('\n', offset - 1)}`;
-}
-
-/** What a mismatch marker prints before and after the mismatched node. */
-export function mismatchDelimiters(): [string, string] {
-    return shouldUseEmoji() ? ['👉', '👈'] : ['\x1b[7m', '\x1b[27m'];
 }
 
 // ============================================================================
@@ -216,6 +191,10 @@ export class AnsiAwarePrintOutputCapture extends PrintOutputCapture {
 
     override append(text: string | undefined): AnsiAwarePrintOutputCapture {
         if (!text || text.length === 0) {
+            return this;
+        }
+        if (!this.resumePending && !text.includes('\x1b') && !text.includes('\n')) {
+            super.append(text);
             return this;
         }
 
@@ -326,7 +305,7 @@ export class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
             }
         } else {
             // Single element - create PatternMismatchMarker
-            const [before, after] = mismatchDelimiters();
+            const [before, after] = shouldUseEmoji() ? ['👉', '👈'] : ['\x1b[7m', '\x1b[27m'];
             this.elementMarkers.set(targetOrCaptures, new PatternMismatchMarker(before, after));
         }
     }
