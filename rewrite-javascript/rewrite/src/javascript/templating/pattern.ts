@@ -27,7 +27,14 @@ import {
     PatternOptions
 } from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {MatcherCallbacks, MatcherState, PatternMatchingComparator, PendingExplanation} from './comparator';
+import {
+    Focus,
+    MarkFocus,
+    MatcherCallbacks,
+    MatcherState,
+    PatternMatchingComparator,
+    PendingExplanation
+} from './comparator';
 import {
     CaptureMarker,
     CaptureStorageValue,
@@ -46,23 +53,30 @@ import {
     callSite,
     CaptureHighlightMarker,
     DebugPatternMatchingComparator,
+    aroundMarks,
     describe,
     describeKind,
     ElementMarkerVisitor,
+    mismatchDelimiters,
+    narrowMark,
     PATTERN_DEBUG_MARKER_PRINTER,
     shouldUseEmoji,
-    sourcePosition
+    sourceLocation
 } from './debug';
 import {dedent} from '../../util';
 import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
 
 
 /**
- * Printed code without its leading blank lines and trailing whitespace,
- * and without the indentation all its lines share.
+ * Printed code without its leading blank lines and trailing whitespace, and without the indentation
+ * all its lines share. Its first line counts as starting at `column`, where the code starts in its
+ * file, so that the lines after it keep their indentation relative to it.
  */
-function layOut(printed: string): string {
-    return dedent(printed.replace(/^\s*\n/, '')).trimEnd();
+function layOut(printed: string, column?: number): string {
+    const text = printed.replace(/^\s*\n/, '');
+    const indent = text.length - text.trimStart().length;
+    const padded = column && column - 1 > indent ? ' '.repeat(column - 1 - indent) + text : text;
+    return dedent(padded).trimEnd().replace(/^[ \t]+/, '');
 }
 
 /**
@@ -166,6 +180,7 @@ export class Pattern {
     private _cachedAstPatterns = new Map<boolean, J>();
     private static nextPatternId = 1;
     private readonly patternId: number;
+    private readonly printedAttempts = new Set<string>();
     private readonly unnamedCaptureMapping = new Map<string, string>();
 
     /**
@@ -338,9 +353,9 @@ export class Pattern {
         if (debug) {
             // Taken before the first await, while the caller is still on the stack
             const caller = callSite(new Error().stack);
-            const {attempt, patternAst} = await this.attempt(tree, cursor);
+            const {attempt, patternAst, focus} = await this.attempt(tree, cursor);
             if (debug === true || debug(tree, cursor, attempt)) {
-                await this.logMatchResult(tree, cursor, attempt, patternAst, caller);
+                await this.logMatchResult(tree, attempt, patternAst, focus, caller);
             }
             return attempt.matched ? attempt.result as MatchResult : undefined;
         }
@@ -357,18 +372,35 @@ export class Pattern {
     }
 
     /**
-     * Prints a match attempt to stderr. A success shows the code with each capture numbered. A failure
-     * shows the pattern and the code with the mismatch marked, and why they differ.
+     * Prints a match attempt to stderr, followed by a blank line. An attempt that prints the same as
+     * an earlier one prints only its heading.
      */
-    private async logMatchResult(tree: J, cursor: Cursor | undefined, attempt: MatchAttemptResult, patternAst: J,
+    private async logMatchResult(tree: J, attempt: MatchAttemptResult, patternAst: J, focus: Focus | undefined,
                                  caller: string | undefined): Promise<void> {
-        const prefix = `[Pattern #${this.patternId}]`;
-        const kind = describeKind(tree);
-        const position = await sourcePosition(tree, cursor);
-        console.error(`${prefix} ${this.getPatternSource()}`);
+        const [source, heading, ...block] = await this.render(tree, attempt, patternAst, focus, caller, true);
+        const key = [heading, ...block.filter(line => !line.includes('called from'))].join('\n');
+        if (this.printedAttempts.has(key)) {
+            console.error(`${heading}, as before\n`);
+            return;
+        }
+        this.printedAttempts.add(key);
+        console.error(source);
+        console.error([heading, ...block].join('\n') + '\n');
+    }
 
-        const lines = [`${prefix} ${attempt.matched ? '✅ SUCCESS' : '❌ FAILED'} matching against ${kind}` +
-            (position ? ` at ${position}` : '')];
+    /**
+     * The lines debug output prints for a match attempt. They start with the pattern and a heading that
+     * says where the code is. A success follows with the code and each capture lettered. A failure follows
+     * with the pattern and the code around the mismatch marked, and how they differ.
+     */
+    private async render(tree: J, attempt: MatchAttemptResult, patternAst: J, focus: Focus | undefined,
+                         caller: string | undefined, colours: boolean): Promise<string[]> {
+        const prefix = `[Pattern #${this.patternId}]`;
+        const location = attempt.location;
+        const where = location ? ` at ${location.sourcePath}` +
+            (location.line ? `:${location.line}:${location.column}` : '') : '';
+        const lines = [`${prefix} ${this.getPatternSource()}`,
+            `${prefix} ${attempt.matched ? '✅ SUCCESS' : '❌ FAILED'} matching against ${describeKind(tree)}${where}`];
         if (caller) {
             lines.push(`${prefix}    called from ${caller}`);
         }
@@ -385,22 +417,26 @@ export class Pattern {
                 const symbol = new CaptureHighlightMarker(number).symbol();
                 legend.push(`${prefix}     ${symbol} 🪝${displayName} = ${await describe(code)}`);
             }
-            lines.push(...(await this.printMarked(tree, captures)).map(line => `${prefix}   ${line}`));
+            const printed = await this.printCaptures(tree, captures, location?.column);
+            lines.push(...printed.map(line => `${prefix}   ${line}`));
             if (legend.length > 0) {
                 lines.push(prefix, `${prefix}   Captures:`, ...legend);
             }
         } else {
             const explanation = attempt.explanation;
-            const [green, red, reset] = shouldUseEmoji() ? ['', '', ''] : ['\x1b[32m', '\x1b[31m', '\x1b[0m'];
-            if (shouldUseEmoji()) {
+            const emoji = !colours || shouldUseEmoji();
+            const [green, red, reset] = emoji ? ['', '', ''] : ['\x1b[32m', '\x1b[31m', '\x1b[0m'];
+            if (emoji) {
                 lines.push(`${prefix}    (Mismatched elements are marked with 👉...👈)`);
             }
             const colored = (printed: string[], color: string) =>
                 printed.map(line => `${color}${prefix}       ${line}${reset}`);
-            lines.push(prefix, `${green}${prefix}    Pattern tree:${reset}`,
-                ...colored(await this.printMarked(patternAst, explanation?.patternElement), green),
-                prefix, `${red}${prefix}    Source tree:${reset}`,
-                ...colored(await this.printMarked(tree, explanation?.targetElement), red));
+            const patternLines = await this.printMismatch(patternAst, explanation?.patternElement, focus?.pattern,
+                emoji);
+            const sourceLines = await this.printMismatch(tree, explanation?.targetElement, focus?.target, emoji,
+                location?.column);
+            lines.push(prefix, `${green}${prefix}    Pattern tree:${reset}`, ...colored(patternLines, green),
+                prefix, `${red}${prefix}    Source tree:${reset}`, ...colored(sourceLines, red));
             if (explanation) {
                 lines.push(prefix, `${prefix}    Details:`,
                     `${prefix}      Pattern:  ${explanation.expected}`,
@@ -408,18 +444,44 @@ export class Pattern {
                     ...(explanation.details ? [`${prefix}      Note:     ${explanation.details}`] : []));
             }
         }
-        console.error(lines.join('\n'));
+        return lines;
     }
 
-    /** The lines of `tree` as debug output prints them, with `marks` shown on it and captures as `🪝name`. */
-    private async printMarked(tree: J, marks?: JTree | Map<number, JTree | JTree[]>): Promise<string[]> {
+    /** The lines of `tree` around the mismatch, with it marked on `element` and narrowed to `focus` there. */
+    private async printMismatch(tree: J, element: JTree | undefined, focus: MarkFocus | undefined,
+                                emoji: boolean, column?: number): Promise<string[]> {
         try {
-            const marker = marks instanceof Map ? new ElementMarkerVisitor(marks) :
-                marks ? new ElementMarkerVisitor(marks) : undefined;
-            const marked = marker ? await marker.visit(tree, undefined) as J : tree;
-            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-            const printed = await printer.print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
-            return layOut(this.replacePlaceholderNames(printed)).split('\n');
+            const delimiters = mismatchDelimiters(emoji);
+            const marked = element ? await new ElementMarkerVisitor(element, emoji).visit(tree, undefined) as J : tree;
+            let printed = await TreePrinters.printer(JS.Kind.CompilationUnit)
+                .print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
+            if (element && focus) {
+                printed = await narrowMark(printed, element as J, focus, delimiters);
+            }
+            return aroundMarks(layOut(this.replacePlaceholderNames(printed), column).split('\n'), delimiters);
+        } catch (e) {
+            return [`(tree printing unavailable: ${e})`];
+        }
+    }
+
+    /** The lines of `tree` with each capture's code between its letter, as in `Ⓐuser?Ⓐ.name`. */
+    private async printCaptures(tree: J, captures: Map<number, JTree | JTree[]>, column?: number): Promise<string[]> {
+        try {
+            const marked = await new ElementMarkerVisitor(captures).visit(tree, undefined) as J;
+            let printed = await TreePrinters.printer(JS.Kind.CompilationUnit)
+                .print(marked, new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER));
+            // An optional receiver's `?` and a non-null `!` belong to the captured code, which a template
+            // writes with them, but the printer writes them after the capture's closing letter
+            for (const [number, code] of captures) {
+                const last: any = [code].flat().pop();
+                const postfix = last?.markers?.markers.some((marker: any) =>
+                    marker.kind === JS.Markers.Optional || marker.kind === JS.Markers.NonNullAssertion);
+                if (postfix) {
+                    const symbol = new CaptureHighlightMarker(number).symbol();
+                    printed = printed.split(symbol + '?').join('?' + symbol).split(symbol + '!').join('!' + symbol);
+                }
+            }
+            return layOut(this.replacePlaceholderNames(printed), column).split('\n');
         } catch (e) {
             return [`(tree printing unavailable: ${e})`];
         }
@@ -499,12 +561,15 @@ export class Pattern {
         cursor: Cursor,
         debugOptions?: DebugOptions
     ): Promise<MatchAttemptResult> {
-        return (await this.attempt(tree, cursor, debugOptions)).attempt;
+        return (await this.attempt(tree, cursor, debugOptions, true)).attempt;
     }
 
-    /** The attempt, and the pattern tree it compared, which holds the explanation's pattern element. */
-    private async attempt(tree: J, cursor: Cursor,
-                          debugOptions?: DebugOptions): Promise<{ attempt: MatchAttemptResult, patternAst: J }> {
+    /**
+     * The attempt, the pattern tree it compared, which holds the explanation's pattern element, and
+     * where on each side the mismatch is narrower than its marked node.
+     */
+    private async attempt(tree: J, cursor: Cursor, debugOptions?: DebugOptions, report: boolean = false):
+        Promise<{ attempt: MatchAttemptResult, patternAst: J, focus?: Focus }> {
         const options: DebugOptions = {enabled: true, logComparison: true, logConstraints: true, ...debugOptions};
         const matcher = new Matcher(this, tree, cursor, options);
         const matched = await matcher.matches();
@@ -517,7 +582,13 @@ export class Pattern {
             explanation: await matcher.getExplanation(text => this.replacePlaceholderNames(text)),
             debugLog: matcher.getDebugLog()
         };
-        return {attempt, patternAst: matcher.getPatternAst()!};
+        attempt.location = await sourceLocation(tree, cursor);
+        const patternAst = matcher.getPatternAst()!;
+        const focus = matcher.getFocus();
+        if (report) {
+            attempt.report = (await this.render(tree, attempt, patternAst, focus, undefined, false)).join('\n');
+        }
+        return {attempt, patternAst, focus};
     }
 }
 
@@ -797,7 +868,8 @@ class Matcher {
         actual: string | Promise<string>,
         details?: string,
         patternElement?: any,
-        targetElement?: any
+        targetElement?: any,
+        focus?: Focus
     ): void {
         // Only set the first failure (most relevant)
         if (this.explanation) return;
@@ -808,7 +880,8 @@ class Matcher {
             actual,
             details,
             patternElement,
-            targetElement
+            targetElement,
+            focus
         };
     }
 
@@ -838,8 +911,8 @@ class Matcher {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
                 setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
                                  actual: string | Promise<string>, details?: string, patternElement?: any,
-                                 targetElement?: any) =>
-                    this.setExplanation(reason, expected, actual, details, patternElement, targetElement),
+                                 targetElement?: any, focus?: Focus) =>
+                    this.setExplanation(reason, expected, actual, details, patternElement, targetElement, focus),
                 getExplanation: () => this.explanation,
                 restoreExplanation: (explanation: PendingExplanation) => { this.explanation = explanation; },
                 clearExplanation: () => { this.explanation = undefined; }
@@ -1018,7 +1091,13 @@ class Matcher {
             return undefined;
         }
         const [expected, actual] = await Promise.all([this.explanation.expected, this.explanation.actual]);
-        return {...this.explanation, expected: display(expected), actual: display(actual)};
+        const {focus, ...explanation} = this.explanation;
+        return {...explanation, expected: display(expected), actual: display(actual)};
+    }
+
+    /** Where the mismatch is narrower than the nodes the explanation marks. */
+    getFocus(): Focus | undefined {
+        return this.explanation?.focus;
     }
 
     /** The pattern tree the last attempt compared. */

@@ -33,7 +33,7 @@ export interface DebugCallbacks {
     log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => void;
     setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
                      actual: string | Promise<string>, details?: string, patternElement?: any,
-                     targetElement?: any) => void;
+                     targetElement?: any, focus?: Focus) => void;
     getExplanation: () => PendingExplanation | undefined;
     restoreExplanation: (explanation: PendingExplanation) => void;
     clearExplanation: () => void;
@@ -43,7 +43,17 @@ export interface DebugCallbacks {
 export type PendingExplanation = Omit<MatchExplanation, 'expected' | 'actual'> & {
     expected: string | Promise<string>;
     actual: string | Promise<string>;
+    focus?: Focus;
 };
+
+/**
+ * Where within the marked node a mismatch is. That is its operator, or an empty mark at its start or
+ * after one of its children, where the other side has something this side lacks.
+ */
+export type MarkFocus = 'operator' | 'start' | { after: J };
+
+/** The {@link MarkFocus} on each side, where the mark is narrower than its node. */
+export type Focus = { pattern?: MarkFocus, target?: MarkFocus };
 
 /**
  * Snapshot of matcher state for backtracking.

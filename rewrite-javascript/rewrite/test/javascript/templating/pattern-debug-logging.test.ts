@@ -11,13 +11,23 @@ describe('Pattern Debug Logging', () => {
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await gen.next()).value as JS.CompilationUnit;
-        const statement = cu.statements[0].element;
+        const statement = cu.statements[cu.statements.length - 1].element;
         return isExpressionStatement(statement) ? statement.expression : statement;
     }
+
+    /** The lines of everything printed so far. */
+    function printed(): string[] {
+        return consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+    }
+
+    // The 👉…👈 markers, rather than whatever the terminal running the tests supports
+    let noColor: string | undefined;
 
     beforeEach(() => {
         // Spy on console.error to capture debug output
         consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        noColor = process.env.NO_COLOR;
+        process.env.NO_COLOR = '1';
     });
 
     afterEach(() => {
@@ -25,6 +35,11 @@ describe('Pattern Debug Logging', () => {
         consoleErrorSpy.mockRestore();
         // Clear environment variable
         delete process.env.PATTERN_DEBUG;
+        if (noColor === undefined) {
+            delete process.env.NO_COLOR;
+        } else {
+            process.env.NO_COLOR = noColor;
+        }
     });
 
     test('no debug logging by default', async () => {
@@ -199,6 +214,84 @@ describe('Pattern Debug Logging', () => {
                 }
             }
         }
+    });
+
+    test('an operator mismatch marks just the operators', async () => {
+        const pat = pattern`${capture('x')} + ${capture('y')}`;
+
+        await pat.match(await parseExpression('a - b'), undefined!, {debug: true});
+
+        expect(printed().some(line => line.endsWith('🪝x 👉+👈 🪝y'))).toBe(true);
+        expect(printed().some(line => line.endsWith('a 👉-👈 b'))).toBe(true);
+    });
+
+    test('a piece only one side has is marked, and where it would go on the other side', async () => {
+        const typed = pattern`useState<number>(${capture('x')})`;
+        await typed.match(await parseExpression('useState(0)'), undefined!, {debug: true});
+
+        expect(printed().some(line => line.endsWith('useState👉<number>👈(🪝x)'))).toBe(true);
+        expect(printed().some(line => line.endsWith('useState👉👈(0)'))).toBe(true);
+
+        consoleErrorSpy.mockClear();
+        const arrow = pattern`(${capture('x')}) => ${capture('y')}`;
+        await arrow.match(await parseExpression('async (a) => a'), undefined!, {debug: true});
+
+        expect(printed().some(line => line.endsWith('👉👈(🪝x) => 🪝y'))).toBe(true);
+        expect(printed().some(line => line.endsWith('👉async👈 (a) => a'))).toBe(true);
+    });
+
+    test('a long tree shows the lines around the mismatch', async () => {
+        const pat = pattern`class ${capture('name')} extends React.Component {}`;
+        const gen = parser.parse({
+            text: `
+            class Big extends Component {
+                render() {
+                    const a = 1;
+                    const b = 2;
+                    return a + b;
+                }
+            }`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const node = cu.statements[0].element;
+
+        await pat.match(node, new Cursor(node, new Cursor(cu)), {debug: true});
+
+        const lines = printed();
+        const source = lines.slice(lines.findIndex(line => line.endsWith('Source tree:')) + 1);
+        const tree = source.slice(0, source.findIndex(line => line.endsWith(']')));
+        expect(tree.map(line => line.replace(/^\[Pattern #\d+] {7}/, ''))).toEqual([
+            'class Big extends 👉Component👈 {',
+            '    render() {',
+            '…'
+        ]);
+    });
+
+    test('a capture of an optional receiver holds its ?', async () => {
+        await pattern`${capture('a')}.b()`.match(await parseExpression('a?.b()'), undefined!, {debug: true});
+
+        expect(printed().some(line => line.endsWith('Ⓐa?Ⓐ.b()'))).toBe(true);
+    });
+
+    test('an attempt like an earlier one prints one line, and each attempt ends in a blank line', async () => {
+        const pat = pattern`console.log(${capture('x')})`;
+        const node = await parseExpression('console.error(1)');
+
+        await pat.match(node, undefined!, {debug: true});
+        const first = consoleErrorSpy.mock.calls.length;
+        await pat.match(node, undefined!, {debug: true});
+
+        const calls: string[] = consoleErrorSpy.mock.calls.map(c => c[0]);
+        expect(calls[first - 1].endsWith('\n')).toBe(true);
+        expect(calls.slice(first)).toEqual([expect.stringMatching(/❌ FAILED matching against .*, as before\n$/)]);
+    });
+
+    test('a constraint that throws names its capture', async () => {
+        const pat = pattern`foo(${capture({name: 'n', constraint: (n: any) => n.value.startsWith('a')})})`;
+
+        await expect(pat.match(await parseExpression('foo(x)'), undefined!, {debug: true}))
+            .rejects.toThrow(/constraint of capture n threw/);
     });
 
     test('an unnamed capture named twice keeps one number', async () => {

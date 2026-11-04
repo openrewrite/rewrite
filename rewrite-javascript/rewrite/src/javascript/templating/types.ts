@@ -864,4 +864,10 @@ export interface MatchAttemptResult {
      * Debug log entries collected during matching (if debug was enabled).
      */
     debugLog?: DebugLogEntry[];
+
+    /** Where the matched code starts in its source file, where the cursor leads to one. */
+    location?: { sourcePath: string, line?: number, column?: number };
+
+    /** What debug output prints for this attempt, without colours. Set by {@link Pattern.matchWithExplanation}. */
+    report?: string;
 }

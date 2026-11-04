@@ -91,10 +91,16 @@ It prints the pattern and the source with the mismatch marked, and how they diff
 `pattern({debug: true})` prints every attempt of one pattern, and `PATTERN_DEBUG=true` every attempt of every pattern. A visitor matches a pattern against every node of a kind, so a predicate can choose the attempts worth printing. It receives the node, its cursor and the attempt, including whether it matched:
 
 ```ts
+import {isMethodInvocation} from '@openrewrite/rewrite/java';
+import {capture, pattern} from '@openrewrite/rewrite/javascript';
+
+const value = capture('value');
 const pat = pattern({debug: tree => isMethodInvocation(tree) && tree.name.simpleName === 'stringify'})`JSON.stringify(${value}, null, 2)`;
 ```
 
-In a terminal that shows colours, the mismatch is in inverse video rather than between 👉 and 👈. `FORCE_COLOR` and `NO_COLOR` choose explicitly. `pat.matchWithExplanation(node, cursor)` returns the explanation instead of printing it, for a test to assert on.
+The attempt has a `location` too, so a predicate can pick a line: `(tree, cursor, attempt) => attempt.location?.line === 12`.
+
+In a terminal that shows colours, the mismatch is in inverse video rather than between 👉 and 👈. `FORCE_COLOR` and `NO_COLOR` choose explicitly. `pat.matchWithExplanation(node, cursor)` returns the explanation instead of printing it, and its `report` holds the printed text, for a test to assert on or use as an assertion message.
 
 ### When making changes to JavaScript code
 

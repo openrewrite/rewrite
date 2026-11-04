@@ -15,6 +15,7 @@
  */
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
+import {Cursor} from '../../../src';
 import {AnsiAwarePrintOutputCapture} from '../../../src/javascript/templating/debug';
 
 /**
@@ -346,7 +347,7 @@ describe('Pattern Debugging', () => {
             await parseExpression('arr.map(function (x) { return x * 2; })'), undefined!);
 
         expect(functionAttempt.explanation!.expected).toBe('arrow function (JS$ArrowFunction)');
-        expect(functionAttempt.explanation!.actual).toBe('function expression (JS$StatementExpression)');
+        expect(functionAttempt.explanation!.actual).toBe('function expression (J$MethodDeclaration)');
     });
 
     test('parentheses the pattern lacks mark both trees and say how to match them', async () => {
@@ -357,6 +358,34 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.FieldAccess);
         expect(attempt.explanation!.targetElement).toBe(node);
         expect(attempt.explanation!.details).toContain('write them in the pattern');
+    });
+
+    test('a receiver written another way says names match as written', async () => {
+        const pat = pattern`Object.assign({}, ${capture('a')})`;
+
+        const node = await parseExpression('globalThis.Object.assign({}, a)');
+
+        const attempt = await pat.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.expected).toBe('identifier (J$Identifier)');
+        expect(attempt.explanation!.details).toContain('as it is written');
+    });
+
+    test('an attempt says where its code is, and reports itself as printed text', async () => {
+        const gen = parser.parse({
+            text: `foo();
+console.error(42);`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const node = cu.statements[1].element;
+
+        const attempt = await pattern`console.log(42)`.matchWithExplanation(node, new Cursor(node, new Cursor(cu)));
+
+        expect(attempt.location).toEqual({sourcePath: 'test.ts', line: 2, column: 1});
+        expect(attempt.report).toContain('Source tree:');
+        expect(attempt.report).toContain('console.👉error👈(42)');
+        expect(attempt.report).not.toContain('\x1b');
     });
 
     test('two kinds with the same name in words show their operators', async () => {

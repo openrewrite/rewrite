@@ -22,12 +22,12 @@
  */
 
 import * as path from 'path';
-import {Cursor, isSourceFile, randomId, Tree} from '../..';
+import {Cursor, isSourceFile, randomId, SourceFile, Tree} from '../..';
 import {Marker, Markers, MarkersKind} from '../../markers';
 import {MarkerPrinter, PrintOutputCapture, TreePrinters} from '../../print';
 import {J, Type} from '../../java';
 import {JavaScriptVisitor, JS} from '../index';
-import {DebugCallbacks, PatternMatchingComparator} from './comparator';
+import {DebugCallbacks, Focus, MarkFocus, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, PlaceholderUtils} from './utils';
 import {MatchExplanation} from './types';
 import {JTree} from "../comparator";
@@ -112,30 +112,128 @@ export function callSite(stack: string | undefined): string | undefined {
     return `${path.relative(process.cwd(), file)}:${line}:${column}${fn ? ` (${fn})` : ''}`;
 }
 
-/** Prints only where the marked node starts, as a NUL character. */
-const POSITION_PRINTER: MarkerPrinter = {
-    beforeSyntax: marker => marker instanceof PatternMismatchMarker ? '\0' : '',
-    beforePrefix: () => '',
-    afterSyntax: () => ''
-};
+/** What a mismatch mark prints before and after the node it is on. */
+export function mismatchDelimiters(emoji: boolean = shouldUseEmoji()): [string, string] {
+    return emoji ? ['👉', '👈'] : ['\x1b[7m', '\x1b[27m'];
+}
+
+/** Marks where a tree starts, for {@link sourceLocation}. */
+class PositionMarker implements Marker {
+    readonly kind = 'org.openrewrite.javascript.templating.PositionMarker';
+    readonly id = randomId();
+
+    constructor(readonly index: number) {
+    }
+}
+
+const positionsBySourceFile = new WeakMap<object, Map<Tree, { line: number, column: number }>>();
+
+/** Where each tree of `sourceFile` starts, from one print of the file with every tree's start marked. */
+async function positionsIn(sourceFile: SourceFile): Promise<Map<Tree, { line: number, column: number }>> {
+    let positions = positionsBySourceFile.get(sourceFile);
+    if (positions) {
+        return positions;
+    }
+    const trees: Tree[] = [];
+    const marked = await new class extends JavaScriptVisitor<undefined> {
+        override async visit<R extends J>(tree: Tree | null | undefined, p: undefined): Promise<R | undefined> {
+            if (!tree) {
+                return tree as R | undefined;
+            }
+            const index = trees.push(tree) - 1;
+            const visited = await super.visit(tree, p) as J | undefined;
+            return visited && {
+                ...visited,
+                markers: {...visited.markers, markers: [...visited.markers.markers, new PositionMarker(index)]}
+            } as R;
+        }
+    }().visit(sourceFile as unknown as J, undefined);
+    const printed = await TreePrinters.printer(sourceFile).print(marked!, new PrintOutputCapture({
+        beforeSyntax: marker => marker instanceof PositionMarker ? `\0${marker.index}\0` : '',
+        beforePrefix: () => '',
+        afterSyntax: () => ''
+    }));
+    positions = new Map();
+    let line = 1;
+    let column = 1;
+    for (let i = 0; i < printed.length; i++) {
+        if (printed[i] === '\0') {
+            const end = printed.indexOf('\0', i + 1);
+            positions.set(trees[Number(printed.slice(i + 1, end))], {line, column});
+            i = end;
+        } else if (printed[i] === '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+    }
+    positionsBySourceFile.set(sourceFile, positions);
+    return positions;
+}
 
 /**
- * Where `tree` starts in the source file `cursor` leads to, as `path:line:column`. That is the path
- * alone where the file does not hold `tree` itself, as for a node a visitor built.
+ * The source file `cursor` leads to, and where `tree` starts in it. A file that does not hold
+ * `tree` itself, as for a node a visitor built, gives its path alone.
  */
-export async function sourcePosition(tree: J, cursor: Cursor | undefined): Promise<string | undefined> {
+export async function sourceLocation(tree: J, cursor: Cursor | undefined):
+    Promise<{ sourcePath: string, line?: number, column?: number } | undefined> {
     const sourceFile = isSourceFile(tree) ? tree : cursor?.firstEnclosing(isSourceFile);
     if (!sourceFile) {
         return undefined;
     }
-    const marked = await new ElementMarkerVisitor(tree).visit(sourceFile, undefined);
-    const printed = await TreePrinters.printer(sourceFile).print(marked!, new PrintOutputCapture(POSITION_PRINTER));
-    const offset = printed.indexOf('\0');
-    if (offset < 0) {
-        return sourceFile.sourcePath;
+    return {sourcePath: sourceFile.sourcePath, ...(await positionsIn(sourceFile)).get(tree)};
+}
+
+/**
+ * `printed` with the mark around `element`'s code moved to `focus` within that code. It stays as it
+ * is where the mark does not hold exactly what `element` prints on its own.
+ */
+export async function narrowMark(printed: string, element: J, focus: MarkFocus,
+                                 [before, after]: [string, string]): Promise<string> {
+    const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+    const code = (await printer.print(element)).trim();
+    const at = printed.indexOf(before + code + after);
+    let range: [number, number] | undefined;
+    if (focus === 'start') {
+        range = [0, 0];
+    } else if (focus === 'operator') {
+        range = await operatorRange(element, code);
+    } else {
+        const child = (await printer.print(focus.after)).trim();
+        const end = code.indexOf(child) + child.length;
+        range = child && end >= child.length ? [end, end] : undefined;
     }
-    const line = printed.slice(0, offset).split('\n').length;
-    return `${sourceFile.sourcePath}:${line}:${offset - printed.lastIndexOf('\n', offset - 1)}`;
+    if (at < 0 || !range) {
+        return printed;
+    }
+    const [start, end] = range;
+    return printed.slice(0, at) + code.slice(0, start) + before + code.slice(start, end) + after +
+        code.slice(end) + printed.slice(at + before.length + code.length + after.length);
+}
+
+/** The lines within one line of a mark, with `…` for each run of two or more lines left out. */
+export function aroundMarks(lines: string[], [before, after]: [string, string]): string[] {
+    let open = 0;
+    const marked = lines.map(line => {
+        const inside = open > 0 || line.includes(before) || line.includes(after);
+        open += line.split(before).length - line.split(after).length;
+        return inside;
+    });
+    if (!marked.includes(true)) {
+        return lines;
+    }
+    const kept = lines.map((_, i) => marked[i] || marked[i - 1] === true || marked[i + 1] === true);
+    const result: string[] = [];
+    for (let i = 0; i < lines.length;) {
+        let j = i;
+        while (j < lines.length && kept[j] === kept[i]) {
+            j++;
+        }
+        result.push(...(!kept[i] && j - i >= 2 ? ['…'] : lines.slice(i, j)));
+        i = j;
+    }
+    return result;
 }
 
 // ============================================================================
@@ -277,12 +375,12 @@ export class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
     /**
      * Create a visitor to mark a single element with a PatternMismatchMarker.
      */
-    constructor(targetElement: JTree);
+    constructor(targetElement: JTree, emoji?: boolean);
     /**
      * Create a visitor to mark multiple captured elements with CaptureHighlightMarkers.
      */
     constructor(captures: Map<number, JTree | JTree[]>);
-    constructor(targetOrCaptures: JTree | Map<number, JTree | JTree[]>) {
+    constructor(targetOrCaptures: JTree | Map<number, JTree | JTree[]>, emoji: boolean = shouldUseEmoji()) {
         super();
         this.elementMarkers = new Map();
 
@@ -301,7 +399,7 @@ export class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
             }
         } else {
             // Single element - create PatternMismatchMarker
-            const [before, after] = shouldUseEmoji() ? ['👉', '👈'] : ['\x1b[7m', '\x1b[27m'];
+            const [before, after] = mismatchDelimiters(emoji);
             this.elementMarkers.set(targetOrCaptures, new PatternMismatchMarker(before, after));
         }
     }
@@ -378,7 +476,9 @@ export async function describe(value: any): Promise<string> {
 
 /** A tree's kind in words, followed by its kind name, such as `arrow function (JS$ArrowFunction)`. */
 export function describeKind(tree: any): string {
-    return `${kindInWords(tree)} (${shortKind(tree)})`;
+    // A function written where an expression goes is held as a statement, which names its kind
+    const named = tree?.kind === JS.Kind.StatementExpression ? tree.statement : tree;
+    return `${kindInWords(tree)} (${shortKind(named)})`;
 }
 
 function shortKind(tree: any): string {
@@ -409,18 +509,32 @@ const PROPERTY_WORDS: Record<string, string> = {
  * Each operand prints at the start or the end of its operation, so what remains is the operator.
  */
 async function operatorOf(tree: any): Promise<string | undefined> {
+    const code = (await TreePrinters.printer(JS.Kind.CompilationUnit).print(tree)).trim();
+    const range = await operatorRange(tree, code);
+    return range ? code.slice(...range) : undefined;
+}
+
+/** Where the operator is in `code`, which is what `tree` prints. */
+async function operatorRange(tree: any, code: string): Promise<[number, number] | undefined> {
     const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-    let text = (await printer.print(tree)).trim();
+    let start = 0;
+    let end = code.length;
     const operands = [tree.left ?? tree.variable ?? tree.expression, tree.right ?? tree.assignment ?? tree.expression];
     for (const operand of operands) {
-        const code = operand ? (await printer.print(operand)).trim() : '';
-        if (code && text.startsWith(code)) {
-            text = text.slice(code.length);
-        } else if (code && text.endsWith(code)) {
-            text = text.slice(0, text.length - code.length);
+        const text = operand ? (await printer.print(operand)).trim() : '';
+        if (text && code.startsWith(text, start)) {
+            start += text.length;
+        } else if (text && code.slice(start, end).endsWith(text)) {
+            end -= text.length;
         }
     }
-    return text.trim() || undefined;
+    while (start < end && /\s/.test(code[start])) {
+        start++;
+    }
+    while (end > start && /\s/.test(code[end - 1])) {
+        end--;
+    }
+    return start < end ? [start, end] : undefined;
 }
 
 /** How the pattern's own text writes a capture, which the debug output shows as `🪝name`. */
@@ -520,9 +634,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     /** Records why matching failed, unless an earlier mismatch already did, and stops the match. */
     private fail<T>(t: T, reason: MatchExplanation['reason'], expected: string | Promise<string>,
                     actual: string | Promise<string>, details: string | undefined, patternElement: any,
-                    targetElement: any): T {
+                    targetElement: any, focus?: Focus): T {
         if (this.match) {
-            this.explain(reason, expected, actual, details, patternElement, targetElement);
+            this.explain(reason, expected, actual, details, patternElement, targetElement, focus);
         }
         this.match = false;
         return t;
@@ -530,9 +644,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
     private explain(reason: MatchExplanation['reason'], expected: string | Promise<string>,
                     actual: string | Promise<string>, details: string | undefined, patternElement: any,
-                    targetElement: any): void {
+                    targetElement: any, focus?: Focus): void {
         this.debug.setExplanation(reason, expected, actual, details,
-            this.markable(patternElement, this.cursor), this.markable(targetElement, this.targetCursor));
+            this.markable(patternElement, this.cursor), this.markable(targetElement, this.targetCursor), focus);
     }
 
     /** An abort that names no values leaves the explanation to the matcher's generic one. */
@@ -552,9 +666,13 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         if (kindInWords(pattern) === kindInWords(target) && (pattern as any)?.operator && target?.operator) {
             const describeOperator = async (tree: any) => `operator: ${await operatorOf(tree) ?? describeKind(tree)}`;
             return this.fail(pattern, 'kind-mismatch', describeOperator(pattern), describeOperator(target), undefined,
-                pattern, target);
+                pattern, target, {pattern: 'operator', target: 'operator'});
         }
-        return this.fail(pattern, 'kind-mismatch', describeKind(pattern), describeKind(target), undefined,
+        const names: string[] = [J.Kind.Identifier, J.Kind.FieldAccess];
+        const note = names.includes(pattern?.kind as string) && names.includes(target?.kind) ?
+            'A pattern matches a name as it is written, not what it refers to. ' +
+            'Write it as the source does, or put a capture in its place.' : undefined;
+        return this.fail(pattern, 'kind-mismatch', describeKind(pattern), describeKind(target), note,
             pattern, target);
     }
 
@@ -564,20 +682,37 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const expectedValue = propertyName ? at(pattern, propertyName) : pattern;
         const actualValue = propertyName ? at(target, propertyName) : target;
         const onlyOneSide = (expectedValue === undefined) !== (actualValue === undefined);
+        // The side without the property is marked where it would go
+        const missing = (node: any): MarkFocus | undefined =>
+            propertyName === 'typeParameters' && node?.name ? {after: node.name} :
+                propertyName === 'select' ? 'start' : undefined;
         return this.fail(pattern, 'structural-mismatch',
             this.describeProperty(propertyName, expectedValue), this.describeProperty(propertyName, actualValue),
-            undefined, onlyOneSide ? expectedValue ?? pattern : pattern, onlyOneSide ? actualValue ?? target : target);
+            undefined, onlyOneSide ? expectedValue ?? pattern : pattern, onlyOneSide ? actualValue ?? target : target,
+            onlyOneSide ? {
+                pattern: expectedValue === undefined ? missing(pattern) : undefined,
+                target: actualValue === undefined ? missing(target) : undefined
+            } : undefined);
     }
 
     protected override arrayLengthMismatch<T extends JTree>(propertyName: string): T {
         const pattern = this.cursor?.value as T;
         const target = this.targetCursor?.value as any;
-        const hint = this.propertyLabel(propertyName) === 'arguments' ?
+        const label = this.propertyLabel(propertyName);
+        const hint = label === 'arguments' ?
             'A capture matches one argument. capture({variadic: true}) matches any number of them.' : undefined;
+        const expected: any[] = at(pattern, propertyName) ?? [];
+        const actual: any[] = at(target, propertyName) ?? [];
+        // A modifier only one side has is marked, and the other side where it would go
+        const modifier = label === 'modifiers' && (expected.length === 0) !== (actual.length === 0);
         return this.fail(pattern, 'array-length-mismatch',
-            this.describeProperty(propertyName, at(pattern, propertyName)),
-            this.describeProperty(propertyName, at(target, propertyName)),
-            hint, pattern, target);
+            this.describeProperty(propertyName, expected), this.describeProperty(propertyName, actual), hint,
+            modifier && expected.length > 0 ? expected[0] : pattern,
+            modifier && actual.length > 0 ? actual[0] : target,
+            modifier ? {
+                pattern: expected.length === 0 ? 'start' : undefined,
+                target: actual.length === 0 ? 'start' : undefined
+            } : undefined);
     }
 
     protected override valueMismatch<T extends JTree>(propertyName?: string, expected?: any, actual?: any): T {
@@ -590,7 +725,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             const patternHolder = this.cursor?.parent?.value;
             const targetHolder = this.targetCursor?.parent?.value;
             return this.fail(pattern as T, 'value-mismatch', describeOperator(patternHolder, expected),
-                describeOperator(targetHolder, actual), undefined, patternHolder, targetHolder);
+                describeOperator(targetHolder, actual), undefined, patternHolder, targetHolder,
+                {pattern: 'operator', target: 'operator'});
         }
         const path = propertyName ? propertyName.split('.') : [];
 
@@ -610,7 +746,14 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const capture = Array.isArray(target) ?
             `variadic capture: ${marker.captureName} (${target.length} elements)` : `capture: ${marker.captureName}`;
         this.debug.log('debug', 'constraint', `Evaluating constraint for ${capture}`);
-        const satisfied = super.satisfiesConstraint(marker, patternElement, target, cursor);
+        let satisfied: boolean;
+        try {
+            satisfied = super.satisfiesConstraint(marker, patternElement, target, cursor);
+        } catch (e) {
+            const on = Array.isArray(target) ? `${target.length} elements` : describeKind(target);
+            const message = (e as Error)?.message ?? e;
+            throw new Error(`The constraint of capture ${marker.captureName} threw on ${on}: ${message}`);
+        }
         if (satisfied) {
             this.debug.log('debug', 'constraint', `Constraint passed for ${capture}`);
         } else {
