@@ -139,12 +139,12 @@ public class HostApiSurfaceTest : IDisposable
     }
 
     [Fact]
-    public void InstallRefusesAnIncompatibleRecipeAssembly()
+    public async Task InstallRefusesAnIncompatibleRecipeAssembly()
     {
         var server = new RewriteRpcServer(new RecipeMarketplace());
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            server.InstallRecipes(new InstallRecipesRequest { Recipes = _pluginDll }).GetAwaiter().GetResult());
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            server.InstallRecipes(new InstallRecipesRequest { Recipes = _pluginDll }));
 
         Assert.Equal(
             $"Recipe assembly {_pluginDll} cannot run on this Moderne CLI: Plugin was compiled against a different " +
