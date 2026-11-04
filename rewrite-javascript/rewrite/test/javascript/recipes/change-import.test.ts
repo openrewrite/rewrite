@@ -345,9 +345,16 @@ describe("change-import", () => {
             const names: (string | undefined)[][] = [];
             await withDir(async repo => {
                 await spec.rewriteRun(npm(repo.path, {
+                    //language=typescript
                     ...typescript(
-                        `import * as NS from "lodash";\nNS.extend({}, {});\nNS.flatten([[1]]);`,
-                        `import * as NS from "lodash";\nNS.assign({}, {});\nNS.flatten([[1]]);`
+                        `
+                        import * as NS from "lodash";
+                        NS.extend({}, {});
+                        NS.flatten([[1]]);`,
+                        `
+                        import * as NS from "lodash";
+                        NS.assign({}, {});
+                        NS.flatten([[1]]);`
                     ),
                     afterRecipe: async (cu: any) => {
                         await new class extends JavaScriptVisitor<any> {

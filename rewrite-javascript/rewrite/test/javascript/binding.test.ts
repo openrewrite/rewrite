@@ -3148,7 +3148,12 @@ describe("maybeRebind and the member's other spellings", () => {
     ])("a reassignable module object is left alone: %s", async declaration => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
-        await spec.rewriteRun(javascript(`${declaration}\nNS = {Old: () => 1};\nNS.Old();`));
+        //language=javascript
+        await spec.rewriteRun(javascript(`
+            ${declaration}
+            NS = {Old: () => 1};
+            NS.Old();
+        `));
     });
 
     test("the types naming a member moved only through a module object name it as a fresh parse of the result would", async () => {
@@ -3205,9 +3210,16 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a module object stays constant in a declaration list", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=javascript
         await spec.rewriteRun(javascript(
-            'const NS = require("m"), Other = require("other");\nNS.Old();\nOther.Old();',
-            'const NS = require("m"), Other = require("other");\nNS.New();\nOther.Old();'
+            `
+            const NS = require("m"), Other = require("other");
+            NS.Old();
+            Other.Old();`,
+            `
+            const NS = require("m"), Other = require("other");
+            NS.New();
+            Other.Old();`
         ));
     });
 
