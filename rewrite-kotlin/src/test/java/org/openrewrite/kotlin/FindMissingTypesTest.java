@@ -18,11 +18,15 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class FindMissingTypesTest implements RewriteTest {
@@ -88,5 +92,22 @@ class FindMissingTypesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void javaVarargsCalledFromKotlinAndJava() {
+        // The Kotlin and Java parsers of a mixed source set share one type cache, keyed by signature (as the
+        // Moderne CLI parses a source set). Kotlin maps java.lang.String through reflection, which gave
+        // String.format the Transient flag instead of Varargs, and the Java call String.format("%n") was
+        // reported as "argument count mismatch: 1 != 2".
+        JavaTypeCache cache = new JavaTypeCache();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("parse failed", t));
+        KotlinParser.builder().typeCache(cache).build()
+          .parse(ctx, "fun newline(): String = java.lang.String.format(\"%n\")").toList();
+        J.CompilationUnit java = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(cache).build()
+          .parse(ctx, "class A { String newline = String.format(\"%n\"); }").findFirst().orElseThrow();
+
+        assertThat(FindMissingTypes.findMissingTypes(java, false)).isEmpty();
     }
 }
