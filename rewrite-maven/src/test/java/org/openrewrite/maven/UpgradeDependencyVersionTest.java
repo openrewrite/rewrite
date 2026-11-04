@@ -3945,7 +3945,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             Files.createDirectories(parentDir);
             Files.writeString(parentDir.resolve("remote-parent-1.0.0.pom"), REMOTE_PARENT_POM);
 
-            return MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+            return MavenCentralMirrorExtension.withMavenCentralMirror(
               MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
                 .setLocalRepository(MavenRepository.builder()
                   .id("local")
