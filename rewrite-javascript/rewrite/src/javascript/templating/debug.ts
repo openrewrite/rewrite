@@ -378,11 +378,17 @@ export async function describe(value: any): Promise<string> {
 
 /** A tree's kind in words, followed by its kind name, such as `arrow function (JS$ArrowFunction)`. */
 function describeKind(tree: any): string {
-    const kind = tree?.kind ? tree.kind.substring(tree.kind.lastIndexOf('.') + 1) : 'unknown';
+    return `${kindInWords(tree)} (${shortKind(tree)})`;
+}
+
+function shortKind(tree: any): string {
+    return tree?.kind ? tree.kind.substring(tree.kind.lastIndexOf('.') + 1) : 'unknown';
+}
+
+function kindInWords(tree: any): string {
     // A function written where an expression goes is held as a statement
-    const words = tree?.kind === JS.Kind.StatementExpression && tree.statement?.kind === J.Kind.MethodDeclaration ?
-        'function expression' : inWords(kind.replace(/^[A-Za-z]+\$/, '').replace(/\$/g, ' '));
-    return `${words} (${kind})`;
+    return tree?.kind === JS.Kind.StatementExpression && tree.statement?.kind === J.Kind.MethodDeclaration ?
+        'function expression' : inWords(shortKind(tree).replace(/^[A-Za-z]+\$/, '').replace(/\$/g, ' '));
 }
 
 function inWords(name: string): string {
@@ -541,7 +547,13 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
     protected override kindMismatch<T extends JTree>(): T {
         const pattern = this.cursor?.value as T;
-        const target = this.targetCursor?.value as JTree;
+        const target = this.targetCursor?.value as any;
+        // Operations of one name in words, such as JavaScript's `===` and Java's `-`, differ in their operators
+        if (kindInWords(pattern) === kindInWords(target) && (pattern as any)?.operator && target?.operator) {
+            const describeOperator = async (tree: any) => `operator: ${await operatorOf(tree) ?? describeKind(tree)}`;
+            return this.fail(pattern, 'kind-mismatch', describeOperator(pattern), describeOperator(target), undefined,
+                pattern, target);
+        }
         return this.fail(pattern, 'kind-mismatch', describeKind(pattern), describeKind(target), undefined,
             pattern, target);
     }

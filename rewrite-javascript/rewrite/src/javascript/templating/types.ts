@@ -795,16 +795,10 @@ export interface MatchExplanation {
      */
     actual: string;
 
-    /**
-     * The actual pattern element that failed to match.
-     * Used for debug visualization - attach markers to this element.
-     */
+    /** The pattern node where the pattern and the source differ, which debug output marks. */
     patternElement?: any;
 
-    /**
-     * The actual target element that failed to match.
-     * Used for debug visualization - attach markers to this element.
-     */
+    /** The source node where the pattern and the source differ, which debug output marks. */
     targetElement?: any;
 
     /**

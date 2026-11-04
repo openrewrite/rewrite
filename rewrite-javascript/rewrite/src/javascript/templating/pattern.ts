@@ -156,7 +156,8 @@ export class PatternBuilder {
 }
 
 /**
- * Represents a pattern that can be matched against AST nodes.
+ * Represents a pattern that can be matched against AST nodes. Where it does not match code you
+ * expected it to, {@link Pattern.match} with `{debug: true}` prints why, as {@link PatternOptions.debug} describes.
  */
 export class Pattern {
     private _options: PatternOptions = {};
@@ -229,6 +230,10 @@ export class Pattern {
      *         context: ['import { forwardRef } from "react"'],
      *         dependencies: {'@types/react': '^18.0.0'}
      *     })
+     *
+     * @example
+     * // Print why each match attempt of this pattern matched or not
+     * pat.configure({debug: true})
      */
     configure(options: PatternOptions): Pattern {
         this._options = {...this._options, ...options};
@@ -307,12 +312,14 @@ export class Pattern {
     }
 
     /**
-     * Creates a matcher for this pattern against a specific AST node.
+     * Matches this pattern against `tree`, returning what its captures hold, or `undefined` where it
+     * does not match. To see why it does not match, pass `{debug: true}`, or a predicate that picks
+     * the attempts to print, as {@link PatternOptions.debug} describes.
      *
      * @param tree The AST node to match against
      * @param cursor Cursor at the node's position in a larger tree. Used for context-aware
      *               capture constraints to navigate to parent nodes.
-     * @param options Optional match options (e.g., debug flag)
+     * @param options Optional match options, such as `debug`
      * @returns A MatchResult if the pattern matches, undefined otherwise
      *
      * @example
@@ -320,8 +327,8 @@ export class Pattern {
      * // Normal match
      * const match = await pattern.match(node, cursor);
      *
-     * // Debug this specific call
-     * const match = await pattern.match(node, cursor, { debug: true });
+     * // Print why this attempt matched or not
+     * const match = await pattern.match(node, cursor, {debug: true});
      * ```
      */
     async match(tree: J, cursor: Cursor, options?: MatchOptions): Promise<MatchResult | undefined> {
@@ -481,11 +488,10 @@ export class Pattern {
      * const pat = pattern`console.log(${x})`;
      * const attempt = await pat.matchWithExplanation(node, cursor);
      * if (attempt.matched) {
-     *     console.log('Matched!');
      *     console.log('Captured x:', attempt.result.get('x'));
      * } else {
-     *     console.log('Failed:', attempt.explanation);
-     *     console.log('Debug log:', attempt.debugLog);
+     *     const {reason, expected, actual} = attempt.explanation!;
+     *     console.log(`${reason}: the pattern has ${expected} where the source has ${actual}`);
      * }
      */
     async matchWithExplanation(
@@ -679,7 +685,8 @@ class Matcher {
             if (this.debugOptions.enabled) {
                 this.setExplanation('kind-mismatch', 'an expression without parentheses',
                     `parentheses (${this.ast.kind.split('.').pop()})`,
-                    'The expression the parentheses hold is matched on its own', this.patternAst, this.ast);
+                    'A visitor reaches the expression inside the parentheses next, where this pattern can match it. ' +
+                    'To match the parentheses too, write them in the pattern.', this.patternAst, this.ast);
             }
             return false;
         }
@@ -1058,7 +1065,8 @@ export function pattern(strings: TemplateStringsArray, ...captures: (Capture | A
  *
  * @example
  * ```typescript
- * const pat = pattern({ debug: true })`console.log(${x})`;
+ * // Prints why each match attempt matched or not, as PatternOptions.debug describes
+ * const pat = pattern({debug: true})`console.log(${x})`;
  * ```
  */
 export function pattern(options: PatternOptions): (strings: TemplateStringsArray, ...captures: (Capture | Any<any> | RawCode | string)[]) => Pattern;

@@ -123,6 +123,10 @@ class RewriteRuleImpl implements RewriteRule {
 /**
  * Creates a replacement rule using a capture context and configuration.
  *
+ * To see why a rule does not apply where you expected it to, create its `before` pattern with
+ * `pattern({debug: true})`, or set PATTERN_DEBUG=true for every pattern. Each match attempt then
+ * prints why it matched or not, as `PatternOptions.debug` describes.
+ *
  * @param builderFn Function that takes a capture context and returns before/after configuration
  * @returns A replacement rule that can be applied to AST nodes
  *

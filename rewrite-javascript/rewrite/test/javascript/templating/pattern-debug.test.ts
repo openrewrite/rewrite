@@ -349,13 +349,23 @@ describe('Pattern Debugging', () => {
         expect(functionAttempt.explanation!.actual).toBe('function expression (JS$StatementExpression)');
     });
 
-    test('parentheses the pattern lacks mark both trees', async () => {
+    test('parentheses the pattern lacks mark both trees and say how to match them', async () => {
         const node = await parseExpression('(a.b)');
 
         const attempt = await pattern`a.b`.matchWithExplanation(node, undefined!);
 
         expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.FieldAccess);
         expect(attempt.explanation!.targetElement).toBe(node);
+        expect(attempt.explanation!.details).toContain('write them in the pattern');
+    });
+
+    test('two kinds with the same name in words show their operators', async () => {
+        const pat = pattern`${capture('l')} === ${capture('r')}`;
+
+        const attempt = await pat.matchWithExplanation(await parseExpression('x - y'), undefined!);
+
+        expect(attempt.explanation!.expected).toBe('operator: ===');
+        expect(attempt.explanation!.actual).toBe('operator: -');
     });
 
     test('inverse video over several lines starts each line at its code', () => {
