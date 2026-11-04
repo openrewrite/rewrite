@@ -1512,6 +1512,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: undefined,
                 namedBindings: namespaceBinding
             };
@@ -1535,6 +1536,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: rightPadded(defaultName, singleSpace),
                 namedBindings: undefined
             };
@@ -1567,6 +1569,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: undefined,
                 namedBindings: namedImports
             };
