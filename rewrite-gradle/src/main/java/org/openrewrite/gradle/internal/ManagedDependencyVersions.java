@@ -94,7 +94,7 @@ public class ManagedDependencyVersions {
     }
 
     private void collectSpringPluginManaged(JavaSourceFile buildScript, ExecutionContext ctx) {
-        if (gradleProject.getPlugins().stream().noneMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+        if (!SpringBomProperty.isPluginApplied(gradleProject)) {
             return;
         }
         String springBootVersion = Optional.ofNullable(getSpringBootVersionFromPlugin()).orElseGet(() ->

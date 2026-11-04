@@ -62,9 +62,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     private final MavenMetadataFailures metadataFailures;
 
     @Nullable
-    private String resolvedVersion;
-
-    @Nullable
     private final Predicate<Cursor> insertPredicate;
 
     @Nullable
@@ -95,17 +92,17 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             isKotlinDsl = sourceFile instanceof K.CompilationUnit;
-            resolvedVersion = null;
+            String resolvedVersion = null;
             String managedVersion = null;
             if (version != null) {
                 if (version.startsWith("$")) {
                     resolvedVersion = version;
                 } else {
-                    managedVersion = dependencyModifier == null ?
+                    String managed = dependencyModifier == null ?
                             ManagedDependencyVersions.of(sourceFile, gradleProject, ctx).getManagedVersion(configuration, groupId, artifactId, classifier) :
                             null;
                     VersionComparator versionComparator = Semver.validate(version, versionPattern).getValue();
-                    if (managedVersion == null || versionComparator == null || !versionComparator.isValid(null, managedVersion)) {
+                    if (managed == null || versionComparator == null || !versionComparator.isValid(null, managed)) {
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
@@ -114,11 +111,10 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                         }
                     }
                     // A managed version as new as the selected one makes an explicit version redundant
-                    if (managedVersion != null && (resolvedVersion == null ||
-                            new Version(managedVersion).compareTo(new Version(resolvedVersion)) >= 0)) {
+                    if (managed != null && (resolvedVersion == null ||
+                            new Version(managed).compareTo(new Version(resolvedVersion)) >= 0)) {
+                        managedVersion = managed;
                         resolvedVersion = null;
-                    } else {
-                        managedVersion = null;
                     }
                 }
             }

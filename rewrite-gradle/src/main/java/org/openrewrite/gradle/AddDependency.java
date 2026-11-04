@@ -363,19 +363,21 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         if (familyPattern == null) {
             return null;
         }
-        String familyVersion = null;
+        Version familyVersion = null;
         for (GradleDependencyConfiguration c : gp.getConfigurations()) {
             if (!c.isCanBeResolved()) {
                 continue;
             }
             for (ResolvedDependency d : c.getResolved()) {
-                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern) &&
-                        (familyVersion == null || new Version(d.getVersion()).compareTo(new Version(familyVersion)) > 0)) {
-                    familyVersion = d.getVersion();
+                if (StringUtils.matchesGlob(d.getGroupId(), familyPattern)) {
+                    Version v = new Version(d.getVersion());
+                    if (familyVersion == null || v.compareTo(familyVersion) > 0) {
+                        familyVersion = v;
+                    }
                 }
             }
         }
-        return familyVersion;
+        return familyVersion == null ? null : familyVersion.toString();
     }
 
     private UpgradeDependencyVersion upgradeDependencyVersion() {
@@ -397,12 +399,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             return;
         }
         GradleProject gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
-        // Upgrading to the requested version would break alignment with the family
-        if (gradleProject == null || familyVersion(gradleProject) != null) {
+        if (gradleProject == null) {
             return;
         }
         for (GradleDependencyConfiguration c : gradleProject.getConfigurations()) {
             if (c.findRequestedDependency(groupId, artifactId) != null) {
+                // Upgrading to the requested version would break alignment with the family
+                if (familyVersion(gradleProject) != null) {
+                    return;
+                }
                 Path dir = sourceFile.getSourcePath().getParent();
                 acc.declaringProjectDirs.put(dir == null ? Paths.get("") : dir,
                         sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null));
