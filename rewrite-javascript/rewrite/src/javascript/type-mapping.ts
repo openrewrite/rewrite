@@ -712,7 +712,8 @@ export class JavaScriptTypeMapping {
         node = this.unparenthesized(node);
         if (ts.isAwaitExpression(node)) {
             const call = this.unparenthesized(node.expression);
-            return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword ?
+            return ts.isCallExpression(call) &&
+                (call.expression.kind === ts.SyntaxKind.ImportKeyword || this.isImportDefer(call.expression)) ?
                 this.moduleSpecifierArgument(call) : undefined;
         }
         return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require' ?
