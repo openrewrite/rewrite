@@ -87,7 +87,15 @@ public final class GradleProjectBuilder {
                         new ArrayList<>(pluginRepositories),
                         GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
                 ),
-                springDependencyManagementPlugin(project));
+                springDependencyManagementPlugin(project),
+                buildFilePath(project));
+    }
+
+    /**
+     * Relative rather than absolute so the build machine's layout does not leak into the LST.
+     */
+    private static String buildFilePath(Project project) {
+        return project.getProjectDir().toPath().relativize(project.getBuildFile().toPath()).toString();
     }
 
     // Reflective because OpenRewrite depends on neither plugin, and null when anything is unavailable so that
