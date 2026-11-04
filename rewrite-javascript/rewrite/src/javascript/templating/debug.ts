@@ -54,8 +54,7 @@ export class PatternMismatchMarker implements Marker {
 }
 
 /**
- * Custom marker for highlighting captures in successful pattern matches.
- * Contains the capture number (0-10) which is rendered as a numbered emoji.
+ * Marks the code a capture holds in a successful match, with a circled letter for the capture's number.
  */
 export class CaptureHighlightMarker implements Marker {
     readonly kind = 'org.openrewrite.javascript.templating.CaptureHighlightMarker';
@@ -68,13 +67,10 @@ export class CaptureHighlightMarker implements Marker {
         this.id = id || randomId();
     }
 
-    /**
-     * Gets the emoji representation for this capture number.
-     * Supports 0-10 using keycap emojis.
-     */
-    getEmoji(): string {
-        const emojis = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-        return emojis[this.captureNumber] || `[${this.captureNumber}]`;
+    /** Ⓐ for the first capture through Ⓩ for the 26th, and the number in brackets after that. */
+    symbol(): string {
+        return this.captureNumber >= 1 && this.captureNumber <= 26 ?
+            String.fromCodePoint(0x24B6 + this.captureNumber - 1) : `[${this.captureNumber}]`;
     }
 }
 
@@ -156,7 +152,7 @@ export const PATTERN_DEBUG_MARKER_PRINTER: MarkerPrinter = {
             return marker.before;
         }
         if (marker instanceof CaptureHighlightMarker) {
-            return marker.getEmoji() + '';
+            return marker.symbol();
         }
         return MarkerPrinter.DEFAULT.beforeSyntax(marker, cursor, commentWrapper);
     },
@@ -170,7 +166,7 @@ export const PATTERN_DEBUG_MARKER_PRINTER: MarkerPrinter = {
             return marker.after;
         }
         if (marker instanceof CaptureHighlightMarker) {
-            return marker.getEmoji() + '';
+            return marker.symbol();
         }
         return MarkerPrinter.DEFAULT.afterSyntax(marker, cursor, commentWrapper);
     }
@@ -362,7 +358,7 @@ function at(node: any, path: string | undefined): any {
 }
 
 /** The code `value` stands for, as one line, or "none" where there is none. */
-async function describe(value: any): Promise<string> {
+export async function describe(value: any): Promise<string> {
     const elements = Array.isArray(value) ? value :
         value?.kind === J.Kind.Container ? value.elements :
             value === undefined || value === null ? [] : [value];
@@ -378,6 +374,47 @@ async function describe(value: any): Promise<string> {
         }
     }
     return printed.length > 0 ? printed.join(', ') : 'none';
+}
+
+/** A tree's kind in words, followed by its kind name, such as `arrow function (JS$ArrowFunction)`. */
+function describeKind(tree: any): string {
+    const kind = tree?.kind ? tree.kind.substring(tree.kind.lastIndexOf('.') + 1) : 'unknown';
+    // A function written where an expression goes is held as a statement
+    const words = tree?.kind === JS.Kind.StatementExpression && tree.statement?.kind === J.Kind.MethodDeclaration ?
+        'function expression' : inWords(kind.replace(/^[A-Za-z]+\$/, '').replace(/\$/g, ' '));
+    return `${words} (${kind})`;
+}
+
+function inWords(name: string): string {
+    return name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
+/** Properties whose names say something other than what TypeScript calls them where they appear. */
+const PROPERTY_WORDS: Record<string, string> = {
+    [`${J.Kind.MethodInvocation}.typeParameters`]: 'type arguments',
+    [`${JS.Kind.FunctionCall}.typeParameters`]: 'type arguments',
+    [`${J.Kind.NewClass}.typeParameters`]: 'type arguments',
+    [`${JS.Kind.ImportClause}.name`]: 'default import',
+    [`${JS.Kind.ImportClause}.namedBindings`]: 'named imports'
+};
+
+/**
+ * The code `tree` writes besides its operands, such as the `+` of a binary or the `!` of a unary.
+ * Each operand prints at the start or the end of its operation, so what remains is the operator.
+ */
+async function operatorOf(tree: any): Promise<string | undefined> {
+    const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
+    let text = (await printer.print(tree)).trim();
+    const operands = [tree.left ?? tree.variable ?? tree.expression, tree.right ?? tree.assignment ?? tree.expression];
+    for (const operand of operands) {
+        const code = operand ? (await printer.print(operand)).trim() : '';
+        if (code && text.startsWith(code)) {
+            text = text.slice(code.length);
+        } else if (code && text.endsWith(code)) {
+            text = text.slice(0, text.length - code.length);
+        }
+    }
+    return text.trim() || undefined;
 }
 
 /** How the pattern's own text writes a capture, which the debug output shows as `🪝name`. */
@@ -440,17 +477,19 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return propertyName ? `${this.propertyLabel(propertyName)}: ${await describe(value)}` : describe(value);
     }
 
-    /** The last name in a property path, or for a container's `elements`, the name its owner holds it under. */
-    private propertyLabel(propertyName: string): string {
-        const container = this.cursor?.value;
-        const owner = this.cursor?.parent?.value;
-        if (propertyName === 'elements' && container?.kind === J.Kind.Container && owner) {
-            const holder = Object.keys(owner).find(key => owner[key] === container);
-            if (holder) {
-                return holder;
-            }
+    /**
+     * The property in words: the last name in its path, or for a container's `elements` or a padded
+     * value, the name its owner holds it under.
+     */
+    private propertyLabel(propertyName: string | undefined): string {
+        let owner = this.cursor?.value;
+        let name = propertyName?.replace(/\[\d+]$/, '').split('.').pop();
+        const wrapper = this.cursor?.value;
+        if (propertyName === undefined || propertyName === 'elements' && wrapper?.kind === J.Kind.Container) {
+            owner = this.cursor?.parent?.value;
+            name = owner ? Object.keys(owner).find(key => owner[key] === wrapper) : undefined;
         }
-        return propertyName.replace(/\[\d+]$/, '').split('.').pop()!;
+        return name ? PROPERTY_WORDS[`${owner?.kind}.${name}`] ?? inWords(name) : 'value';
     }
 
     /**
@@ -474,7 +513,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
     /** Records why matching failed, unless an earlier mismatch already did, and stops the match. */
     private fail<T>(t: T, reason: MatchExplanation['reason'], expected: string | Promise<string>,
-                    actual: string | Promise<string>, details: string, patternElement: any, targetElement: any): T {
+                    actual: string | Promise<string>, details: string | undefined, patternElement: any,
+                    targetElement: any): T {
         if (this.match) {
             this.explain(reason, expected, actual, details, patternElement, targetElement);
         }
@@ -483,7 +523,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     }
 
     private explain(reason: MatchExplanation['reason'], expected: string | Promise<string>,
-                    actual: string | Promise<string>, details: string, patternElement: any, targetElement: any): void {
+                    actual: string | Promise<string>, details: string | undefined, patternElement: any,
+                    targetElement: any): void {
         this.debug.setExplanation(reason, expected, actual, details,
             this.markable(patternElement, this.cursor), this.markable(targetElement, this.targetCursor));
     }
@@ -493,7 +534,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         if (reason && (expected !== undefined || actual !== undefined)) {
             return this.fail(t, reason as MatchExplanation['reason'],
                 this.formatValue(expected), this.formatValue(actual),
-                'Property values do not match', this.cursor?.value, this.targetCursor?.value);
+                undefined, this.cursor?.value, this.targetCursor?.value);
         }
         return super.abort(t, reason, propertyName, expected, actual);
     }
@@ -501,8 +542,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     protected override kindMismatch<T extends JTree>(): T {
         const pattern = this.cursor?.value as T;
         const target = this.targetCursor?.value as JTree;
-        return this.fail(pattern, 'kind-mismatch', this.formatKind(pattern?.kind), this.formatKind(target?.kind),
-            'Node kinds differ', pattern, target);
+        return this.fail(pattern, 'kind-mismatch', describeKind(pattern), describeKind(target), undefined,
+            pattern, target);
     }
 
     protected override structuralMismatch<T extends JTree>(propertyName?: string): T {
@@ -513,22 +554,32 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const onlyOneSide = (expectedValue === undefined) !== (actualValue === undefined);
         return this.fail(pattern, 'structural-mismatch',
             this.describeProperty(propertyName, expectedValue), this.describeProperty(propertyName, actualValue),
-            onlyOneSide ? `Only one side has ${propertyName}` : `${propertyName} differs`,
-            onlyOneSide ? expectedValue ?? pattern : pattern, onlyOneSide ? actualValue ?? target : target);
+            undefined, onlyOneSide ? expectedValue ?? pattern : pattern, onlyOneSide ? actualValue ?? target : target);
     }
 
     protected override arrayLengthMismatch<T extends JTree>(propertyName: string): T {
         const pattern = this.cursor?.value as T;
         const target = this.targetCursor?.value as any;
+        const hint = this.propertyLabel(propertyName) === 'arguments' ?
+            'A capture matches one argument. capture({variadic: true}) matches any number of them.' : undefined;
         return this.fail(pattern, 'array-length-mismatch',
             this.describeProperty(propertyName, at(pattern, propertyName)),
             this.describeProperty(propertyName, at(target, propertyName)),
-            `Array length mismatch in ${propertyName}`, pattern, target);
+            hint, pattern, target);
     }
 
     protected override valueMismatch<T extends JTree>(propertyName?: string, expected?: any, actual?: any): T {
         const pattern = this.cursor?.value as any;
         const target = this.targetCursor?.value as any;
+        const padded = pattern?.kind === J.Kind.LeftPadded || pattern?.kind === J.Kind.RightPadded;
+        if (!propertyName && padded && typeof expected === 'string') {
+            const label = this.propertyLabel(undefined);
+            const describeOperator = async (tree: any, value: string) => `${label}: ${await operatorOf(tree) ?? value}`;
+            const patternHolder = this.cursor?.parent?.value;
+            const targetHolder = this.targetCursor?.parent?.value;
+            return this.fail(pattern as T, 'value-mismatch', describeOperator(patternHolder, expected),
+                describeOperator(targetHolder, actual), undefined, patternHolder, targetHolder);
+        }
         const path = propertyName ? propertyName.split('.') : [];
 
         // The mismatch shows on the node holding the property, and a call's method type on the call's name
@@ -539,8 +590,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return this.fail(pattern as T, 'value-mismatch',
             describeValue(expected !== undefined ? expected : at(pattern, propertyName)),
             describeValue(actual !== undefined ? actual : at(target, propertyName)),
-            'Property values do not match',
-            at(pattern, holder), at(target, holder));
+            undefined, at(pattern, holder), at(target, holder));
     }
 
     protected override satisfiesConstraint(marker: CaptureMarker, patternElement: JTree, target: J | J[],
@@ -556,7 +606,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             if (this.match) {
                 const constraint = String(marker.constraint).split('\n')[0];
                 this.explain('constraint-failed', `${placeholder(marker)} satisfying ${constraint}`, describe(target),
-                    'Constraint evaluation returned false', patternElement,
+                    undefined, patternElement,
                     Array.isArray(target) && target.length !== 1 ? this.targetCursor?.value : [target].flat()[0]);
             }
         }

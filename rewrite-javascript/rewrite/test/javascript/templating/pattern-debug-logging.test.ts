@@ -51,7 +51,7 @@ describe('Pattern Debug Logging', () => {
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
         expect(calls.some(c => c.includes("Captures:"))).toBe(true);
-        expect(calls.some(c => c.includes("= 🪝value"))).toBe(true);
+        expect(calls.some(c => c.includes("🪝value = 42"))).toBe(true);
     });
 
     test('pattern-level debug: pattern({ debug: true })', async () => {
@@ -113,25 +113,6 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
 
-    test('logs failure with path and explanation', async () => {
-        const value = capture('value');
-        const pat = pattern`console.log(${value})`;
-        // Use console.error instead - should not match
-        const node = await parseExpression('console.error(42)');
-
-        const match = await pat.match(node, undefined!, { debug: true });
-
-        expect(match).toBeUndefined();
-        expect(consoleErrorSpy).toHaveBeenCalled();
-
-        const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        expect(calls.some(c => c.includes('❌ FAILED matching against'))).toBe(true);
-        // At path may or may not appear depending on where mismatch occurred
-        expect(calls.some(c => c.includes('Reason:'))).toBe(true);
-        expect(calls.some(c => c.includes('Expected:'))).toBe(true);
-        expect(calls.some(c => c.includes('Actual:'))).toBe(true);
-    });
-
     test('pattern source includes capture names', async () => {
         const x = capture('x');
         const y = capture('y');
@@ -180,16 +161,22 @@ describe('Pattern Debug Logging', () => {
         expect(lines[heading + 1]).toMatch(/called from \S*pattern-debug-logging\.test\.ts:\d+:\d+/);
     });
 
-    test('captures past the tenth are numbered alike in the tree and the legend', async () => {
-        const c = 'abcdefghijk'.split('').map(name => capture(name));
-        const pat = pattern({debug: true})
-            `f(${c[0]}, ${c[1]}, ${c[2]}, ${c[3]}, ${c[4]}, ${c[5]}, ${c[6]}, ${c[7]}, ${c[8]}, ${c[9]}, ${c[10]})`;
+    test('the legend names each capture with the code it holds', async () => {
+        const pat = pattern({debug: true})`JSON.stringify(${capture('value')}, ${capture({variadic: true})})`;
 
-        await pat.match(await parseExpression('f(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)'), undefined!);
+        await pat.match(await parseExpression('JSON.stringify(user, null, 2)'), undefined!);
 
         const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
-        expect(lines.some(line => line.includes('[11]11[11])'))).toBe(true);
-        expect(lines.some(line => line.endsWith('[11] = 🪝k'))).toBe(true);
+        expect(lines.some(line => line.endsWith('JSON.stringify(ⒶuserⒶ, ⒷnullⒷ, Ⓑ2Ⓑ)'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Ⓐ 🪝value = user'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Ⓑ 🪝1 = null, 2'))).toBe(true);
+    });
+
+    test('an argument count mismatch suggests a variadic capture', async () => {
+        await pattern`foo(${capture('a')})`.match(await parseExpression('foo(1, 2)'), undefined!, {debug: true});
+
+        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+        expect(lines.some(line => line.includes('Note:') && line.includes('capture({variadic: true})'))).toBe(true);
     });
 
     test('NO_COLOR asks for markers, and FORCE_COLOR for colours even then', () => {
@@ -237,7 +224,7 @@ describe('Pattern Debug Logging', () => {
         expect(calls.some(c => c.includes("Captures:"))).toBe(true);
     });
 
-    test('shows matched tree with mismatch highlighted', async () => {
+    test('prints a failure with both trees and how they differ', async () => {
         const x = capture('x');
         const y = capture('y');
         const pat = pattern({ debug: true })`${x} + ${y}`;
@@ -251,11 +238,12 @@ describe('Pattern Debug Logging', () => {
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
 
-        // Should show matched tree and mismatch reason
-        expect(calls.some(c => c.includes('Matched tree'))).toBe(true);
-        expect(calls.some(c => c.includes('Reason:'))).toBe(true);
-        expect(calls.some(c => c.includes('Expected:'))).toBe(true);
-        expect(calls.some(c => c.includes('Actual:'))).toBe(true);
+        const lines: string[] = calls.flatMap(c => c.split('\n'));
+        expect(lines.some(line => line.includes('❌ FAILED matching against J$Binary'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Source tree:'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Reason:   value-mismatch'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Pattern:  operator: +'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Source:   operator: -'))).toBe(true);
     });
 
     test('prints the matched tree without the whitespace before it', async () => {
@@ -272,7 +260,7 @@ describe('Pattern Debug Logging', () => {
 
         const calls: string[] = consoleErrorSpy.mock.calls.map(c => c[0]);
         const lines = calls.flatMap(c => c.split('\n'));
-        const header = lines.findIndex(line => line.includes('Matched tree'));
+        const header = lines.findIndex(line => line.includes('Source tree'));
         expect(lines[header + 1]).toMatch(/\] {7}console\./);
     });
 });

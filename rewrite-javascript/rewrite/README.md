@@ -60,6 +60,43 @@ Nodes with no type attribution (a recipe gated on one of these cannot fire):
 
 To see what a recipe's output carries, call `printTypes` from a spec's `afterRecipe` hook. From code, `printTypes(sourceFile)` writes the same listing, `buildTypeReport(sourceFile)` returns it as data, and `new LstDebugPrinter({includeTypes: true})` adds types to the tree view.
 
+### Debugging patterns
+
+When a `pattern` doesn't match code you expected it to, `match()` returns `undefined`. Pass `{debug: true}` to see why:
+
+```ts
+const match = await pat.match(node, this.cursor, {debug: true});
+```
+
+It prints the pattern and the source with the mismatch marked, and how they differ:
+
+```
+[Pattern #1] ${🪝req}.map(${🪝r} => ${🪝r}.json())
+[Pattern #1] ❌ FAILED matching against J$MethodInvocation at source-0.ts:2:16
+[Pattern #1]    called from test/my-recipe.test.ts:16:27 (JavaScriptVisitor.visitMethodInvocation)
+[Pattern #1]    (Mismatched elements are marked with 👉...👈)
+[Pattern #1]
+[Pattern #1]    Pattern tree:
+[Pattern #1]       🪝req.map(🪝r => 👉🪝r👈.json())
+[Pattern #1]
+[Pattern #1]    Source tree:
+[Pattern #1]       req.map(res => 👉other👈.json())
+[Pattern #1]
+[Pattern #1]    Details:
+[Pattern #1]      Reason:   value-mismatch
+[Pattern #1]      Pattern:  res (what 🪝r holds already)
+[Pattern #1]      Source:   other
+[Pattern #1]      Note:     A capture the pattern names twice binds the same code at both places
+```
+
+`pattern({debug: true})` prints every attempt of one pattern, and `PATTERN_DEBUG=true` every attempt of every pattern. A visitor matches a pattern against every node of a kind, so a predicate can choose the attempts worth printing. It receives the node, its cursor and the attempt, including whether it matched:
+
+```ts
+const pat = pattern({debug: tree => isMethodInvocation(tree) && tree.name.simpleName === 'stringify'})`JSON.stringify(${value}, null, 2)`;
+```
+
+In a terminal that shows colours, the mismatch is in inverse video rather than between 👉 and 👈. `FORCE_COLOR` and `NO_COLOR` choose explicitly. `pat.matchWithExplanation(node, cursor)` returns the explanation instead of printing it, for a test to assert on.
+
 ### When making changes to JavaScript code
 
 You can run this command from rewrite/ directory to build the JavaScript code. A

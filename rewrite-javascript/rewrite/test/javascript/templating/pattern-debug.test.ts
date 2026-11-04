@@ -251,8 +251,8 @@ describe('Pattern Debugging', () => {
 
         const attempt = await pat.matchWithExplanation(node, undefined!);
 
-        expect(attempt.explanation!.expected).toBe('"Addition"');
-        expect(attempt.explanation!.actual).toBe('"Subtraction"');
+        expect(attempt.explanation!.expected).toBe('operator: +');
+        expect(attempt.explanation!.actual).toBe('operator: -');
         expect(attempt.explanation!.targetElement).toBe(node);
     });
 
@@ -282,8 +282,8 @@ describe('Pattern Debugging', () => {
         const attempt = await pat.matchWithExplanation(node, undefined!);
 
         expect(attempt.explanation!.reason).toBe('structural-mismatch');
-        expect(attempt.explanation!.expected).toBe('typeParameters: number');
-        expect(attempt.explanation!.actual).toBe('typeParameters: none');
+        expect(attempt.explanation!.expected).toBe('type arguments: number');
+        expect(attempt.explanation!.actual).toBe('type arguments: none');
         expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.Container);
         expect(attempt.explanation!.targetElement).toBe(node);
     });
@@ -294,8 +294,8 @@ describe('Pattern Debugging', () => {
         const attempt = await pat.matchWithExplanation(await parseExpression(`import _ from 'lodash';`), undefined!);
 
         expect(attempt.explanation!.reason).toBe('structural-mismatch');
-        expect(attempt.explanation!.expected).toBe('name: none');
-        expect(attempt.explanation!.actual).toBe('name: _');
+        expect(attempt.explanation!.expected).toBe('default import: none');
+        expect(attempt.explanation!.actual).toBe('default import: _');
     });
 
     test('a capture that backtracking rebinds does not hide the mismatch after it', async () => {
@@ -334,12 +334,19 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.actual).toBe('statements: foo()');
     });
 
-    test('a kind mismatch names both kinds', async () => {
+    test('a kind mismatch names both kinds in words', async () => {
         const attempt = await pattern`42`.matchWithExplanation(await parseExpression('x'), undefined!);
 
         expect(attempt.explanation!.reason).toBe('kind-mismatch');
-        expect(attempt.explanation!.expected).toBe('J$Literal');
-        expect(attempt.explanation!.actual).toBe('J$Identifier');
+        expect(attempt.explanation!.expected).toBe('literal (J$Literal)');
+        expect(attempt.explanation!.actual).toBe('identifier (J$Identifier)');
+
+        const arrow = pattern`${capture('arr')}.map(${capture('x')} => ${capture('body')})`;
+        const functionAttempt = await arrow.matchWithExplanation(
+            await parseExpression('arr.map(function (x) { return x * 2; })'), undefined!);
+
+        expect(functionAttempt.explanation!.expected).toBe('arrow function (JS$ArrowFunction)');
+        expect(functionAttempt.explanation!.actual).toBe('function expression (JS$StatementExpression)');
     });
 
     test('parentheses the pattern lacks mark both trees', async () => {

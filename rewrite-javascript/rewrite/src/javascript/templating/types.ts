@@ -733,7 +733,6 @@ export interface RewriteConfig {
 
 /**
  * Options for debugging pattern matching.
- * Used in Layer 1 (Core Instrumentation) to control debug output.
  */
 export interface DebugOptions {
     /**
@@ -754,7 +753,6 @@ export interface DebugOptions {
 
 /**
  * A single debug log entry collected during pattern matching.
- * Part of Layer 1 (Core Instrumentation).
  */
 export interface DebugLogEntry {
     /**
@@ -780,7 +778,6 @@ export interface DebugLogEntry {
 
 /**
  * Detailed explanation of why a pattern failed to match.
- * Built by Layer 1 (Core Instrumentation) and exposed by Layer 2 (API).
  */
 export interface MatchExplanation {
     /**
@@ -851,7 +848,6 @@ export interface MatchResult {
 
 /**
  * Result of a pattern match attempt with debug information.
- * Part of Layer 2 (Public API).
  */
 export interface MatchAttemptResult {
     /**

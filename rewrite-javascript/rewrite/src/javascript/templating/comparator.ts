@@ -28,7 +28,6 @@ import {CAPTURE_NAME_SYMBOL} from './capture';
 /**
  * Debug callbacks for pattern matching.
  * These are always used together - either all present or all absent.
- * Part of Layer 1 (Core Instrumentation).
  */
 export interface DebugCallbacks {
     log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => void;
@@ -60,7 +59,6 @@ export interface MatcherState {
 
 /**
  * Callbacks for the matcher (debug and capture handling).
- * Part of Layer 1 (Core Instrumentation).
  */
 export interface MatcherCallbacks {
     handleCapture: (capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>) => Promise<boolean>;

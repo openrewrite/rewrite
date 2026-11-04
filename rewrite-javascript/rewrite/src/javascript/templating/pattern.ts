@@ -46,6 +46,7 @@ import {
     callSite,
     CaptureHighlightMarker,
     DebugPatternMatchingComparator,
+    describe,
     ElementMarkerVisitor,
     PATTERN_DEBUG_MARKER_PRINTER,
     shouldUseEmoji,
@@ -370,9 +371,11 @@ export class Pattern {
             const legend: string[] = [];
             for (const [name, value] of result.storage as Map<string, CaptureStorageValue>) {
                 const number = captures.size + 1;
-                captures.set(number, result.extractElements(value));
+                const code = result.extractElements(value);
+                captures.set(number, code);
                 const displayName = this.unnamedCaptureMapping.get(name) ?? name;
-                legend.push(`${prefix}     ${new CaptureHighlightMarker(number).getEmoji()} = 🪝${displayName}`);
+                const symbol = new CaptureHighlightMarker(number).symbol();
+                legend.push(`${prefix}     ${symbol} 🪝${displayName} = ${await describe(code)}`);
             }
             lines.push(...(await this.printMarked(tree, captures)).map(line => `${prefix}   ${line}`));
             if (legend.length > 0) {
@@ -388,13 +391,14 @@ export class Pattern {
                 printed.map(line => `${color}${prefix}       ${line}${reset}`);
             lines.push(prefix, `${green}${prefix}    Pattern tree:${reset}`,
                 ...colored(await this.printMarked(patternAst, explanation?.patternElement), green),
-                prefix, `${red}${prefix}    Matched tree:${reset}`,
+                prefix, `${red}${prefix}    Source tree:${reset}`,
                 ...colored(await this.printMarked(tree, explanation?.targetElement), red));
             if (explanation) {
                 lines.push(prefix, `${prefix}    Details:`,
                     `${prefix}      Reason:   ${explanation.reason}`,
-                    `${prefix}      Expected: ${explanation.expected}`,
-                    `${prefix}      Actual:   ${explanation.actual}`);
+                    `${prefix}      Pattern:  ${explanation.expected}`,
+                    `${prefix}      Source:   ${explanation.actual}`,
+                    ...(explanation.details ? [`${prefix}      Note:     ${explanation.details}`] : []));
             }
         }
         console.error(lines.join('\n'));
@@ -629,7 +633,7 @@ class Matcher {
     private readonly storage = new Map<string, CaptureStorageValue>();
     private patternAst?: J;
 
-    // Debug tracking (Layer 1: Core Instrumentation)
+    // Debug tracking
     private readonly debugOptions: DebugOptions;
     private readonly debugLog: DebugLogEntry[] = [];
     private explanation?: PendingExplanation;
@@ -673,8 +677,8 @@ class Matcher {
         if ((this.ast.kind === J.Kind.Parentheses || this.ast.kind === J.Kind.ControlParentheses) &&
             this.patternAst.kind !== this.ast.kind) {
             if (this.debugOptions.enabled) {
-                this.setExplanation('kind-mismatch', 'An expression without parentheses',
-                    `Parentheses (${this.ast.kind.split('.').pop()})`,
+                this.setExplanation('kind-mismatch', 'an expression without parentheses',
+                    `parentheses (${this.ast.kind.split('.').pop()})`,
                     'The expression the parentheses hold is matched on its own', this.patternAst, this.ast);
             }
             return false;
@@ -743,7 +747,6 @@ class Matcher {
 
     /**
      * Logs a debug message if debugging is enabled.
-     * Part of Layer 1 (Core Instrumentation).
      *
      * @param level The severity level
      * @param scope The scope/category
@@ -773,7 +776,6 @@ class Matcher {
     /**
      * Sets the explanation for why the pattern match failed.
      * Only sets the first failure (most relevant).
-     * Part of Layer 1 (Core Instrumentation).
      *
      * @param reason The reason for failure
      * @param expected Human-readable description of what was expected
@@ -824,7 +826,7 @@ class Matcher {
             getCapture: (name: string) => this.storage.get(name),
             saveState: () => this.saveState(),
             restoreState: (state) => this.restoreState(state),
-            // Debug callbacks (Layer 1) - grouped together, always present or absent
+            // Debug callbacks, all present or all absent
             debug: this.debugOptions.enabled ? {
                 log: (level: DebugLogEntry['level'], scope: DebugLogEntry['scope'], message: string, data?: any) => this.log(level, scope, message, data),
                 setExplanation: (reason: MatchExplanation['reason'], expected: string | Promise<string>,
@@ -993,7 +995,6 @@ class Matcher {
 
     /**
      * Gets the debug log entries collected during matching.
-     * Part of Layer 2 (Public API).
      *
      * @returns The debug log entries, or undefined if debug wasn't enabled
      */
