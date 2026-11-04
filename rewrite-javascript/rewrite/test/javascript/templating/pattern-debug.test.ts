@@ -15,6 +15,7 @@
  */
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
+import {AnsiAwarePrintOutputCapture} from '../../../src/javascript/templating/debug';
 
 /**
  * Tests for the debug system.
@@ -286,6 +287,33 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.reason).toBe('structural-mismatch');
         expect(attempt.explanation!.expected).toBe('typeParameters');
         expect(attempt.explanation!.actual).toBe('none');
+        expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.Container);
+        expect(attempt.explanation!.targetElement).toBe(node);
+    });
+
+    test('a kind mismatch names both kinds', async () => {
+        const attempt = await pattern`42`.matchWithExplanation(await parseExpression('x'), undefined!);
+
+        expect(attempt.explanation!.reason).toBe('kind-mismatch');
+        expect(attempt.explanation!.expected).toBe('J$Literal');
+        expect(attempt.explanation!.actual).toBe('J$Identifier');
+    });
+
+    test('parentheses the pattern lacks mark both trees', async () => {
+        const node = await parseExpression('(a.b)');
+
+        const attempt = await pattern`a.b`.matchWithExplanation(node, undefined!);
+
+        expect(attempt.explanation!.patternElement.kind).toBe(J.Kind.FieldAccess);
+        expect(attempt.explanation!.targetElement).toBe(node);
+    });
+
+    test('inverse video over several lines starts each line at its code', () => {
+        const out = new AnsiAwarePrintOutputCapture();
+
+        out.append('foo\x1b[7m(1,\n    2)\x1b[27m');
+
+        expect(out.out).toBe('foo\x1b[7m(1,\x1b[27m\n    \x1b[7m2)\x1b[27m');
     });
 
     test('multi-line element pattern matching works correctly', async () => {

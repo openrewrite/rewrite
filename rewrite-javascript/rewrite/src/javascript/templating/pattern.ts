@@ -45,6 +45,7 @@ import {
     AnsiAwarePrintOutputCapture,
     DebugPatternMatchingComparator,
     ElementMarkerVisitor,
+    mismatchDelimiters,
     PATTERN_DEBUG_MARKER_PRINTER,
     shouldUseEmoji
 } from './debug';
@@ -58,6 +59,22 @@ import {JavaScriptSemanticComparatorVisitor, JTree} from '../comparator';
  */
 function layOut(printed: string): string {
     return dedent(printed.replace(/^\s*\n/, '')).trimEnd();
+}
+
+/**
+ * The code between the mismatch markers of a printed tree. Its first line keeps the column it
+ * starts at while the lines are dedented, so the lines after it keep their indentation relative to it.
+ */
+function markedPart(printed: string): string | undefined {
+    const [before, after] = mismatchDelimiters();
+    const start = printed.indexOf(before);
+    const end = printed.lastIndexOf(after);
+    if (start < 0 || end < start) {
+        return undefined;
+    }
+    const column = Array.from(printed.slice(printed.lastIndexOf('\n', start) + 1, start)).length;
+    const part = ' '.repeat(column) + printed.slice(start + before.length, end).replace(/\x1b\[\d*m/g, '');
+    return dedent(part).trimStart();
 }
 
 /**
@@ -519,63 +536,14 @@ export class Pattern {
                 lines.push(`[${patternId}]      Expected: ${explanation.expected}`);
                 lines.push(`[${patternId}]      Actual:   ${explanation.actual}`);
 
-                // Print mismatched subtrees if available
-                if (explanation.patternElement || explanation.targetElement) {
-                    // Helper to print an element (handles both regular elements and Containers)
-                    const printElement = async (element: any, label: string): Promise<void> => {
-                        try {
-                            const printer = TreePrinters.printer(JS.Kind.CompilationUnit);
-
-                            // Check if this is a Container - if so, print its elements
-                            const kind = (element as any)?.kind;
-                            if (kind === 'org.openrewrite.java.tree.JContainer') {
-                                const container = element as J.Container<J>;
-                                if (container.elements && container.elements.length > 0) {
-                                    const elementStrs = await Promise.all(
-                                        container.elements.map(async (padded) => {
-                                            // Create fresh output capture for each element
-                                            const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
-                                            const subtree = await printer.print(padded.element, output);
-                                            return subtree.trim();
-                                        })
-                                    );
-                                    let subtreeStr = elementStrs.join(', ');
-                                    subtreeStr = this.replacePlaceholderNames(subtreeStr);
-                                    lines.push(`[${patternId}]      ${label}:  (${subtreeStr})`);
-                                } else {
-                                    lines.push(`[${patternId}]      ${label}:  ()`);
-                                }
-                            } else {
-                                // Regular element
-                                const output = new AnsiAwarePrintOutputCapture(PATTERN_DEBUG_MARKER_PRINTER);
-                                let subtreeStr = await printer.print(element, output);
-                                subtreeStr = layOut(this.replacePlaceholderNames(subtreeStr));
-
-                                // Calculate proper indentation to align continuation lines
-                                // Pattern is: "[Pattern #2]      Label:  content"
-                                // So continuation lines should start at position of "content"
-                                const patternPrefix = `[${patternId}]      `;
-                                const labelPrefix = `${label}:  `;
-                                const firstLinePrefix = patternPrefix + labelPrefix;
-                                const continuationPrefix = patternPrefix + ' '.repeat(labelPrefix.length);
-
-                                // Apply prefixes using prefixLines utility
-                                const prefixedStr = prefixLines(subtreeStr, continuationPrefix, firstLinePrefix);
-                                lines.push(prefixedStr);
-                            }
-                        } catch (e) {
-                            lines.push(`[${patternId}]      ${label}:  (unable to print: ${e})`);
-                        }
-                    };
-
-                    // Print pattern subtree
-                    if (explanation.patternElement) {
-                        await printElement(explanation.patternElement, 'Pattern');
-                    }
-
-                    // Print target subtree
-                    if (explanation.targetElement) {
-                        await printElement(explanation.targetElement, 'Matched');
+                for (const [label, printed] of [['Pattern', patternTreeStr], ['Matched', matchedTreeStr]]) {
+                    const part = markedPart(printed);
+                    if (part !== undefined) {
+                        // Continuation lines align under the first, after "[Pattern #2]      Label:  "
+                        const patternPrefix = `[${patternId}]      `;
+                        const labelPrefix = `${label}:  `;
+                        const continuationPrefix = patternPrefix + ' '.repeat(labelPrefix.length);
+                        lines.push(prefixLines(part, continuationPrefix, patternPrefix + labelPrefix));
                     }
                 }
             }
@@ -918,7 +886,7 @@ class Matcher {
             if (this.debugOptions.enabled) {
                 this.setExplanation('kind-mismatch', 'An expression without parentheses',
                     `Parentheses (${this.ast.kind.split('.').pop()})`,
-                    'The expression the parentheses hold is matched on its own');
+                    'The expression the parentheses hold is matched on its own', this.patternAst, this.ast);
             }
             return false;
         }
@@ -1091,7 +1059,9 @@ class Matcher {
                 'structural-mismatch',
                 `Pattern node of type ${patternKind}`,
                 `Target node of type ${targetKind}`,
-                'Nodes did not match structurally'
+                'Nodes did not match structurally',
+                pattern,
+                target
             );
         }
 

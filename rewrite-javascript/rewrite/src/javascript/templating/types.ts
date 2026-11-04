@@ -367,8 +367,8 @@ export interface PatternOptions {
 
     /**
      * Enable debug logging for this pattern.
-     * When enabled, all match attempts will log detailed information to stderr,
-     * including the AST path traversed, mismatches encountered, and captured values.
+     * When enabled, every match attempt logs to stderr. A failed one prints the pattern and the matched
+     * tree with the mismatch marked and says why they differ. A successful one marks the captured code.
      *
      * Can be overridden at the match() call level.
      * Global debug can be enabled via PATTERN_DEBUG=true environment variable.

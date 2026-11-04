@@ -116,6 +116,11 @@ export function shouldUseEmoji(): boolean {
     return true;
 }
 
+/** What a mismatch marker prints before and after the mismatched node. */
+export function mismatchDelimiters(): [string, string] {
+    return shouldUseEmoji() ? ['👉', '👈'] : ['\x1b[7m', '\x1b[27m'];
+}
+
 // ============================================================================
 // Marker Printer
 // ============================================================================
@@ -155,18 +160,14 @@ export const PATTERN_DEBUG_MARKER_PRINTER: MarkerPrinter = {
 // ============================================================================
 
 /**
- * A print output capture that tracks active ANSI escape codes and reapplies them
- * after newlines to ensure multi-line elements maintain their styling.
- *
- * This is necessary because ANSI escape codes like \x1b[7m (inverted colors) don't
- * persist across newlines - each line needs to be individually styled.
+ * A print output capture that closes active ANSI escape codes at each newline and resumes them at the
+ * next line's first non-blank character. Each line of debug output is then styled on its own, and its
+ * indentation stays unstyled so that it can be dedented.
  */
 export class AnsiAwarePrintOutputCapture extends PrintOutputCapture {
     private activeAnsiCodes: string[] = [];
+    private resumePending = false;
 
-    /**
-     * Appends text, tracking ANSI escape codes and reapplying them after newlines.
-     */
     override append(text: string | undefined): AnsiAwarePrintOutputCapture {
         if (!text || text.length === 0) {
             return this;
@@ -209,22 +210,23 @@ export class AnsiAwarePrintOutputCapture extends PrintOutputCapture {
             // Check for newline
             if (text[i] === '\n') {
                 // First, close any active ANSI codes before the newline
-                for (let j = this.activeAnsiCodes.length - 1; j >= 0; j--) {
+                for (let j = this.activeAnsiCodes.length - 1; j >= 0 && !this.resumePending; j--) {
                     if (this.activeAnsiCodes[j] === '\x1b[7m') {
                         super.append('\x1b[27m');
                     }
                 }
 
-                // Add the newline
                 super.append('\n');
+                this.resumePending = this.activeAnsiCodes.length > 0;
+                i++;
+                continue;
+            }
 
-                // Reapply active ANSI codes after the newline
+            if (this.resumePending && text[i] !== ' ' && text[i] !== '\t') {
                 for (const code of this.activeAnsiCodes) {
                     super.append(code);
                 }
-
-                i++;
-                continue;
+                this.resumePending = false;
             }
 
             // Regular character
@@ -278,9 +280,7 @@ export class ElementMarkerVisitor extends JavaScriptVisitor<undefined> {
             }
         } else {
             // Single element - create PatternMismatchMarker
-            const useEmoji = shouldUseEmoji();
-            const before = useEmoji ? '👉' : '\x1b[7m';
-            const after = useEmoji ? '👈' : '\x1b[27m';
+            const [before, after] = mismatchDelimiters();
             this.elementMarkers.set(targetOrCaptures, new PatternMismatchMarker(before, after));
         }
     }
@@ -453,8 +453,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
     protected override kindMismatch<T extends JTree>(): T {
         const pattern = this.cursor?.value as T;
         const target = this.targetCursor?.value as JTree;
-        // Pass the full kind strings - formatValue() will detect and format them
-        return this.abort(pattern, 'kind-mismatch', 'kind', this.formatKind(pattern?.kind), this.formatKind(target?.kind)) as T;
+        return this.fail(pattern, 'kind-mismatch', this.formatKind(pattern?.kind), this.formatKind(target?.kind),
+            'Node kinds differ', pattern, target);
     }
 
     protected override structuralMismatch<T extends JTree>(propertyName: string): T {
@@ -466,7 +466,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             return this.fail(pattern, 'structural-mismatch',
                 expectedValue === undefined ? 'none' : propertyName,
                 actualValue === undefined ? 'none' : propertyName,
-                `Only one side has ${propertyName}`, pattern, target);
+                `Only one side has ${propertyName}`, expectedValue ?? pattern, actualValue ?? target);
         }
         return this.abort(pattern, 'structural-mismatch', propertyName, expectedValue, actualValue) as T;
     }
@@ -542,7 +542,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
 
         const kindStr = this.formatKind(j.kind);
         if (j.kind !== other.kind) {
-            return this.abort(j, 'kind-mismatch', 'kind', kindStr, this.formatKind(other.kind));
+            return this.fail(j, 'kind-mismatch', kindStr, this.formatKind(other.kind), 'Node kinds differ', j, other);
         }
 
         for (const key of Object.keys(j)) {

@@ -143,6 +143,24 @@ describe('Pattern Debug Logging', () => {
         expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{🪝x\}, \$\{🪝y\}\)/))).toBe(true);
     });
 
+    test('details show the marked part of each tree as it is written', async () => {
+        const pat = pattern`useState<number>(${capture('x')})`;
+
+        await pat.match(await parseExpression('useState(0)'), undefined!, {debug: true});
+
+        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+        expect(lines.some(line => line.endsWith('Pattern:  <number>'))).toBe(true);
+        expect(lines.some(line => line.endsWith('Matched:  useState(0)'))).toBe(true);
+    });
+
+    test('details keep the lines of a marked part where they stand relative to its first', async () => {
+        await pattern`foo(${capture('a')})`.match(await parseExpression('foo(1,\n    2)'), undefined!, {debug: true});
+
+        const lines: string[] = consoleErrorSpy.mock.calls.flatMap(c => c[0].split('\n'));
+        const first = lines.findIndex(line => line.endsWith('Matched:  (1,'));
+        expect(lines[first + 1]).toMatch(/\] {17}2\)$/);
+    });
+
     test('an unnamed capture named twice keeps one number', async () => {
         const args = capture({variadic: true});
         const pat = pattern({debug: true})`f(${args}) || g(${args})`;
