@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
@@ -567,6 +568,57 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               tasks.named<JavaCompile>("compileJava") {
                   options.release.set(11)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              ext.versions = [java: JavaVersion.VERSION_17]
+
+              java {
+                  sourceCompatibility = versions.java
+                  targetCompatibility = project.ext.versions.java
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(versions.java.majorVersion)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAloneInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null))
+            .typeValidationOptions(TypeValidation.none()),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              object Versions {
+                  val java = JavaVersion.VERSION_17
+              }
+
+              java {
+                  sourceCompatibility = Versions.java
+                  targetCompatibility = Versions.java
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+                  }
               }
               """
           )
