@@ -35,6 +35,8 @@ from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_a
                                          referenced_names)
 from rewrite.python.tree import CompilationUnit, ExpressionStatement, MultiImport, Shebang
 from rewrite.python.visitor import PythonVisitor
+from rewrite.tree import PrintOutputCapture
+from rewrite.visitor import Cursor
 
 
 def _is_module_docstring(padded_stmts: list) -> bool:
@@ -321,7 +323,7 @@ class AddImport(PythonVisitor):
         else:
             placement = None
             if first_import is not None:
-                placement = self._place_in_sections(cu, padded_stmts[first_import:insert_idx], first_import)
+                placement = self._place_in_sections(cu, padded_stmts, first_import, insert_idx)
             # A future import must precede every statement but the header, where isort adds a file's first
             # import too. An existing `from __future__ import` takes the new name instead.
             if (first_import is None or self.module == '__future__') and header < len(padded_stmts) \
@@ -342,24 +344,29 @@ class AddImport(PythonVisitor):
 
         return cu.padding.replace(_statements=padded_stmts)
 
-    def _place_in_sections(self, cu: CompilationUnit, block: list, offset: int) -> Optional['_Placement']:
-        """Where the new import goes when `block` is laid out in isort's sections: future, standard
-        library, third party and local, each a run of imports separated from the next by a blank line,
-        in that order. None where the imports are laid out otherwise, or are one run that shows no layout."""
+    def _place_in_sections(self, cu: CompilationUnit, padded_stmts: list, start: int,
+                           end: int) -> Optional['_Placement']:
+        """Where the new import goes when the imports `padded_stmts[start:end]` are laid out in isort's sections:
+        future, standard library, third party and local, each a run of imports separated from the next by a blank
+        line, in that order. None where they are laid out otherwise, or are one run that shows no layout."""
+        if not any(_BLANK_LINE.search(_text_of(padded_stmts[i].element.prefix)) for i in range(start + 1, end)):
+            return None
+        # isort never moves an import across the end of a block, and the imports after it may rely on that order.
+        block = _last_isort_block(cu, padded_stmts, start, end)
+        if not block:
+            return None
         # First-party packages sit in the project root or its `src` directory, isort's default `src_paths`.
         directories = Path(str(cu.source_path)).parts[:-1]
         local_roots = {directories[0]} if directories else set()
         local_roots.update(directories[i + 1] for i, directory in enumerate(directories[:-1]) if directory == 'src')
         groups: list[list[int]] = []
-        for i, padded in enumerate(block):
-            if not groups or _BLANK_LINE.search(_text_of(padded.element.prefix)):
+        for i in block:
+            if not groups or _BLANK_LINE.search(_text_of(padded_stmts[i].element.prefix)):
                 groups.append([])
-            groups[-1].append(offset + i)
-        if len(groups) < 2:
-            return None
+            groups[-1].append(i)
         sections = []
         for group in groups:
-            in_group = {_section(_module_of(block[i - offset].element), local_roots) for i in group}
+            in_group = {_section(_module_of(padded_stmts[i].element), local_roots) for i in group}
             if len(in_group) != 1:
                 return None
             sections.append(in_group.pop())
@@ -373,11 +380,11 @@ class AddImport(PythonVisitor):
             # A section can hold its `import m` and `from m import n` statements in separate runs, and either
             # kind in several.
             runs = [group for group in own
-                    if all(_isort_key(block[i - offset].element)[0] == key[0] for i in group)]
-            group = next((run for run in reversed(runs) if _isort_key(block[run[0] - offset].element) <= key),
+                    if all(_isort_key(padded_stmts[i].element)[0] == key[0] for i in group)]
+            group = next((run for run in reversed(runs) if _isort_key(padded_stmts[run[0]].element) <= key),
                          runs[0] if runs else own[0])
             for i in group:
-                if key < _isort_key(block[i - offset].element):
+                if key < _isort_key(padded_stmts[i].element):
                     return _Placement(i, after=False, new_group=False)
             return _Placement(group[-1], after=True, new_group=False)
         earlier = [group for group, group_section in zip(groups, sections) if group_section < section]
@@ -387,6 +394,43 @@ class AddImport(PythonVisitor):
 
 
 _BLANK_LINE = re.compile(r'\n[ \t\r\f]*\n')
+_SKIP = re.compile(r'isort: ?skip')
+_SKIP_FILE = re.compile(r'isort: ?skip_file')
+
+
+def _last_isort_block(cu: CompilationUnit, padded_stmts: list, start: int, end: int) -> list[int]:
+    """The last of the blocks isort sorts apart among the imports `padded_stmts[start:end]`. A block ends at a
+    `# isort: split` comment and at an import isort leaves in place."""
+    if _SKIP_FILE.search(cu.print_all()):
+        return []
+    cursor = Cursor(Cursor(None, Cursor.ROOT_VALUE), cu)
+    block: list[int] = []
+    off = False
+    for i in range(start, end):
+        for comment in padded_stmts[i].element.prefix.comments:
+            action = comment.text.strip()
+            if action == 'isort: off':
+                off = True
+            elif action == 'isort: on':
+                off = False
+            elif action == 'isort: split':
+                block = []
+        following = padded_stmts[i + 1].element.prefix if i + 1 < len(padded_stmts) else cu.eof
+        if off or _is_skipped(padded_stmts[i].element, following, cursor):
+            block = []
+        else:
+            block.append(i)
+    return block
+
+
+def _is_skipped(statement: J, following: Space, cursor: Cursor) -> bool:
+    """Whether `# isort: skip` ends the first line of `statement`, the line isort and ruff both read it on.
+    The comment ending a one-line statement opens `following`, the space after the statement."""
+    text = statement.replace(prefix=Space.EMPTY).print(cursor, PrintOutputCapture(0))
+    first_line = re.split(r'[\r\n]', text, maxsplit=1)[0]
+    if first_line == text and following.comments and not re.search(r'[\r\n]', following.whitespace):
+        first_line += '#' + following.comments[0].text
+    return bool(_SKIP.search(first_line))
 
 
 class _Section(IntEnum):
@@ -484,13 +528,14 @@ def _respace(cu: CompilationUnit, padded_stmts: list, at: int, change: Callable[
 
 def _split_attached_comments(space: Space) -> tuple[Space, list]:
     """`space` up to the comment lines directly above the statement it precedes, and those comments.
-    As in isort, such a comment moves with the statement."""
+    As in isort, such a comment moves with the statement. An isort action comment stays where it is."""
     comments = space.comments
     attached = len(comments)
     while attached > 0:
         before = comments[attached - 2].suffix if attached > 1 else space.whitespace
         on_own_line = '\n' in before or '\r' in before
-        if _BLANK_LINE.search(comments[attached - 1].suffix) or not on_own_line:
+        is_action = comments[attached - 1].text.strip().startswith('isort:')
+        if _BLANK_LINE.search(comments[attached - 1].suffix) or not on_own_line or is_action:
             break
         attached -= 1
     return Space(comments[:attached], space.whitespace), comments[attached:]
