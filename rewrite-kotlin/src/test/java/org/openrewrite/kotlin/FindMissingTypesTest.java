@@ -97,10 +97,7 @@ class FindMissingTypesTest implements RewriteTest {
     @SuppressWarnings("deprecation")
     @Test
     void javaVarargsCalledFromKotlinAndJava() {
-        // The Kotlin and Java parsers of a mixed source set share one type cache, keyed by signature (as the
-        // Moderne CLI parses a source set). Kotlin maps java.lang.String through reflection, which gave
-        // String.format the Transient flag instead of Varargs, and the Java call String.format("%n") was
-        // reported as "argument count mismatch: 1 != 2".
+        // Kotlin maps String.format through reflection into the type cache it shares with the Java parser
         JavaTypeCache cache = new JavaTypeCache();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("parse failed", t));
         KotlinParser.builder().typeCache(cache).build()
