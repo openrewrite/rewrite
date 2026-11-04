@@ -41,15 +41,14 @@ import static java.util.Collections.emptyList;
  * Versions a build script manages through a Gradle {@code platform}/{@code enforcedPlatform} or the Spring
  * dependency management plugin.
  */
-@Getter
 public class ManagedDependencyVersions {
     private final GradleProject gradleProject;
 
-    /**
-     * Platforms by the configuration declaring them.
-     */
+    // Platforms by the configuration declaring them
+    @Getter
     private final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
 
+    @Getter
     private final Map<GroupArtifact, @Nullable String> springPluginManaged = new HashMap<>();
 
     private ManagedDependencyVersions(GradleProject gradleProject) {
