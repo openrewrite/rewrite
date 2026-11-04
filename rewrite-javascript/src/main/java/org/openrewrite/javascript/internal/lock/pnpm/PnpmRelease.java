@@ -126,6 +126,85 @@ public final class PnpmRelease {
                              "from " + major + "." + minor + "." + patch + " install it otherwise than those before");
     }
 
+    /**
+     * pnpm 11 moved non-network settings from npm-conf's .npmrc files to pnpm-workspace.yaml.
+     */
+    boolean readsSettingsFromNpmrc() {
+        return !atLeast(11, 0, 0);
+    }
+
+    /**
+     * pnpm 11 removed package.json's pnpm settings and Yarn resolutions. pnpm 10's
+     * config/config src/getOptionsFromRootManifest.ts reads them before the workspace's settings.
+     */
+    boolean readsSettingsFromRootManifest() {
+        return !atLeast(11, 0, 0);
+    }
+
+    /**
+     * General settings in pnpm-workspace.yaml are read from 10.5.0; before, only packages and catalogs.
+     */
+    boolean readsSettingsFromWorkspaceManifest() {
+        return atLeast(10, 5, 0);
+    }
+
+    /**
+     * pnpm 11 defaults minimumReleaseAge to one day; pnpm 10 leaves it unset (the resolver uses zero).
+     */
+    boolean defaultsToOneDayReleaseAge() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#9950).
+     */
+    boolean fetchesFullMetadataForOptionalDependencies() {
+        return atLeast(10, 28, 2);
+    }
+
+    /**
+     * package-requester seeds the preferred version from currentPkg from 10.12.1.
+     */
+    boolean prefersTheCurrentPackageVersion() {
+        return atLeast(10, 12, 1);
+    }
+
+    /**
+     * resolveRootDependencies passes the workspace root's providers to hoistPeers from 10.15.0.
+     */
+    boolean hoistsPeersFromTheWorkspaceRoot() {
+        return atLeast(10, 15, 0);
+    }
+
+    /**
+     * hoistPeers reads a weighted preferred selector's type and omits a null maximum from 10.33.0.
+     */
+    boolean readsWeightedRequiredPeerSelectors() {
+        return atLeast(10, 33, 0);
+    }
+
+    /**
+     * pnpm 11 weights versions from the existing lock above direct dependency selectors. pnpm 10 keeps each
+     * locked version as the bare selector type, without increasing an existing selector's weight.
+     */
+    boolean weightsLockedPreferredVersions() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * Dot-prefixed workspace manifest misspellings are detected from 10.29.0.
+     */
+    boolean detectsDotPrefixedWorkspaceManifests() {
+        return atLeast(10, 29, 0);
+    }
+
+    /**
+     * pnpm 10 bundles @yarnpkg/extensions 2.0.3; pnpm 11's compatibility database is 2.0.6.
+     */
+    boolean usesCompatibilityDatabase206() {
+        return atLeast(11, 0, 0);
+    }
+
     // @pnpm/lockfile.utils src/toLockfileResolution.ts and pkgSnapshotToResolution.ts, @pnpm/lockfile.fs
     // src/lockfileFormatConverters.ts
 
@@ -143,7 +222,7 @@ public final class PnpmRelease {
      * give is kept in the lock, from 11.0.8 (pnpm/pnpm#11276); before, the resolution is the integrity alone.
      */
     boolean keepsATarballUrlTheRegistryCannotGive() {
-        return atLeast(11, 0, 8);
+        return !atLeast(11, 0, 0) || atLeast(11, 0, 8);
     }
 
     /**
@@ -969,6 +1048,13 @@ public final class PnpmRelease {
      */
     boolean movesAStalePinUpToADirectVersion() {
         return atLeast(11, 8, 0);
+    }
+
+    /**
+     * The install command passes supportedArchitectures.libc to getFetchFullMetadata from 10.14.0.
+     */
+    boolean fetchesFullMetadataForConfiguredLibc() {
+        return atLeast(10, 14, 0);
     }
 
     /**

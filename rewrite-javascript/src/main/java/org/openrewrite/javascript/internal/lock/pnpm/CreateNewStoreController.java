@@ -96,7 +96,9 @@ final class CreateNewStoreController {
      * 11.13.0 nothing ({@link PnpmRelease#fetchesFullMetadataForLibcAndNoDowngrade}).
      */
     NpmResolver createInstallStoreController(PnpmOptions options) {
-        return createNewStoreController(options, options.getFetchFullMetadata(), options.get("fetchFullMetadata"));
+        return createNewStoreController(options,
+                options.getRelease().fetchesFullMetadataForConfiguredLibc() ? options.getFetchFullMetadata() : null,
+                options.get("fetchFullMetadata"));
     }
 
     /**
