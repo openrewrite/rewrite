@@ -207,7 +207,7 @@ public class TwoBundleVersionIsolationTest : IDisposable
     }
 
     [Fact]
-    public void TwoBundles_ResolveTheirOwnDependencyVersion()
+    public async Task TwoBundles_ResolveTheirOwnDependencyVersion()
     {
         var primaryADll = Path.Combine(_publishDirA, "PrimaryA.dll");
         var primaryBDll = Path.Combine(_publishDirB, "PrimaryB.dll");
@@ -225,19 +225,15 @@ public class TwoBundleVersionIsolationTest : IDisposable
         // Install both primaries into the same server / marketplace.
         // Each is loaded into its own PluginLoadContext (ALC), so each primary's
         // ALC holds its own copy of DepPlugin.dll.
-        server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryADll })
-            .GetAwaiter().GetResult();
-        server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryBDll })
-            .GetAwaiter().GetResult();
+        await server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryADll });
+        await server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryBDll });
 
         // Whole-tree preparation: PrepareInstance calls recipe.GetRecipeList() on the live
         // instance stored in the marketplace. Because PrimaryRecipeA was created inside ALC-A,
         // its GetRecipeList() returns a DepPlugin.ChildRecipe instance from ALC-A's DepPlugin
         // (v1), not from ALC-B's DepPlugin (v2) — and vice versa for PrimaryRecipeB.
-        var a = server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryA.PrimaryRecipeA" })
-            .GetAwaiter().GetResult();
-        var b = server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryB.PrimaryRecipeB" })
-            .GetAwaiter().GetResult();
+        var a = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryA.PrimaryRecipeA" });
+        var b = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryB.PrimaryRecipeB" });
 
         // Each parent's composite child must reflect ITS OWN bundled DepPlugin version.
         // Same FQN (DepPlugin.ChildRecipe), different DisplayName proves per-ALC isolation:

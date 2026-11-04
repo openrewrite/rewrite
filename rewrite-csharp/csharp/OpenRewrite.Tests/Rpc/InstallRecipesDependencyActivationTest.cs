@@ -130,7 +130,7 @@ public class InstallRecipesDependencyActivationTest : IDisposable
     }
 
     [Fact]
-    public void InstallRecipes_FromLooseDll_RegistersOnlyPrimaryAssemblyRecipes()
+    public async Task InstallRecipes_FromLooseDll_RegistersOnlyPrimaryAssemblyRecipes()
     {
         var primaryDll = Path.Combine(_publishDir, "PrimaryPlugin.dll");
         Assert.True(File.Exists(primaryDll), $"Primary plugin DLL not found at {primaryDll}");
@@ -140,8 +140,7 @@ public class InstallRecipesDependencyActivationTest : IDisposable
         var marketplace = new RecipeMarketplace();
         var server = new RewriteRpcServer(marketplace);
 
-        server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryDll })
-            .GetAwaiter().GetResult();
+        await server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryDll });
 
         var names = marketplace.AllRecipes().Select(r => r.Name).ToHashSet();
 

@@ -46,6 +46,7 @@ public abstract class RewriteTest
 
     private static ImmutableArray<MetadataReference> ResolveAssemblies(ReferenceAssemblies assemblies)
     {
+        // Blocks because its callers, RewriteRun and Parse, are synchronous test APIs.
         return ResolvedAssembliesCache.GetOrAdd(assemblies, a =>
             a.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
                 .GetAwaiter()
