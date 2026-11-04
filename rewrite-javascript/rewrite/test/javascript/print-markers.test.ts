@@ -56,6 +56,17 @@ describe("marker printing", () => {
         expect(await print(MarkerPrinter.SEARCH_MARKERS_ONLY)).toEqual("a");
     });
 
+    test("a marker on a container encloses its delimiters", async () => {
+        const cu = await parse("f(a)", "a.ts");
+        const call = cu.statements[0].element as J.MethodInvocation;
+        const args = foundSearchResult(call.arguments);
+        const marked = {...cu, statements: [{...cu.statements[0], element: {...call, arguments: args}}]};
+        const fence = `{{${args.markers.markers[0].id}}}`;
+
+        expect(await TreePrinters.printer(marked).print(marked, new PrintOutputCapture(MarkerPrinter.FENCED)))
+            .toEqual(`f${fence}(a)${fence}`);
+    });
+
     test("a markup with no detail prints its message when asked for the detail", async () => {
         const marked = markupInfo(await parse("a", "a.ts"), "message");
         expect(await TreePrinters.printer(marked).print(marked, new PrintOutputCapture(MarkerPrinter.VERBOSE)))
