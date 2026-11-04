@@ -1100,6 +1100,27 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
+         * The nearest manifest, from this one up to the repository's root, that declares {@code name} in any scope, as
+         * the scan read it before the cycle's edits: the one Node resolves {@code name} from. Null when none does.
+         */
+        public NodeDependencyScan.@Nullable Manifest scannedDeclaring(String name) {
+            for (Path dir = path.getParent(); ; dir = dir.getParent()) {
+                NodeDependencyScan.Manifest manifest = acc.captured(dir == null ? Paths.get("package.json") :
+                        dir.resolve("package.json"));
+                if (manifest != null) {
+                    for (Map<String, String> declared : manifest.getDeclared().values()) {
+                        if (declared.containsKey(name)) {
+                            return manifest;
+                        }
+                    }
+                }
+                if (dir == null) {
+                    return null;
+                }
+            }
+        }
+
+        /**
          * The catalogs the manifest's package manager reads for it, as the recipes before this one left them, with
          * the edits decided so far; throws Rejected, with corepack's message, for a spec corepack rejects.
          */

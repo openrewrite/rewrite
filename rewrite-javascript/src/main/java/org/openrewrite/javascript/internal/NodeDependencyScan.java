@@ -189,6 +189,9 @@ public final class NodeDependencyScan {
         @Getter
         private final Map<String, Map<String, String>> declared;
 
+        // the version the lock its NodeResolutionResult records resolves for each package it declares
+        private final Map<String, String> resolvedVersions;
+
         /** Whether it holds a NodeResolutionResult. */
         @Getter
         private final boolean marked;
@@ -212,6 +215,7 @@ public final class NodeDependencyScan {
             this.text = PackageJsonHelper.printed(packageJson);
             this.json = packageJson instanceof Json.Document;
             this.declared = PackageJsonHelper.declaredDependencies(packageJson);
+            this.resolvedVersions = resolvedVersions(marker);
             this.marked = marker != null;
             this.packageManager = marker == null ? null : marker.getPackageManager();
             this.npmrcConfigs = marker == null ? null : marker.getNpmrcConfigs();
@@ -228,6 +232,33 @@ public final class NodeDependencyScan {
          */
         public static Manifest of(SourceFile packageJson, @Nullable String resolved) {
             return new Manifest(packageJson, resolved);
+        }
+
+        private static Map<String, String> resolvedVersions(@Nullable NodeResolutionResult marker) {
+            if (marker == null) {
+                return emptyMap();
+            }
+            Map<String, String> versions = new HashMap<>();
+            for (List<NodeResolutionResult.Dependency> scope : Arrays.asList(marker.getDependencies(),
+                    marker.getDevDependencies(), marker.getOptionalDependencies(), marker.getPeerDependencies())) {
+                if (scope == null) {
+                    continue;
+                }
+                for (NodeResolutionResult.Dependency dependency : scope) {
+                    if (dependency.getResolved() != null) {
+                        versions.putIfAbsent(dependency.getName(), dependency.getResolved().getVersion());
+                    }
+                }
+            }
+            return versions.isEmpty() ? emptyMap() : versions;
+        }
+
+        /**
+         * The version the lock its NodeResolutionResult records resolves for {@code name}, a package it declares;
+         * null when it records none.
+         */
+        public @Nullable String resolvedVersion(String name) {
+            return resolvedVersions.get(name);
         }
 
         // whether the lock the marker records resolves name; true when it records no resolutions at all
