@@ -85,12 +85,12 @@ public class Java11Parser implements JavaParser {
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Integer.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), release);
 
                 return new Java11Parser(delegate);
             } catch (Exception e) {

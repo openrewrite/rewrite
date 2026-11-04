@@ -38,6 +38,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.JavaLangReleaseClasses;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.parser.ClasspathJarIndex;
 import org.openrewrite.java.internal.JavaTypeFactory;
@@ -95,7 +96,8 @@ public class ReloadableJava17Parser implements JavaParser {
             Charset charset,
             Collection<NamedStyles> styles,
             JavaTypeCache typeCache,
-            @Nullable JavaTypeFactory typeFactory) {
+            @Nullable JavaTypeFactory typeFactory,
+            @Nullable Integer release) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -105,7 +107,8 @@ public class ReloadableJava17Parser implements JavaParser {
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
-        this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
+        this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath,
+                release == null ? null : JavaLangReleaseClasses.forRelease(release));
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
@@ -358,7 +361,7 @@ public class ReloadableJava17Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
         public ReloadableJava17Parser build() {
-            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory);
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), javaTypeFactory, release);
         }
     }
 
@@ -366,11 +369,19 @@ public class ReloadableJava17Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
         private List<ClasspathJarIndex> indexedJars = emptyList();
 
+        /**
+         * The classes of {@code java.lang} in the release the sources are written for, or {@code null} to list
+         * those of the running JDK.
+         */
+        private final @Nullable Set<String> javaLangClasses;
+
         public ByteArrayCapableJavacFileManager(Context context,
                                                 boolean register,
                                                 Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                                                Collection<byte[]> classByteClasspath,
+                                                @Nullable Set<String> javaLangClasses) {
             super(context, register, charset);
+            this.javaLangClasses = javaLangClasses;
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)
                     .collect(toList());
@@ -420,7 +431,20 @@ public class ReloadableJava17Parser implements JavaParser {
                                 StreamSupport.stream(listed.spliterator(), false)
                         ).collect(toList());
             }
-            return super.list(location, packageName, kinds, recurse);
+            Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
+            if (javaLangClasses != null && "java.lang".equals(packageName)) {
+                // Hide what java.lang only gained after the release of the sources, so that the names every
+                // compilation unit imports from it are those the compiler of that release imports
+                List<JavaFileObject> inRelease = new ArrayList<>();
+                for (JavaFileObject file : listed) {
+                    if (file.getKind() != JavaFileObject.Kind.CLASS ||
+                        javaLangClasses.contains(inferBinaryName(location, file))) {
+                        inRelease.add(file);
+                    }
+                }
+                return inRelease;
+            }
+            return listed;
         }
     }
 

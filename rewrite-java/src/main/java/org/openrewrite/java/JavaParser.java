@@ -254,6 +254,10 @@ public interface JavaParser extends Parser {
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
         protected boolean typeAttribution = true;
+
+        @Nullable
+        protected Integer release;
+
         protected List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
@@ -271,6 +275,25 @@ public interface JavaParser extends Parser {
          */
         public B typeAttribution(boolean typeAttribution) {
             this.typeAttribution = typeAttribution;
+            return (B) this;
+        }
+
+        /**
+         * The Java release the sources are written for, such as {@code 8} for sources compiled with
+         * {@code --release 8} or {@code -source 1.8}. Without it, the parser resolves the names that every
+         * compilation unit imports from {@code java.lang} against the JDK running it.
+         * <p>
+         * When that JDK is newer, the classes that {@code java.lang} only gained in a later release are not
+         * imported, so that a type of the same simple name imported on demand from another package, such as
+         * a {@code Record} of the project's own, resolves to that type, as it does for the compiler of that
+         * release, instead of being ambiguous and left without a type. The language level of the parser
+         * stays that of the JDK running it.
+         *
+         * @param release The major Java version, such as {@code 8}, {@code 11} or {@code 17}, or {@code null}
+         *                to resolve against the JDK running the parser.
+         */
+        public B release(@Nullable Integer release) {
+            this.release = release;
             return (B) this;
         }
 
