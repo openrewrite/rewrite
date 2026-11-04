@@ -623,12 +623,10 @@ class UsesTypeTest implements RewriteTest {
 
     @Test
     void unresolvedImportCountsAsUse() {
-        // Parsed without AspectJ on the classpath (as LSTs built with an unreadable aspectjweaver jar were), the
-        // aspect's types are missing, but its import still names them. Spring Boot 4's migration removed
-        // spring-boot-starter-aop from such applications because no org.aspectj type was in use.
+        // Spring Boot 4's migration removed spring-boot-starter-aop when AspectJ types did not resolve
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.ProceedingJoinPoint", false)))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)), // no AspectJ
           java(
             """
               import org.aspectj.lang.ProceedingJoinPoint;
@@ -661,7 +659,7 @@ class UsesTypeTest implements RewriteTest {
     void unresolvedImportMatchesPatterns(String pattern) {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new UsesType<>(pattern, false)))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().identifiers(false)), // no AspectJ
           java(
             """
               import org.aspectj.lang.annotation.Aspect;
@@ -684,8 +682,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void unresolvedImportOfAnotherTypeOrAPackageIsNotAUse() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.annotation.Aspect", false)))
-            .typeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.annotation.Aspect", false))),
           java(
             """
               import org.aspectj.lang.annotation.*;
@@ -700,7 +697,6 @@ class UsesTypeTest implements RewriteTest {
 
     @Test
     void resolvedImportIsMatchedByTypeAsBefore() {
-        // An import that resolves is only a use when its type is: here java.util.List is, Collections is not.
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
           java(

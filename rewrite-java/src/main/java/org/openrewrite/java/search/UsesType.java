@@ -121,14 +121,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         return tree;
     }
 
-    /**
-     * Whether the source file imports a matching type that didn't resolve. Such a file was parsed without the
-     * type on its classpath, so its uses of the type have no type attribution and {@link TypesInUse} can't see
-     * them, but the import still names the type. Counting it keeps a recipe guarded by
-     * {@code Preconditions.not(new UsesType<>(...))} (an {@code unlessUsing}) from removing a dependency the
-     * code does use. Only single-type imports count: a package import has no type even when it resolves, so
-     * counting one would change what matches in fully attributed code.
-     */
+    /// An unresolved import still names a type whose uses [TypesInUse] can't see, as when parsed without it on
+    /// the classpath. Package imports are skipped, as they have no type even when resolved.
     private boolean importsUnresolvedMatch(JavaSourceFile cu) {
         for (J.Import anImport : cu.getImports()) {
             J.FieldAccess qualid = anImport.getQualid();
