@@ -558,4 +558,78 @@ public class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addImportKeepsTopLevelDeclarationOrder() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              package a
+
+              val first = 1
+
+              fun second(): ArrayList<Int>? = null
+
+              class Third
+
+              val fourth = first
+
+              data class Fifth(val a: Int)
+              """,
+            """
+              package a
+
+              import java.util.ArrayList
+
+              val first = 1
+
+              fun second(): ArrayList<Int>? = null
+
+              class Third
+
+              val fourth = first
+
+              data class Fifth(val a: Int)
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportKeepsTopLevelDeclarationOrder() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                  maybeRemoveImport("java.nio.file.Paths");
+                  return cu;
+              }
+          })),
+          kotlin(
+            """
+              package a
+
+              import java.nio.file.Paths
+
+              private fun first() = 1
+
+              /** Documents Second. */
+              class Second
+
+              internal fun third() = first()
+              """,
+            """
+              package a
+
+              private fun first() = 1
+
+              /** Documents Second. */
+              class Second
+
+              internal fun third() = first()
+              """
+          )
+        );
+    }
 }
