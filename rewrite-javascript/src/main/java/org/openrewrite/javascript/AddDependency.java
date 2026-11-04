@@ -34,6 +34,7 @@ import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 
+import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -129,7 +130,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         if (onlyIfResolving != null) {
             for (String entry : onlyIfResolving) {
                 v = v.and(Validated.test("onlyIfResolving", "entries are `name@range` with a valid npm semver range",
-                        entry, e -> rangeOf(e) != null));
+                        entry, e -> nameAndRange(e) != null));
             }
         }
         return v;
@@ -268,8 +269,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             return true;
         }
         for (String entry : onlyIfResolving) {
-            String range = rangeOf(entry);
-            if (range == null || !resolves(decision, entry.substring(0, entry.lastIndexOf('@')), range)) {
+            Map.Entry<String, String> nameAndRange = nameAndRange(entry);
+            if (nameAndRange == null || !resolves(decision, nameAndRange.getKey(), nameAndRange.getValue())) {
                 return false;
             }
         }
@@ -289,8 +290,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             for (String scope : RESOLVED_SCOPES) {
                 String constraint = declaring.getDeclared().getOrDefault(scope, emptyMap()).get(name);
                 if (constraint != null) {
-                    return NodeSemver.validRange(constraint, NodeSemver.Options.LOOSE) != null &&
-                           NodeSemver.subset(constraint, range, NodeSemver.Options.LOOSE);
+                    return NodeSemver.subset(constraint, range, NodeSemver.Options.LOOSE);
                 }
             }
         } catch (IllegalArgumentException e) {
@@ -299,13 +299,18 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         return false;
     }
 
-    private static @Nullable String rangeOf(String entry) {
-        int at = entry.lastIndexOf('@');
-        if (at <= 0 || at == entry.length() - 1) {
+    private static Map.@Nullable Entry<String, String> nameAndRange(@Nullable String entry) {
+        if (entry == null) {
             return null;
         }
-        String range = entry.substring(at + 1);
-        return NodeSemver.validRange(range, NodeSemver.Options.LOOSE) == null ? null : range;
+        String trimmed = entry.trim();
+        int at = trimmed.lastIndexOf('@');
+        if (at <= 0 || at == trimmed.length() - 1) {
+            return null;
+        }
+        String range = trimmed.substring(at + 1);
+        return NodeSemver.validRange(range, NodeSemver.Options.LOOSE) == null ? null :
+                new AbstractMap.SimpleImmutableEntry<>(trimmed.substring(0, at), range);
     }
 
     private boolean matchesAdd(Json.Document pkg) {

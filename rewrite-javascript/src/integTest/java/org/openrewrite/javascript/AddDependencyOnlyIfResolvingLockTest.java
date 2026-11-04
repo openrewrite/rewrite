@@ -49,12 +49,12 @@ class AddDependencyOnlyIfResolvingLockTest implements RewriteTest {
             packageJson(
               """
                 {
-                  "name": "x",
+                  "name": "x",%s
                   "dependencies": {
                     "is-odd": ">=1.0.0 <4"
                   }
                 }
-                """,
+                """.formatted(pm == PackageManager.YarnBerry ? "\n  \"packageManager\": \"yarn@4.0.2\"," : ""),
               spec -> spec.after(actual -> {
                   assertThat(actual).contains("\"is-number\": \"7.0.0\"");
                   return actual;

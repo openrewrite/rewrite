@@ -27,6 +27,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -353,13 +354,45 @@ class AddDependencyOnlyIfResolvingTest implements RewriteTest {
     void rejectsAnEntryWithoutAValidRange() {
         // given
         AddDependency recipe = new AddDependency("@testing-library/react", "^12.1.5", "devDependencies", null,
-          List.of("react@>=16.9.0 <18", "@types/react", "react@not-a-range"));
+          Arrays.asList("react@>=16.9.0 <18", "@types/react", "react@not-a-range", null));
 
         // when
         List<?> failures = recipe.validate().failures();
 
         // then
-        assertThat(failures).hasSize(2);
+        assertThat(failures).hasSize(3);
+    }
+
+    @Test
+    void entriesAreTrimmed() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("@testing-library/react", "^12.1.5", "devDependencies", null,
+            List.of(" react@>=16.9.0 <18", " react-dom@>=16.9.0 <18 "))),
+          packageJson(
+            """
+              {
+                "name": "react17",
+                "dependencies": {
+                  "react": "^17.0.2",
+                  "react-dom": "^17.0.2"
+                }
+              }
+              """,
+            """
+              {
+                "name": "react17",
+                "dependencies": {
+                  "react": "^17.0.2",
+                  "react-dom": "^17.0.2"
+                },
+                "devDependencies": {
+                  "@testing-library/react": "^12.1.5"
+                }
+              }
+              """,
+            nodeResolutionResult(PackageManager.Npm, dependency("react", "^17.0.2"), dependency("react-dom", "^17.0.2"))
+          )
+        );
     }
 
     private static Dependency resolved(String name, String versionConstraint, String version) {

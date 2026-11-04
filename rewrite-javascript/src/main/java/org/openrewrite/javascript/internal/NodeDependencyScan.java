@@ -189,7 +189,6 @@ public final class NodeDependencyScan {
         @Getter
         private final Map<String, Map<String, String>> declared;
 
-        // the version the lock its NodeResolutionResult records resolves for each package it declares
         private final Map<String, String> resolvedVersions;
 
         /** Whether it holds a NodeResolutionResult. */
