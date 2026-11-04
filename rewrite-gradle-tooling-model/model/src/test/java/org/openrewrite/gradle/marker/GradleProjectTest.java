@@ -545,8 +545,7 @@ class GradleProjectTest {
     }
 
     @Nested
-    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
-    class renamedBuildFile {
+    class RenamedBuildFile {
         @TempDir
         static Path dir;
 
