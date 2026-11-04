@@ -1837,6 +1837,34 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Nested
+    class WithoutGradleModel implements RewriteTest {
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
+        }
+
+        @Test
+        void noChangeWithoutGradleProjectMarker() {
+            rewriteRun(
+              buildGradle(
+                """
+                  plugins {
+                      id 'java'
+                  }
+                  repositories { mavenCentral() }
+
+                  dependencies {
+                      implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class OnGradle8 implements RewriteTest {
 
         // Kotlin 1.7's Gradle plugin, the last to add kotlin-stdlib-jdk8, uses SelfResolvingDependency, which Gradle 9 removed
