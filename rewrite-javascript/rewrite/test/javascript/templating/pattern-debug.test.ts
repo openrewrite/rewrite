@@ -291,6 +291,16 @@ describe('Pattern Debugging', () => {
         expect(attempt.explanation!.targetElement).toBe(node);
     });
 
+    test('a property only one side has is named', async () => {
+        const pat = pattern`import {${capture('name')}} from 'lodash'`;
+
+        const attempt = await pat.matchWithExplanation(await parseExpression(`import _ from 'lodash';`), undefined!);
+
+        expect(attempt.explanation!.reason).toBe('structural-mismatch');
+        expect(attempt.explanation!.expected).toBe('none');
+        expect(attempt.explanation!.actual).toBe('name');
+    });
+
     test('a kind mismatch names both kinds', async () => {
         const attempt = await pattern`42`.matchWithExplanation(await parseExpression('x'), undefined!);
 

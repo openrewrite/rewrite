@@ -535,47 +535,6 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         return await super.visit(j, p, parent);
     }
 
-    protected override async visitElement<T extends J>(j: T, other: T): Promise<T> {
-        if (!this.match) {
-            return j;
-        }
-
-        const kindStr = this.formatKind(j.kind);
-        if (j.kind !== other.kind) {
-            return this.fail(j, 'kind-mismatch', kindStr, this.formatKind(other.kind), 'Node kinds differ', j, other);
-        }
-
-        for (const key of Object.keys(j)) {
-            if (key.startsWith('_') || key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix') {
-                continue;
-            }
-
-            const jValue = (j as any)[key];
-            const otherValue = (other as any)[key];
-
-            if (Array.isArray(jValue)) {
-                if (!Array.isArray(otherValue) || jValue.length !== otherValue.length) {
-                    return this.abort(j, 'array-length-mismatch', key, jValue.length,
-                        Array.isArray(otherValue) ? otherValue.length : otherValue);
-                }
-
-                for (let i = 0; i < jValue.length; i++) {
-                    await this.visitProperty(jValue[i], otherValue[i]);
-                    if (!this.match) {
-                        return j;
-                    }
-                }
-            } else {
-                await this.visitProperty(jValue, otherValue);
-                if (!this.match) {
-                    return j;
-                }
-            }
-        }
-
-        return j;
-    }
-
     override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: J.RightPadded<T>): Promise<J.RightPadded<T>> {
         if (!this.match) {
             return right;
