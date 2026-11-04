@@ -128,13 +128,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                             gp = maybeGp.get();
 
-                            try {
-                                ManagedDependencyVersions managed = ManagedDependencyVersions.of((JavaSourceFile) tree, gp, ctx);
-                                platforms.putAll(managed.getPlatforms());
-                                springPluginManagedDependencies.putAll(managed.getSpringPluginManaged());
-                            } catch (MavenDownloadingException e) {
-                                throw new RuntimeException(e);
+                            ManagedDependencyVersions managed = ManagedDependencyVersions.of((JavaSourceFile) tree, gp, ctx);
+                            if (managed.getPlatformFailure() != null) {
+                                throw new RuntimeException(managed.getPlatformFailure());
                             }
+                            managed.getPlatforms().forEach((configuration, poms) ->
+                                    platforms.computeIfAbsent(configuration, k -> new ArrayList<>()).addAll(poms));
+                            springPluginManagedDependencies.putAll(managed.getSpringPluginManaged());
 
                             GradleMultiDependency.matcher()
                                     .asVisitor(gmd -> gmd.map(gradleDependency -> {

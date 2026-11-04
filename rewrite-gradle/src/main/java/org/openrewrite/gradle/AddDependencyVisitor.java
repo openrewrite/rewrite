@@ -39,8 +39,6 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.function.Predicate;
 
-import static java.util.Objects.requireNonNull;
-
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     private final String groupId;
@@ -97,12 +95,15 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             isKotlinDsl = sourceFile instanceof K.CompilationUnit;
+            resolvedVersion = null;
             String managedVersion = null;
             if (version != null) {
                 if (version.startsWith("$")) {
                     resolvedVersion = version;
                 } else {
-                    managedVersion = dependencyModifier == null ? findManagedVersion(sourceFile, ctx) : null;
+                    managedVersion = dependencyModifier == null ?
+                            ManagedDependencyVersions.of(sourceFile, gradleProject, ctx).getManagedVersion(configuration, groupId, artifactId, classifier) :
+                            null;
                     VersionComparator versionComparator = Semver.validate(version, versionPattern).getValue();
                     if (managedVersion == null || versionComparator == null || !versionComparator.isValid(null, managedVersion)) {
                         try {
@@ -140,15 +141,6 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             return sourceFile;
         }
         return (J) tree;
-    }
-
-    private @Nullable String findManagedVersion(JavaSourceFile sourceFile, ExecutionContext ctx) {
-        try {
-            return ManagedDependencyVersions.of(sourceFile, requireNonNull(gradleProject), ctx)
-                    .getManagedVersion(configuration, groupId, artifactId, classifier);
-        } catch (MavenDownloadingException e) {
-            return null;
-        }
     }
 
     public enum DependencyModifier {

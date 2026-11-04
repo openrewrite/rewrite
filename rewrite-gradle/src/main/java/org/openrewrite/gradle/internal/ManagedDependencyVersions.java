@@ -51,14 +51,14 @@ public class ManagedDependencyVersions {
     @Getter
     private final Map<GroupArtifact, @Nullable String> springPluginManaged = new HashMap<>();
 
+    @Getter
+    private @Nullable MavenDownloadingException platformFailure;
+
     private ManagedDependencyVersions(GradleProject gradleProject) {
         this.gradleProject = gradleProject;
     }
 
-    /**
-     * @throws MavenDownloadingException when a platform cannot be downloaded
-     */
-    public static ManagedDependencyVersions of(JavaSourceFile buildScript, GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+    public static ManagedDependencyVersions of(JavaSourceFile buildScript, GradleProject gradleProject, ExecutionContext ctx) {
         ManagedDependencyVersions managed = new ManagedDependencyVersions(gradleProject);
         managed.collectSpringPluginManaged(buildScript, ctx);
         managed.collectPlatforms(buildScript, ctx);
@@ -140,9 +140,8 @@ public class ManagedDependencyVersions {
         }
     }
 
-    private void collectPlatforms(JavaSourceFile buildScript, ExecutionContext ctx) throws MavenDownloadingException {
+    private void collectPlatforms(JavaSourceFile buildScript, ExecutionContext ctx) {
         MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-        List<MavenDownloadingException> failures = new ArrayList<>();
         GradleMultiDependency.matcher()
                 .asVisitor(gmd -> gmd.map(gradleDependency -> {
                     if (gradleDependency.isPlatform()) {
@@ -151,15 +150,14 @@ public class ManagedDependencyVersions {
                                     .resolve(emptyList(), mpd, ctx);
                             platforms.computeIfAbsent(gradleDependency.getConfigurationName(), k -> new ArrayList<>()).add(platformPom);
                         } catch (MavenDownloadingException e) {
-                            failures.add(e);
+                            if (platformFailure == null) {
+                                platformFailure = e;
+                            }
                         }
                     }
                     return gradleDependency.getTree();
                 }))
                 .visit(buildScript, ctx);
-        if (!failures.isEmpty()) {
-            throw failures.get(0);
-        }
     }
 
     private @Nullable String getSpringBootVersionFromPlugin() {
