@@ -27,11 +27,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.CodeSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -144,7 +146,7 @@ public class OpenRewriteModelBuilder {
                 } else {
                     Package modelPackage = OpenRewriteModel.class.getPackage();
                     pluginVersion = modelPackage == null ? null : modelPackage.getImplementationVersion();
-                    resolvedInitScript = defaultInitScript(pluginVersion);
+                    resolvedInitScript = defaultInitScript(pluginVersion, modelJar());
                 }
             } else {
                 resolvedInitScript = initScript;
@@ -177,13 +179,45 @@ public class OpenRewriteModelBuilder {
      * The bundled init script, loading the plugin at the given version, so that the markers it builds are the ones this
      * jar reads. Without a version, as for a model loaded from a classes directory, it loads the newest plugin.
      */
-    static String defaultInitScript(@Nullable String pluginVersion) throws IOException {
+    static String defaultInitScript(@Nullable String pluginVersion, @Nullable Path modelJar) throws IOException {
         try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
             if (is == null) {
                 throw new IllegalStateException("Expected to find init.gradle on the classpath");
             }
             String script = new String(readAllBytes(is), StandardCharsets.UTF_8);
-            return pluginVersion == null ? script : script.replace(PLUGIN + "latest.integration", PLUGIN + pluginVersion);
+            if (pluginVersion == null) {
+                return script;
+            }
+            script = script.replace(PLUGIN + "latest.integration", PLUGIN + pluginVersion);
+            URI repository = repositoryOnDisk(modelJar, pluginVersion);
+            return repository == null ? script : script.replace("mavenLocal()",
+                    "mavenLocal()\n        maven { url = uri('" + escapeGroovy(repository.toString()) + "') }");
+        }
+    }
+
+    /**
+     * The Maven repository on disk the model jar was loaded from, which holds the plugin at the same version: a
+     * version that is in no remote repository yet, as a release staged in a file repository before it is published.
+     */
+    static @Nullable URI repositoryOnDisk(@Nullable Path modelJar, String version) {
+        if (modelJar == null) {
+            return null;
+        }
+        Path versionDirectory = modelJar.toAbsolutePath().getParent();
+        Path root = versionDirectory;
+        for (int i = 0; i < 6 && root != null; i++) {
+            root = root.getParent();
+        }
+        return root != null && versionDirectory.equals(root.resolve(Paths.get("org", "openrewrite", "gradle", "tooling", "model", version))) ?
+                root.toUri() : null;
+    }
+
+    private static @Nullable Path modelJar() {
+        try {
+            CodeSource source = OpenRewriteModel.class.getProtectionDomain().getCodeSource();
+            return source == null || source.getLocation() == null ? null : Paths.get(source.getLocation().toURI());
+        } catch (URISyntaxException | RuntimeException e) {
+            return null;
         }
     }
 
