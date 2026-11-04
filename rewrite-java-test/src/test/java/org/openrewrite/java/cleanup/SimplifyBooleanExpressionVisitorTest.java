@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -39,6 +40,56 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value",
+      "true ? value : false", "false ? false : value"})
+    void preserveBoxedBooleanUnboxing(String expression) {
+        rewriteRun(java("class A { Object f(Boolean value) { return " + expression + "; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value == true", "value != false", "!!value", "true && value", "value && true",
+      "false || value", "value || false", "value && false", "value || true", "value && value", "value || value"})
+    void preserveBooleanBoundUnboxing(String expression) {
+        rewriteRun(java("class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"true ? value : false", "false ? false : value"})
+    void simplifyBooleanBoundReferenceConditional(String expression) {
+        rewriteRun(java(
+          "class A { <T extends Boolean> Object f(T value) { return " + expression + "; } }",
+          "class A { <T extends Boolean> Object f(T value) { return value; } }"
+        ));
+    }
+
+    @Test
+    void preserveBooleanBoundOverloadSelection() {
+        rewriteRun(java(
+          """
+            class A {
+                <T extends Boolean> String f(T value) { return select(value == true); }
+                String select(boolean value) { return "primitive"; }
+                String select(Boolean value) { return "boxed"; }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void preservePrimitiveOverloadSelection() {
+        rewriteRun(java(
+          """
+            class A {
+                String f(Boolean value) { return select(value == true); }
+                String select(boolean value) { return "primitive"; }
+                String select(Boolean value) { return "boxed"; }
+            }
+            """
+        ));
     }
 
     @ParameterizedTest
