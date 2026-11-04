@@ -47,6 +47,7 @@ import {
     CaptureHighlightMarker,
     DebugPatternMatchingComparator,
     describe,
+    describeKind,
     ElementMarkerVisitor,
     PATTERN_DEBUG_MARKER_PRINTER,
     shouldUseEmoji,
@@ -362,7 +363,7 @@ export class Pattern {
     private async logMatchResult(tree: J, cursor: Cursor | undefined, attempt: MatchAttemptResult, patternAst: J,
                                  caller: string | undefined): Promise<void> {
         const prefix = `[Pattern #${this.patternId}]`;
-        const kind = tree.kind.split('.').pop();
+        const kind = describeKind(tree);
         const position = await sourcePosition(tree, cursor);
         console.error(`${prefix} ${this.getPatternSource()}`);
 
@@ -402,7 +403,6 @@ export class Pattern {
                 ...colored(await this.printMarked(tree, explanation?.targetElement), red));
             if (explanation) {
                 lines.push(prefix, `${prefix}    Details:`,
-                    `${prefix}      Reason:   ${explanation.reason}`,
                     `${prefix}      Pattern:  ${explanation.expected}`,
                     `${prefix}      Source:   ${explanation.actual}`,
                     ...(explanation.details ? [`${prefix}      Note:     ${explanation.details}`] : []));

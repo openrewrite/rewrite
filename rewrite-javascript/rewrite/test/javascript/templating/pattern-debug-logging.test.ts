@@ -239,9 +239,9 @@ describe('Pattern Debug Logging', () => {
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
 
         const lines: string[] = calls.flatMap(c => c.split('\n'));
-        expect(lines.some(line => line.includes('❌ FAILED matching against J$Binary'))).toBe(true);
+        expect(lines.some(line => line.includes('❌ FAILED matching against binary (J$Binary)'))).toBe(true);
         expect(lines.some(line => line.endsWith('Source tree:'))).toBe(true);
-        expect(lines.some(line => line.endsWith('Reason:   value-mismatch'))).toBe(true);
+        expect(lines.some(line => line.includes('Reason:'))).toBe(false);
         expect(lines.some(line => line.endsWith('Pattern:  operator: +'))).toBe(true);
         expect(lines.some(line => line.endsWith('Source:   operator: -'))).toBe(true);
     });

@@ -377,7 +377,7 @@ export async function describe(value: any): Promise<string> {
 }
 
 /** A tree's kind in words, followed by its kind name, such as `arrow function (JS$ArrowFunction)`. */
-function describeKind(tree: any): string {
+export function describeKind(tree: any): string {
     return `${kindInWords(tree)} (${shortKind(tree)})`;
 }
 

@@ -72,7 +72,7 @@ It prints the pattern and the source with the mismatch marked, and how they diff
 
 ```
 [Pattern #1] ${🪝req}.map(${🪝r} => ${🪝r}.json())
-[Pattern #1] ❌ FAILED matching against J$MethodInvocation at source-0.ts:2:16
+[Pattern #1] ❌ FAILED matching against method invocation (J$MethodInvocation) at source-0.ts:2:16
 [Pattern #1]    called from test/my-recipe.test.ts:16:27 (JavaScriptVisitor.visitMethodInvocation)
 [Pattern #1]    (Mismatched elements are marked with 👉...👈)
 [Pattern #1]
@@ -83,7 +83,6 @@ It prints the pattern and the source with the mismatch marked, and how they diff
 [Pattern #1]       req.map(res => 👉other👈.json())
 [Pattern #1]
 [Pattern #1]    Details:
-[Pattern #1]      Reason:   value-mismatch
 [Pattern #1]      Pattern:  res (what 🪝r holds already)
 [Pattern #1]      Source:   other
 [Pattern #1]      Note:     A capture the pattern names twice binds the same code at both places
