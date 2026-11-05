@@ -93,3 +93,9 @@ const spread = Math.max(...numbers, ...[1, 2]);
 const grouped = ((a + b)) * (c);
 const escaped = "tab\t unicode\u00e9 lone\uD800 pair\uD83D\uDE00";
 delete object.plain;
+const tight = typeof(a) + void(a) + new(A)() + (a in{}) + (a instanceof(A));
+function* tightGenerator(a) {
+    yield*a;
+    switch (a) {default:}
+    return(a);
+}

@@ -18,7 +18,6 @@
 import {mapAsync, updateIfChanged} from "../util";
 import {Markers} from "../markers";
 import {SourceFile} from "../tree";
-import {afterChildren, takeAfterChildren} from "./after-children";
 import {ValidRecipeReturnType} from "../visitor";
 import {Expression, J, JavaVisitor, NameTree, Statement, Type, TypedTree} from "../java";
 import {create, Draft} from "mutative";
@@ -1316,32 +1315,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         ]);
     }
 
-    protected override visitChildrenOf<R>(tree: J, visit: () => Promise<R>): Promise<R> {
-        const given = this.cursor;
-        let held = given;
-        return super.visitChildrenOf(tree, () => {
-            held = this.cursor;
-            return visit();
-        }).then(visited => {
-            if (held !== given) {
-                for (const callback of takeAfterChildren(held)) {
-                    afterChildren(given, callback);
-                }
-            }
-            return visited;
-        });
-    }
-
-    override async accept<J2 extends J, P2 extends P>(j: J2, p: P2): Promise<J | undefined> {
-        const cursor = this.cursor;
+    override accept<J2 extends J, P2 extends P>(j: J2, p: P2): Promise<J | undefined> {
         const visit = (JavaScriptVisitor.javaScriptDispatch ??= JavaScriptVisitor.createJavaScriptDispatch()).get(j.kind);
-        let visited = await (visit ? visit(this, j, p) : super.accept(j, p));
-        for (const callback of takeAfterChildren(cursor)) {
-            if (visited !== undefined) {
-                visited = await callback(visited);
-            }
+        if (visit) {
+            return visit(this, j, p);
         }
-        return visited;
+        return super.accept(j, p);
     }
 }
 

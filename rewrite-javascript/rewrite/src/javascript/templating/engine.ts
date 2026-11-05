@@ -22,7 +22,6 @@ import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
 import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
-import {Enclosing, separateFromNeighbours} from './token-separation';
 import {autoIndent, maybeAutoFormat} from '../format';
 import {getPrettierStyle} from '../format/prettier-format';
 import {renameBindings} from './bindings';
@@ -859,51 +858,24 @@ const templateResults = new WeakSet<J>();
  * holds it, as where a recipe applies a template to a child of the node it visits.
  */
 async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | undefined> {
-    return (await enclosingPath(tree, cursor))[0]?.tree;
-}
-
-/** The trees from `tree` as `owner` holds it up to `owner`, or `undefined` where `owner` does not hold `tree`. */
-async function chainInOwner(tree: J, owner: J): Promise<J[] | undefined> {
-    // A chained rule's result stands in for the owner, though it can keep the id of a capture inside it
-    const held = (t: J) => t === tree || (t.id === tree.id && !templateResults.has(tree));
-    let chain: J[] | undefined;
-    await new class extends JavaScriptVisitor<undefined> {
-        protected override async preVisit(t: J, p: undefined): Promise<J | undefined> {
-            if (chain === undefined && held(t)) {
-                chain = [t];
-                for (let c = this.cursor.parentTree(); c; c = c.parentTree()) {
-                    chain.push(c.value as J);
-                }
-            }
-            if (chain !== undefined) {
-                this.stopAfterPreVisit();
-            }
-            return t;
-        }
-    }().visit(owner, undefined);
-    return chain;
-}
-
-/** The trees around the slot `tree` is replaced in, innermost first; see {@link replacedParent} for the cursor. */
-async function enclosingPath(tree: J, cursor: Cursor | undefined): Promise<Enclosing[]> {
-    const path: Enclosing[] = [];
     const owner = cursor?.value;
-    let child: J = tree;
-    if (isTree(owner)) {
-        const chain = owner.id !== tree.id ? await chainInOwner(tree, owner as J) ?? [] : [];
-        for (let i = 1; i < chain.length; i++) {
-            path.push({tree: chain[i], child: chain[i - 1], cursor});
-        }
-        // The cursor holds the tree as its parent holds it, which a visitor may since have changed
-        child = owner as J;
+    let holder: J | undefined;
+    if (isTree(owner) && owner.id !== tree.id) {
+        // A chained rule's result stands in for the owner, though it can keep the id of a capture inside it
+        const held = (t: J) => t === tree || (t.id === tree.id && !templateResults.has(tree));
+        await new class extends JavaScriptVisitor<undefined> {
+            protected override async preVisit(t: J, p: undefined): Promise<J | undefined> {
+                if (holder === undefined && held(t)) {
+                    holder = this.cursor.parentTree()?.value;
+                }
+                if (holder !== undefined) {
+                    this.stopAfterPreVisit();
+                }
+                return t;
+            }
+        }().visit(owner, undefined);
     }
-    for (let c = isTree(owner) ? cursor?.parent : cursor; c; c = c.parent) {
-        if (isTree(c.value)) {
-            path.push({tree: c.value as J, child, cursor: c});
-            child = c.value as J;
-        }
-    }
-    return path;
+    return holder ?? cursor?.parentTree()?.value;
 }
 
 /**
@@ -951,8 +923,7 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        const path = await enclosingPath(originalTree, this.cursor);
-        const parentTree = path[0]?.tree;
+        const parentTree = await replacedParent(originalTree, this.cursor);
         let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
         // A replaced node spliced back in as a capture carries its own trailing markers
         const trailing = trailingMarkers(originalTree);
@@ -964,7 +935,7 @@ export class TemplateApplier {
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
             {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        const result = await separateFromNeighbours(await this.format(resultToUse, originalTree), path);
+        const result = await this.format(resultToUse, originalTree);
         templateResults.add(result);
         return result;
     }
