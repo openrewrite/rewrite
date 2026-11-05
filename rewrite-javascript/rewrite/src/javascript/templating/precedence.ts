@@ -363,9 +363,14 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
 /**
  * Parenthesizes `expression` if the slot of `parent` holding `childId` would otherwise reparse it.
  * `slotMarkers` are the markers the slot contributed; {@link parenthesize} says what they decide.
+ * A union, a function type and the other loose types only sit in type slots, so
+ * {@link maybeParenthesizeType} decides for them.
  */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
                                   slotMarkers?: Markers): J {
+    if (looseTypes.has(expression.kind)) {
+        return maybeParenthesizeType(parent, childId, expression);
+    }
     const constraints = parent && slotConstraints(parent, childId);
     if (!constraints) {
         return followsTrailingMarker(expression, slotMarkers) ? parenthesize(expression, slotMarkers) : expression;

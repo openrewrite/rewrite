@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {JavaScriptVisitor, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 /** Replaces every `Old` identifier with `code`, as a recipe replacing a deprecated type does. */
@@ -23,6 +23,19 @@ function replaceOld(code: TemplateStringsArray) {
         override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
             const visited = await super.visitIdentifier(identifier, p) as J.Identifier;
             return visited.simpleName === "Old" ? await template(code).apply(visited, this.cursor) ?? visited : visited;
+        }
+    });
+}
+
+/** Replaces each type argument `t` but a union with `${t} | null`, as a recipe making a ref nullable does. */
+function nullableTypeArguments() {
+    const t = capture('t');
+    return fromVisitor(new class extends JavaScriptVisitor<any> {
+        protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+            const parent = this.cursor.parentTree()?.value as J;
+            return parent?.kind === J.Kind.ParameterizedType && tree.kind !== JS.Kind.Union &&
+                (parent as J.ParameterizedType).typeParameters?.elements.some(e => e.element.id === tree.id) ?
+                await template`${t} | null`.apply(tree, this.cursor, {values: {t: tree}}) : tree;
         }
     });
 }
@@ -90,6 +103,23 @@ describe("template replacing a type", () => {
             `
                 let a: (() => void) | null;
                 let b: () => void;
+            `
+        ));
+    });
+
+    test("a function, conditional or constructor type substituted into a union is parenthesized", () => {
+        spec.recipe = nullableTypeArguments();
+        //language=typescript
+        return spec.rewriteRun(typescript(
+            `
+                let a: RefObject<() => void>;
+                let b: RefObject<A extends B ? C : D>;
+                let c: RefObject<new () => X>;
+            `,
+            `
+                let a: RefObject<(() => void) | null>;
+                let b: RefObject<(A extends B ? C : D) | null>;
+                let c: RefObject<(new () => X) | null>;
             `
         ));
     });
