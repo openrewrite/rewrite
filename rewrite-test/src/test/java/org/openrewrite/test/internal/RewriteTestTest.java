@@ -2185,6 +2185,24 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void rejectVisitorInStaticFieldOfDeclarativeRecipePrecondition() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.PreconditionWithStaticVisitor
+                displayName: Has a precondition with a static visitor
+                description: Has a precondition that keeps a visitor in a static field.
+                preconditions:
+                  - org.openrewrite.test.internal.KeepsVisitorInStaticField
+                recipeList:
+                  - org.openrewrite.test.internal.KeepsMatchersInStaticFields
+                """, "org.openrewrite.test.PreconditionWithStaticVisitor"),
+              text("foo")
+            ));
+            assertThat(e).hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
         void acceptMatchersInStaticFields() {
             rewriteRun(
               spec -> spec.recipe(new KeepsMatchersInStaticFields()),

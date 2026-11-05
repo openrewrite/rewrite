@@ -23,9 +23,12 @@ import org.openrewrite.config.RecipePreconditions;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -38,14 +41,19 @@ final class StaticVisitors {
     private static final ClassValue<List<Field>> STATIC_FIELDS = new ClassValue<List<Field>>() {
         @Override
         protected List<Field> computeValue(Class<?> type) {
+            Field[] declared;
+            try {
+                declared = type.getDeclaredFields();
+            } catch (RuntimeException | LinkageError ignored) {
+                return emptyList();
+            }
             List<Field> fields = new ArrayList<>();
-            for (Field field : type.getDeclaredFields()) {
-                if (Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() && mayHoldVisitor(field.getType())) {
+            for (Field field : declared) {
+                if (Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() && mayHoldVisitor(field)) {
                     try {
                         field.setAccessible(true);
                         fields.add(field);
                     } catch (RuntimeException ignored) {
-                        // a field that can't be read can't be checked
                     }
                 }
             }
@@ -62,14 +70,13 @@ final class StaticVisitors {
         Set<String> found = new LinkedHashSet<>();
         for (Class<?> c : classes) {
             for (Field field : STATIC_FIELDS.get(c)) {
-                Object value;
+                Map<String, TreeVisitor<?, ?>> visitors;
                 try {
-                    value = field.get(null);
+                    visitors = visitors(AddedMarkers.typeName(c) + "." + field.getName(), field.get(null));
                 } catch (IllegalAccessException | RuntimeException | LinkageError ignored) {
                     continue;
                 }
-                String path = AddedMarkers.typeName(c) + "." + field.getName();
-                for (Map.Entry<String, TreeVisitor<?, ?>> visitor : visitors(path, value).entrySet()) {
+                for (Map.Entry<String, TreeVisitor<?, ?>> visitor : visitors.entrySet()) {
                     found.add("  " + visitor.getKey() + " -> " + AddedMarkers.typeName(visitor.getValue().getClass()));
                 }
             }
@@ -95,8 +102,7 @@ final class StaticVisitors {
             return;
         }
         if (!(r instanceof AdHocRecipe) && !(r instanceof AdHocScanningRecipe)) {
-            for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class && !isJdk(c);
-                 c = c.getSuperclass()) {
+            for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
                 collectNested(c, classes);
             }
         }
@@ -119,7 +125,6 @@ final class StaticVisitors {
                 collectNested(nested, classes);
             }
         } catch (RuntimeException | LinkageError ignored) {
-            // a class whose nested classes can't be loaded is checked on its own
         }
     }
 
@@ -136,12 +141,12 @@ final class StaticVisitors {
             for (int i = 0; i < elements.length; i++) {
                 addIfVisitor(found, path + "[" + i + "]", elements[i]);
             }
-        } else if (value instanceof Collection && isJdk(value.getClass())) {
+        } else if (value instanceof Collection && AccumulatorContents.isJdk(value.getClass())) {
             int i = 0;
             for (Object element : (Collection<?>) value) {
                 addIfVisitor(found, path + "[" + i++ + "]", element);
             }
-        } else if (value instanceof Map && isJdk(value.getClass())) {
+        } else if (value instanceof Map && AccumulatorContents.isJdk(value.getClass())) {
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                 addIfVisitor(found, path + "[" + entry.getKey() + "]", entry.getValue());
             }
@@ -159,16 +164,39 @@ final class StaticVisitors {
         }
     }
 
-    private static boolean mayHoldVisitor(Class<?> type) {
-        return TreeVisitor.class.isAssignableFrom(type) || type.isAssignableFrom(TreeVisitor.class) ||
-               type.isArray() && !type.getComponentType().isPrimitive() ||
-               Collection.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type) ||
-               Optional.class.equals(type) || AtomicReference.class.isAssignableFrom(type);
+    private static boolean mayHoldVisitor(Field field) {
+        Class<?> type = field.getType();
+        if (type.isArray()) {
+            return mayBeVisitor(type.getComponentType());
+        }
+        boolean map = Map.class.isAssignableFrom(type);
+        if (map || Collection.class.isAssignableFrom(type) || Optional.class.equals(type) ||
+            AtomicReference.class.isAssignableFrom(type)) {
+            return mayBeVisitor(elementType(field, map ? 1 : 0));
+        }
+        return mayBeVisitor(type);
     }
 
-    private static boolean isJdk(Class<?> type) {
-        String name = type.getName();
-        return name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") ||
-               name.startsWith("sun.") || name.startsWith("com.sun.");
+    private static Type elementType(Field field, int index) {
+        try {
+            Type generic = field.getGenericType();
+            if (generic instanceof ParameterizedType) {
+                Type[] arguments = ((ParameterizedType) generic).getActualTypeArguments();
+                if (index < arguments.length) {
+                    return arguments[index];
+                }
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+        return Object.class;
+    }
+
+    private static boolean mayBeVisitor(Type type) {
+        Type raw = type instanceof ParameterizedType ? ((ParameterizedType) type).getRawType() : type;
+        if (!(raw instanceof Class)) {
+            return true;
+        }
+        Class<?> c = (Class<?>) raw;
+        return TreeVisitor.class.isAssignableFrom(c) || c.isAssignableFrom(TreeVisitor.class);
     }
 }
