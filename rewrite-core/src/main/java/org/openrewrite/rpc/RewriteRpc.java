@@ -558,6 +558,10 @@ public class RewriteRpc {
         if (preconditions.isEmpty()) {
             return null;
         }
+        if (preconditions.size() == 1) {
+            // Unwrapped, so that RpcRecipe#editPreconditionReadsContent recognises a lone language gate
+            return buildPreconditionVisitor(preconditions.get(0));
+        }
 
         List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
         for (PrepareRecipeResponse.Precondition p : preconditions) {

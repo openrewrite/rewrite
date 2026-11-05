@@ -973,6 +973,13 @@ function javascriptVisitorAdapter<P>(visitor: JavaVisitor<P>): JavaVisitor<P> {
 
 registerJavaExtensionKinds(Object.values(JS.Kind), javascriptVisitorAdapter);
 
+/** Whether a file, or a source path, is TypeScript by its extension: `.ts`, `.tsx`, `.mts` or `.cts`, declaration files included. */
+export function isTypeScript(source: JS.CompilationUnit | string): boolean {
+    return TYPESCRIPT_EXTENSION.test(typeof source === "string" ? source : source.sourcePath);
+}
+
+const TYPESCRIPT_EXTENSION = /\.[cm]?tsx?$/;
+
 export function isJavaScript(tree: any): tree is JS {
     return KindValues.has(tree["kind"]);
 }

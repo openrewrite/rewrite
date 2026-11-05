@@ -79,7 +79,7 @@ public class MoveFile extends Recipe {
                         return ((SourceFile) tree).withSourcePath(newPath);
                     }
                 }
-                return super.visit(tree, ctx);
+                return tree;
             }
         };
     }

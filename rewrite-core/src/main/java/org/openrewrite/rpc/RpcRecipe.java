@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.rpc.internal.FindTreesOfType;
 import org.openrewrite.rpc.request.PrepareRecipeResponse;
 
 import java.time.Duration;
@@ -167,6 +168,14 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     public boolean reachesEditVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
         return reachesRemote(this::editor, editVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Whether an earlier recipe's edit can change what the edit precondition decides.
+     * A lone {@link FindTreesOfType}, a peer's language gate, only checks the file's class, which edits keep.
+     */
+    public boolean editPreconditionReadsContent() {
+        return editPreconditionVisitor != null && !(editPreconditionVisitor instanceof FindTreesOfType);
     }
 
     /**

@@ -17,8 +17,7 @@ import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
 import {JavaScriptTypeMapping} from "./type-mapping";
-
-const TYPESCRIPT_FILE = /\.[cm]?tsx?$/;
+import {isTypeScript} from "./tree";
 
 // Free functions are not exported-type entries; only nominal types (and value modules, which are
 // descended into for nested types) qualify.
@@ -187,7 +186,7 @@ function arity(cls: Type.Class): number {
 
 /** A TypeScript declaration/source FILE (e.g. a `lib.*.d.ts` of ambient globals), used directly as a program entry. */
 function declarationFileEntry(artifact: string): string | undefined {
-    return ts.sys.fileExists(artifact) && TYPESCRIPT_FILE.test(artifact) ? artifact : undefined;
+    return ts.sys.fileExists(artifact) && isTypeScript(artifact) ? artifact : undefined;
 }
 
 /** Top-level ambient type declarations of a script (non-module) file — a `lib.*.d.ts`'s globals; namespaces descended for nested types. */
@@ -231,7 +230,7 @@ function resolvePackageEntry(dir: string, options: ts.CompilerOptions, host: ts.
         for (const attempt of [conditions, [...conditions, "require"]]) {
             const resolved = ts.resolveModuleName(manifest.name, path.join(dir, "__entry__.ts"),
                 {...options, customConditions: attempt}, host).resolvedModule?.resolvedFileName;
-            if (resolved && TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved)) {
+            if (resolved && isTypeScript(resolved) && containedIn(dir, resolved)) {
                 return resolved;
             }
         }

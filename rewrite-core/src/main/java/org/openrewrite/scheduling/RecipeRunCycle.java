@@ -469,8 +469,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
             captureRpc(currentRpc, touched, refCheckpoints);
 
-            // Flush batch if switching to a different RPC or non-RPC recipe
-            if (batch.rpc != null && batch.rpc != currentRpc) {
+            // Flush before a different RPC, a non-RPC recipe, or a precondition that reads the batch's edits
+            if (batch.rpc != null && (batch.rpc != currentRpc || ((RpcRecipe) recipe).editPreconditionReadsContent())) {
                 source = flushBatch(batch, source);
                 if (source == null) {
                     return null;
@@ -551,7 +551,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
             } catch (Throwable t) {
                 if (isInBatch) {
-                    batch.clear();
+                    // The recipes queued before this one run first, as they would unbatched
+                    SourceFile flushed = flushBatch(batch, src);
+                    if (flushed == null) {
+                        return null;
+                    }
+                    SourceFile marked = handleError(recipe, flushed, flushed, t);
+                    return marked != null && marked != flushed ?
+                            addRecipesThatMadeChanges(recipeStack, marked) :
+                            marked;
                 }
                 after = handleError(recipe, src, after, t);
             }
@@ -572,8 +580,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile flushBatch(BatchState batch, SourceFile source) {
-        if (batch.rpc == null || batch.items.isEmpty()) {
+        try {
+            return sendBatch(batch, source);
+        } finally {
+            // Emptied even when recording the results throws, so editSource's catch doesn't send the batch twice
             batch.clear();
+        }
+    }
+
+    private @Nullable SourceFile sendBatch(BatchState batch, SourceFile source) {
+        if (batch.rpc == null || batch.items.isEmpty()) {
             return source;
         }
 
@@ -629,7 +645,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     recordSourceFileResultAndSearchResults(originalBefore, null, batch.recipeStacks.get(i), emptyList(), ctx);
                 }
             }
-            batch.clear();
             return null;
         }
 
@@ -667,7 +682,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
         }
 
-        batch.clear();
         return fetched;
     }
 
@@ -693,7 +707,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
             }
         }
-        batch.clear();
         return source;
     }
 
