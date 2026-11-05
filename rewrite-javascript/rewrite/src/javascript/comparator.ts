@@ -1985,15 +1985,15 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<JTree> {
  */
 export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVisitor {
     /**
-     * When true, allows patterns without type annotations to match code with type annotations.
-     * This enables lenient matching where undefined types on either side are considered compatible.
+     * When true, a pattern without a type annotation matches code with or without one, and type
+     * attribution missing on either side is not a mismatch.
      */
     protected readonly lenientTypeMatching: boolean;
 
     /**
      * Creates a new semantic comparator visitor.
      *
-     * @param lenientTypeMatching If true, a pattern without a type annotation matches code with one
+     * @param lenientTypeMatching If true, a pattern without a type annotation matches code with or without one
      */
     constructor(lenientTypeMatching: boolean = false) {
         super();
