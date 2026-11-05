@@ -157,17 +157,12 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
             if (precedence === undefined) {
                 return undefined;
             }
-            if (binary.operator.element === JS.Binary.Type.Exponentiation) {
-                // Right-associative, and `-a ** b` is a syntax error
-                if (binary.left?.id === childId) {
-                    return {precedence: Precedence.Postfix};
-                }
-                return binary.right?.id === childId ? {precedence} : undefined;
-            }
+            // Right-associative, and `-a ** b` is a syntax error
+            const exponentiation = binary.operator.element === JS.Binary.Type.Exponentiation;
             if (binary.left?.id === childId) {
-                return {precedence};
+                return {precedence: exponentiation ? Precedence.Postfix : precedence};
             }
-            return binary.right?.id === childId ? {precedence: precedence + 1} : undefined;
+            return binary.right?.id === childId ? {precedence: exponentiation ? precedence : precedence + 1} : undefined;
         }
 
         case J.Kind.Unary: {
