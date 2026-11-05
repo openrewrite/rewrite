@@ -55,6 +55,10 @@ import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.rpc.internal.FindTreesOfType;
+import org.openrewrite.rpc.request.PrepareRecipeResponse;
+import org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition;
+import org.openrewrite.rpc.request.RpcRequest;
 import org.openrewrite.text.Find;
 import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
@@ -92,6 +96,7 @@ class RewriteRpcTest implements RewriteTest {
 
     RecipeMarketplace marketplace;
     RewriteRpc client;
+    List<String> sentByClient = new CopyOnWriteArrayList<>();
     JsonRpc serverJsonRpc;
     RewriteRpc server;
 
@@ -107,8 +112,13 @@ class RewriteRpcTest implements RewriteTest {
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
-          .batchSize(1);
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace) {
+            @Override
+            protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
+                sentByClient.add(method);
+                return super.send(method, body, responseType);
+            }
+        }.batchSize(1);
 
         serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut));
         server = new RewriteRpc(serverJsonRpc, marketplace, List.of(new TestRecipeBundleResolver()))
@@ -1173,6 +1183,71 @@ class RewriteRpcTest implements RewriteTest {
           .extracting(r -> r.getAfter().printAll())
           .containsExactly("kept:generated");
         assertThat(run.getDataTableRows(TextMatches.class)).isEmpty();
+    }
+
+    @Test
+    void batchedEditPreconditionSeesTheEarlierRecipesEdits() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(
+              client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "kept")),
+              editGatedBy(new Precondition("org.openrewrite.text.Find", Map.of("find", "kept"), null, null),
+                "org.openrewrite.text.FindAndReplace", Map.of("find", "kept", "replace", "found")))))
+            .validateRecipeSerialization(false)
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "found"
+          )
+        );
+    }
+
+    @Test
+    void recipesGatedOnlyByTheirLanguageShareOneBatchVisit() {
+        Recipe composite = new CompositeRecipe(List.of(
+          editGatedBy(languageGate(PlainText.class.getName()), "org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A")),
+          editGatedBy(languageGate(PlainText.class.getName()), "org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"))));
+        sentByClient.clear();
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(composite,
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults()).extracting(r -> r.getAfter().printAll()).containsExactly("B");
+        assertThat(sentByClient).filteredOn(method -> method.endsWith("Visit")).containsExactly("BatchVisit");
+    }
+
+    @Test
+    void editPreconditionThatThrowsKeepsTheEarlierBatchedEdits() {
+        // A language gate is checked while the batch is pending, and one naming a class the host lacks throws
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(
+            client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "changed")),
+            editGatedBy(languageGate("org.example.Missing"),
+              "org.openrewrite.text.FindAndReplace", Map.of("find", "changed", "replace", "unreached")))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults()).singleElement().satisfies(r -> {
+            assertThat(((PlainText) r.getAfter()).getText()).isEqualTo("changed");
+            assertThat(r.getAfter().getMarkers().findFirst(Markup.Error.class))
+              .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo("org.openrewrite.text.FindAndReplace"));
+        });
+    }
+
+    private static Precondition languageGate(String treeType) {
+        return new Precondition(FindTreesOfType.class.getName(), Map.of("type", treeType), null, null);
+    }
+
+    /**
+     * Builds the recipe as it arrives from a peer that sends its edit precondition with PrepareRecipe.
+     */
+    private Recipe editGatedBy(Precondition editPrecondition, String recipeName, Map<String, Object> options) {
+        RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(recipeName, options);
+        String editVisitor = prepared.getEditVisitor();
+        return client.recipeFromPrepareResponse(new PrepareRecipeResponse(editVisitor.substring("edit:".length()),
+          prepared.getDescriptor(), editVisitor, List.of(editPrecondition), null, List.of(), null, List.of(), null));
     }
 
     /**

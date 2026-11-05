@@ -472,8 +472,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
             captureRpc(currentRpc, touched, refCheckpoints);
 
-            // Flush batch if switching to a different RPC or non-RPC recipe
-            if (batch.rpc != null && batch.rpc != currentRpc) {
+            // Flush before a different RPC, a non-RPC recipe, or a precondition that reads the batch's edits
+            if (batch.rpc != null && (batch.rpc != currentRpc || ((RpcRecipe) recipe).editPreconditionReadsContent())) {
                 source = flushBatch(batch, source);
                 if (source == null) {
                     return null;
@@ -554,7 +554,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
             } catch (Throwable t) {
                 if (isInBatch) {
-                    batch.clear();
+                    // The recipes queued before this one run first, as they would unbatched
+                    SourceFile flushed = flushBatch(batch, src);
+                    if (flushed == null) {
+                        return null;
+                    }
+                    SourceFile marked = handleError(recipe, flushed, flushed, t);
+                    return marked != null && marked != flushed ? addRecipesThatMadeChanges(recipeStack, marked) : marked;
                 }
                 after = handleError(recipe, src, after, t);
             }
