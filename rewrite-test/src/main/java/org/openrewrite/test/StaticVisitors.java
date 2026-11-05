@@ -25,6 +25,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.CodeSource;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -69,6 +73,9 @@ final class StaticVisitors {
         collectRecipeClasses(recipe, classes, newSetFromMap(new IdentityHashMap<>()));
         Set<String> found = new LinkedHashSet<>();
         for (Class<?> c : classes) {
+            if (!underTest(c)) {
+                continue;
+            }
             for (Field field : STATIC_FIELDS.get(c)) {
                 Map<String, TreeVisitor<?, ?>> visitors;
                 try {
@@ -113,6 +120,21 @@ final class StaticVisitors {
         }
         for (Recipe child : r.getRecipeList()) {
             collectRecipeClasses(child, classes, seen);
+        }
+    }
+
+    /**
+     * Whether the class comes from the build output of the module under test, a directory, and not from a dependency
+     * jar, whose violations fail in the build of the project that owns it.
+     */
+    private static boolean underTest(Class<?> c) {
+        try {
+            CodeSource source = c.getProtectionDomain().getCodeSource();
+            URL location = source == null ? null : source.getLocation();
+            return location != null && "file".equals(location.getProtocol()) &&
+                   Files.isDirectory(Paths.get(location.toURI()));
+        } catch (Exception ignored) {
+            return false;
         }
     }
 

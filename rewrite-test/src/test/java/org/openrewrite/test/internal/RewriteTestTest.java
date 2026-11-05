@@ -24,6 +24,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
@@ -61,6 +62,11 @@ import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -73,6 +79,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -2206,6 +2214,50 @@ class RewriteTestTest implements RewriteTest {
             ))
               .isInstanceOf(AssertionError.class)
               .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
+        void acceptVisitorInStaticFieldOfRecipeFromDependencyJar(@TempDir Path dir) throws Exception {
+            try (URLClassLoader dependency = loadFromJar(dir, KeepsVisitorInStaticField.class)) {
+                Constructor<?> constructor = dependency.loadClass(KeepsVisitorInStaticField.class.getName())
+                  .getDeclaredConstructor();
+                constructor.setAccessible(true);
+                Recipe recipe = (Recipe) constructor.newInstance();
+                assertThat(recipe.getClass()).isNotEqualTo(KeepsVisitorInStaticField.class);
+                rewriteRun(
+                  spec -> spec.recipe(recipe).validateRecipeSerialization(false),
+                  text("foo")
+                );
+            }
+        }
+
+        private URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
+            Path jar = dir.resolve("dependency.jar");
+            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass.getDeclaredClasses()));
+            classes.add(recipeClass);
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                for (Class<?> c : classes) {
+                    String entry = c.getName().replace('.', '/') + ".class";
+                    out.putNextEntry(new JarEntry(entry));
+                    try (InputStream in = recipeClass.getClassLoader().getResourceAsStream(entry)) {
+                        assertThat(in).isNotNull();
+                        in.transferTo(out);
+                    }
+                    out.closeEntry();
+                }
+            }
+            return new URLClassLoader(new URL[]{jar.toUri().toURL()}, recipeClass.getClassLoader()) {
+                @Override
+                protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                    if (!name.equals(recipeClass.getName()) && !name.startsWith(recipeClass.getName() + "$")) {
+                        return super.loadClass(name, resolve);
+                    }
+                    synchronized (getClassLoadingLock(name)) {
+                        Class<?> loaded = findLoadedClass(name);
+                        return loaded != null ? loaded : findClass(name);
+                    }
+                }
+            };
         }
 
         @Test
