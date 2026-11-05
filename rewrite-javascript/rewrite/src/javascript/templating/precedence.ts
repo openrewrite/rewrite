@@ -490,8 +490,8 @@ function hasOmitParentheses(newClass: J.NewClass): boolean {
     return !!newClass.arguments?.markers?.markers?.some(marker => marker.kind === J.Markers.OmitParentheses);
 }
 
-/** The JS parser reuses `J.NewClass` for object literals, which have no `class`. */
-function isObjectLiteral(expression: J): boolean {
+/** Whether `expression` is an object literal, which the JS parser models as a `J.NewClass` with no `class`. */
+export function isObjectLiteral(expression: J): expression is J.NewClass {
     return expression.kind === J.Kind.NewClass && !(expression as J.NewClass).class;
 }
 
@@ -544,8 +544,11 @@ export function startsWithDeclarationToken(expression: J): boolean {
     return isObjectLiteral(leftmost) || isFunctionOrClassExpression(leftmost);
 }
 
-/** A function or class *expression*, which the JS parser wraps in a `JS.StatementExpression`. */
-function isFunctionOrClassExpression(expression: J): boolean {
+/**
+ * Whether `expression` is a function or class *expression*, which the JS parser wraps in a
+ * `JS.StatementExpression`. An arrow function is a `JS.ArrowFunction` and does not count.
+ */
+export function isFunctionOrClassExpression(expression: J): expression is JS.StatementExpression {
     if (expression.kind !== JS.Kind.StatementExpression) {
         return false;
     }
@@ -553,8 +556,24 @@ function isFunctionOrClassExpression(expression: J): boolean {
     return statement?.kind === J.Kind.MethodDeclaration || statement?.kind === J.Kind.ClassDeclaration;
 }
 
-/** Walks down the left spine, to the token the expression starts with. */
-function leftmostExpression(expression: J): J {
+/**
+ * The function a function *expression* `function () {}` declares, unwrapped from the
+ * `JS.StatementExpression` the JS parser puts around it. Anything else, a function declaration
+ * or a method included, answers undefined, and so does a class expression.
+ */
+export function functionExpressionOf(expression: J): J.MethodDeclaration | undefined {
+    if (expression.kind !== JS.Kind.StatementExpression) {
+        return undefined;
+    }
+    const statement = (expression as JS.StatementExpression).statement;
+    return statement?.kind === J.Kind.MethodDeclaration ? statement as J.MethodDeclaration : undefined;
+}
+
+/**
+ * Walks down the left spine, to the node holding the token the expression is printed starting
+ * with: `a` in `a.b().c + 1`. A node with no left operand answers itself.
+ */
+export function leftmostExpression(expression: J): J {
     let current = expression;
     for (let next = leftmostChild(current); next; next = leftmostChild(current)) {
         current = next;
@@ -562,7 +581,17 @@ function leftmostExpression(expression: J): J {
     return current;
 }
 
-function leftmostChild(expression: J): J | undefined {
+/** Whether `child` is the {@link leftmostChild} of `parent`, so that `parent` is printed starting with it. */
+export function isLeftmostChild(parent: J, child: J): boolean {
+    return leftmostChild(parent)?.id === child.id;
+}
+
+/**
+ * The operand `expression` is printed starting with, one step down its left spine: the left of a
+ * binary, the target of a member access, the callee of a call, the operand of a postfix `++`/`--`.
+ * Undefined where the expression starts with a token of its own, as a prefix unary or a literal does.
+ */
+export function leftmostChild(expression: J): J | undefined {
     switch (expression.kind) {
         case J.Kind.Binary:
             return (expression as J.Binary).left;

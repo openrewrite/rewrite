@@ -568,6 +568,33 @@ function withParts(
     return {...call, arguments: {...call.arguments, elements: args}};
 }
 
+/**
+ * `call` with the body of `block`'s factory replaced by what `edit` makes of it, the factory staying
+ * in whichever wrapper it was written in. An arrow factory written without braces has no block body,
+ * so it is left alone and `edit` is not called. `block` is the {@link amdBlockOf} of `call`.
+ */
+export function withFactoryBody(
+    call: J.MethodInvocation,
+    block: AmdBlock,
+    edit: (body: J.Block) => J.Block
+): J.MethodInvocation {
+    const body = bodyOf(block);
+    if (body?.kind !== J.Kind.Block) {
+        return call;
+    }
+    const updated = edit(body as J.Block);
+    if (updated === body) {
+        return call;
+    }
+    const factory: J.MethodDeclaration | J.Lambda = block.factory.kind === J.Kind.MethodDeclaration ?
+        {...block.factory as J.MethodDeclaration, body: updated} :
+        {...block.factory as J.Lambda, body: updated};
+    const args = [...call.arguments.elements];
+    const original = args[block.factoryIndex];
+    args[block.factoryIndex] = {...original, element: restoreFactory(original.element, factory)};
+    return {...call, arguments: {...call.arguments, elements: args}};
+}
+
 /** Puts the rewritten factory back into whichever wrapper the original was written as. */
 function restoreFactory(original: Expression, factory: J.MethodDeclaration | J.Lambda): Expression {
     if (original.kind === JS.Kind.StatementExpression) {
