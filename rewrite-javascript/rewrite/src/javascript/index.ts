@@ -40,10 +40,11 @@ export type {Scope, Meaning, Reference} from "./scope";
 // the free functions that have no visitor to reach it through are already in this list.
 export {
     scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesUsedWithin, namesReferencedWithin, bindingNames,
-    deconflict, isReference, isValueReference, isWrite, resolve, referencesOf, declarationsOf, compilationUnitOf, walk
+    deconflict, isReference, isValueReference, isWrite, meaningAt, resolve, referencesOf, declarationsOf, compilationUnitOf,
+    walk
 } from "./scope";
-export type {QuoteChar, AddImportOptions} from "./add-import";
-export {ImportStyle, moduleNameOf, AddImport} from "./add-import";
+export type {QuoteChar, AddImportOptions, ModuleScopeBinding} from "./add-import";
+export {ImportStyle, moduleNameOf, moduleScopeBindings, AddImport} from "./add-import";
 // AMD mechanics `recipes-ui5` builds on directly, beyond the `maybeBind` surface below.
 export type {AmdBlock, AmdCalleeOptions} from "./amd";
 export {
@@ -52,7 +53,9 @@ export {
     withDependency, withUnboundDependency, withoutDependencyAt,
     RemoveAmdDependency, removeNewlyUnusedAmdBindings
 } from "./amd";
-export type {MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings} from "./binding";
+export type {
+    ExportOfOptions, MaybeBindOptions, MaybeUnbindOptions, MaybeRebindOptions, ModuleBindings, ModuleExport
+} from "./binding";
 export {maybeBind, maybeUnbind, maybeRebind, moduleBindings, isAmdBlock, maybeRemoveImport, maybeAddImport} from "./binding";
 export * from "./remove-import";
 export * from "./cleanup/index";
