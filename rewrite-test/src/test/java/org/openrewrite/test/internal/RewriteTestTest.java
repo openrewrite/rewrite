@@ -24,6 +24,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
@@ -61,6 +62,11 @@ import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -73,6 +79,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -2126,6 +2134,154 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class NoStaticVisitors {
+
+        @Test
+        void rejectVisitorInStaticFieldOfRecipe() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorInStaticField()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageStartingWith(
+                "A recipe should create its visitors in getVisitor() and keep none in static fields")
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor")
+              .hasMessageContaining("noStaticVisitors(false)");
+        }
+
+        @Test
+        void rejectPreconditionInStaticField() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsPreconditionInStaticField()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsPreconditionInStaticField.PRECONDITION -> Preconditions.Or");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfNestedClass() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorInStaticFieldOfNestedClass()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining(
+                "KeepsVisitorInStaticFieldOfNestedClass.Outer.INNER -> KeepsVisitorInStaticFieldOfNestedClass.Inner");
+        }
+
+        @Test
+        void rejectVisitorsInStaticList() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipe(new KeepsVisitorsInStaticList()),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorsInStaticList.VISITORS[1] -> PlainTextVisitor");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfDeclarativeRecipeStep() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.ListsRecipeWithStaticVisitor
+                displayName: Lists a recipe with a static visitor
+                description: Lists a recipe that keeps a visitor in a static field.
+                recipeList:
+                  - org.openrewrite.test.internal.KeepsVisitorInStaticField
+                """, "org.openrewrite.test.ListsRecipeWithStaticVisitor"),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
+        void rejectVisitorInStaticFieldOfDeclarativeRecipePrecondition() {
+            assertThatThrownBy(() -> rewriteRun(
+              spec -> spec.recipeFromYaml("""
+                type: specs.openrewrite.org/v1beta/recipe
+                name: org.openrewrite.test.PreconditionWithStaticVisitor
+                displayName: Has a precondition with a static visitor
+                description: Has a precondition that keeps a visitor in a static field.
+                preconditions:
+                  - org.openrewrite.test.internal.KeepsVisitorInStaticField
+                recipeList:
+                  - org.openrewrite.test.internal.KeepsMatchersInStaticFields
+                """, "org.openrewrite.test.PreconditionWithStaticVisitor"),
+              text("foo")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+        }
+
+        @Test
+        void acceptVisitorInStaticFieldOfRecipeFromDependencyJar(@TempDir Path dir) throws Exception {
+            try (URLClassLoader dependency = loadFromJar(dir, KeepsVisitorInStaticField.class)) {
+                Constructor<?> constructor = dependency.loadClass(KeepsVisitorInStaticField.class.getName())
+                  .getDeclaredConstructor();
+                constructor.setAccessible(true);
+                Recipe recipe = (Recipe) constructor.newInstance();
+                assertThat(recipe.getClass()).isNotEqualTo(KeepsVisitorInStaticField.class);
+                rewriteRun(
+                  spec -> spec.recipe(recipe).validateRecipeSerialization(false),
+                  text("foo")
+                );
+            }
+        }
+
+        private URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
+            Path jar = dir.resolve("dependency.jar");
+            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass));
+            for (int i = 0; i < classes.size(); i++) {
+                classes.addAll(List.of(classes.get(i).getDeclaredClasses()));
+            }
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+                for (Class<?> c : classes) {
+                    String entry = c.getName().replace('.', '/') + ".class";
+                    out.putNextEntry(new JarEntry(entry));
+                    try (InputStream in = recipeClass.getClassLoader().getResourceAsStream(entry)) {
+                        assertThat(in).isNotNull();
+                        in.transferTo(out);
+                    }
+                    out.closeEntry();
+                }
+            }
+            return new URLClassLoader(new URL[]{jar.toUri().toURL()}, recipeClass.getClassLoader()) {
+                @Override
+                protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                    if (!name.equals(recipeClass.getName()) && !name.startsWith(recipeClass.getName() + "$")) {
+                        return super.loadClass(name, resolve);
+                    }
+                    synchronized (getClassLoadingLock(name)) {
+                        Class<?> loaded = findLoadedClass(name);
+                        return loaded != null ? loaded : findClass(name);
+                    }
+                }
+            };
+        }
+
+        @Test
+        void acceptMatchersInStaticFields() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsMatchersInStaticFields()),
+              text("foo")
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().noStaticVisitors(false).build())
+                .recipe(new KeepsVisitorInStaticField()),
+              text("foo")
+            );
+        }
+    }
+
+    @Nested
     class OrderStepsForEarlierChanges {
         private static final String RECURSIVE_FIRST = """
           type: specs.openrewrite.org/v1beta/recipe
@@ -3566,5 +3722,106 @@ class RenameListImportAndRebuildTheOthers extends Recipe {
                 }));
             }
         };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorInStaticField extends Recipe {
+
+    private static final TreeVisitor<?, ExecutionContext> VISITOR = new Visitor();
+
+    String displayName = "Keeps a visitor in a static field";
+
+    String description = "Keeps the visitor it returns in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return VISITOR;
+    }
+
+    private static class Visitor extends PlainTextVisitor<ExecutionContext> {
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsPreconditionInStaticField extends Recipe {
+
+    private static final TreeVisitor<?, ExecutionContext> PRECONDITION =
+      Preconditions.or(new PlainTextVisitor<>(), new PlainTextVisitor<>());
+
+    String displayName = "Keeps a precondition in a static field";
+
+    String description = "Keeps the visitor of its precondition in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(PRECONDITION, new PlainTextVisitor<>());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorInStaticFieldOfNestedClass extends Recipe {
+
+    String displayName = "Keeps a visitor in a static field of a nested class";
+
+    String description = "Keeps a visitor that its visitor delegates to in a static field.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new Outer();
+    }
+
+    private static class Outer extends PlainTextVisitor<ExecutionContext> {
+        private static final Inner INNER = new Inner();
+
+        @Override
+        public PlainText visitText(PlainText text, ExecutionContext ctx) {
+            return (PlainText) INNER.visitNonNull(text, ctx, getCursor().getParentOrThrow());
+        }
+    }
+
+    private static class Inner extends PlainTextVisitor<ExecutionContext> {
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsVisitorsInStaticList extends Recipe {
+
+    private static final List<Object> VISITORS = List.of("not a visitor", new PlainTextVisitor<ExecutionContext>());
+
+    String displayName = "Keeps visitors in a static list";
+
+    String description = "Keeps the visitors it runs in a static list.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>();
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsMatchersInStaticFields extends Recipe {
+
+    private static final MethodMatcher MATCHER = new MethodMatcher("java.util.List add(..)");
+
+    private static final List<String> TYPES = List.of("java.util.List");
+
+    String displayName = "Keeps matchers in static fields";
+
+    String description = "Keeps what its visitors are built from in static fields, and creates the visitors in getVisitor().";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>();
     }
 }

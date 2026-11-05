@@ -731,6 +731,9 @@ public interface RewriteTest extends SourceSpecs {
         if (quality.orderStepsForEarlierChanges()) {
             CompositeOrder.assertOrdered(recipe);
         }
+        if (quality.noStaticVisitors()) {
+            StaticVisitors.assertNoneKept(recipe);
+        }
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
