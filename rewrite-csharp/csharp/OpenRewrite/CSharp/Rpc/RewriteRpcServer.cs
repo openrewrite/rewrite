@@ -944,6 +944,7 @@ public class RewriteRpcServer
         string? version = null;          // requested version, as supplied by the caller (never mutated)
         string? resolvedVersion = null;  // concrete version NuGet resolved it to (null for a loose assembly)
         string? publishDir = null;       // the bundle's publish output (null for a loose assembly)
+        var unchanged = false;           // whether a NuGet install kept an earlier publish output
 
         // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
         // a JSON string is a local path; a JSON object describes a NuGet package.
@@ -1000,7 +1001,7 @@ public class RewriteRpcServer
             // floating/unspecified spec — restore resolves either uniformly.
             var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
             resolvedVersion = resolved;
-            publishDir = PublishBundle(stagingCsproj, resolved);
+            (publishDir, unchanged) = PublishBundle(stagingCsproj, resolved);
             ActivateBundle(publishDir, packageName);
         }
 
@@ -1008,7 +1009,8 @@ public class RewriteRpcServer
         {
             RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
             Version = resolvedVersion ?? version,
-            PublishDir = publishDir
+            PublishDir = publishDir,
+            Unchanged = unchanged
         });
     }
 
@@ -1064,15 +1066,12 @@ public class RewriteRpcServer
         var root = _recipeInstallDir
             ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes");
         // Mirror NuGet's global-packages layout: <root>/<id>/<version>/, versions as
-        // immutable siblings. Never deleted — old versions accumulate (no cleanup),
-        // matching ~/.nuget and existing Moderne/OpenRewrite practice.
+        // siblings. Old versions accumulate, as in ~/.nuget.
         var bundleDir = Path.Combine(root, Sanitize(packageName), Sanitize(version ?? "unversioned"));
         var csprojPath = Path.Combine(bundleDir, "Recipes.csproj");
         _recipesProjectDir = bundleDir;
 
-        // Reuse an already-published version dir (idempotent, like NuGet reusing an
-        // already-extracted package). Snapshots carry timestamps in their version string,
-        // so each publish lands in a fresh dir.
+        // Every install restores the staging project again, so an existing one is reused.
         if (File.Exists(csprojPath))
         {
             return csprojPath;
@@ -1203,21 +1202,64 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Publish stage: publish a restored staging project into its permanent, resolved-version-keyed
-    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), reusing it if already
-    /// present. Returns the publish output directory.
+    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), keeping an existing one
+    /// that was published from the package contents the restore resolved. Returns the publish
+    /// output directory and whether it was kept.
     /// </summary>
-    private static string PublishBundle(string stagingCsproj, string resolvedVersion)
+    private static (string PublishDir, bool Unchanged) PublishBundle(string stagingCsproj, string resolvedVersion)
     {
-        var bundleRoot = Directory.GetParent(Path.GetDirectoryName(stagingCsproj)!)!.FullName; // <root>/<id>
+        var stagingDir = Path.GetDirectoryName(stagingCsproj)!;
+        var bundleRoot = Directory.GetParent(stagingDir)!.FullName; // <root>/<id>
         var publishDir = Path.Combine(bundleRoot, Sanitize(resolvedVersion));
-        // The publish output is an immutable sibling: publish only when this resolved version
-        // isn't there yet. --no-restore reuses the staging project's restore.
-        if (!File.Exists(Path.Combine(publishDir, "Recipes.dll")))
+        // A package rebuilt under the same version has a different content hash.
+        if (File.Exists(Path.Combine(publishDir, "Recipes.dll")) &&
+            PublishedBundle.Read(publishDir).PackageHashes.IsSubsetOf(RestoredPackageHashes(stagingDir)))
         {
-            RunDotnet(Path.GetDirectoryName(stagingCsproj)!,
-                $"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
+            return (publishDir, true);
         }
-        return publishDir;
+
+        // Publish beside the old output and swap it in. A publish over it skips each file whose new copy
+        // has the old one's size and timestamp, and a failed one leaves it half-written.
+        // --no-restore reuses the staging project's restore.
+        var fresh = Path.Combine(bundleRoot, $".publish-{Guid.NewGuid():N}");
+        try
+        {
+            RunDotnet(stagingDir, $"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{fresh}\"");
+            if (Directory.Exists(publishDir))
+            {
+                var stale = Path.Combine(bundleRoot, $".stale-{Guid.NewGuid():N}");
+                Directory.Move(publishDir, stale);
+                try
+                {
+                    Directory.Move(fresh, publishDir);
+                }
+                catch
+                {
+                    Directory.Move(stale, publishDir);
+                    throw;
+                }
+                Directory.Delete(stale, true);
+            }
+            else
+            {
+                Directory.Move(fresh, publishDir);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(fresh))
+            {
+                Directory.Delete(fresh, true);
+            }
+        }
+        return (publishDir, false);
+    }
+
+    /// <summary>The content hash of each package in the staging project's restore, which publish reads.</summary>
+    private static HashSet<string> RestoredPackageHashes(string stagingDir)
+    {
+        using var assets = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(stagingDir, "obj", "project.assets.json")));
+        return PublishedBundle.PackageHashesIn(assets.RootElement.GetProperty("libraries"));
     }
 
     /// <summary>
@@ -2633,6 +2675,12 @@ public class InstallRecipesResponse
     /// bundle again without a registry. Null for a loose assembly.
     /// </summary>
     public string? PublishDir { get; set; }
+
+    /// <summary>
+    /// True when a NuGet install kept the publish output an earlier install built from the same
+    /// package contents.
+    /// </summary>
+    public bool Unchanged { get; set; }
 }
 
 public class PrepareRecipeRequest
