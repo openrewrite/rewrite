@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {isIdentifier, J, TextComment} from "../java";
+import {isIdentifier, J, Statement, TextComment} from "../java";
 import {bindingNames, namesReferencedAsTypesWithin, namesReferencedWithin, valuesDeclaredAtTopLevel, walk} from "./scope";
 import {sameModule} from "./package-name";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
@@ -7,6 +7,7 @@ import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 import {randomId} from "../uuid";
 import {JavaScriptParser} from "./parser";
+import {ambientModules, ImportContainer} from "./add-import";
 
 // Type alias for RightPadded elements to simplify type signatures
 type RightPaddedElement<T extends J> = {
@@ -107,88 +108,18 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const memberScoped = this.member !== undefined && this.member !== '*' && this.member !== 'default';
         const usedNames = collectUsedNames(compilationUnit, memberScoped ? jsxFactory(compilationUnit) : undefined);
-        return this.produceJavaScript(compilationUnit, p, async draft => {
-            const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
-
-            const newStatements = await mapAsync(compilationUnit.statements, async (stmt) => {
-                const statement = stmt.element;
-
-                // Handle ES6 imports
-                if (statement?.kind === JS.Kind.Import) {
-                    const jsImport = statement as JS.Import;
-                    const result = await this.processImport(jsImport, usedNames, p);
-                    if (result === undefined) {
-                        formatter.markRemoved(statement);
-                        return undefined;
-                    }
-
-                    const finalResult = formatter.processKept(result) as JS.Import;
-                    return updateIfChanged(stmt, {element: finalResult});
-                }
-
-                // Handle CommonJS require statements
-                // Note: const fs = require() comes as J.VariableDeclarations
-                // Multi-variable declarations might come as JS.ScopedVariableDeclarations
-                if (statement?.kind === J.Kind.VariableDeclarations) {
-                    const varDecl = statement as J.VariableDeclarations;
-                    const result = await this.processRequireFromVarDecls(varDecl, usedNames.all, p);
-                    if (result === undefined) {
-                        formatter.markRemoved(statement);
-                        return undefined;
-                    }
-
-                    const finalResult = formatter.processKept(result) as J.VariableDeclarations;
-                    return updateIfChanged(stmt, {element: finalResult});
-                }
-
-                // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
-                if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
-                    const scopedVarDecl = statement as any;
-                    // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
-                    const filteredVariables: any[] = [];
-                    let hasChanges = false;
-                    const varFormatter = new ElementRemovalFormatter<J.VariableDeclarations>(true); // Preserve file headers
-
-                    for (const v of scopedVarDecl.variables) {
-                        const varDecl = v.element;
-                        if (varDecl?.kind === J.Kind.VariableDeclarations) {
-                            const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, usedNames.all, p);
-                            if (result === undefined) {
-                                hasChanges = true;
-                                varFormatter.markRemoved(varDecl);
-                            } else {
-                                const formattedVarDecl = varFormatter.processKept(result as J.VariableDeclarations);
-                                filteredVariables.push(updateIfChanged(v, {element: formattedVarDecl}));
-                            }
-                        } else {
-                            filteredVariables.push(v);
-                        }
-                    }
-
-                    if (filteredVariables.length === 0) {
-                        formatter.markRemoved(statement);
-                        return undefined;
-                    }
-
-                    const finalElement: any = hasChanges
-                        ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
-                        : formatter.processKept(statement);
-
-                    return updateIfChanged(stmt, {element: finalElement});
-                }
-
-                // For any other statement type, apply prefix from removed elements
-                if (statement) {
-                    const finalStatement = formatter.processKept(statement);
-                    return updateIfChanged(stmt, {element: finalStatement});
-                }
-
+        // An ambient module declaration's imports are used in its body alone.
+        const ambient = new Set<J>(ambientModules(compilationUnit));
+        const statements = await mapAsync(compilationUnit.statements, async stmt => {
+            if (!ambient.has(stmt.element)) {
                 return stmt;
-            });
-
-            const filtered = newStatements.some(s => s === undefined)
-                ? newStatements.filter(s => s !== undefined)
-                : newStatements;
+            }
+            const body = (stmt.element as JS.NamespaceDeclaration).body!;
+            const kept = await this.withoutUnused(body.statements, collectUsedNames(body, undefined), p);
+            return kept === body.statements ? stmt : {...stmt, element: {...stmt.element, body: {...body, statements: kept}}};
+        });
+        return this.produceJavaScript(compilationUnit, p, async draft => {
+            const filtered = await this.withoutUnused(statements, usedNames, p);
 
             const eof = await this.visitSpace(compilationUnit.eof, p);
             if (isTypeScriptSource(compilationUnit.sourcePath) && hasModuleSyntax(compilationUnit.statements) &&
@@ -206,6 +137,95 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 draft.eof = eof;
             }
         });
+    }
+
+    /** `statements` without the imports and requires of the module that `used` leaves unused. */
+    private async withoutUnused(
+        statements: J.RightPadded<Statement>[],
+        used: UsedNames,
+        p: P
+    ): Promise<J.RightPadded<Statement>[]> {
+        const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
+
+        const newStatements = await mapAsync(statements, async (stmt) => {
+            const statement = stmt.element;
+
+            // Handle ES6 imports
+            if (statement?.kind === JS.Kind.Import) {
+                const jsImport = statement as JS.Import;
+                const result = await this.processImport(jsImport, used, p);
+                if (result === undefined) {
+                    formatter.markRemoved(statement);
+                    return undefined;
+                }
+
+                const finalResult = formatter.processKept(result) as JS.Import;
+                return updateIfChanged(stmt, {element: finalResult});
+            }
+
+            // Handle CommonJS require statements
+            // Note: const fs = require() comes as J.VariableDeclarations
+            // Multi-variable declarations might come as JS.ScopedVariableDeclarations
+            if (statement?.kind === J.Kind.VariableDeclarations) {
+                const varDecl = statement as J.VariableDeclarations;
+                const result = await this.processRequireFromVarDecls(varDecl, used.all, p);
+                if (result === undefined) {
+                    formatter.markRemoved(statement);
+                    return undefined;
+                }
+
+                const finalResult = formatter.processKept(result) as J.VariableDeclarations;
+                return updateIfChanged(stmt, {element: finalResult});
+            }
+
+            // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
+            if (statement?.kind === JS.Kind.ScopedVariableDeclarations) {
+                const scopedVarDecl = statement as any;
+                // Scoped variable declarations contain a variables array where each element is a single-variable J.VariableDeclarations
+                const filteredVariables: any[] = [];
+                let hasChanges = false;
+                const varFormatter = new ElementRemovalFormatter<J.VariableDeclarations>(true); // Preserve file headers
+
+                for (const v of scopedVarDecl.variables) {
+                    const varDecl = v.element;
+                    if (varDecl?.kind === J.Kind.VariableDeclarations) {
+                        const result = await this.processRequireFromVarDecls(varDecl as J.VariableDeclarations, used.all, p);
+                        if (result === undefined) {
+                            hasChanges = true;
+                            varFormatter.markRemoved(varDecl);
+                        } else {
+                            const formattedVarDecl = varFormatter.processKept(result as J.VariableDeclarations);
+                            filteredVariables.push(updateIfChanged(v, {element: formattedVarDecl}));
+                        }
+                    } else {
+                        filteredVariables.push(v);
+                    }
+                }
+
+                if (filteredVariables.length === 0) {
+                    formatter.markRemoved(statement);
+                    return undefined;
+                }
+
+                const finalElement: any = hasChanges
+                    ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
+                    : formatter.processKept(statement);
+
+                return updateIfChanged(stmt, {element: finalElement});
+            }
+
+            // For any other statement type, apply prefix from removed elements
+            if (statement) {
+                const finalStatement = formatter.processKept(statement);
+                return updateIfChanged(stmt, {element: finalStatement});
+            }
+
+            return stmt;
+        });
+
+        return newStatements.some(s => s === undefined)
+            ? newStatements.filter(s => s !== undefined)
+            : newStatements;
     }
 
     private async processImport(
@@ -675,14 +695,15 @@ interface UsedNames {
 }
 
 /**
- * The names the file references, less its own imports: a specifier names what it binds, so counting
- * one would read an import as a use of itself. A value read reaches a type-only import, as `typeof X`
- * does, only where the file declares no value of that name itself. The JSX factory is read as a value.
+ * The names the file, or an ambient module declaration's body, references, less its own imports: a
+ * specifier names what it binds, so counting one would read an import as a use of itself. A value read
+ * reaches a type-only import, as `typeof X` does, only where the container declares no value of that
+ * name itself. The JSX factory is read as a value.
  */
-function collectUsedNames(cu: JS.CompilationUnit, jsxFactory: string | undefined): UsedNames {
+function collectUsedNames(container: ImportContainer, jsxFactory: string | undefined): UsedNames {
     const all = new Set<string>();
     const types = new Set<string>();
-    for (const statement of cu.statements) {
+    for (const statement of container.statements) {
         const element = statement.element;
         if (!element || element.kind === JS.Kind.Import) {
             continue;
@@ -690,7 +711,7 @@ function collectUsedNames(cu: JS.CompilationUnit, jsxFactory: string | undefined
         namesReferencedWithin(element).forEach(name => all.add(name));
         namesReferencedAsTypesWithin(element).forEach(name => types.add(name));
     }
-    const values = valuesDeclaredAtTopLevel(cu);
+    const values = valuesDeclaredAtTopLevel(container);
     all.forEach(name => !values.has(name) && types.add(name));
     if (jsxFactory) {
         all.add(jsxFactory);

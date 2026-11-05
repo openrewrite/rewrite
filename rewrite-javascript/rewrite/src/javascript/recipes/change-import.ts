@@ -111,13 +111,20 @@ export class ChangeImport extends Recipe {
         const newMember = this.newMember ?? oldMember;
         const newAlias = this.newAlias;
 
+        const options = {
+            from: {module: oldModule, member: oldMember},
+            to: {module: newModule, member: newMember, alias: newAlias}
+        };
         return new class extends JavaScriptVisitor<ExecutionContext> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
-                maybeRebind(this, {
-                    from: {module: oldModule, member: oldMember},
-                    to: {module: newModule, member: newMember, alias: newAlias}
-                });
+                maybeRebind(this, options);
                 return super.visitJsCompilationUnit(cu, ctx);
+            }
+
+            /** A script's `declare module "m" {…}` binds imports of its own, which the file's rebind does not reach. */
+            override async visitNamespaceDeclaration(declaration: JS.NamespaceDeclaration, ctx: ExecutionContext): Promise<J | undefined> {
+                maybeRebind(this, options);
+                return declaration;
             }
         }();
     }
