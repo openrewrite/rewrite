@@ -72,8 +72,7 @@ def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor'
     target = coordinates.tree
     if not isinstance(target, Statement):
         return False
-    ambiguous = isinstance(target, Expression) and \
-        not isinstance(target, (py.ExpressionStatement, py.StatementExpression))
+    ambiguous = isinstance(target, Expression) and not isinstance(target, py.ExpressionStatement)
     if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
             or cursor is None or getattr(cursor.value, 'id', None) != target.id:
         return True
@@ -471,13 +470,18 @@ class TemplateEngine:
         unformatted = _SubstitutedValues()
         unformatted.visit(result, None)
 
+        # A replacement keeps the blank lines before the code it replaces and the indentation of the line
+        # that code starts, which may align to a bracket that formatting the result alone can't see.
+        keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
+
         # Auto-format the result
         try:
             from ..format import maybe_auto_format
             original = coordinates.tree
             result = maybe_auto_format(
                 original, result, None, None,
-                cursor.parent if cursor.parent is not None else None
+                cursor.parent if cursor.parent is not None else None,
+                keep_indent=keep_indent
             )
         except (ValueError, AttributeError):
             # No CompilationUnit in cursor ancestry — skip formatting
@@ -486,7 +490,8 @@ class TemplateEngine:
         if unformatted.values:
             result = _SubstitutedLayout(unformatted.values).visit(result, None)
             from ..format import minimally_format
-            result = minimally_format(result, None, cursor.parent if cursor is not None else None)
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None,
+                                      keep_indent=keep_indent)
         return result
 
     @classmethod

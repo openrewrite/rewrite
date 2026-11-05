@@ -146,14 +146,13 @@ public class InstallRecipesFromPublishDirTest : IDisposable
     }
 
     [Fact]
-    public void NuGetInstallReportsPublishDirThatAFreshServerReloadsWithoutAFeed()
+    public async Task NuGetInstallReportsPublishDirThatAFreshServerReloadsWithoutAFeed()
     {
-        var installed = new RewriteRpcServer(new RecipeMarketplace(), _installDir)
+        var installed = await new RewriteRpcServer(new RecipeMarketplace(), _installDir)
             .InstallRecipes(new InstallRecipesRequest
             {
                 Recipes = JsonSerializer.SerializeToElement(new { packageName = "Primary", version = "1.0.0" })
-            })
-            .GetAwaiter().GetResult();
+            });
 
         Assert.Equal(1, installed.RecipesInstalled);
         Assert.Equal("1.0.0", installed.Version);
@@ -165,8 +164,7 @@ public class InstallRecipesFromPublishDirTest : IDisposable
         // A fresh server with no install dir and no feed: the publish dir is all it gets.
         var marketplace = new RecipeMarketplace();
         var server = new RewriteRpcServer(marketplace);
-        var reloaded = server.InstallRecipes(new InstallRecipesRequest { Recipes = installed.PublishDir })
-            .GetAwaiter().GetResult();
+        var reloaded = await server.InstallRecipes(new InstallRecipesRequest { Recipes = installed.PublishDir });
 
         Assert.Equal(1, reloaded.RecipesInstalled);
         Assert.Equal("1.0.0", reloaded.Version);
@@ -176,22 +174,20 @@ public class InstallRecipesFromPublishDirTest : IDisposable
         Assert.DoesNotContain("Dep.DepRecipe", names);
 
         // The composite's child comes from Dep.dll, resolved through Recipes.deps.json.
-        var prepared = server.PrepareRecipe(new PrepareRecipeRequest { Id = "Primary.PrimaryRecipe" })
-            .GetAwaiter().GetResult();
+        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "Primary.PrimaryRecipe" });
         Assert.Single(prepared.RecipeList);
         Assert.Equal("Dependency recipe", prepared.RecipeList[0].Descriptor.DisplayName);
 
-        var row = server.GetMarketplace().GetAwaiter().GetResult()
+        var row = (await server.GetMarketplace())
             .Single(r => r.Descriptor.Name == "Primary.PrimaryRecipe");
         Assert.Equal(installed.PublishDir, row.PackageName);
 
         // The package form is what the Java side sends for a path that exists; a directory works there too.
-        var byPackageForm = new RewriteRpcServer(new RecipeMarketplace())
+        var byPackageForm = await new RewriteRpcServer(new RecipeMarketplace())
             .InstallRecipes(new InstallRecipesRequest
             {
                 Recipes = JsonSerializer.SerializeToElement(new { packageName = installed.PublishDir, version = (string?)null })
-            })
-            .GetAwaiter().GetResult();
+            });
         Assert.Equal(1, byPackageForm.RecipesInstalled);
         Assert.Equal("1.0.0", byPackageForm.Version);
     }

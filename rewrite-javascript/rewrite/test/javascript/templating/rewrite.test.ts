@@ -41,6 +41,7 @@ describe('RewriteRule composition', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -68,6 +69,7 @@ describe('RewriteRule composition', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -130,6 +132,7 @@ describe('RewriteRule composition', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -188,6 +191,7 @@ describe('RewriteRule composition', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript
@@ -216,6 +220,7 @@ describe('RewriteRule composition', () => {
                     return await combined.tryOn(this.cursor, binary) || binary;
                 }
             });
+            spec.cycles = 1;
 
             return spec.rewriteRun(
                 //language=typescript

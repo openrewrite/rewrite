@@ -33,6 +33,7 @@ func NewCursor(parent *Cursor, value java.Tree) *Cursor {
 
 func (c *Cursor) Parent() *Cursor  { return c.parent }
 func (c *Cursor) Value() java.Tree { return c.value }
+func (*Cursor) IsHeavyweight()     {}
 
 // Mirrors Java Cursor.putMessage(String, Object).
 func (c *Cursor) PutMessage(key string, value any) {

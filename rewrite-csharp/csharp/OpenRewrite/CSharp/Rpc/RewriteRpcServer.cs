@@ -979,7 +979,7 @@ public class RewriteRpcServer
             var absolutePath = Path.GetFullPath(packageName);
             var context = new PluginLoadContext(absolutePath);
             var assembly = context.LoadFromAssemblyPath(absolutePath);
-            CheckVersionCompatibility(assembly);
+            CheckHostApiCompatibility(assembly, $"Recipe assembly {absolutePath}");
             ActivateAssembly(assembly, packageName);
         }
         else if (Directory.Exists(packageName))
@@ -1237,7 +1237,7 @@ public class RewriteRpcServer
         }
         foreach (var assembly in LoadPlugin(publishDir))
         {
-            CheckVersionCompatibility(assembly);
+            CheckHostApiCompatibility(assembly, $"Recipe package {bundle.PackageName} {bundle.Version}");
             if (bundle.OwnAssemblyNames.Contains(assembly.GetName().Name!))
             {
                 ActivateAssembly(assembly, origin);
@@ -1310,33 +1310,36 @@ public class RewriteRpcServer
                assemblyName.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Verify that the plugin's OpenRewrite.CSharp dependency version is compatible with the host.
-    /// Logs a warning if the plugin was compiled against a newer version than the host.
-    /// </summary>
-    private static void CheckVersionCompatibility(Assembly pluginAssembly)
+    private static readonly Lazy<HostApiSurface?> HostApi = new(() =>
     {
-        var hostAssembly = typeof(RewriteRpcServer).Assembly;
-        var hostName = hostAssembly.GetName();
-        var hostVersion = hostName.Version;
+        var hostPath = typeof(RewriteRpcServer).Assembly.Location;
+        return string.IsNullOrEmpty(hostPath) ? null : HostApiSurface.Read(hostPath);
+    });
 
-        // Match on the host's assembly name (OpenRewrite), not the NuGet package id (OpenRewrite.CSharp).
-        var openRewriteRef = pluginAssembly.GetReferencedAssemblies()
-            .FirstOrDefault(a => string.Equals(a.Name, hostName.Name,
-                StringComparison.OrdinalIgnoreCase));
-
-        if (openRewriteRef?.Version == null || hostVersion == null)
+    private static void CheckHostApiCompatibility(Assembly pluginAssembly, string origin)
+    {
+        if (string.IsNullOrEmpty(pluginAssembly.Location) || HostApi.Value is not { } hostApi)
             return;
 
-        var pluginRefVersion = openRewriteRef.Version;
-        if (pluginRefVersion.Major != hostVersion.Major ||
-            pluginRefVersion.Minor > hostVersion.Minor)
+        var missing = hostApi.FindMissing(pluginAssembly.Location);
+        if (missing.Count > 0)
         {
-            Log.Warning(
-                "Plugin {Plugin} references OpenRewrite.CSharp {PluginVersion} " +
-                "but host is {HostVersion}. This may cause runtime errors",
-                pluginAssembly.GetName().Name, pluginRefVersion, hostVersion);
+            throw new InvalidOperationException(
+                DescribeIncompatibility(origin, pluginAssembly.GetName().Name!, missing));
         }
+    }
+
+    private static string DescribeIncompatibility(string origin, string assemblyName, IReadOnlyList<string> missing)
+    {
+        const int shown = 5;
+        var listed = string.Join("; ", missing.Take(shown));
+        if (missing.Count > shown)
+        {
+            listed += $"; and {missing.Count - shown} more";
+        }
+        return $"{origin} cannot run on this Moderne CLI: {assemblyName} was compiled against a different " +
+               $"version of OpenRewrite.CSharp than the one this CLI bundles, and uses APIs it does not have " +
+               $"({listed}). Upgrade the Moderne CLI, or install a version of the recipe package that matches it.";
     }
 
     private static readonly string[] Languages = [

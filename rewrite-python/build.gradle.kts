@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import nl.javadude.gradle.plugins.license.LicenseExtension
+import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -35,7 +36,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -49,6 +50,10 @@ val venvDir = pythonDir.resolve(".venv")
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 val pythonExe = if (isWindows) venvDir.resolve("Scripts/python.exe") else venvDir.resolve("bin/python")
 val pipExe = if (isWindows) venvDir.resolve("Scripts/pip.exe") else venvDir.resolve("bin/pip")
+
+// The Python sources the tests run, apart from the *.egg-info setuptools generates from pyproject.toml, which the
+// tests track on their own. A publishing build stamps its version into that egg-info.
+val pythonSources = fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**", "**/*.egg-info/**") }
 
 // The floor the package's requires-python declares. An interpreter below it still
 // yields a venv, and the rejection surfaces out of the editable install as a
@@ -173,7 +178,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
@@ -188,7 +193,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-test"))
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("io.moderne:jsonrpc:latest.integration")
             }
@@ -244,7 +249,7 @@ fun registerPytest(name: String, description: String, markers: String, junitXml:
         pytestArgs.add(if (project.hasProperty("verboseTests")) "-v" else "-q")
         commandLine(pytestArgs)
 
-        inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
+        inputs.files(pythonSources)
             .withPathSensitivity(PathSensitivity.RELATIVE)
         inputs.files(fileTree(pythonDir.resolve("tests")) { exclude("**/__pycache__/**") })
             .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -281,6 +286,13 @@ tasks.named("check") {
 tasks.withType<Test> {
     // Ensure Python venv is set up before running tests
     dependsOn(pythonInstall)
+    // The RPC processes run the Python sources in place, so a change to them runs the tests again
+    inputs.files(pythonSources)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("pythonSources")
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("pythonProject")
 
     // A fork costs a Python process besides its JVM, so there are at most four
     maxParallelForks = maxParallelForks.coerceAtMost(4)
@@ -415,7 +427,7 @@ val pythonInstallBuildDeps = tasks.register<Exec>("pythonInstallBuildDeps") {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "-q", "--disable-pip-version-check", "build>=1.0.0", "twine>=5.0.0")
+    commandLine(pipExe.absolutePath, "install", "-q", "--disable-pip-version-check", "build>=1.0.0", "twine>=6.1.0")
 
     // Once per venv and set of requirements, as the marker goes with the venv, or with an install that failed
     val installed = venvDir.resolve(".build-deps-installed")
@@ -620,33 +632,38 @@ extensions.configure<LicenseExtension> {
 }
 
 // The lock regeneration test fixtures (recorded package-manager output) live in
-// openrewrite/rewrite-python-lock-fixtures. The pinned commit is fetched into build/lock-fixtures and joins the test
-// classpath, and a change of pin fetches again. A change that needs new fixtures moves the pin with it.
+// openrewrite/rewrite-python-lock-fixtures. A change that needs new fixtures moves the pin with it. Gradle reruns
+// this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
 val lockFixturesCommit = "c3231458118bb94a0cab845bc39a268b2e93e2a9"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
-val lockFixturesFetched = layout.buildDirectory.file("tmp/lock-fixtures-commit")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
     inputs.property("commit", lockFixturesCommit)
     outputs.dir(lockFixturesDir)
-    onlyIf {
-        val fetched = lockFixturesFetched.get().asFile
-        !fetched.exists() || fetched.readText() != lockFixturesCommit
-    }
     doLast {
-        val archive = layout.buildDirectory.file("tmp/lock-fixtures.tar.gz").get().asFile
-        archive.parentFile.mkdirs()
-        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/$lockFixturesCommit")
-            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
-        delete(lockFixturesDir)
-        copy {
-            from(tarTree(resources.gzip(archive))) {
-                include("*/lock/**")
-                eachFile { path = path.substringAfter('/') }
-                includeEmptyDirs = false
-            }
-            into(lockFixturesDir)
+        val archiveDir = layout.buildDirectory.dir("tmp/lock-fixtures-archive").get().asFile
+        val archive = archiveDir.resolve("$lockFixturesCommit.tar.gz")
+        if (!archive.exists()) {
+            delete(archiveDir)
+            archiveDir.mkdirs()
+            val download = archiveDir.resolve("$lockFixturesCommit.tar.gz.part")
+            uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/$lockFixturesCommit")
+                .toURL().openStream().use { input -> download.outputStream().use { input.copyTo(it) } }
+            Files.move(download.toPath(), archive.toPath())
         }
-        lockFixturesFetched.get().asFile.writeText(lockFixturesCommit)
+        delete(lockFixturesDir)
+        try {
+            copy {
+                from(tarTree(resources.gzip(archive))) {
+                    include("*/lock/**")
+                    eachFile { path = path.substringAfter('/') }
+                    includeEmptyDirs = false
+                }
+                into(lockFixturesDir)
+            }
+        } catch (e: Exception) {
+            archive.delete()
+            throw e
+        }
     }
 }
 tasks.named<ProcessResources>("processTestResources") {

@@ -55,6 +55,7 @@ public final class BunOptions {
     private boolean linkWorkspacePackages = true;
     private boolean frozenLockfile;
     private boolean loadLockfile = true;
+    private boolean saveLockfile = true;
 
     /**
      * From 1.4.1, bunfig.toml's {@code install.offline}, or {@code install.prefer = "offline"}: versions come from bun's
@@ -115,6 +116,17 @@ public final class BunOptions {
         BunOptions options = new BunOptions();
         options.release = release;
         options.apply(install, env);
+        if (release.honoursLockfileSaveOptions()) {
+            Json.Expr lockfile = installObj == null ? null : installObj.getObject("lockfile");
+            Json.Expr save = lockfile == null ? null : lockfile.get("save");
+            if (save != null && save.asBool() != null) {
+                options.saveLockfile = save.asBool();
+            }
+            String skipSave = env.setting("BUN_CONFIG_SKIP_SAVE_LOCKFILE");
+            if (skipSave != null) {
+                options.saveLockfile = "0".equals(skipSave);
+            }
+        }
         return options;
     }
 
@@ -172,7 +184,8 @@ public final class BunOptions {
         }
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
             String value = env.setting(key);
-            if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
+            if (value != null && !value.isEmpty() && (release.readsANonemptyRegistryEnvironmentValue() ||
+                    value.startsWith("https://") || value.startsWith("http://"))) {
                 registry = scopeUrl(value);
                 break;
             }

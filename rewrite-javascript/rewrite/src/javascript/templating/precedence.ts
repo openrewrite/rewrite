@@ -305,7 +305,7 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case J.Kind.ClassDeclaration:
             // `class A extends B {}` takes a LeftHandSideExpression
             return (parent as J.ClassDeclaration).extends?.element?.id === childId ?
-                {precedence: Precedence.Call} : undefined;
+                {precedence: Precedence.Call, typeTree: true} : undefined;
 
         case JS.Kind.ExpressionStatement:
             return (parent as JS.ExpressionStatement).expression?.id === childId ?

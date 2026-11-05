@@ -17,8 +17,10 @@
 package test
 
 import (
+	"fmt"
 	"math"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -26,13 +28,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 type SourceSpec struct {
@@ -40,8 +42,9 @@ type SourceSpec struct {
 	After       *string // nil means no change expected (parse-print idempotence only)
 	Path        string
 	Markers     []java.Marker                                  // markers attached to the parsed source after parse
-	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional post-parse assertion callback (.go files only)
+	AfterRecipe func(t *testing.T, cu *golang.CompilationUnit) // optional assertion callback on the recipe's result (.go files only)
 	generated   bool                                           // true for a file the recipe is expected to Generate (see Generated)
+	deleted     bool                                           // true for a file the recipe is expected to delete (see ExpectDeleted)
 }
 
 // Sources is the unit RewriteRun consumes. Single SourceSpecs and project
@@ -61,12 +64,20 @@ func (s SourceSpec) WithPath(p string) SourceSpec {
 	return s
 }
 
-// WithAfterRecipe returns a copy of s with the post-parse callback set.
-// The callback fires after parsing (with type attribution wired) and
-// before recipe application; recipes can read s.Markers off the cu and
-// assert on resolved types.
+// WithAfterRecipe returns a copy of s with the after-recipe callback set.
+// Once the source matches its expected after state, the callback receives
+// the recipe's result, or the parsed source when no recipe is configured,
+// so it can read s.Markers off the cu and assert on resolved types.
 func (s SourceSpec) WithAfterRecipe(fn func(t *testing.T, cu *golang.CompilationUnit)) SourceSpec {
 	s.AfterRecipe = fn
+	return s
+}
+
+// ExpectDeleted returns a copy of s that expects the recipe to delete the
+// source file.
+func (s SourceSpec) ExpectDeleted() SourceSpec {
+	s.After = nil
+	s.deleted = true
 	return s
 }
 
@@ -244,9 +255,9 @@ func FindGoResolutionResult(spec SourceSpec) *golang.GoResolutionResult {
 // parses each group together via parser.ParsePackage so files in the same
 // package share a types.Info — file A can see file B's symbols. Returns
 // a map from the spec's index in `flat` to its CompilationUnit so two
-// specs sharing the same Path don't clobber each other in the result.
-func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map[int]*golang.CompilationUnit {
-	t.Helper()
+// specs sharing the same Path don't clobber each other in the result,
+// along with the error of a package that did not parse.
+func parsePackageGroups(p *parser.GoParser, flat []SourceSpec) (map[int]*golang.CompilationUnit, error) {
 	type indexed struct {
 		idx   int
 		input parser.FileInput
@@ -261,6 +272,7 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 	}
 
 	out := map[int]*golang.CompilationUnit{}
+	var firstErr error
 	for dir, group := range byDir {
 		// Pre-filter against BuildContext so post-parse `cus` aligns
 		// with the included subset of `group`.
@@ -277,12 +289,17 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 			continue
 		}
 		cus, err := p.ParsePackage(files)
-		require.NoErrorf(t, err, "parse error in package %s", dir)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("parse error in package %s: %w", dir, err)
+			}
+			continue
+		}
 		for i, cu := range cus {
 			out[included[i].idx] = cu
 		}
 	}
-	return out
+	return out, firstErr
 }
 
 // buildProjectImporter scans a flattened source list for a go.mod with
@@ -468,13 +485,18 @@ func ValidateSpaces(root java.Tree) []string {
 	return (&recipes.WhitespaceValidationService{}).Validate(root)
 }
 
-type JavaRecipeConfig struct {
-	RecipeName string
-	Options    map[string]any
-}
-
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
+	// CheckExecutionContextUnchanged asserts that a recipe puts no message on the
+	// ExecutionContext, which every recipe and source file in a run shares.
+	CheckExecutionContextUnchanged bool
+	// CheckNoEditsInScanningPhase asserts that the scanner of a ScanningRecipe
+	// returns each tree it visits unchanged, as the scanning phase discards edits.
+	CheckNoEditsInScanningPhase bool
+	// CheckLightweightAccumulators asserts that the accumulator of a ScanningRecipe
+	// keeps no recipe.Heavyweight objects, such as trees, cursors, visitors,
+	// execution contexts and module graphs, which would stay in memory all cycle.
+	CheckLightweightAccumulators bool
 	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
 	// report, such as search results and markup: a marker type turning up where
 	// neither the sources it was given nor a fresh parse of its output have one
@@ -484,17 +506,42 @@ type RecipeSpec struct {
 	// unchanged comes back as the same tree pointer. Turn it off for fixtures that
 	// deliberately rebuild nodes into printed-identical replacements.
 	CheckUnchangedTreeIdentity bool
-	Recipe                     recipe.Recipe
-	JavaRecipe                 *JavaRecipeConfig     // when set, delegates to Java RPC
-	JavaRpcClient              *JavaRpcClient        // injected Java RPC client
-	MarkerPrinter              printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
+	// CheckParserShapedTrees asserts that the recipe's output is the tree the
+	// parser makes of the text it prints, such as a java.Literal and not a
+	// java.Identifier for `1`.
+	CheckParserShapedTrees bool
+	// CheckMinimalFormatting asserts that the recipe auto-formats only what it
+	// changed, not a whole source file that existed before the run.
+	CheckMinimalFormatting bool
+	// Cycles is how many times the recipe runs, each run on the output of the one
+	// before, by default one more than ExpectedCyclesThatMakeChanges and at least
+	// two. The cycles after the expected ones, and a run on a fresh parse of the
+	// output, fail the test if they change anything, so 1 turns these checks off.
+	Cycles int
+	// ExpectedCyclesThatMakeChanges is how many cycles the recipe needs to settle,
+	// by default 1. A recipe that only reaches its result over several cycles
+	// declares how many here, and the test then compares the output of the last
+	// of them.
+	ExpectedCyclesThatMakeChanges int
+	Recipe                        recipe.Recipe
+	MarkerPrinter                 printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
+	// ExecutionContext is the context every cycle of the recipe shares, by
+	// default a fresh one for each RewriteRun. Each RewriteRun installs a new
+	// in-memory DataTableStore on it, holding the rows of the first cycle.
+	ExecutionContext *recipe.ExecutionContext
+	dataTables       []dataTableExpectation
 }
 
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
-		CheckParsePrintIdempotence: true,
-		CheckReportingMarkersOnly:  true,
-		CheckUnchangedTreeIdentity: true,
+		CheckParsePrintIdempotence:     true,
+		CheckExecutionContextUnchanged: true,
+		CheckNoEditsInScanningPhase:    true,
+		CheckLightweightAccumulators:   true,
+		CheckReportingMarkersOnly:      true,
+		CheckUnchangedTreeIdentity:     true,
+		CheckParserShapedTrees:         true,
+		CheckMinimalFormatting:         true,
 	}
 }
 
@@ -503,19 +550,38 @@ func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	return spec
 }
 
-// WithJavaRecipe configures the test to delegate to a Java-defined recipe via RPC.
-// Requires a JavaRpcClient to be set on the spec.
-func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any) *RecipeSpec {
-	spec.JavaRecipe = &JavaRecipeConfig{
-		RecipeName: recipeName,
-		Options:    options,
-	}
+// WithExecutionContext sets the context the recipe runs with; see
+// RecipeSpec.ExecutionContext.
+func (spec *RecipeSpec) WithExecutionContext(ctx *recipe.ExecutionContext) *RecipeSpec {
+	spec.ExecutionContext = ctx
 	return spec
 }
 
-func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
-	spec.JavaRpcClient = client
+// WithCycles sets how many times the recipe runs; see RecipeSpec.Cycles.
+func (spec *RecipeSpec) WithCycles(cycles int) *RecipeSpec {
+	spec.Cycles = cycles
 	return spec
+}
+
+// WithExpectedCyclesThatMakeChanges sets how many cycles the recipe needs to
+// settle; see RecipeSpec.ExpectedCyclesThatMakeChanges.
+func (spec *RecipeSpec) WithExpectedCyclesThatMakeChanges(cycles int) *RecipeSpec {
+	spec.ExpectedCyclesThatMakeChanges = cycles
+	return spec
+}
+
+func (spec *RecipeSpec) expectedCycles() int {
+	if spec.ExpectedCyclesThatMakeChanges > 0 {
+		return spec.ExpectedCyclesThatMakeChanges
+	}
+	return 1
+}
+
+func (spec *RecipeSpec) cycles() int {
+	if spec.Cycles > 0 {
+		return spec.Cycles
+	}
+	return spec.expectedCycles() + 1
 }
 
 // WithMarkerPrinter overrides the MarkerPrinter used when printing recipe output.
@@ -534,20 +600,73 @@ type parsedSource struct {
 	result java.Tree
 }
 
+// recipeRun is what RewriteRun parsed and what the recipe made of it over its
+// cycles.
+type recipeRun struct {
+	parsed                []parsedSource
+	genSpecs              []SourceSpec
+	generated             []java.Tree
+	cyclesThatMadeChanges int
+	dataTables            recipe.DataTableStore
+	// freshParseContext holds the messages the ExecutionContext started with,
+	// for the run on a fresh parse of the output.
+	freshParseContext *recipe.ExecutionContext
+	// unsettled is the first cycle after the expected ones that changed anything.
+	unsettled  *cycleChanges
+	checks     *runChecks
+	formatting *formattingScope
+	output     *outputParse
+}
+
+type cycleChanges struct {
+	cycle   int
+	changes []change
+}
+
+// change is a source a run of the recipe changed; before is nil for a file it
+// generated.
+type change struct {
+	before, after java.Tree
+}
+
 // RewriteRun parses each source, checks parse-print idempotence, attaches
 // any markers contributed by project wrappers (GoProject), and (if
-// configured) applies a recipe and checks the result. Accepts both bare
+// configured) applies a recipe and checks the result, then hands each source's
+// final tree to its AfterRecipe callback when every check passed, before it
+// runs the recipe on sources the test does not give it. Accepts both bare
 // SourceSpec values and project wrappers like GoProject — they both
 // implement Sources.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	t.Helper()
-	parsed, genSpecs, generated := spec.parseAndApply(t, sources)
-	spec.verify(t, parsed, genSpecs, generated)
+	run := spec.parseAndApply(t, sources)
+	spec.verify(t, run)
+	if !t.Failed() {
+		spec.afterRecipe(t, run)
+	}
+	if !t.Failed() {
+		spec.expectOtherSourcesHandled(t, run)
+	}
 }
 
-// parseAndApply parses every source and applies the recipe (Passes 1 and 2),
-// returning the generated-file specs alongside the files the recipe generated.
-func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) ([]parsedSource, []SourceSpec, []java.Tree) {
+func (spec *RecipeSpec) afterRecipe(t *testing.T, run *recipeRun) {
+	t.Helper()
+	for _, ps := range run.parsed {
+		if cu, ok := ps.result.(*golang.CompilationUnit); ok && ps.spec.AfterRecipe != nil {
+			ps.spec.AfterRecipe(t, cu)
+		}
+	}
+	paired, _ := pairGenerated(run.genSpecs, run.generated)
+	for k, gs := range run.genSpecs {
+		if cu, ok := paired[k].(*golang.CompilationUnit); ok && gs.AfterRecipe != nil {
+			gs.AfterRecipe(t, cu)
+		}
+	}
+	spec.checkDataTables(t, run.dataTables)
+}
+
+// parseAndApply parses every source and applies the recipe over its cycles
+// (Passes 1 and 2).
+func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) *recipeRun {
 	t.Helper()
 
 	// Flatten any project wrappers into a flat list of SourceSpecs, with
@@ -573,7 +692,9 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) ([]parsed
 	var parsedByIdx map[int]*golang.CompilationUnit
 	if pi := buildProjectImporter(flat); pi != nil {
 		p.Importer = pi
-		parsedByIdx = parsePackageGroups(t, p, flat)
+		var err error
+		parsedByIdx, err = parsePackageGroups(p, flat)
+		require.NoError(t, err)
 	}
 
 	// Pass 1: parse every source.
@@ -590,42 +711,343 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) ([]parsed
 		}
 	}
 
-	// Pass 2: apply the recipe over the parsed set.
-	var generated []java.Tree
+	// Pass 2: apply the recipe over the parsed set, cycle after cycle.
+	run := &recipeRun{parsed: parsed, genSpecs: genSpecs}
+	for i := range parsed {
+		parsed[i].result = parsed[i].tree
+	}
 	if spec.Recipe != nil {
-		for i := range parsed {
-			parsed[i].result = parsed[i].tree
+		spec.runCycles(run)
+	}
+	return run
+}
+
+// runCycles runs the recipe on the output of its previous run until it changes
+// nothing or the cycles run out, keeping the output of the expected cycles and
+// noting the first later cycle that changed anything.
+func (spec *RecipeSpec) runCycles(run *recipeRun) {
+	ctx := spec.ExecutionContext
+	if ctx == nil {
+		ctx = recipe.NewExecutionContext()
+	}
+	run.freshParseContext = recipe.NewExecutionContext()
+	for _, k := range ctx.MessageKeys() {
+		v, _ := ctx.GetMessage(k)
+		run.freshParseContext.PutMessage(k, v)
+	}
+	run.freshParseContext.PutMessage(recipe.DataTableStoreKey, discardingStore{})
+	run.dataTables = recipe.NewInMemoryDataTableStore()
+	ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
+	defer ctx.PutMessage(recipe.DataTableStoreKey, run.dataTables)
+	run.checks = &runChecks{
+		executionContextUnchanged: spec.CheckExecutionContextUnchanged,
+		noEditsInScanningPhase:    spec.CheckNoEditsInScanningPhase,
+		lightweightAccumulators:   spec.CheckLightweightAccumulators,
+	}
+	if spec.CheckMinimalFormatting {
+		run.formatting = newFormattingScope(run.parsed)
+		defer format.ListenToFormatting(run.formatting.onFormat)()
+	}
+	for cycle := 1; cycle <= spec.cycles(); cycle++ {
+		if cycle == 2 {
+			ctx.PutMessage(recipe.DataTableStoreKey, discardingStore{})
 		}
-		if recipeIsScanning(spec.Recipe) {
-			generated = spec.runScanningLifecycle(parsed)
-		} else {
-			for i := range parsed {
-				if parsed[i].tree != nil {
-					parsed[i].result = runRecipe(spec.Recipe, parsed[i].tree)
-				}
+		var live []java.Tree
+		var slots []*java.Tree
+		for i := range run.parsed {
+			if run.parsed[i].result != nil {
+				live = append(live, run.parsed[i].result)
+				slots = append(slots, &run.parsed[i].result)
 			}
 		}
+		for i := range run.generated {
+			if run.generated[i] != nil {
+				live = append(live, run.generated[i])
+				slots = append(slots, &run.generated[i])
+			}
+		}
+		results, generated := runCycle(spec.Recipe, live, ctx, run.checks)
+		changes := changesOf(live, results, generated)
+		if len(changes) == 0 {
+			return
+		}
+		if cycle > spec.expectedCycles() {
+			run.unsettled = &cycleChanges{cycle: cycle, changes: changes}
+			return
+		}
+		run.cyclesThatMadeChanges++
+		for k, result := range results {
+			*slots[k] = result
+		}
+		run.generated = append(run.generated, generated...)
 	}
-	return parsed, genSpecs, generated
+}
+
+func changesOf(before, after, generated []java.Tree) []change {
+	var changes []change
+	for k := range before {
+		if after[k] != before[k] {
+			changes = append(changes, change{before: before[k], after: after[k]})
+		}
+	}
+	for _, g := range generated {
+		changes = append(changes, change{after: g})
+	}
+	return changes
 }
 
 // verify checks what the recipe produced. Markers come first, since a recipe that
 // only added some returns a new tree printing the same as the old one, which Pass 3
 // would otherwise put down to a needless rebuild.
-func (spec *RecipeSpec) verify(t testing.TB, parsed []parsedSource, genSpecs []SourceSpec, generated []java.Tree) {
+func (spec *RecipeSpec) verify(t testing.TB, run *recipeRun) {
 	t.Helper()
+	if spec.Cycles > 0 && spec.Cycles < spec.expectedCycles() {
+		t.Errorf("Cycles is %d, fewer than the %d ExpectedCyclesThatMakeChanges.", spec.Cycles, spec.expectedCycles())
+		return
+	}
+	if expected := spec.expectedCycles(); expected > 1 && run.cyclesThatMadeChanges < expected {
+		t.Errorf("Expected recipe to complete in %s, but it settled after %s. Lower ExpectedCyclesThatMakeChanges.",
+			pluralCycles(expected), pluralCycles(run.cyclesThatMadeChanges))
+		return
+	}
+	if failures := run.checks.failures(); len(failures) > 0 {
+		for _, failure := range failures {
+			t.Error(failure)
+		}
+		return
+	}
+
 	if spec.CheckReportingMarkersOnly {
-		if failure := addedMarkersFailure(parsed, generated); failure != "" {
+		if failure := addedMarkersFailure(run.parsed, run.generated); failure != "" {
 			t.Error(failure)
 			return
 		}
 	}
 
 	// Pass 3: compare each source (and any generated files) to expectations.
-	for i := range parsed {
-		spec.compareSource(t, parsed[i])
+	for i := range run.parsed {
+		spec.compareSource(t, run.parsed[i])
 	}
-	spec.compareGenerated(t, genSpecs, generated)
+	spec.compareGenerated(t, run.genSpecs, run.generated)
+	if t.Failed() {
+		return
+	}
+
+	// Pass 4: the recipe leaves its own output alone.
+	if run.unsettled != nil && spec.expectNoFurtherChanges(t, run.unsettled.changes, fmt.Sprintf("Expected recipe to complete in %s, but cycle %d changed",
+		pluralCycles(spec.expectedCycles()), run.unsettled.cycle), false) {
+		return
+	}
+	if spec.cycles() > spec.expectedCycles() {
+		spec.expectStableOnFreshParse(t, run)
+	}
+	if t.Failed() {
+		return
+	}
+
+	spec.expectDataTablesWritten(t, run.dataTables)
+	if t.Failed() {
+		return
+	}
+
+	// Pass 5: the recipe formats only what it changed, and its output is the tree
+	// the parser makes of the text it prints.
+	if failure := run.formatting.failure(spec.Recipe, run.parsed); failure != "" {
+		t.Error(failure)
+		return
+	}
+	if spec.Recipe != nil && spec.CheckParserShapedTrees {
+		if failure := treeShapesFailure(run.parseOutput(), run.checks); failure != "" {
+			t.Error(failure)
+		}
+	}
+}
+
+// expectOtherSourcesHandled is Pass 6: the recipe copes with sources the test
+// does not give it.
+func (spec *RecipeSpec) expectOtherSourcesHandled(t testing.TB, run *recipeRun) {
+	t.Helper()
+	spec.expectEmptySourcesHandled(t, run)
+	if t.Failed() {
+		return
+	}
+	spec.expectUnparsedSourcesHandled(t, run)
+}
+
+// expectNoFurtherChanges reports whether it found changes to fail t with.
+func (spec *RecipeSpec) expectNoFurtherChanges(t testing.TB, changes []change, headline string, sanitized bool) bool {
+	t.Helper()
+	mp := spec.markerPrinter()
+	if sanitized {
+		mp = printer.SanitizedMarkerPrinter
+	}
+	var found strings.Builder
+	for _, c := range changes {
+		if c.before == nil {
+			fmt.Fprintf(&found, "  %s, which it generated\n", sourcePathOf(c.after))
+			continue
+		}
+		if c.after == nil {
+			fmt.Fprintf(&found, "  %s, which it deleted\n", sourcePathOf(c.before))
+			continue
+		}
+		expected, actual := printTree(c.before, mp), printTree(c.after, mp)
+		if expected != actual {
+			fmt.Fprintf(&found, "  %s\nExpected:\n%s\n\nActual:\n%s\n", sourcePathOf(c.after), expected, actual)
+		} else if !sanitized && spec.CheckUnchangedTreeIdentity {
+			fmt.Fprintf(&found, "  %s, whose LST it changed without changing the printed source\n", sourcePathOf(c.after))
+		}
+	}
+	if found.Len() == 0 {
+		return false
+	}
+	t.Error(headline + " the sources again:\n" + found.String() +
+		"A recipe should recognize code it has already changed and leave it alone, so that running it " +
+		"again changes nothing. A recipe that is meant to need more cycles declares how many with " +
+		"ExpectedCyclesThatMakeChanges.")
+	return true
+}
+
+// expectStableOnFreshParse runs the recipe on a fresh parse of its output. The
+// code a later run reads is parsed from the printed output, not the LST this run
+// produced, and a recipe that recognizes its own output only by the shape of
+// that LST changes it again.
+func (spec *RecipeSpec) expectStableOnFreshParse(t testing.TB, run *recipeRun) {
+	t.Helper()
+	if run.cyclesThatMadeChanges == 0 {
+		return
+	}
+	output := run.parseOutput()
+	sources := make([]java.Tree, len(output.finals))
+	reparsed := false
+	for k, final := range output.finals {
+		sources[k] = final
+		if output.trees[k] != nil {
+			sources[k] = output.trees[k]
+			reparsed = true
+		}
+	}
+	if !reparsed {
+		return
+	}
+	results, generated := runCycle(spec.Recipe, sources, run.freshParseContext, nil)
+	spec.expectNoFurtherChanges(t, changesOf(sources, results, generated),
+		"Running the recipe on a fresh parse of its output changed", true)
+}
+
+// outputParse is a fresh parse of the printed source of each source a run ended
+// with, parsed as the harness parses its sources.
+type outputParse struct {
+	befores []java.Tree // the parsed source each final started as, nil for a generated one
+	finals  []java.Tree
+	printed []string
+	// trees holds the fresh parse of each final, or nil where its printed source
+	// does not parse back to the same text. Of the markers on a final, the fresh
+	// parse carries only those of a type given to the source from outside its text.
+	trees []java.Tree
+	// errs holds why the printed source of a final does not parse, where it does not.
+	errs []error
+}
+
+// parseOutput parses the printed source of each source the run ended with,
+// once for every check that compares the recipe's output with a fresh parse.
+func (run *recipeRun) parseOutput() *outputParse {
+	if run.output != nil {
+		return run.output
+	}
+	o := &outputParse{}
+	var specs []SourceSpec
+	add := func(before, final java.Tree, external []java.Marker) {
+		o.befores = append(o.befores, before)
+		o.finals = append(o.finals, final)
+		o.printed = append(o.printed, printTree(final, printer.SanitizedMarkerPrinter))
+		specs = append(specs, SourceSpec{
+			Before:  o.printed[len(o.printed)-1],
+			Path:    sourcePathOf(final),
+			Markers: carriedMarkers(markersOf(final), external),
+		})
+	}
+	for _, ps := range run.parsed {
+		if ps.result != nil {
+			add(ps.tree, ps.result, ps.spec.Markers)
+		}
+	}
+	for _, g := range run.generated {
+		if g != nil {
+			add(nil, g, nil)
+		}
+	}
+
+	p := parser.NewGoParser()
+	var byIdx map[int]*golang.CompilationUnit
+	if pi := buildProjectImporter(specs); pi != nil {
+		p.Importer = pi
+		byIdx, _ = parsePackageGroups(p, specs)
+	}
+	o.trees = make([]java.Tree, len(specs))
+	o.errs = make([]error, len(specs))
+	for k, s := range specs {
+		var fresh java.Tree
+		if cu := byIdx[k]; cu != nil {
+			fresh = cu
+		} else {
+			fresh, o.errs[k] = parseSource(p, s.Path, s.Before)
+		}
+		if fresh == nil || printTree(fresh, printer.SanitizedMarkerPrinter) != s.Before {
+			continue
+		}
+		markers := markersOf(fresh)
+		for _, m := range s.Markers {
+			markers = java.AddMarker(markers, m)
+		}
+		o.trees[k] = withMarkers(fresh, markers)
+	}
+	run.output = o
+	return o
+}
+
+func carriedMarkers(markers java.Markers, external []java.Marker) []java.Marker {
+	var carried []java.Marker
+	for _, m := range markers.Entries() {
+		for _, e := range external {
+			if reflect.TypeOf(m) == reflect.TypeOf(e) {
+				carried = append(carried, m)
+				break
+			}
+		}
+	}
+	return carried
+}
+
+func markersOf(t java.Tree) java.Markers {
+	switch sf := t.(type) {
+	case *golang.CompilationUnit:
+		return sf.Markers
+	case *golang.GoMod:
+		return sf.Markers
+	case *golang.GoSum:
+		return sf.Markers
+	}
+	return nil
+}
+
+func withMarkers(t java.Tree, markers java.Markers) java.Tree {
+	switch sf := t.(type) {
+	case *golang.CompilationUnit:
+		return sf.WithMarkers(markers)
+	case *golang.GoMod:
+		return sf.WithMarkers(markers)
+	case *golang.GoSum:
+		return sf.WithMarkers(markers)
+	}
+	return t
+}
+
+func pluralCycles(count int) string {
+	if count == 1 {
+		return "1 cycle"
+	}
+	return fmt.Sprintf("%d cycles", count)
 }
 
 func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedByIdx map[int]*golang.CompilationUnit, i int, src SourceSpec) *golang.CompilationUnit {
@@ -662,10 +1084,6 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 		for _, e := range errs {
 			t.Errorf("whitespace attachment: %s", e)
 		}
-	}
-
-	if src.AfterRecipe != nil {
-		src.AfterRecipe(t, cu)
 	}
 
 	if spec.CheckParsePrintIdempotence {
@@ -726,7 +1144,7 @@ func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	src := ps.spec
 
 	if ps.tree == nil {
-		assert.Falsef(t, src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
+		assert.Falsef(t, src.deleted || src.After != nil && *src.After != src.Before, "non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		return
 	}
 
@@ -736,7 +1154,17 @@ func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	}
 
 	if ps.result == nil {
-		assert.Nil(t, src.After, "recipe returned nil (deleted source file) but expected an after state")
+		switch {
+		case src.deleted:
+		case src.After == nil || *src.After == src.Before:
+			t.Errorf("The recipe deleted a source file %q that was not expected to change", src.Path)
+		default:
+			t.Errorf("The recipe deleted a source file %q but should have changed it instead", src.Path)
+		}
+		return
+	}
+	if src.deleted {
+		t.Errorf("Expected the recipe to delete %q", src.Path)
 		return
 	}
 
@@ -769,26 +1197,37 @@ func (spec *RecipeSpec) compareGenerated(t testing.TB, specs []SourceSpec, gener
 	}
 
 	mp := spec.markerPrinter()
-	matched := make([]bool, len(generated))
-	for _, gs := range specs {
-		found := false
-		for j, gt := range generated {
-			if matched[j] || gt == nil || generatedSourcePath(gt) != gs.Path {
-				continue
-			}
-			matched[j] = true
-			found = true
-			if actual := printTree(gt, mp); gs.After != nil && actual != *gs.After {
-				t.Errorf("generated file %q mismatch\n\nexpected:\n%s\n\nactual:\n%s", gs.Path, *gs.After, actual)
-				showDiff(t, *gs.After, actual)
-			}
-			break
+	paired, matched := pairGenerated(specs, generated)
+	for k, gs := range specs {
+		gt := paired[k]
+		if !assert.Truef(t, gt != nil, "expected recipe to generate file %q, but it was not generated", gs.Path) {
+			continue
 		}
-		assert.Truef(t, found, "expected recipe to generate file %q, but it was not generated", gs.Path)
+		if actual := printTree(gt, mp); gs.After != nil && actual != *gs.After {
+			t.Errorf("generated file %q mismatch\n\nexpected:\n%s\n\nactual:\n%s", gs.Path, *gs.After, actual)
+			showDiff(t, *gs.After, actual)
+		}
 	}
 	for j, gt := range generated {
-		assert.Falsef(t, !matched[j] && gt != nil, "recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", generatedSourcePath(gt))
+		assert.Falsef(t, !matched[j] && gt != nil, "recipe generated an unexpected file %q; add a test.Generated(...) spec to assert it", sourcePathOf(gt))
 	}
+}
+
+// pairGenerated pairs each spec with the first not yet paired generated file at
+// its path, leaving nil for a spec the recipe generated nothing for.
+func pairGenerated(specs []SourceSpec, generated []java.Tree) ([]java.Tree, []bool) {
+	paired := make([]java.Tree, len(specs))
+	matched := make([]bool, len(generated))
+	for k, gs := range specs {
+		for j, gt := range generated {
+			if !matched[j] && gt != nil && sourcePathOf(gt) == gs.Path {
+				matched[j] = true
+				paired[k] = gt
+				break
+			}
+		}
+	}
+	return paired, matched
 }
 
 func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
@@ -808,107 +1247,11 @@ func printTree(t java.Tree, mp printer.MarkerPrinter) string {
 	return printer.PrintWithMarkers(t, mp)
 }
 
-func generatedSourcePath(t java.Tree) string {
+func sourcePathOf(t java.Tree) string {
 	if sp, ok := t.(interface{ GetSourcePath() string }); ok {
 		return sp.GetSourcePath()
 	}
 	return ""
-}
-
-func recipeIsScanning(r recipe.Recipe) bool {
-	if _, ok := r.(recipe.ScanningRecipe); ok {
-		return true
-	}
-	for _, sub := range r.RecipeList() {
-		if recipeIsScanning(sub) {
-			return true
-		}
-	}
-	return false
-}
-
-func (spec *RecipeSpec) runScanningLifecycle(parsed []parsedSource) []java.Tree {
-	ctx := recipe.NewExecutionContext()
-
-	working := make([]java.Tree, 0, len(parsed))
-	idx := make([]int, 0, len(parsed))
-	for i := range parsed {
-		if parsed[i].tree != nil {
-			working = append(working, parsed[i].tree)
-			idx = append(idx, i)
-		}
-	}
-	nExisting := len(working)
-
-	var walk func(r recipe.Recipe)
-	walk = func(r recipe.Recipe) {
-		if sr, ok := r.(recipe.ScanningRecipe); ok {
-			acc := sr.InitialValue(ctx)
-			if scanner := sr.Scanner(acc); scanner != nil {
-				for _, tr := range working {
-					if tr != nil {
-						scanner.Visit(tr, ctx)
-					}
-				}
-			}
-			for _, g := range sr.Generate(acc, ctx) {
-				if g != nil {
-					working = append(working, g)
-				}
-			}
-			if editor := sr.EditorWithData(acc); editor != nil {
-				applyEditorAcross(editor, working, ctx)
-			}
-		} else if editor := r.Editor(); editor != nil {
-			applyEditorAcross(editor, working, ctx)
-		}
-		for _, sub := range r.RecipeList() {
-			walk(sub)
-		}
-	}
-	walk(spec.Recipe)
-
-	for k, i := range idx {
-		parsed[i].result = working[k]
-	}
-	return working[nExisting:]
-}
-
-func applyEditorAcross(editor recipe.TreeVisitor, trees []java.Tree, ctx *recipe.ExecutionContext) {
-	for i, tr := range trees {
-		if tr == nil {
-			continue
-		}
-		result := editor.Visit(tr, ctx)
-		if result != nil {
-			tr = result
-		}
-		trees[i] = visitor.DrainAfterVisits(editor, tr, ctx)
-	}
-}
-
-func runRecipe(r recipe.Recipe, t java.Tree) java.Tree {
-	ctx := recipe.NewExecutionContext()
-
-	// Apply this recipe's own editor, then drain any queued after-visits
-	// (e.g. ImportService.AddImportVisitor inserted via DoAfterVisit).
-	if editor := r.Editor(); editor != nil {
-		result := editor.Visit(t, ctx)
-		if result != nil {
-			t = result
-		}
-		t = visitor.DrainAfterVisits(editor, t, ctx)
-	}
-
-	// Apply sub-recipes
-	for _, sub := range r.RecipeList() {
-		result := runRecipe(sub, t)
-		if result != nil {
-			t = result
-		}
-	}
-
-	return t
 }
 
 func showDiff(t testing.TB, expected, actual string) {

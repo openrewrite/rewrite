@@ -313,4 +313,28 @@ class ChangeValueTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$..b", "3", null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job: *base
+              other:
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job: *base
+              other:
+                b: 3
+              """
+          )
+        );
+    }
 }

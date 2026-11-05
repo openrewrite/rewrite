@@ -15,7 +15,7 @@
  */
 import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
 import {findMarker, printer} from "../../src";
-import {RecipeSpec} from "../../src/test";
+import {dedent, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -514,4 +514,157 @@ host: {C App}.colruyt.int/{C App}`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
     });
+});
+
+describe('Multi-line flow scalars', () => {
+    const spec = new RecipeSpec();
+
+    test('plain scalar continued on the following lines', () =>
+        spec.rewriteRun(
+            yaml(`
+                build:
+                  - script: npm ci &&
+                            npm test &&
+                            npm run build
+            `)
+        ));
+
+    test('plain scalar with a blank line and extra indentation', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: one
+                  two
+
+                    three
+            `)
+        ));
+
+    test('plain scalars in flow collections', () =>
+        spec.rewriteRun(
+            yaml(`
+                seq: [one
+                  two, three]
+                map: {a: one
+                  two}
+            `)
+        ));
+
+    test('single-quoted scalar with an escaped quote and a line break', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: 'it''s
+                  continued'
+            `)
+        ));
+
+    test('double-quoted scalar with escapes and an escaped line break', () =>
+        spec.rewriteRun(
+            yaml(String.raw`
+                a: "tab\t, quote \", escaped \
+                  line break"
+            `)
+        ));
+
+    test('scalar value is the source text between any quotes', async () => {
+        const docs = await parseYaml(dedent(String.raw`
+            plain: one
+              two
+            single: 'it''s'
+            double: "a\tb"
+        `));
+        const [plain, single, double] = (docs.documents[0].block as Yaml.Mapping).entries
+            .map(e => (e.value as Yaml.Scalar).value);
+
+        expect(plain).toBe(dedent(`
+            one
+              two`));
+        expect(single).toBe("it''s");
+        expect(double).toBe(String.raw`a\tb`);
+    });
+});
+
+describe('Anchor and tag on a scalar', () => {
+    const spec = new RecipeSpec();
+
+    test('either order, on every scalar style and position', () =>
+        spec.rewriteRun(
+            yaml(`
+                plain: &a !!str one
+                single: &b !!str 'two'
+                double: &c !!str "three"
+                literal: &d !!str |
+                  four
+                folded: &e !!str >-
+                  five
+                tagFirst: !!str &f six
+                seq:
+                  - &g !!str seven
+                  - !!str &h eight
+                flowSeq: [&i !!str nine, !!str &j ten]
+                flowMap: {k: &k !!str eleven}
+                &l !!str key: twelve
+                aliases: [*a, *d, *g]
+            `)
+        ));
+});
+
+describe('Tag on a mapping or sequence', () => {
+    const spec = new RecipeSpec();
+
+    test('block and flow collections, with and without an anchor', () =>
+        spec.rewriteRun(
+            yaml(`
+                map: !!map
+                  k: v
+                anchoredMap: &m !!map
+                  k: v
+                seq: !!seq
+                  - x
+                anchoredSeq: &s !!seq
+                  - x
+                flowMap: !!map {k: v}
+                flowSeq: &f !!seq [x]
+                local: !custom
+                  k: v
+                entries:
+                  - !!map
+                    k: v
+                  - !!seq [x]
+                aliases: [*m, *s, *f]
+            `)
+        ));
+});
+
+describe('Text after the last document', () => {
+    const spec = new RecipeSpec();
+
+    test('newline, blank lines and comments after the last document end marker', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: b
+                ...
+            `),
+            yaml(`
+                ---
+                a: b
+                ...
+
+
+            `),
+            yaml(`
+                a: b
+                ...
+                ---
+                c: d
+                ...
+                # trailing
+            `)
+        ));
+
+    test('file with only a comment', () =>
+        spec.rewriteRun(
+            yaml(`
+                # only a comment
+            `)
+        ));
 });

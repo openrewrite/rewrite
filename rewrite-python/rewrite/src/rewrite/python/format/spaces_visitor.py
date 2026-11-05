@@ -9,7 +9,7 @@ from rewrite.java import (J, Assignment, JLeftPadded, AssignmentOperation, Membe
 from rewrite.python import (PythonVisitor, SpacesStyle, Binary, ChainedAssignment, Slice, CollectionLiteral,
                              DictLiteral, KeyValue, TypeHint, MultiImport, ExpressionTypeTree,
                              ComprehensionExpression, NamedArgument, TypeAlias)
-from rewrite.visitor import P, Cursor
+from rewrite.visitor import P, T, Cursor
 
 J2 = TypeVar('J2', bound=J)
 
@@ -19,6 +19,7 @@ class SpacesVisitor(PythonVisitor):
         self._style = style
         self._before_parentheses = style.before_parentheses
         self._stop_after = stop_after
+        self._stop = False
 
     def visit_class_declaration(self, class_decl: ClassDeclaration, p: P) -> J:
         c = cast(ClassDeclaration, super().visit_class_declaration(class_decl, p))
@@ -138,8 +139,9 @@ class SpacesVisitor(PythonVisitor):
             return v
 
         if v.padding.initializer is not None and v.padding.initializer.element is not None:
-            use_space = self._style.around_operators.eq_in_named_parameter or v.variable_type is not None
-            use_space |= self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
+            # As PEP 8 asks, an annotated parameter's default takes spaces
+            use_space = self._style.around_operators.eq_in_named_parameter or \
+                self.cursor.first_enclosing_or_throw(VariableDeclarations).type_expression is not None
 
             v = v.padding.replace(
                 initializer=space_before_left_padded(v.padding.initializer, use_space))
@@ -529,6 +531,14 @@ class SpacesVisitor(PythonVisitor):
         cc = cc.replace(iterator_variable=space_before(cc.iterator_variable, True))
         cc = cc.padding.replace(iterated_list=space_before_left_padded_element(cc.padding.iterated_list, True))
         return cc
+
+    def post_visit(self, tree: T, p: P) -> Optional[T]:
+        if self._stop_after and tree == self._stop_after:
+            self._stop = True
+        return tree
+
+    def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
+        return cast(Optional[T], tree if self._stop else super().visit(tree, p, parent))
 
 
 def _trailing_comma_suffix(tc: TrailingComma, within: bool) -> TrailingComma:

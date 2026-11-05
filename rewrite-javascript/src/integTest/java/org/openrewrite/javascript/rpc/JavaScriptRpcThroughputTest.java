@@ -103,6 +103,7 @@ class JavaScriptRpcThroughputTest {
     @AfterEach
     void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Test

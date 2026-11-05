@@ -91,7 +91,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v > 0));
+        return super.validate().and(Validated.test("version", "Version must be > 0.", version, v -> v != null && v > 0));
     }
 
     @Override

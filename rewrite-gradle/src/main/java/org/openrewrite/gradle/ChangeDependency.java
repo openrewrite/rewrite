@@ -26,6 +26,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.VersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
@@ -211,38 +212,30 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                new GradleDependency.Matcher().get(getCursor()).ifPresent(dep -> {
+                GradleMultiDependency.matcher().get(getCursor()).ifPresent(multi -> multi.forEach(dep -> {
                     String varName = dep.getVersionVariable();
-                    if (varName != null) {
-                        acc.versionVariableUsages
-                                .computeIfAbsent(varName, k -> new HashSet<>())
-                                .add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                    if (varName == null) {
+                        return;
                     }
-                });
-
-                new GradleDependency.Matcher()
-                        .groupId(oldGroupId)
-                        .artifactId(oldArtifactId)
-                        .get(getCursor())
-                        .ifPresent(dep -> {
-                            String varName = dep.getVersionVariable();
-                            if (varName != null && !StringUtils.isBlank(newVersion)) {
-                                resolveAndRecordVersion(varName, m, dep, ctx);
-                            }
-                        });
-
-                // Also resolve for NEW-coord deps so survivor-upgrade can rewrite a variable that
-                // only the survivor references (the OLD dep might use a literal version).
-                new GradleDependency.Matcher()
-                        .groupId(newGroupId)
-                        .artifactId(newArtifactId)
-                        .get(getCursor())
-                        .ifPresent(dep -> {
-                            String varName = dep.getVersionVariable();
-                            if (varName != null && !StringUtils.isBlank(newVersion)) {
-                                resolveAndRecordVersion(varName, m, dep, ctx);
-                            }
-                        });
+                    acc.versionVariableUsages
+                            .computeIfAbsent(varName, k -> new HashSet<>())
+                            .add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                    if (StringUtils.isBlank(newVersion)) {
+                        return;
+                    }
+                    new GradleDependency.Matcher()
+                            .groupId(oldGroupId)
+                            .artifactId(oldArtifactId)
+                            .get(dep.getCursor())
+                            .ifPresent(oldDep -> resolveAndRecordVersion(varName, m, oldDep, ctx));
+                    // Also resolve for NEW-coord deps so survivor-upgrade can rewrite a variable that
+                    // only the survivor references (the OLD dep might use a literal version).
+                    new GradleDependency.Matcher()
+                            .groupId(newGroupId)
+                            .artifactId(newArtifactId)
+                            .get(dep.getCursor())
+                            .ifPresent(newDep -> resolveAndRecordVersion(varName, m, newDep, ctx));
+                }));
 
                 return m;
             }
@@ -336,22 +329,31 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                // Matching the visited call keeps the edits made inside it
+                return GradleMultiDependency.matcher()
+                        .get(new Cursor(getCursor().getParent(), m))
+                        .map(multi -> multi.map(notation -> changeNotation(notation, ctx)))
+                        .orElse(m);
+            }
+
+            private J.MethodInvocation changeNotation(GradleDependency notation, ExecutionContext ctx) {
+                J.MethodInvocation m = notation.getTree();
 
                 Optional<GradleDependency> maybeDep = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId)
-                        .get(getCursor());
+                        .get(notation.getCursor());
                 if (maybeDep.isPresent()) {
                     return updateDependency(m, maybeDep.get(), ctx);
                 }
 
-                // Survivor-upgrade: if this method invocation is the pre-existing NEW-coord dep in a
+                // Survivor-upgrade: if this notation is the pre-existing NEW-coord dep in a
                 // configuration where dedupe removed the old coord, upgrade its version to newVersion.
                 if (!StringUtils.isBlank(newVersion) && !configurationsWithSurvivorUpgrade.isEmpty()) {
                     Optional<GradleDependency> maybeSurvivor = new GradleDependency.Matcher()
                             .groupId(newGroupId)
                             .artifactId(newArtifactId)
-                            .get(getCursor());
+                            .get(notation.getCursor());
                     if (maybeSurvivor.isPresent() &&
                             configurationsWithSurvivorUpgrade.contains(maybeSurvivor.get().getConfigurationName())) {
                         return upgradeSurvivorVersion(m, maybeSurvivor.get(), ctx);

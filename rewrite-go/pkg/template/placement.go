@@ -17,8 +17,13 @@
 package template
 
 import (
+	"reflect"
+
+	"github.com/google/uuid"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parenthesize"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -29,7 +34,17 @@ func placeAt(result java.J, site *visitor.Cursor) java.J {
 	if !ok {
 		return result
 	}
-	out := parenthesized(setLeadingPrefix(result, getLeadingPrefix(replaced)), site)
+	var out java.J
+	_, isStatement := result.(java.Statement)
+	if expr, ok := result.(java.Expression); ok && !isStatement && inStatementSlot(site) {
+		out = &golang.ExpressionStatement{
+			ID:         uuid.New(),
+			Prefix:     getLeadingPrefix(replaced),
+			Expression: setLeadingPrefix(expr, java.EmptySpace).(java.Expression),
+		}
+	} else {
+		out = parenthesized(setLeadingPrefix(result, getLeadingPrefix(replaced)), site)
+	}
 	if formatted, ok := format.AutoFormat(out, nil, nil, site.Parent()).(java.J); ok {
 		return formatted
 	}
@@ -44,4 +59,48 @@ func parenthesized(j java.J, site *visitor.Cursor) java.J {
 		return j
 	}
 	return parenthesize.Maybe(expr, site)
+}
+
+var statementType = reflect.TypeOf((*java.Statement)(nil)).Elem()
+
+// inStatementSlot reports whether the parent declares the field holding the
+// node at site as a java.Statement, where an expression alone cannot go.
+func inStatementSlot(site *visitor.Cursor) bool {
+	parent := site.Parent()
+	if parent == nil {
+		return false
+	}
+	node, holder := reflect.ValueOf(site.Value()), reflect.ValueOf(parent.Value())
+	if node.Kind() != reflect.Pointer || holder.Kind() != reflect.Pointer || holder.Elem().Kind() != reflect.Struct {
+		return false
+	}
+	return heldAsStatement(holder.Elem(), node.Pointer())
+}
+
+// heldAsStatement looks through the padding and lists of v, but not into
+// other nodes, for an interface of type java.Statement pointing at node.
+func heldAsStatement(v reflect.Value, node uintptr) bool {
+	if t := v.Type(); t == spaceType || t == markersType || t.Implements(javaTypeType) {
+		return false
+	}
+	switch v.Kind() {
+	case reflect.Interface:
+		e := v.Elem()
+		return v.Type() == statementType && e.Kind() == reflect.Pointer && e.Pointer() == node
+	case reflect.Pointer:
+		return !v.IsNil() && !v.Type().Implements(jType) && heldAsStatement(v.Elem(), node)
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if heldAsStatement(v.Field(i), node) {
+				return true
+			}
+		}
+	case reflect.Slice:
+		for i := range v.Len() {
+			if heldAsStatement(v.Index(i), node) {
+				return true
+			}
+		}
+	}
+	return false
 }

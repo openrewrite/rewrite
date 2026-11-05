@@ -609,9 +609,21 @@ describe("change-import", () => {
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(repo.path, {
+                    //language=typescript
                     ...typescript(
-                        `import { extend, flatten } from 'lodash';\n\nextend({}, {});\nflatten([[1]]);\n`,
-                        `import { flatten } from 'lodash';\nimport { assign } from 'lodash-es';\n\nassign({}, {});\nflatten([[1]]);\n`),
+                        `
+                        import { extend, flatten } from 'lodash';
+
+                        extend({}, {});
+                        flatten([[1]]);
+                        `,
+                        `
+                        import { flatten } from 'lodash';
+                        import { assign } from 'lodash-es';
+
+                        assign({}, {});
+                        flatten([[1]]);
+                        `),
                     afterRecipe: async (cu: any) => {
                         await new class extends JavaScriptVisitor<any> {
                             override async visitMethodInvocation(m: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -653,9 +665,20 @@ describe("change-import", () => {
                 npm(
                     repo.path,
                     {
+                        //language=typescript
                         ...typescript(
-                            `import { documentToken } from './token';\n\nconst d = documentToken;\nconsole.log(d);\n`,
-                            `import { documentToken } from './core-token';\n\nconst d = documentToken;\nconsole.log(d);\n`),
+                            `
+                            import { documentToken } from './token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `,
+                            `
+                            import { documentToken } from './core-token';
+
+                            const d = documentToken;
+                            console.log(d);
+                            `),
                         path: "main.ts",
                         afterRecipe: async (cu: any) => {
                             await new class extends JavaScriptVisitor<any> {

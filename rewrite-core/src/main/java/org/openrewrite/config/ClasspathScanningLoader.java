@@ -74,6 +74,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
     //    one YamlResourceLoader per file (cheap; no YAML parsing yet).
     // YAML parsing happens progressively in loadRecipe — one file at a time —
     // until either the requested recipe is found or all loaders are drained.
+    // Each phase is cleared before it runs, so a phase that reaches this loader again
+    // on the same thread skips it. The methods that run the phases or read what they
+    // fill are synchronized, so another thread waits for a phase under way rather than
+    // skipping it and reading collections that are still being filled.
     private @Nullable Runnable performClassScan;
     private @Nullable Runnable performYamlListing;
 
@@ -305,6 +309,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * A map that lazily resolves superclass names by reading class bytecode from the classloader.
      * Entries from the seed map are returned directly; missing entries are resolved on demand
      * by finding the .class resource via the classloader and reading its header with ASM.
+     * <p>
+     * Its methods are synchronized because {@code Environment.Builder.scanJar} shares one
+     * instance among loaders that may scan at the same time on different threads.
      */
     static class ClassLoaderBackedSuperclassMap {
         private static final String NOT_FOUND = "\0";
@@ -317,7 +324,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             this.classLoader = classLoader;
         }
 
-        public @Nullable String get(String key) {
+        public synchronized @Nullable String get(String key) {
             String result = delegate.get(key);
             if (result != null) {
                 return NOT_FOUND.equals(result) ? null : result;
@@ -328,7 +335,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             return resolved;
         }
 
-        public void putAll(Map<String, String> m) {
+        public synchronized void putAll(Map<String, String> m) {
             delegate.putAll(m);
         }
 
@@ -339,7 +346,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
          * @return a {@link Scan} bundling the classes found in this specific path
          * (the candidates) together with this hierarchy map.
          */
-        public Scan scan(Path path) {
+        public synchronized Scan scan(Path path) {
             Map<String, String> classes = new HashMap<>();
             buildSuperclassMapFromPath(path, classes, scannedPaths);
             delegate.putAll(classes);
@@ -615,7 +622,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     // ---- ResourceLoader interface ----
 
     @Override
-    public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
+    public synchronized @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
         // Imperative fast path: try to load by FQCN directly. This succeeds for any
         // imperative recipe whose name matches its class, without triggering any scan.
         if (performClassScan != null) {
@@ -644,7 +651,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<Recipe> listRecipes() {
+    public synchronized Collection<Recipe> listRecipes() {
         ensureScanned();
         return recipes.values();
     }
@@ -677,38 +684,38 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     // ---- Package-private introspection for tests ----
 
-    boolean classScanTriggered() {
+    synchronized boolean classScanTriggered() {
         return performClassScan == null;
     }
 
-    boolean yamlListingTriggered() {
+    synchronized boolean yamlListingTriggered() {
         return performYamlListing == null;
     }
 
-    int yamlLoadersDrained() {
+    synchronized int yamlLoadersDrained() {
         return yamlScanIndex;
     }
 
-    int yamlLoadersListed() {
+    synchronized int yamlLoadersListed() {
         return yamlResourceLoaders.size();
     }
 
     @Override
-    public Collection<RecipeDescriptor> listRecipeDescriptors() {
+    public synchronized Collection<RecipeDescriptor> listRecipeDescriptors() {
         ensureScanned();
         extractYamlRecipeDescriptors();
         return recipeDescriptors;
     }
 
     @Override
-    public Collection<CategoryDescriptor> listCategoryDescriptors() {
+    public synchronized Collection<CategoryDescriptor> listCategoryDescriptors() {
         // Categories come from YAML only; no need to walk class bytecode.
         ensureYamlScanned();
         return categoryDescriptors;
     }
 
     @Override
-    public Collection<NamedStyles> listStyles() {
+    public synchronized Collection<NamedStyles> listStyles() {
         // Styles can come from either imperative classes or YAML, so both phases are needed.
         ensureScanned();
         return styles;

@@ -832,7 +832,12 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
-        return await(request(method, body, responseType), responseType);
+        try {
+            return await(request(method, body, responseType), responseType);
+        } catch (RuntimeException e) {
+            IncompatibleRecipeBundleException refusal = IncompatibleRecipeBundleException.from(e);
+            throw refusal != null ? refusal : e;
+        }
     }
 
     /**

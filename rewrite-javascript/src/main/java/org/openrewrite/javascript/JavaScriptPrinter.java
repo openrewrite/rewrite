@@ -2005,9 +2005,8 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
 
         p.append(before);
         visitRightPaddedLocal(container.getPadding().getElements(), suffixBetween, p);
-        afterSyntax(container.getMarkers(), p);
-
         p.append(after);
+        afterSyntax(container.getMarkers(), p);
     }
 
     private void visitRightPadded(JRightPadded<?> right, PrintOutputCapture<P> p) {

@@ -38,11 +38,11 @@ public class DependencyTypesPaginationTest
     };
 
     [Fact]
-    public void PagesResponseAcrossRepeatedRequests()
+    public async Task PagesResponseAcrossRepeatedRequests()
     {
         // Single-shot reference: one batch large enough to hold the whole response.
         var single = new RewriteRpcServer(new RecipeMarketplace()) { DependencyTypesBatchSize = int.MaxValue };
-        var want = single.DependencyTypes(Request()).Result;
+        var want = await single.DependencyTypes(Request());
         Assert.NotEmpty(want);
         Assert.Equal(RpcObjectData.ObjectState.END_OF_OBJECT, want[^1].State);
         Assert.True(want.Count > 2, "response should exceed a single tiny slice");
@@ -54,7 +54,7 @@ public class DependencyTypesPaginationTest
         for (var calls = 0; ; calls++)
         {
             Assert.True(calls <= want.Count + 2, "pagination did not terminate");
-            var batch = server.DependencyTypes(Request()).Result;
+            var batch = await server.DependencyTypes(Request());
             Assert.True(batch.Count <= 2, $"batch of {batch.Count} exceeds batchSize 2");
             slices++;
             got.AddRange(batch);
@@ -72,7 +72,7 @@ public class DependencyTypesPaginationTest
 
         // Cache freed after drain: a fresh request rebuilds and hands back the first slice again
         // (a non-evicted entry would have nothing left to return).
-        var afterDrain = server.DependencyTypes(Request()).Result;
+        var afterDrain = await server.DependencyTypes(Request());
         Assert.Equal(
             JsonSerializer.Serialize(got.Take(2), RpcJson.Options),
             JsonSerializer.Serialize(afterDrain, RpcJson.Options));

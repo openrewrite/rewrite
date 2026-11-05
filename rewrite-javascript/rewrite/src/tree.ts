@@ -17,6 +17,7 @@ import {Markers} from "./markers";
 import {UUID} from "./uuid";
 import {PlainText} from "./text";
 import {RpcCodecs} from "./rpc";
+import {registerHeavyweight} from "./heavyweight";
 
 export const TreeKind = {
     Checksum: "org.openrewrite.Checksum",
@@ -111,6 +112,8 @@ export class Cursor {
         return root;
     }
 }
+
+registerHeavyweight(Cursor);
 
 export function rootCursor(): Cursor {
     return new Cursor("root");

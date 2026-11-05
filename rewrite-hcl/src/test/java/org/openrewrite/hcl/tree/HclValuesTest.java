@@ -57,7 +57,7 @@ class HclValuesTest {
           entry("d", "3"),
           entry("e", "1.50"),
           entry("f", "true"),
-          entry("g", "with \\\"escape\\\"")
+          entry("g", "with \"escape\"")
         );
     }
 

@@ -88,7 +88,7 @@ public class DeleteProperty extends Recipe {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, ctx)) {
+                if (ReplaceAliasWithAnchorValueVisitor.hasResolvableAlias(documents)) {
                     return documents;
                 }
                 return super.visitDocuments(documents, ctx);

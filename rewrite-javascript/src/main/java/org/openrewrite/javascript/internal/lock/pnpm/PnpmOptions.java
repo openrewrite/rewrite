@@ -195,6 +195,10 @@ public final class PnpmOptions {
                             @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env,
                             PnpmRelease release) {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
+        if (!release.defaultsToOneDayReleaseAge()) {
+            defaultOptions.put("minimum-release-age", 0.0);
+            defaultOptions.put("block-exotic-subdeps", false);
+        }
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
                 readAndFilterNpmrc(npmrc, env, release, true);
         requireTheUserNpmrcAtHome(env, release);
@@ -217,7 +221,7 @@ public final class PnpmOptions {
                 workspaceNpmrc, envScopedConfig, jsonAuth.auth)) {
             for (String key : Js.keys(source)) {
                 rawConfig.put(key, source.get(key));
-                if (isNpmrcReadableKey(key)) {
+                if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
                     mergedConfig.put(key, source.get(key));
                 }
             }
@@ -265,6 +269,12 @@ public final class PnpmOptions {
             config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest, release));
         }
 
+        if (rootManifest != null && release.readsSettingsFromRootManifest()) {
+            Map<String, @Nullable Object> settings = rootManifestSettings(rootManifest, env, release);
+            config.putAll(settings);
+            explicitlySetKeys.addAll(settings.keySet());
+        }
+
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
         if (workspaceManifest != null) {
@@ -274,6 +284,9 @@ public final class PnpmOptions {
             if (manifest != null) {
                 Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env,
                         release);
+                if (!release.readsSettingsFromWorkspaceManifest()) {
+                    newSettings.clear();
+                }
                 for (String option : CLI_OPTIONS) {
                     newSettings.put(camelcase(option), true);
                 }
@@ -371,6 +384,37 @@ public final class PnpmOptions {
                 wantedPackageManager, release.toString(), release);
     }
 
+    // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.
+    private static final List<String> ROOT_MANIFEST_SETTINGS = Arrays.asList(
+            "allowNonAppliedPatches", "allowUnusedPatches", "allowedDeprecatedVersions", "auditConfig",
+            "configDependencies", "executionEnv", "ignorePatchFailures", "ignoredBuiltDependencies",
+            "ignoredOptionalDependencies", "neverBuiltDependencies", "onlyBuiltDependencies",
+            "onlyBuiltDependenciesFile", "overrides", "packageExtensions", "patchedDependencies",
+            "peerDependencyRules", "supportedArchitectures", "updateConfig");
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> rootManifestSettings(Map<String, @Nullable Object> manifest,
+            @Nullable Map<String, String> env, PnpmRelease release) {
+        Map<String, @Nullable Object> settings = new LinkedHashMap<>();
+        Object pnpm = manifest.get("pnpm");
+        if (pnpm instanceof Map) {
+            for (String key : ROOT_MANIFEST_SETTINGS) {
+                if (((Map<?, ?>) pnpm).containsKey(key)) {
+                    settings.put(key, ((Map<?, ?>) pnpm).get(key));
+                }
+            }
+        }
+        Map<String, @Nullable Object> overrides = new LinkedHashMap<>();
+        if (manifest.get("resolutions") instanceof Map) {
+            overrides.putAll((Map<String, @Nullable Object>) manifest.get("resolutions"));
+        }
+        if (settings.get("overrides") instanceof Map) {
+            overrides.putAll((Map<String, @Nullable Object>) settings.get("overrides"));
+        }
+        settings.put("overrides", overrides);
+        return getOptionsFromPnpmSettings(settings, manifest, env, release);
+    }
+
     /**
      * getConfig's {@code packageManagerRegistries} of 11.5.3, from its {@code trustedConfig}: pnpm's built-in config,
      * the defaults and the user's .npmrc (the port reads no auth.ini, and no command line names a registry), with
@@ -386,7 +430,7 @@ public final class PnpmOptions {
         for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
                 envScopedConfig, jsonAuth.auth)) {
             for (String key : Js.keys(source)) {
-                if (isNpmrcReadableKey(key)) {
+                if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
                     trustedConfig.put(key, source.get(key));
                 }
             }
@@ -862,7 +906,14 @@ public final class PnpmOptions {
                 value = env == null && !readByALockOnlyInstall(key) ? rawValue :
                         substituteEnv((String) rawValue, env, release);
             }
-            if (isNpmrcReadableKey(key)) {
+            if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
+                if (release.readsSettingsFromNpmrc() && value instanceof String && ConfigTypes.TYPES.containsKey(key)) {
+                    Object parsed = parseValueBySchema(ConfigTypes.TYPES.get(key), (String) value,
+                            env == null ? Collections.emptyMap() : env);
+                    if (parsed != Js.UNDEFINED) {
+                        value = parsed;
+                    }
+                }
                 result.put(key, value);
             }
         }

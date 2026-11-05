@@ -125,8 +125,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
         return convert(ctx.STRING(), (str, prefix) -> {
             String source = str.getText();
-            return new Json.Literal(randomId(), prefix, Markers.EMPTY, source,
-                    source.substring(1, source.length() - 1));
+            return new Json.Literal(randomId(), prefix, Markers.EMPTY, source, JsonString.decode(source));
         });
     }
 
@@ -237,8 +236,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         if (ctx.STRING() != null) {
             return convert(ctx.STRING(), (str, prefix) -> {
                 String source = str.getText();
-                return new Json.Literal(randomId(), prefix, Markers.EMPTY, source,
-                        source.substring(1, source.length() - 1));
+                return new Json.Literal(randomId(), prefix, Markers.EMPTY, source, JsonString.decode(source));
             });
         } else if (ctx.LITERAL() != null) {
             return convert(ctx.LITERAL(), (literal, prefix) -> {

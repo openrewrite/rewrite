@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.test.RewriteTest;
 
@@ -55,6 +56,36 @@ class HclAttributeTest implements RewriteTest {
                   key = "goodbye"
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void attributeValueIsWrittenAsGivenAndHoldsTheTextItStandsFor() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("key", "say \\\"hi\\\"")),
+          hcl(
+            """
+              provider {
+                  key = "hello"
+              }
+              """,
+            """
+              provider {
+                  key = "say \\"hi\\""
+              }
+              """,
+            spec -> spec.afterRecipe(config -> {
+                List<Object> values = new ArrayList<>();
+                new HclIsoVisitor<List<Object>>() {
+                    @Override
+                    public Hcl.Literal visitLiteral(Hcl.Literal literal, List<Object> found) {
+                        found.add(literal.getValue());
+                        return literal;
+                    }
+                }.visit(config, values);
+                assertThat(values).containsExactly("say \"hi\"");
+            })
           )
         );
     }

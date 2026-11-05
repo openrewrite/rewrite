@@ -203,6 +203,46 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("job.b", null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("YAMLUnusedAnchor")
+    @Test
+    void anchorWithoutAlias() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("job.b", null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                b: 2
+                c: 3
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                c: 3
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {

@@ -170,4 +170,52 @@ class FindKeyTest implements RewriteTest {
                 .contains("Invalid JsonPath expression")
                 .contains("Syntax error");
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$.job.b")),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                ~~>b: 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void recursiveDescentPastAliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..b")),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+                b: 2
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+                ~~>b: 2
+              """
+          )
+        );
+    }
 }

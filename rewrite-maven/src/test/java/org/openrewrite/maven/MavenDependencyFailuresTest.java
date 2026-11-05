@@ -145,7 +145,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
         MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
           .snapshots(false).knownToExist(true).build();
-        MavenExecutionContextView recipeCtx = MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+        MavenExecutionContextView recipeCtx = MavenCentralMirrorExtension.withMavenCentralMirror(
           MavenExecutionContextView.view(new InMemoryExecutionContext())
             .setLocalRepository(mavenLocal)
             .setPomCache(new InMemoryMavenPomCache()));
@@ -157,7 +157,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(updateModel())
-            .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+            .executionContext(MavenCentralMirrorExtension.withMavenCentralMirror(
               MavenExecutionContextView.view(new InMemoryExecutionContext())
                 .setLocalRepository(mavenLocal)
             ))

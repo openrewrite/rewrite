@@ -26,6 +26,8 @@ import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
@@ -33,30 +35,37 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
         J.Binary asBinary = (J.Binary) j;
+        // Replacing a primitive result with a boxed operand can remove unboxing or change overloads.
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit &&
+            (isBoxedBoolean(asBinary.getLeft()) || isBoxedBoolean(asBinary.getRight()))) {
+            return asBinary;
+        }
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
-            if (isLiteralFalse(asBinary.getLeft())) {
+            if (isLiteralFalse(asBinary.getLeft()) && !declaresPatternVariable(asBinary.getRight())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
+            } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralTrue(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
-            if (isLiteralTrue(asBinary.getLeft())) {
+            if (isLiteralTrue(asBinary.getLeft()) && !declaresPatternVariable(asBinary.getRight())) {
                 j = asBinary.getLeft();
-            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
+            } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft())) {
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralFalse(asBinary.getLeft())) {
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) &&
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
@@ -189,7 +198,62 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             }
         }
+        if (j instanceof Expression && ternary.getType() == JavaType.Primitive.Boolean &&
+            isBoxedBoolean((Expression) j) &&
+            getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return ternary;
+        }
         return j;
+    }
+
+    private static boolean declaresPatternVariable(Expression expression) {
+        AtomicBoolean found = new AtomicBoolean();
+        new JavaVisitor<AtomicBoolean>() {
+            @Override
+            public J visitInstanceOf(J.InstanceOf instanceOf, AtomicBoolean found) {
+                if (instanceOf.getPattern() != null) {
+                    found.set(true);
+                }
+                return super.visitInstanceOf(instanceOf, found);
+            }
+        }.visit(expression, found);
+        return found.get();
+    }
+
+    private boolean canDiscardEvaluation(Expression expression) {
+        if (!(getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit)) {
+            return true;
+        }
+        expression = expression.unwrap();
+        if (expression instanceof J.Literal) {
+            return true;
+        }
+        if (expression instanceof J.Identifier) {
+            JavaType.Variable variable = ((J.Identifier) expression).getFieldType();
+            return variable != null && !variable.hasFlags(Flag.Volatile) && !variable.hasFlags(Flag.Static);
+        }
+        if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            return binary.getOperator() != J.Binary.Type.Division && binary.getOperator() != J.Binary.Type.Modulo &&
+                   isPrimitiveOperand(binary.getLeft()) && isPrimitiveOperand(binary.getRight()) &&
+                   canDiscardEvaluation(binary.getLeft()) && canDiscardEvaluation(binary.getRight());
+        }
+        if (expression instanceof J.Unary) {
+            J.Unary unary = (J.Unary) expression;
+            return (unary.getOperator() == J.Unary.Type.Not || unary.getOperator() == J.Unary.Type.Positive ||
+                    unary.getOperator() == J.Unary.Type.Negative || unary.getOperator() == J.Unary.Type.Complement) &&
+                   isPrimitiveOperand(unary.getExpression()) && canDiscardEvaluation(unary.getExpression());
+        }
+        // Calls, field/array access, casts and assignments can have effects or throw.
+        return false;
+    }
+
+    private static boolean isPrimitiveOperand(Expression expression) {
+        return expression.getType() instanceof JavaType.Primitive && expression.getType() != JavaType.Primitive.String;
+    }
+
+    private static boolean isBoxedBoolean(Expression expression) {
+        return TypeUtils.isAssignableTo("java.lang.Boolean", expression.getType());
     }
 
     private Expression unpackExpression(Expression expr, Expression j) {
@@ -208,7 +272,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 if (isComparison(binary.getLeft()) || isComparison(binary.getRight())) {
                     return j;
                 }
-                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                J.Binary.Type negated = maybeNegate(binary);
                 if (negated != binary.getOperator()) {
                     j = binary.withOperator(negated).withPrefix(j.getPrefix());
                 }
@@ -235,7 +299,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (expr instanceof J.Binary) {
             J.Binary binary = (J.Binary) expr;
             if (!isComparison(binary.getLeft()) && !isComparison(binary.getRight())) {
-                J.Binary.Type negated = maybeNegate(binary.getOperator());
+                J.Binary.Type negated = maybeNegate(binary);
                 if (negated != binary.getOperator()) {
                     return binary.withOperator(negated).withPrefix(expr.getPrefix());
                 }
@@ -258,8 +322,30 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         return not(expr).withPrefix(expr.getPrefix());
     }
 
-    private J.Binary.Type maybeNegate(J.Binary.Type operator) {
-        switch (operator) {
+    private static boolean isKnownIntegral(@Nullable JavaType type) {
+        return type == JavaType.Primitive.Byte || type == JavaType.Primitive.Short ||
+               type == JavaType.Primitive.Int || type == JavaType.Primitive.Long ||
+               type == JavaType.Primitive.Char ||
+               TypeUtils.isOfClassType(type, "java.lang.Byte") ||
+               TypeUtils.isOfClassType(type, "java.lang.Short") ||
+               TypeUtils.isOfClassType(type, "java.lang.Integer") ||
+               TypeUtils.isOfClassType(type, "java.lang.Long") ||
+               TypeUtils.isOfClassType(type, "java.lang.Character");
+    }
+
+    private J.Binary.Type maybeNegate(J.Binary binary) {
+        switch (binary.getOperator()) {
+            case LessThan:
+            case GreaterThan:
+            case LessThanOrEqual:
+            case GreaterThanOrEqual:
+                // Ordered floating-point comparisons are not complementary when either operand is NaN.
+                if (!isKnownIntegral(binary.getLeft().getType()) || !isKnownIntegral(binary.getRight().getType())) {
+                    return binary.getOperator();
+                }
+                break;
+        }
+        switch (binary.getOperator()) {
             case LessThan:
                 return J.Binary.Type.GreaterThanOrEqual;
             case GreaterThan:
@@ -273,7 +359,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             case NotEqual:
                 return J.Binary.Type.Equal;
             default:
-                return operator;
+                return binary.getOperator();
         }
     }
 
@@ -456,23 +542,20 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     /**
-     * In Java, {@code !} only applies to boolean expressions, so {@code !!x} is always
-     * equivalent to {@code x}. In other languages like JavaScript/TypeScript and Groovy,
+     * A boxed Java {@code Boolean} must still be unboxed, so {@code !!x} can only become
+     * {@code x} when the operand is primitive boolean. In JavaScript/TypeScript and Groovy,
      * {@code !!x} is an idiomatic boolean coercion that converts any truthy/falsy value
      * to a strict boolean. In those cases, simplifying {@code !!x} to {@code x} changes
      * semantics when {@code x} is not boolean-typed.
      */
     private boolean canSimplifyDoubleNegation(Expression innerExpression) {
-        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
-            return true;
-        }
         return isBooleanValued(innerExpression);
     }
 
     /**
      * Determines whether an equals comparison with a boolean literal can be simplified.
      * <p>
-     * In Java, {@code x == true} can always be simplified to {@code x}.
+     * For primitive Java booleans, {@code x == true} can be simplified to {@code x}.
      * In Kotlin and other languages, nullable types like {@code Boolean?} compared
      * with {@code == true} have different semantics than using the value directly,
      * e.g. {@code nullableBoolean == true} evaluates to {@code false} when null,

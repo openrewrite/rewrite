@@ -16,8 +16,16 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GrUnnecessarySemicolon")
@@ -32,6 +40,47 @@ class BlockTest implements RewriteTest {
                   force = true;
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9486")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "if (true) { println(1);; }",
+      "if (true) { println(1); ; }",
+      "if (true) { println(1);;; }",
+      "if (true) { println(1);; println(2) }",
+      "if (true) { ; }",
+      "if (true) { ;println(1) }",
+      "if (true) { println(1) /* c */ ; }",
+      "if (true) {\n    println(1);\n    ;\n}",
+      "def c = { println(1);; }",
+      "class A { void m() { int i = 1;; } }",
+      "def a = 1;;",
+      "def a = 1;; def b = 2",
+    })
+    void emptyStatement(String source) {
+        rewriteRun(
+          groovy(source)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9486")
+    @Test
+    void emptyStatementIsJEmpty() {
+        rewriteRun(
+          groovy(
+            """
+              if (true) { println(1);; }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new GroovyIsoVisitor<AtomicInteger>() {
+                @Override
+                public J.Empty visitEmpty(J.Empty empty, AtomicInteger empties) {
+                    empties.incrementAndGet();
+                    return super.visitEmpty(empty, empties);
+                }
+            }.reduce(cu, new AtomicInteger())).hasValue(1))
           )
         );
     }

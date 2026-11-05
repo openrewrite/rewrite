@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
+import {registerHeavyweight} from "./heavyweight";
 
 export class ExecutionContext {
     /** Mirrors `org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT`. */
     static readonly REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
+
+    /** Mirrors `org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION`, which the test harness sets. */
+    static readonly SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
     readonly kind: string = "org.openrewrite.InMemoryExecutionContext"
 
@@ -44,6 +48,8 @@ export class ExecutionContext {
         }
     }
 }
+
+registerHeavyweight(ExecutionContext);
 
 const executionContextCodec: RpcCodec<ExecutionContext> = {
     rpcNew(): ExecutionContext {
