@@ -1245,6 +1245,32 @@ class RewriteRpcTest implements RewriteTest {
         });
     }
 
+    @Test
+    void batchThatFailsAfterItsBatchVisitIsNotSentAgain() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        DataTableExecutionContextView.view(ctx).setDataTableStore(new InMemoryDataTableStore() {
+            @Override
+            public <Row> void insertRow(DataTable<Row> dataTable, ExecutionContext ctx, Row row) {
+                if (dataTable instanceof SourcesFileResults) {
+                    throw new IllegalStateException("Unrecordable");
+                }
+                super.insertRow(dataTable, ctx, row);
+            }
+        });
+        sentByClient.clear();
+
+        new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(
+            client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "changed")),
+            client.prepareRecipe("org.openrewrite.text.FindAndReplace",
+              Map.of("find", "changed", "replace", "again")))),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          ctx, 1, 1);
+
+        assertThat(sentByClient).filteredOn(method -> method.endsWith("Visit")).containsExactly("BatchVisit");
+    }
+
     private static Precondition languageGate(String treeType) {
         return new Precondition(FindTreesOfType.class.getName(), Map.of("type", treeType), null, null);
     }

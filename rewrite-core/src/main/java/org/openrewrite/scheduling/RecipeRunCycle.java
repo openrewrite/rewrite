@@ -580,8 +580,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile flushBatch(BatchState batch, SourceFile source) {
-        if (batch.rpc == null || batch.items.isEmpty()) {
+        try {
+            return sendBatch(batch, source);
+        } finally {
+            // Emptied even when recording the results throws, so editSource's catch doesn't send the batch twice
             batch.clear();
+        }
+    }
+
+    private @Nullable SourceFile sendBatch(BatchState batch, SourceFile source) {
+        if (batch.rpc == null || batch.items.isEmpty()) {
             return source;
         }
 
@@ -637,7 +645,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     recordSourceFileResultAndSearchResults(originalBefore, null, batch.recipeStacks.get(i), emptyList(), ctx);
                 }
             }
-            batch.clear();
             return null;
         }
 
@@ -675,7 +682,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
         }
 
-        batch.clear();
         return fetched;
     }
 
@@ -701,7 +707,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
             }
         }
-        batch.clear();
         return source;
     }
 
