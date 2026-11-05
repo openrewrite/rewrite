@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -131,7 +132,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
-        return scanVisitor == null ? TreeVisitor.noop() : Preconditions.check(scanPreconditionVisitor, new RpcVisitor(rpc, scanVisitor));
+        return scanVisitor == null ? TreeVisitor.noop() : scanner(new RpcVisitor(rpc, scanVisitor));
     }
 
     @Override
@@ -141,7 +142,15 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
-        return Preconditions.check(editPreconditionVisitor, new RpcVisitor(rpc, editVisitor));
+        return editor(new RpcVisitor(rpc, editVisitor));
+    }
+
+    private TreeVisitor<?, ExecutionContext> scanner(RpcVisitor remote) {
+        return Preconditions.check(scanPreconditionVisitor, remote);
+    }
+
+    private TreeVisitor<?, ExecutionContext> editor(RpcVisitor remote) {
+        return Preconditions.check(editPreconditionVisitor, remote);
     }
 
     /**
@@ -150,24 +159,24 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      * scanner would.
      */
     public boolean reachesScanVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
-        return scanVisitor != null && reachesRemote(scanPreconditionVisitor, scanVisitor, source, ctx, cursor);
+        return scanVisitor != null && reachesRemote(this::scanner, scanVisitor, source, ctx, cursor);
     }
 
     /**
      * Whether {@link #getVisitor()} would send {@code source} to {@link #getEditVisitor()}.
      */
     public boolean reachesEditVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
-        return reachesRemote(editPreconditionVisitor, editVisitor, source, ctx, cursor);
+        return reachesRemote(this::editor, editVisitor, source, ctx, cursor);
     }
 
     /**
-     * Applies the gate {@link #getScanner} and {@link #getVisitor} build, ending in a visitor that
-     * records being reached in place of the remote call.
+     * Runs {@code gate}, the method {@link #getScanner} or {@link #getVisitor} builds its visitor with,
+     * around a visitor that records being reached in place of the remote call.
      */
-    private boolean reachesRemote(@Nullable TreeVisitor<?, ExecutionContext> precondition, String visitorName,
+    private boolean reachesRemote(Function<RpcVisitor, TreeVisitor<?, ExecutionContext>> gate, String visitorName,
                                   SourceFile source, ExecutionContext ctx, Cursor cursor) {
         boolean[] reached = {false};
-        TreeVisitor<?, ExecutionContext> gate = Preconditions.check(precondition, new RpcVisitor(rpc, visitorName) {
+        TreeVisitor<?, ExecutionContext> gated = gate.apply(new RpcVisitor(rpc, visitorName) {
             @Override
             public Tree preVisit(Tree tree, ExecutionContext p) {
                 stopAfterPreVisit();
@@ -175,8 +184,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
                 return tree;
             }
         });
-        if (gate.isAcceptable(source, ctx)) {
-            gate.visit(source, ctx, cursor);
+        if (gated.isAcceptable(source, ctx)) {
+            gated.visit(source, ctx, cursor);
         }
         return reached[0];
     }
