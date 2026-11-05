@@ -1127,7 +1127,7 @@ export function isWrite(cursor: Cursor, identifier: J.Identifier): boolean {
 export function isAssignmentTarget(cursor: Cursor): boolean {
     const path = treePath(cursor);
     const node = path.pop();
-    return node !== undefined && path.length > 0 && position(path, node)[1] === 'write';
+    return node !== undefined && node === cursor.value && path.length > 0 && position(path, node)[1] === 'write';
 }
 
 /** One identifier referring to a binding, from {@link referencesOf}. */

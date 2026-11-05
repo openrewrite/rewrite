@@ -314,7 +314,7 @@ function readModuleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
     }
     let esm = false;
     walk(cu.statements, node => {
-        if (esm || node.kind === JS.Kind.Await) {
+        if (esm || isAwait(node)) {
             esm = true;
             return false;
         }
@@ -363,6 +363,13 @@ function isEsmStatement(element: J | undefined): boolean {
         element?.kind === JS.Kind.ExportDeclaration ||
         element?.kind === JS.Kind.ExportAssignment ||
         (modifiers?.some(m => m.keyword === "export") ?? false);
+}
+
+/** An `await` expression, a `for await` loop or an `await using` declaration. */
+function isAwait(node: {kind: string}): boolean {
+    return node.kind === JS.Kind.Await ||
+        node.kind === JS.Kind.ForOfLoop && (node as JS.ForOfLoop).await !== undefined ||
+        ((node as {modifiers?: J.Modifier[]}).modifiers?.some(m => m.keyword === "await") ?? false);
 }
 
 /** Function bodies and type declarations, where no `await` belongs to the module's top level. */

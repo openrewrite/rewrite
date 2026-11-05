@@ -152,6 +152,21 @@ describe('hasEsmSyntax and isCommonJs', () => {
         // then
         expect(answers).toEqual([[true, false], [false, true], [false, false], [false, true]]);
     });
+
+    test('a top-level `for await` or `await using` is module syntax, one in a function is not', async () => {
+        // given
+        const sources = [
+            `for await (const x of xs) {}`,
+            `await using r = open();`,
+            `async function f() { for await (const x of xs) {} await using r = open(); }`
+        ];
+
+        // when
+        const answers = await Promise.all(sources.map(async source => hasEsmSyntax(await parse(source))));
+
+        // then
+        expect(answers).toEqual([true, true, false]);
+    });
 });
 
 describe('isDirective and prologueLength', () => {

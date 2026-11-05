@@ -589,10 +589,7 @@ export function withFactoryBody(
     const factory: J.MethodDeclaration | J.Lambda = block.factory.kind === J.Kind.MethodDeclaration ?
         {...block.factory as J.MethodDeclaration, body: updated} :
         {...block.factory as J.Lambda, body: updated};
-    const args = [...call.arguments.elements];
-    const original = args[block.factoryIndex];
-    args[block.factoryIndex] = {...original, element: restoreFactory(original.element, factory)};
-    return {...call, arguments: {...call.arguments, elements: args}};
+    return withParts(call, block, block.dependencies, factory);
 }
 
 /** Puts the rewritten factory back into whichever wrapper the original was written as. */
