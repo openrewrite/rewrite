@@ -128,7 +128,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return produce(declaration, draft => {
             const elements = (draft.exportClause as Draft<JS.NamedExports>).elements.elements;
             elements.forEach((element, i) => {
-                if (!moving[i]) {
+                // A member keeping its name keeps its specifier as written; only the module moves
+                if (!moving[i] || this.to.member === this.from.member) {
                     return;
                 }
                 const specifier = element.element as Draft<JS.ExportSpecifier>;
