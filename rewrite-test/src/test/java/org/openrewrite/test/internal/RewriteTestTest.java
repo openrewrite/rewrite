@@ -2233,8 +2233,10 @@ class RewriteTestTest implements RewriteTest {
 
         private URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
             Path jar = dir.resolve("dependency.jar");
-            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass.getDeclaredClasses()));
-            classes.add(recipeClass);
+            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass));
+            for (int i = 0; i < classes.size(); i++) {
+                classes.addAll(List.of(classes.get(i).getDeclaredClasses()));
+            }
             try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
                 for (Class<?> c : classes) {
                     String entry = c.getName().replace('.', '/') + ".class";
