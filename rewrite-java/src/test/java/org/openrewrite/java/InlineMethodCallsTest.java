@@ -659,7 +659,7 @@ class InlineMethodCallsTest implements RewriteTest {
               null,
               null))
             // Without `classpathFromResources` holding `com.lib.Old`, the template can not attribute the new call
-            .typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
+            .afterTypeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
           java(
             """
               package com.lib;
