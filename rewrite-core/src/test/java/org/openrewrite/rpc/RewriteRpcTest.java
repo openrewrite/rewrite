@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
@@ -54,6 +55,7 @@ import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.text.Find;
 import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -1134,6 +1136,71 @@ class RewriteRpcTest implements RewriteTest {
           .allSatisfy(result -> assertThat(result.getAfter().getMarkers().findFirst(Markup.Error.class))
             .describedAs("No Markup.Error should be attached for an unsupported source type")
             .isEmpty());
+    }
+
+    @Test
+    void batchedScanVisitsOnlyWhatAnUnbatchedScanAccepts() {
+        // A peer moves a serializable scan precondition out of its scanner, so only this side applies it
+        TreeVisitor<?, ExecutionContext> notExcluded = Preconditions.not(new FindSourceFiles("excluded.txt").getVisitor());
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(scanThenEditGatedBy(notExcluded, null), scanThenEditGatedBy(notExcluded, null))),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("kept").sourcePath(Path.of("kept.txt")).build(),
+            PlainText.builder().text("excluded").sourcePath(Path.of("excluded.txt")).build(),
+            new org.openrewrite.quark.Quark(Tree.randomId(), Path.of("image.jpg"),
+              Markers.build(List.of(new Unwritable())), null, null))),
+          new InMemoryExecutionContext(errors::add), 1, 1);
+
+        assertThat(errors).as("the Quark is never sent to the peer").isEmpty();
+        // ScanThenEdit writes what it scanned into every text file
+        assertThat(run.getChangeset().getAllResults())
+          .extracting(r -> r.getAfter().getSourcePath() + "=" + r.getAfter().printAll())
+          .containsExactlyInAnyOrder("kept.txt=kept:generated", "excluded.txt=kept:generated");
+    }
+
+    @Test
+    void batchedPreconditionWritesNoDataTableRows() {
+        TreeVisitor<?, ExecutionContext> mentionsKept = new Find("kept", null, null, null, null, null, null, null).getVisitor();
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(scanThenEditGatedBy(mentionsKept, mentionsKept), scanThenEditGatedBy(mentionsKept, mentionsKept))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("kept").sourcePath(Path.of("kept.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults())
+          .extracting(r -> r.getAfter().printAll())
+          .containsExactly("kept:generated");
+        assertThat(run.getDataTableRows(TextMatches.class)).isEmpty();
+    }
+
+    /**
+     * A tree carrying this marker can't be written as JSON, like the lazily loaded Quark in gh-9668.
+     */
+    static class Unwritable implements Marker {
+        @Override
+        public UUID getId() {
+            return new UUID(0, 0);
+        }
+
+        @Override
+        public <M extends Marker> M withId(UUID id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @JsonValue
+        Object value() {
+            throw new IllegalStateException("Unwritable");
+        }
+    }
+
+    private RpcRecipe scanThenEditGatedBy(TreeVisitor<?, ExecutionContext> scanPrecondition,
+                                          @Nullable TreeVisitor<?, ExecutionContext> editPrecondition) {
+        RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(ScanThenEdit.class.getName(), Map.of());
+        String scanVisitor = requireNonNull(prepared.getScanVisitor());
+        return new RpcRecipe(client, scanVisitor.substring("scan:".length()), prepared.getDescriptor(),
+          prepared.getEditVisitor(), editPrecondition, scanVisitor, scanPrecondition, List.of(), false);
     }
 
     @Test

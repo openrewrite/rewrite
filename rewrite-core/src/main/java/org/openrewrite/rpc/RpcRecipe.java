@@ -51,12 +51,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String editVisitor;
 
     /**
-     * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
-     * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
-     * evaluate preconditions locally before adding a visitor to the batch — otherwise the
-     * batch would dispatch the visit RPC for files that the precondition would have rejected.
-     * The non-batch path uses {@link #getVisitor()}, which already wraps with
-     * {@link org.openrewrite.Preconditions#check}.
+     * Composite of all editPreconditions resolved during PrepareRecipe.
      */
     @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
@@ -147,6 +142,43 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
         return Preconditions.check(editPreconditionVisitor, new RpcVisitor(rpc, editVisitor));
+    }
+
+    /**
+     * Whether {@link #getScanner} would send {@code source} to {@link #getScanVisitor()}. A batch
+     * request names the remote visitor directly, so a batch asks this to send exactly the files the
+     * scanner would.
+     */
+    public boolean reachesScanVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        return scanVisitor != null && reachesRemote(scanPreconditionVisitor, scanVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Whether {@link #getVisitor()} would send {@code source} to {@link #getEditVisitor()}.
+     */
+    public boolean reachesEditVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        return reachesRemote(editPreconditionVisitor, editVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Applies the gate {@link #getScanner} and {@link #getVisitor} build, ending in a visitor that
+     * records being reached in place of the remote call.
+     */
+    private boolean reachesRemote(@Nullable TreeVisitor<?, ExecutionContext> precondition, String visitorName,
+                                  SourceFile source, ExecutionContext ctx, Cursor cursor) {
+        boolean[] reached = {false};
+        TreeVisitor<?, ExecutionContext> gate = Preconditions.check(precondition, new RpcVisitor(rpc, visitorName) {
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext p) {
+                stopAfterPreVisit();
+                reached[0] = true;
+                return tree;
+            }
+        });
+        if (gate.isAcceptable(source, ctx)) {
+            gate.visit(source, ctx, cursor);
+        }
+        return reached[0];
     }
 
     @Override

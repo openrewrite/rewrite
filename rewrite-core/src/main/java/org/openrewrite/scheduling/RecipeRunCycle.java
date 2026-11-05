@@ -251,12 +251,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
 
                                 if (isInBatch) {
-                                    scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
-                                    scanBatch.recipeStacks.add(recipeStack);
-                                    if (scanBatch.originalBeforeBatch == null) {
-                                        scanBatch.originalBeforeBatch = source;
+                                    if (((RpcRecipe) recipe).reachesScanVisitor(source, ctx, rootCursor)) {
+                                        scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
+                                        scanBatch.recipeStacks.add(recipeStack);
+                                        if (scanBatch.originalBeforeBatch == null) {
+                                            scanBatch.originalBeforeBatch = source;
+                                        }
+                                        scanBatch.rpc = currentRpc;
                                     }
-                                    scanBatch.rpc = currentRpc;
 
                                     // If this is the last recipe in the batch, flush now
                                     if (nextRpc != currentRpc || nextScanVisitor == null) {
@@ -505,41 +507,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
                 if (isInBatch) {
                     // Batch path: accumulate visitor names instead of executing.
-                    // Only batch if the remote actually has a codec for this source file type;
-                    // otherwise the BatchVisit RPC fails on the remote side and the resulting
-                    // exception gets attached to the source as a Markup$Error, falsely marking
-                    // the file as modified.
-                    //
-                    // Compare against the canonical source file type, not the raw class name:
-                    // lazily-loaded LSTs (e.g. the Moderne CLI's V3 format) hand the scheduler
-                    // generated subclasses of the real tree type, whose getClass().getName() is
-                    // the subclass name. getLanguages() reports canonical type names (the same
-                    // ones used as the RPC sourceFileType), so a raw name comparison never
-                    // matches for those, silently dropping every batched recipe but the last.
-                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
-                        RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                        // Evaluate the precondition locally before batching. The non-batch
-                        // path runs the precondition via getVisitor()'s Preconditions.check
-                        // wrapper; the batch path bypasses that wrapper because it dispatches
-                        // editVisitor names directly. Without this gate, every batched recipe
-                        // would visit every file regardless of preconditions, defeating the
-                        // optimization.
-                        TreeVisitor<?, ExecutionContext> precondition = rpcRecipe.getEditPreconditionVisitor();
-                        boolean preconditionPasses = true;
-                        if (precondition != null) {
-                            //noinspection unchecked
-                            TreeVisitor<Tree, ExecutionContext> typed =
-                                    (TreeVisitor<Tree, ExecutionContext>) precondition;
-                            preconditionPasses = typed.visit(src, ctx, rootCursor) != src;
+                    RpcRecipe rpcRecipe = (RpcRecipe) recipe;
+                    if (rpcRecipe.reachesEditVisitor(src, ctx, rootCursor)) {
+                        batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                        batch.recipeStacks.add(recipeStack);
+                        if (batch.originalBeforeBatch == null) {
+                            batch.originalBeforeBatch = src;
                         }
-                        if (preconditionPasses) {
-                            batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                            batch.recipeStacks.add(recipeStack);
-                            if (batch.originalBeforeBatch == null) {
-                                batch.originalBeforeBatch = src;
-                            }
-                            batch.rpc = currentRpc;
-                        }
+                        batch.rpc = currentRpc;
                     }
 
                     // If this is the last recipe in the batch, flush now
