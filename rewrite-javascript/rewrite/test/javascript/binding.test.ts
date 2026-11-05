@@ -5,12 +5,13 @@ import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
-    removeNewlyUnusedAmdBindings, ImportStyle
+    removeNewlyUnusedAmdBindings, ImportStyle, ExportOfOptions, ModuleExport
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
-import {ExecutionContext} from "../../src";
+import {Cursor} from "../../src/tree";
+import {ExecutionContext, TreePrinters} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -201,6 +202,149 @@ describe("moduleBindings", () => {
         //language=typescript
         await spec.rewriteRun(typescript(`import Elem = require("sap/ui/core/Element");`));
         expect(seen).toEqual({module: "sap/ui/core/Element", binding: "Elem"});
+    });
+});
+
+/**
+ * What `exportOf` answers for the last node of `source` that prints as `reference`, past any import
+ * spelling it, with the cursor on that node, or on the parameterized type holding it, which is how a
+ * visitor reaches `SFC` in `SFC<P>`.
+ */
+async function exportOfIn(source: string, reference: string, options?: ExportOfOptions): Promise<ModuleExport | undefined> {
+    const answers: (ModuleExport | undefined)[] = [];
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+        private async ask(node: J): Promise<void> {
+            if ((await TreePrinters.printer(this.cursor).print(node)).trim() === reference) {
+                answers.push(moduleBindings(this).exportOf(node, options));
+            }
+        }
+
+        override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+            await this.ask(identifier);
+            return super.visitIdentifier(identifier, p);
+        }
+
+        override async visitFieldAccess(fieldAccess: J.FieldAccess, p: any): Promise<J | undefined> {
+            await this.ask(fieldAccess);
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+
+        override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            await this.ask(method);
+            return super.visitMethodInvocation(method, p);
+        }
+
+        override async visitImportType(importType: JS.ImportType, p: any): Promise<J | undefined> {
+            await this.ask(importType);
+            return super.visitImportType(importType, p);
+        }
+
+        override async visitParameterizedType(type: J.ParameterizedType, p: any): Promise<J | undefined> {
+            await this.ask(type.class);
+            return super.visitParameterizedType(type, p);
+        }
+    });
+    await spec.rewriteRun(typescript(source));
+    expect(answers.length).toBeGreaterThan(0);
+    return answers[answers.length - 1];
+}
+
+describe("exportOf", () => {
+    const react = (member: string, typeOnly: boolean, kind: ModuleExport["via"]["kind"], name?: string): ModuleExport =>
+        ({module: "react", member, typeOnly, via: name === undefined ? {kind} : {kind, name}});
+
+    test.each([
+        ["a named import", `import {useState} from "react"; useState(0);`, "useState", undefined,
+            react("useState", false, "named", "useState")],
+        ["an export clause reads the binding it publishes", `import {FC} from "react"; export {FC};`, "FC", undefined,
+            react("FC", false, "named", "FC")],
+        ["a call names what its callee does", `import {useState} from "react"; useState(0);`, "useState(0)", undefined,
+            react("useState", false, "named", "useState")],
+        ["an aliased import names the member, not the alias", `import {SFC as S} from "react"; let a: S<{}>;`, "S", undefined,
+            react("SFC", false, "named", "S")],
+        ["a type-only import", `import type {FC} from "react"; let a: FC;`, "FC", undefined,
+            react("FC", true, "named", "FC")],
+        ["an inline type specifier", `import {type FC} from "react"; let a: FC;`, "FC", undefined,
+            react("FC", true, "named", "FC")],
+        ["a member through a namespace import", `import * as R from "react"; let a: R.SFC<{}>;`, "R.SFC", undefined,
+            react("SFC", false, "namespace", "R")],
+        ["a call through a namespace import", `import * as React from "react"; React.createElement("div");`,
+            `React.createElement("div")`, undefined, react("createElement", false, "namespace", "React")],
+        ["a member through a type-only namespace import", `import type * as React from "react"; let a: React.FC;`,
+            "React.FC", undefined, react("FC", true, "namespace", "React")],
+        ["a member through import-equals", `import React = require("react"); let a: React.FC;`, "React.FC", undefined,
+            react("FC", false, "require", "React")],
+        ["an import() type", `let a: import("react").SFC<{}>;`, `import("react").SFC<{}>`, undefined,
+            react("SFC", true, "import-type")],
+        ["a default import's own name", `import React from "react"; React;`, "React", undefined,
+            react("default", false, "default", "React")],
+        ["a member through a default import, where the caller says the default is the module",
+            `import React from "react"; let a: React.SFC<{}>;`, "React.SFC", {defaultIsModule: ["react"]},
+            react("SFC", false, "default", "React")],
+        ["a member of a global the caller maps to a module", `let a: React.SFC<{}>;`, "React.SFC", {globals: {React: "react"}},
+            react("SFC", false, "global", "React")],
+        ["a value of the same name does not hide the global namespace a type reads",
+            `const React = {}; let a: React.SFC<{}>;`, "React.SFC", {globals: {React: "react"}},
+            react("SFC", false, "global", "React")],
+    ] as [string, string, string, ExportOfOptions | undefined, ModuleExport | undefined][])(
+        "%s", async (_rule, source, reference, options, expected) => {
+            expect(await exportOfIn(source, reference, options)).toEqual(expected);
+        });
+
+    test.each([
+        ["a member through a default import, which reads a property of the default export",
+            `import React from "react"; let a: React.SFC<{}>;`, "React.SFC", undefined],
+        ["a default import's own name, where the default is the module", `import React from "react"; React;`, "React",
+            {defaultIsModule: ["react"]}],
+        ["a namespace import's own name", `import * as React from "react"; React;`, "React", undefined],
+        ["a global the caller does not map", `let a: React.SFC<{}>;`, "React.SFC", undefined],
+        ["a mapped global that the file declares as a namespace", `namespace React { export type SFC<T> = T; } let a: React.SFC<{}>;`,
+            "React.SFC", {globals: {React: "react"}}],
+        ["a type parameter shadowing the import", `import {FC} from "react"; function f<FC>(a: FC) {}`, "FC", undefined],
+        ["a parameter shadowing the import", `import {useState} from "react"; function f(useState: number) { useState; }`,
+            "useState", undefined],
+        ["a member of a member", `import * as React from "react"; let a: React.JSX.Element;`, "React.JSX.Element", undefined],
+        ["a name the file declares", `type FC = number; let a: FC;`, "FC", undefined],
+        ["the name an import declares", `import {FC} from "react";`, "FC", undefined],
+        ["a property that reads like an import", `import {FC} from "react"; o.FC;`, "o.FC", undefined],
+        ["a reassignable require", `let React = require("react"); React.createElement("div");`, `React.createElement("div")`,
+            undefined],
+    ] as [string, string, string, ExportOfOptions | undefined][])(
+        "no export: %s", async (_rule, source, reference, options) => {
+            expect(await exportOfIn(source, reference, options)).toBeUndefined();
+        });
+
+    test("a cursor in place of the visitor, for a node the visitor's node holds", async () => {
+        const spec = new RecipeSpec();
+        const seen: (ModuleExport | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitParameterizedType(type: J.ParameterizedType, p: any): Promise<J | undefined> {
+                seen.push(moduleBindings(new Cursor(type.class, this.cursor)).exportOf(type.class));
+                return super.visitParameterizedType(type, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`import {SFC} from "react"; let a: SFC<{}>;`));
+        expect(seen).toEqual([{module: "react", member: "SFC", typeOnly: false, via: {kind: "named", name: "SFC"}}]);
+    });
+
+    test("a member read through an AMD factory parameter", async () => {
+        const spec = new RecipeSpec();
+        const seen: (ModuleExport | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                if (method.name.simpleName === "extend") {
+                    seen.push(moduleBindings(this).exportOf(method));
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        });
+        await spec.rewriteRun(javascript(`
+            sap.ui.define(["sap/m/Button"], function (Button) {
+                return Button.extend("my.Button", {});
+            });
+        `));
+        expect(seen).toEqual([{module: "sap/m/Button", member: "extend", typeOnly: false, via: {kind: "amd", name: "Button"}}]);
     });
 });
 

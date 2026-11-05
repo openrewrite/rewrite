@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isStringLiteral, J} from "../java";
+import {isIdentifier, isStringLiteral, J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {
-    compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, referencesOf, scopeOf,
+    compilationUnitOf, cursorOf, declarationsOf, isFree, isReference, namesUsedIn, referencesOf, resolve, rootName, scopeOf,
     valuesDeclaredAtTopLevel
 } from "./scope";
 import {Cursor, isTree} from "../tree";
@@ -93,13 +93,53 @@ export interface ModuleBindings {
      * for `"none"` itself.
      */
     readonly moduleSystem: "esm" | "amd" | "commonjs" | "none";
+
+    /**
+     * The export of a module that `ref` names, read where the cursor (or the visitor's) stands on it
+     * or on the node holding it, or undefined where it names none: a local, a binding nearer than the
+     * module's, an unbound global, or a module object's own name. `ref` is an identifier, a member
+     * read through a module object (`NS.X`, `NS.f()`) or an `import()` type.
+     * `S` with `import {SFC as S} from "react"`, `R.SFC` with `import * as R from "react"`, and
+     * `import("react").SFC` → `{module: "react", member: "SFC"}`
+     */
+    exportOf(ref: J, options?: ExportOfOptions): ModuleExport | undefined;
+}
+
+/** A module export a reference names, and the binding the file reaches it through. */
+export interface ModuleExport {
+    module: string;
+
+    /** `"SFC"` for `SFC`, for `S` of `{SFC as S}` and for `R.SFC`; `"default"` for a default import's own name. */
+    member: string;
+
+    /** A type-only import binds it, or an `import()` type spells it, so it stands for no value at runtime. */
+    typeOnly: boolean;
+
+    /**
+     * How the file reaches it, so a replacement can be spelled alike: `{kind: "namespace", name: "R"}`
+     * for `R.SFC` with `import * as R`. `name` is the local name read; an `import()` type reads none.
+     */
+    via: {kind: "named" | "default" | "namespace" | "require" | "amd" | "global" | "import-type"; name?: string};
+}
+
+/** What `exportOf` reads as a module object beyond the bindings that are one by their syntax. */
+export interface ExportOfOptions {
+    /**
+     * Modules whose default import is the module itself, as `export =` typings make it under
+     * `esModuleInterop`: with `["react"]`, `React.SFC` reads `SFC` through `import React from "react"`.
+     * Type attribution does not tell such a default from a default export, so the caller names them.
+     */
+    defaultIsModule?: readonly string[];
+
+    /** Globals that stand for a module where nothing in the file binds them, as UMD typings declare: `{React: "react"}`. */
+    globals?: Readonly<Record<string, string>>;
 }
 
 export function moduleBindings(
-    visitor: JavaScriptVisitor<any>,
+    from: Cursor | JavaScriptVisitor<any>,
     options?: AmdCalleeOptions
 ): ModuleBindings {
-    const amd = enclosingAmdBlock(visitor, options);
+    const amd = enclosingAmdBlock(from, options);
     if (amd !== undefined) {
         const modules = dependencyNames(amd.block);
         const bindings = parameterNames(amd.block);
@@ -114,20 +154,111 @@ export function moduleBindings(
             bindingOf: module => {
                 const index = module === "" ? -1 : modules.indexOf(module);
                 return index < 0 ? undefined : bindings[index];
-            }
+            },
+            // A factory parameter binds a whole module, so only a member read through it names an export
+            exportOf: (ref, options) => exportRead(from, ref, amd.block.factory, () => undefined, name => {
+                const index = bindings.indexOf(name);
+                return index < 0 || modules[index] === "" ? undefined : {module: modules[index], kind: "amd", typeOnly: false};
+            }, options)
         };
     }
 
-    const cu = compilationUnitOf(visitor);
+    const cu = compilationUnitOf(from);
     const bound = cu === undefined ? [] : moduleObjectBindings(cu);
+    const defaultIsModule = (b: ModuleObjectBinding, options?: ExportOfOptions) =>
+        options?.defaultIsModule?.some(module => sameModule(module, b.module)) ?? false;
     return {
         // Read on demand, so a caller asking only for bindings never reads the file's module syntax.
         get moduleSystem() {
             return cu === undefined ? "none" : isCommonJs(cu) ? "commonjs" : hasEsmSyntax(cu) ? "esm" : "none";
         },
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
-        bindingOf: module => bound.find(b => sameModule(b.module, module))?.name
+        bindingOf: module => bound.find(b => sameModule(b.module, module))?.name,
+        exportOf: (ref, options) => cu === undefined ? undefined : exportRead(from, ref, cu,
+            name => {
+                const object = bound.find(b => b.name === name);
+                if (object !== undefined) {
+                    // A module object's own name names no one export, unless it is a default that is not the module
+                    return object.shape === "default" && !defaultIsModule(object, options)
+                        ? {module: object.module, member: "default", typeOnly: object.typeOnly, via: {kind: "default", name}}
+                        : undefined;
+                }
+                const named = moduleScopeBindings(cu).find(b => b.name === name && b.member !== undefined && b.member !== "*");
+                return named?.module === undefined ? undefined :
+                    {module: named.module, member: named.member!, typeOnly: named.typeOnly ?? false, via: {kind: "named", name}};
+            },
+            name => {
+                const object = bound.find(b => b.name === name && !b.reassignable);
+                return object === undefined || object.shape === "default" && !defaultIsModule(object, options) ? undefined :
+                    {module: object.module, kind: object.shape, typeOnly: object.typeOnly};
+            },
+            options)
     };
+}
+
+/** A binding of a whole module, which a member is read through: `NS` of `import * as NS`. */
+interface ModuleObjectRead {
+    module: string;
+    kind: ModuleExport["via"]["kind"];
+    typeOnly: boolean;
+}
+
+/**
+ * `exportOf` for a lane whose bindings `owner`'s scope declares: the compilation unit's, or an AMD
+ * factory's. A name resolving to `owner` reads its binding there; one resolving nowhere may be a
+ * module's global. `namedExport` answers a name bound to a member, `moduleObject` one bound to a module.
+ */
+function exportRead(
+    from: Cursor | JavaScriptVisitor<any>,
+    ref: J,
+    owner: J,
+    namedExport: (name: string) => ModuleExport | undefined,
+    moduleObject: (name: string) => ModuleObjectRead | undefined,
+    options: ExportOfOptions = {}
+): ModuleExport | undefined {
+    const cursor = from instanceof Cursor ? from : cursorOf(from);
+    if (cursor === undefined) {
+        return undefined;
+    }
+    if (ref.kind === JS.Kind.ImportType) {
+        return importTypeExport(ref as JS.ImportType);
+    }
+    // By id, so a visitor's own copy of the node it stands on is that node
+    let at = (cursor.value as J | undefined)?.id === ref.id ? cursor : new Cursor(ref, cursor);
+    const boundHere = (id: J.Identifier) => resolve(at, id)?.id === owner.id;
+    // `f()` names what `f` does
+    const callee = ref.kind === J.Kind.MethodInvocation && (ref as J.MethodInvocation).select === undefined
+        ? (ref as J.MethodInvocation).name : undefined;
+    if (callee !== undefined) {
+        at = new Cursor(callee, at);
+    }
+    const name = callee ?? ref;
+    // `resolve` answers nothing for a name that declares or names rather than reads
+    if (isIdentifier(name)) {
+        return boundHere(name) ? namedExport(name.simpleName) : undefined;
+    }
+    const [qualifier, member] = ref.kind === J.Kind.FieldAccess ? [(ref as J.FieldAccess).target, (ref as J.FieldAccess).name.element] :
+        ref.kind === J.Kind.MethodInvocation ? [(ref as J.MethodInvocation).select?.element, (ref as J.MethodInvocation).name] :
+            [undefined, undefined];
+    if (qualifier === undefined || member === undefined || !isIdentifier(qualifier)) {
+        return undefined;
+    }
+    const global = options.globals?.[qualifier.simpleName];
+    const object = boundHere(qualifier) ? moduleObject(qualifier.simpleName) :
+        global !== undefined && isFree(at, qualifier) ? {module: global, kind: "global" as const, typeOnly: false} : undefined;
+    return object && {module: object.module, member: member.simpleName, typeOnly: object.typeOnly,
+        via: {kind: object.kind, name: qualifier.simpleName}};
+}
+
+/** `import("m").X`, which names `X` of `m` with no binding in the file; `import("m").X.Y` names `X` too. */
+function importTypeExport(importType: JS.ImportType): ModuleExport | undefined {
+    const argument = importType.argumentAndAttributes.elements[0]?.element;
+    const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
+    const member = rootName(importType.qualifier?.element);
+    if (literal?.kind !== J.Kind.Literal || typeof (literal as J.Literal).value !== "string" || !isIdentifier(member)) {
+        return undefined;
+    }
+    return {module: moduleNameOf(literal as J.Literal), member: member.simpleName, typeOnly: true, via: {kind: "import-type"}};
 }
 
 export function isAmdBlock(node: J, options?: AmdCalleeOptions): boolean {
