@@ -557,7 +557,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         return null;
                     }
                     SourceFile marked = handleError(recipe, flushed, flushed, t);
-                    return marked != null && marked != flushed ? addRecipesThatMadeChanges(recipeStack, marked) : marked;
+                    return marked != null && marked != flushed ?
+                            addRecipesThatMadeChanges(recipeStack, marked) :
+                            marked;
                 }
                 after = handleError(recipe, src, after, t);
             }

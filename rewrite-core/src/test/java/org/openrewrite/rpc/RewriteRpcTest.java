@@ -112,7 +112,8 @@ class RewriteRpcTest implements RewriteTest {
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace) {
+        var clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut));
+        client = new RewriteRpc(clientJsonRpc, marketplace) {
             @Override
             protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
                 sentByClient.add(method);
@@ -1210,12 +1211,15 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void recipesGatedOnlyByTheirLanguageShareOneBatchVisit() {
         Recipe composite = new CompositeRecipe(List.of(
-          editGatedBy(languageGate(PlainText.class.getName()), "org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A")),
-          editGatedBy(languageGate(PlainText.class.getName()), "org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"))));
+          editGatedBy(languageGate(PlainText.class.getName()),
+            "org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A")),
+          editGatedBy(languageGate(PlainText.class.getName()),
+            "org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"))));
         sentByClient.clear();
 
         RecipeRun run = new RecipeScheduler().scheduleRun(composite,
-          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 
         assertThat(run.getChangeset().getAllResults()).extracting(r -> r.getAfter().printAll()).containsExactly("B");
@@ -1230,13 +1234,14 @@ class RewriteRpcTest implements RewriteTest {
             client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "changed")),
             editGatedBy(languageGate("org.example.Missing"),
               "org.openrewrite.text.FindAndReplace", Map.of("find", "changed", "replace", "unreached")))),
-          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryLargeSourceSet(List.of(
+            PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 
         assertThat(run.getChangeset().getAllResults()).singleElement().satisfies(r -> {
             assertThat(((PlainText) r.getAfter()).getText()).isEqualTo("changed");
-            assertThat(r.getAfter().getMarkers().findFirst(Markup.Error.class))
-              .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo("org.openrewrite.text.FindAndReplace"));
+            assertThat(r.getAfter().getMarkers().findFirst(Markup.Error.class)).hasValueSatisfying(err ->
+              assertThat(err.getRecipeName()).isEqualTo("org.openrewrite.text.FindAndReplace"));
         });
     }
 
