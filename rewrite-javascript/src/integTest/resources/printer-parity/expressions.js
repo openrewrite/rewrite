@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-const numbers = [1, 0x1f, 0b11, 0o17, 1_000, 1e3, .5, 10n,];
+const numbers = [1, 0x1f, 0b11, 0o17, 1_000, 1e3, .5, 10n, 0x1fn, 123456789012345678901234567890n,];
 const strings = ['single', "double", `template`, `multi
 line ${numbers[0]} and ${`nested ${numbers.length}`}`];
 const regex = /ab+c/gi, sparse = [, 1, , 2];

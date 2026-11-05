@@ -801,7 +801,8 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
     }
 
     protected visitLiteral(literal: J.Literal, q: RpcSendQueue): J | undefined {
-        q.getAndSend(literal, l => l.value);
+        // JSON has no bigint, and a number would lose precision, so it travels as its decimal text
+        q.getAndSend(literal, l => typeof l.value === "bigint" ? l.value.toString() : l.value);
         q.getAndSend(literal, l => l.valueSource);
         q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint, (e) => {
             q.getAndSend(e, u => u.valueSourceIndex);
@@ -1468,6 +1469,10 @@ export class JavaReceiver extends JavaRpcVisitor<RpcReceiveQueue> {
             })),
             type: q.receive(literal.type, type => this.visitType(type, q) as unknown as Type.Primitive)
         };
+        if (updates.type === Type.Primitive.BigInt && (typeof updates.value === "string" ||
+            (typeof updates.value === "number" && Number.isInteger(updates.value)))) {
+            updates.value = BigInt(updates.value);
+        }
         return updateIfChanged(literal, updates);
     }
 

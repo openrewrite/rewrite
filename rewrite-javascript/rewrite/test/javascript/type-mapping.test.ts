@@ -129,7 +129,7 @@ describe('JavaScript type mapping', () => {
         test('should map bigint literal', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'string') {
+                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'bigint') {
                     return formatPrimitiveType(type);
                 }
                 return null;
