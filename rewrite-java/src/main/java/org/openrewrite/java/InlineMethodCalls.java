@@ -103,11 +103,13 @@ public class InlineMethodCalls extends Recipe {
 
             private void removeAndAddImports(MethodCall method, Set<String> templateImports, Set<String> templateStaticImports) {
                 Set<String> originalImports = findOriginalImports(method);
+                Set<String> constructedTypes = constructedTypes(method);
 
                 // Remove regular and static imports that are no longer needed
                 for (String originalImport : originalImports) {
                     if (!templateImports.contains(originalImport) &&
-                            !templateStaticImports.contains(originalImport)) {
+                            !templateStaticImports.contains(originalImport) &&
+                            !constructedTypes.contains(originalImport)) {
                         maybeRemoveImport(originalImport);
                     }
                 }
@@ -130,6 +132,20 @@ public class InlineMethodCalls extends Recipe {
                         }
                     }
                 }
+            }
+
+            /**
+             * A constructor-to-constructor replacement constructs the same class again, which the template can not
+             * attribute without a classpath that holds it, so its import would otherwise look unused.
+             */
+            private Set<String> constructedTypes(MethodCall method) {
+                Set<String> constructedTypes = new HashSet<>();
+                if (method instanceof J.NewClass && replacement.startsWith("this(") && method.getMethodType() != null) {
+                    for (JavaType.FullyQualified type = method.getMethodType().getDeclaringType(); type != null; type = type.getOwningClass()) {
+                        constructedTypes.add(type.getFullyQualifiedName());
+                    }
+                }
+                return constructedTypes;
             }
 
             private Set<String> findOriginalImports(MethodCall method) {
@@ -194,8 +210,11 @@ public class InlineMethodCalls extends Recipe {
             private String createTemplateString(MethodCall original, JavaType.Method methodType) {
                 String templateString;
                 if (original instanceof J.NewClass && replacement.startsWith("this(")) {
-                    // For constructor-to-constructor replacement, replace "this" with "new ClassName"
-                    templateString = "new " + methodType.getDeclaringType().getClassName() + replacement.substring(4);
+                    // For constructor-to-constructor replacement, replace "this" with "new ClassName",
+                    // spelled as the original call does to keep its type arguments or diamond
+                    TypeTree clazz = ((J.NewClass) original).getClazz();
+                    String className = clazz == null ? methodType.getDeclaringType().getClassName() : clazz.printTrimmed(getCursor());
+                    templateString = "new " + className + replacement.substring(4);
                 } else if (original instanceof J.MethodInvocation &&
                         ((J.MethodInvocation) original).getSelect() == null &&
                         replacement.startsWith("this.")) {
@@ -208,14 +227,7 @@ public class InlineMethodCalls extends Recipe {
                 } else {
                     templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
                 }
-                List<String> originalParameterNames = methodType.getParameterNames();
-                for (String parameterName : originalParameterNames) {
-                    // Replace parameter names with their values in the templateString
-                    templateString = templateString
-                            .replaceFirst(format("\\b%s\\b", parameterName), format("#{%s:any()}", parameterName))
-                            .replaceAll(format("(?<!\\{)\\b%s\\b", parameterName), format("#{%s}", parameterName));
-                }
-                return templateString;
+                return substituteParameters(templateString, methodType.getParameterNames());
             }
 
             private Object[] createParameters(String templateString, MethodCall original) {
@@ -269,5 +281,70 @@ public class InlineMethodCalls extends Recipe {
                 return replacement;
             }
         });
+    }
+
+    /**
+     * Replaces references to the original method's parameters with template parameters, the first reference to each
+     * with its type, leaving alone string and character literals, existing template parameters, and member selects
+     * such as {@code other.name} that merely share a parameter's name.
+     */
+    private static String substituteParameters(String template, List<String> parameterNames) {
+        StringBuilder result = new StringBuilder();
+        Set<String> substituted = new HashSet<>();
+        int i = 0;
+        while (i < template.length()) {
+            char c = template.charAt(i);
+            int end;
+            if (c == '"' || c == '\'') {
+                end = endOfLiteral(template, i);
+                result.append(template, i, end);
+            } else if (template.startsWith("#{", i)) {
+                end = template.indexOf('}', i) + 1;
+                result.append(template, i, end);
+            } else if (Character.isJavaIdentifierStart(c)) {
+                end = i + 1;
+                while (end < template.length() && Character.isJavaIdentifierPart(template.charAt(end))) {
+                    end++;
+                }
+                String identifier = template.substring(i, end);
+                if (parameterNames.contains(identifier) && !isMemberSelect(result)) {
+                    result.append(substituted.add(identifier) ? format("#{%s:any()}", identifier) : format("#{%s}", identifier));
+                } else {
+                    result.append(identifier);
+                }
+            } else {
+                end = i + 1;
+                result.append(c);
+            }
+            i = end;
+        }
+        return result.toString();
+    }
+
+    private static int endOfLiteral(String template, int start) {
+        if (template.startsWith("\"\"\"", start)) {
+            int close = template.indexOf("\"\"\"", start + 3);
+            return close < 0 ? template.length() : close + 3;
+        }
+        char quote = template.charAt(start);
+        for (int i = start + 1; i < template.length(); i++) {
+            char c = template.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i + 1;
+            }
+        }
+        return template.length();
+    }
+
+    private static boolean isMemberSelect(StringBuilder preceding) {
+        for (int i = preceding.length() - 1; i >= 0; i--) {
+            char c = preceding.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return c == '.';
+            }
+        }
+        return false;
     }
 }
