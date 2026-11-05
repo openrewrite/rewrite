@@ -299,6 +299,23 @@ statement of its own right after the one it left. A statement it empties goes.
 A default import is left alone: `D.Old` reads a property of the default export, which is the member
 only where the default is the module object, as `export =` typings make it.
 
+### Which export a reference names
+
+`moduleBindings(visitor).exportOf(ref)` answers which module export `ref` names where the cursor
+stands, through whatever binding the file reaches it by: a named import (aliased or type-only too), a
+namespace import, `import X = require`, a `const` `require`, an AMD factory parameter, or an
+`import("m").X` type. `via` says which, and under what local name, so a replacement can be spelled
+the way the file spells the original. A name a nearer scope binds with the meaning its position reads
+answers `undefined`, while a value does not hide the namespace a type reads (`const React = {}` leaves
+`React.FC` in a type reading the global). `meaningAt(cursor)` is that reading: `'type'`, `'value'` or
+`'namespace'`.
+
+Two module objects are the caller's to name, since type attribution does not tell them apart:
+
+- a default import is the module only where `export =` typings make it so, as React's do;
+  `defaultIsModule: ["react"]` says so, and otherwise `D.X` reads a property of the default export
+- a UMD global stands for its module where nothing binds it; `globals: {React: "react"}` maps it
+
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
