@@ -859,10 +859,7 @@ const templateResults = new WeakSet<J>();
  * holds it, as where a recipe applies a template to a child of the node it visits.
  */
 async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | undefined> {
-    const owner = cursor?.value;
-    const holder = isTree(owner) && owner.id !== tree.id ?
-        (await chainInOwner(tree, owner as J))?.[1] : undefined;
-    return holder ?? cursor?.parentTree()?.value;
+    return (await enclosingPath(tree, cursor))[0]?.tree;
 }
 
 /** The trees from `tree` as `owner` holds it up to `owner`, or `undefined` where `owner` does not hold `tree`. */
@@ -954,7 +951,8 @@ export class TemplateApplier {
         }
 
         const originalTree = tree as J;
-        const parentTree = await replacedParent(originalTree, this.cursor);
+        const path = await enclosingPath(originalTree, this.cursor);
+        const parentTree = path[0]?.tree;
         let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
         // A replaced node spliced back in as a capture carries its own trailing markers
         const trailing = trailingMarkers(originalTree);
@@ -966,8 +964,7 @@ export class TemplateApplier {
         // `format` substitutes the target's prefix, so decide against the prefix that will print
         resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
             {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        const result = await separateFromNeighbours(await this.format(resultToUse, originalTree),
-            await enclosingPath(originalTree, this.cursor));
+        const result = await separateFromNeighbours(await this.format(resultToUse, originalTree), path);
         templateResults.add(result);
         return result;
     }

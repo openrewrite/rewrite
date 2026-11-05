@@ -168,6 +168,29 @@ describe('template token separation', () => {
         ));
     });
 
+    test('before `in` where a visitor replaced the tree printing it', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                return expression.kind === JS.Kind.Binary && (expression as JS.Binary).left.kind === J.Kind.ArrayAccess ?
+                    {...expression} : expression;
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: any): Promise<J | undefined> {
+                const visited = await super.visitArrayAccess(arrayAccess, p) as J.ArrayAccess;
+                const o = capture();
+                return await rewrite(() => ({
+                    before: pattern`${o}["bar"]`,
+                    after: template`${o}.bar`
+                })).tryOn(this.cursor, visited) || visited;
+            }
+        });
+        //language=javascript
+        return spec.rewriteRun(javascript(
+            `if (foo["bar"]in x) {}`,
+            `if (foo.bar in x) {}`
+        ));
+    });
+
     test('leaves tokens that do not fuse as they are', () => {
         spec.recipe = doubleNegationToBoolean();
         //language=javascript

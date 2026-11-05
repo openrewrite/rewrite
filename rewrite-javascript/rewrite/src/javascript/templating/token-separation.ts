@@ -72,7 +72,6 @@ async function lastCharBefore(path: Enclosing[]): Promise<string | undefined> {
     return undefined;
 }
 
-/** What `tree` prints before `child`, or `undefined` if it does not print `child`. */
 async function printedBefore(tree: J, child: J): Promise<string | undefined> {
     const printer = new class extends JavaScriptPrinter {
         reached?: number;
@@ -110,7 +109,6 @@ function separateWhatFollows(path: Enclosing[]): void {
     }
 }
 
-/** Whether `tree` prints a word keyword right after `child`. */
 function keywordFollows(tree: J, child: J): boolean {
     switch (tree.kind) {
         case JS.Kind.Binary: {
@@ -131,7 +129,7 @@ function keywordFollows(tree: J, child: J): boolean {
 }
 
 function isWordOperator(operator: JS.Binary.Type): boolean {
-    return operator === JS.Binary.Type.In || operator === JS.Binary.Type.As;
+    return operator === JS.Binary.Type.In;
 }
 
 /** A single space before the keyword of {@link keywordFollows}, where what precedes it ends in a word. */
@@ -185,7 +183,6 @@ function separatedAfter<T extends J>(padded: J.RightPadded<T>): J.RightPadded<T>
     return {...padded, after: singleSpace(padded.after)};
 }
 
-/** Whether `tree` prints nothing after `child`. */
 function endsWith(tree: J, child: J): boolean {
     switch (tree.kind) {
         case J.Kind.Binary:
@@ -227,7 +224,6 @@ function endsWith(tree: J, child: J): boolean {
     }
 }
 
-/** `tree` with `change` applied to the tree in it with `id`. */
 async function withTreeAt(tree: J, id: string, change: (t: J) => Promise<J>): Promise<J> {
     if (tree.id === id) {
         return change(tree);
