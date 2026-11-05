@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
@@ -34,14 +35,15 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class InlineMethodCalls extends Recipe {
-    private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
-    private static final Pattern BARE_METHOD_CALL = Pattern.compile("^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\(");
-    /// Only group 1 is a parameter reference; the other alternatives consume literals, existing template parameters,
-    /// and member selects like `other.name` so a parameter's name inside them is left alone.
-    private static final Pattern PARAMETER_CANDIDATE = Pattern.compile(
-            "\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|#\\{[^}]*}" +
-            "|\\.\\s*\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
-            "|(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)");
+    private static final String IDENTIFIER = "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*";
+    private static final Pattern BARE_METHOD_CALL = Pattern.compile("^" + IDENTIFIER + "\\(");
+    /// Shared by substitution and argument collection so both agree on which placeholders exist. Literals and member
+    /// selects like `other.name` are consumed without a group, so a parameter's name inside them is left alone.
+    private static final Pattern TEMPLATE_TOKEN = Pattern.compile(
+            "\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'" +
+            "|#\\{(?:(?<declared>" + IDENTIFIER + "):any\\([^}]*\\))?[^}]*}" +
+            "|\\.\\s*" + IDENTIFIER +
+            "|(?<reference>" + IDENTIFIER + ")");
 
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
@@ -216,6 +218,7 @@ public class InlineMethodCalls extends Recipe {
 
             private String createTemplateString(MethodCall original, JavaType.Method methodType) {
                 String templateString;
+                List<String> placeholders = methodType.getParameterNames();
                 if (isConstructorToConstructor(original)) {
                     // Spelled as the original call does to keep its type arguments or diamond
                     TypeTree clazz = ((J.NewClass) original).getClazz();
@@ -231,9 +234,10 @@ public class InlineMethodCalls extends Recipe {
                     // Original had a select but replacement is a bare method call; preserve the select
                     templateString = "#{this:any()}." + replacement;
                 } else {
-                    templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
+                    templateString = replacement;
+                    placeholders = ListUtils.concat(placeholders, "this");
                 }
-                return substituteParameters(templateString, methodType.getParameterNames());
+                return substituteParameters(templateString, placeholders);
             }
 
             private Object[] createParameters(String templateString, MethodCall original) {
@@ -251,11 +255,11 @@ public class InlineMethodCalls extends Recipe {
                     lookup.put(originalName, originalValue);
                 }
                 List<Object> parameters = new ArrayList<>();
-                Matcher matcher = TEMPLATE_IDENTIFIER.matcher(templateString);
+                Matcher matcher = TEMPLATE_TOKEN.matcher(templateString);
                 while (matcher.find()) {
-                    Expression o = lookup.get(matcher.group(1));
-                    if (o != null) {
-                        parameters.add(o);
+                    String declared = matcher.group("declared");
+                    if (declared != null && lookup.containsKey(declared)) {
+                        parameters.add(lookup.get(declared));
                     }
                 }
                 return parameters.toArray();
@@ -291,14 +295,16 @@ public class InlineMethodCalls extends Recipe {
 
     private static String substituteParameters(String template, List<String> parameterNames) {
         StringBuilder result = new StringBuilder();
-        Set<String> substituted = new HashSet<>();
-        Matcher matcher = PARAMETER_CANDIDATE.matcher(template);
+        Set<String> declared = new HashSet<>();
+        Matcher matcher = TEMPLATE_TOKEN.matcher(template);
         int copied = 0;
         while (matcher.find()) {
-            String identifier = matcher.group(1);
-            if (identifier != null && parameterNames.contains(identifier)) {
+            String reference = matcher.group("reference");
+            if (matcher.group("declared") != null) {
+                declared.add(matcher.group("declared"));
+            } else if (reference != null && parameterNames.contains(reference)) {
                 result.append(template, copied, matcher.start())
-                        .append(substituted.add(identifier) ? "#{" + identifier + ":any()}" : "#{" + identifier + "}");
+                        .append(declared.add(reference) ? "#{" + reference + ":any()}" : "#{" + reference + "}");
                 copied = matcher.end();
             }
         }

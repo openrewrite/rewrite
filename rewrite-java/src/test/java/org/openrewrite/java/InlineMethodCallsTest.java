@@ -741,4 +741,92 @@ class InlineMethodCallsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void thisInStringLiteralNotReplaced() {
+        rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib old(java.lang.String)",
+              "this.replacement(name, \"this one\")",
+              null,
+              null,
+              null)),
+          java(
+            """
+              class Lib {
+                  void replacement(String value, String label) {
+                  }
+
+                  @Deprecated
+                  void old(String name) {
+                      this.replacement(name, "this one");
+                  }
+
+                  static void usage(Lib lib) {
+                      lib.old("x");
+                  }
+              }
+              """,
+            """
+              class Lib {
+                  void replacement(String value, String label) {
+                  }
+
+                  @Deprecated
+                  void old(String name) {
+                      this.replacement(name, "this one");
+                  }
+
+                  static void usage(Lib lib) {
+                      lib.replacement("x", "this one");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaredPlaceholderReusedByLaterReference() {
+        rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib old(java.lang.String)",
+              "replacement(#{name:any(java.lang.String)}, name)",
+              null,
+              null,
+              null)),
+          java(
+            """
+              class Lib {
+                  void replacement(String value, String label) {
+                  }
+
+                  @Deprecated
+                  void old(String name) {
+                      replacement(name, name);
+                  }
+
+                  void usage() {
+                      old("x");
+                  }
+              }
+              """,
+            """
+              class Lib {
+                  void replacement(String value, String label) {
+                  }
+
+                  @Deprecated
+                  void old(String name) {
+                      replacement(name, name);
+                  }
+
+                  void usage() {
+                      replacement("x", "x");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
