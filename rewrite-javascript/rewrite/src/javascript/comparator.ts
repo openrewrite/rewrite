@@ -1993,7 +1993,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
     /**
      * Creates a new semantic comparator visitor.
      *
-     * @param lenientTypeMatching If true, allows matching between nodes with and without type annotations
+     * @param lenientTypeMatching If true, a pattern without a type annotation matches code with one
      */
     constructor(lenientTypeMatching: boolean = false) {
         super();
@@ -2582,16 +2582,15 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         );
         if (!this.match) return variableDeclarations;
 
-        // Compare typeExpression - lenient matching allows one to be undefined
-        if ((variableDeclarations.typeExpression === undefined) !== (otherVariableDeclarations.typeExpression === undefined)) {
-            if (!this.lenientTypeMatching) {
+        // Lenient matching excuses only a pattern's missing annotation, never the code's
+        if (variableDeclarations.typeExpression) {
+            if (!otherVariableDeclarations.typeExpression) {
                 return this.structuralMismatch<J>('typeExpression');
             }
-            // In lenient mode, skip type comparison and continue
-        } else if (variableDeclarations.typeExpression && otherVariableDeclarations.typeExpression) {
-            // Both have typeExpression, visit them
             await this.visit(variableDeclarations.typeExpression, otherVariableDeclarations.typeExpression);
             if (!this.match) return variableDeclarations;
+        } else if (otherVariableDeclarations.typeExpression && !this.lenientTypeMatching) {
+            return this.structuralMismatch<J>('typeExpression');
         }
 
         // Compare varargs
@@ -2664,16 +2663,15 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
             if (!this.match) return methodDeclaration;
         }
 
-        // Compare returnTypeExpression - lenient matching allows one to be undefined
-        if ((methodDeclaration.returnTypeExpression === undefined) !== (otherMethodDeclaration.returnTypeExpression === undefined)) {
-            if (!this.lenientTypeMatching) {
+        // Lenient matching excuses only a pattern's missing return type, never the code's
+        if (methodDeclaration.returnTypeExpression) {
+            if (!otherMethodDeclaration.returnTypeExpression) {
                 return this.typeMismatch('returnTypeExpression');
             }
-            // In lenient mode, skip type comparison and continue
-        } else if (methodDeclaration.returnTypeExpression && otherMethodDeclaration.returnTypeExpression) {
-            // Both have returnTypeExpression, visit them
             await this.visit(methodDeclaration.returnTypeExpression, otherMethodDeclaration.returnTypeExpression);
             if (!this.match) return methodDeclaration;
+        } else if (otherMethodDeclaration.returnTypeExpression && !this.lenientTypeMatching) {
+            return this.typeMismatch('returnTypeExpression');
         }
 
         // Visit name
