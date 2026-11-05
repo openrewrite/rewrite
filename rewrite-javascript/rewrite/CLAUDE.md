@@ -289,9 +289,13 @@ nothing binds `from`, which still answers `undefined` since no binding moved. A 
 binding renames none of them, so the file is never left half-moved.
 
 A module object keeps naming `from`'s module, so `NS.Old` moves only within one module. An `import()`
-type and a re-export spell their module and move it too, a re-export only where it re-exports nothing
-else. A default import is left alone: `D.Old` reads a property of the default export, which is the
-member only where the default is the module object, as `export =` typings make it.
+type and a re-export spell their module and move it too. A re-export that re-exports something else as
+well leaves that behind: the moved specifier joins a re-export of `to` of the same kind (`export type`
+or not) where the file has one, as a moved import joins an import of `to`, and otherwise takes a
+statement of its own right after the one it left. A statement it empties goes.
+
+A default import is left alone: `D.Old` reads a property of the default export, which is the member
+only where the default is the module object, as `export =` typings make it.
 
 ### What a rebind's attribution follows
 
