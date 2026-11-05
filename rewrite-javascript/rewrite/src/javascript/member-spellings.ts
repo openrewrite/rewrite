@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {create as produce, Draft} from "mutative";
-import {isIdentifier, J} from "../java";
+import {emptySpace, Expression, isIdentifier, J, singleSpace, Statement} from "../java";
+import {randomId} from "../uuid";
 import {JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
@@ -28,8 +29,9 @@ import {sameModule, spelledLike} from "./package-name";
  * and `export {Old} from "m"`, which keeps the name it publishes as `export {New as Old} from "m"`.
  *
  * A module object still names `from`'s module after the move, so `NS.Old` moves only within one module.
- * An `import()` type spells its module, which moves with it. So does a re-export, where it re-exports
- * nothing else; one that does is left as it stands.
+ * An `import()` type spells its module, which moves with it. So does a re-export: one that re-exports
+ * something else too leaves that behind, and joins a re-export of `to` of the same kind (`export type`
+ * or not) or takes a statement of its own right after the one it left.
  */
 export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     constructor(
@@ -45,10 +47,13 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p);
+        if (visited?.kind !== JS.Kind.CompilationUnit) {
+            return visited;
+        }
+        // A re-export moving to another module may leave its statement or join another, so it moves here
+        const moved = this.withinModule ? visited as JS.CompilationUnit : this.withReExportsMoved(visited as JS.CompilationUnit);
         // Only a spelling renamed here moves the types, so a file left as it was keeps them as they were
-        return visited === cu || !this.retypes || visited?.kind !== JS.Kind.CompilationUnit
-            ? visited
-            : withMovedTypes(visited as JS.CompilationUnit, this.from, this.to);
+        return moved === cu || !this.retypes ? moved : withMovedTypes(moved, this.from, this.to);
     }
 
     private get withinModule(): boolean {
@@ -109,43 +114,100 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 
     override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, p: P): Promise<J | undefined> {
         const visited = await super.visitExportDeclaration(exportDeclaration, p);
-        if (visited?.kind !== JS.Kind.ExportDeclaration) {
+        const declaration = reExportFrom(visited, this.from.module);
+        if (!this.withinModule || declaration === undefined) {
             return visited;
         }
-        const declaration = visited as JS.ExportDeclaration;
-        const source = declaration.moduleSpecifier?.element;
-        const clause = declaration.exportClause;
-        if (source?.kind !== J.Kind.Literal || typeof (source as J.Literal).value !== "string" ||
-            !sameModule(moduleNameOf(source as J.Literal), this.from.module) || clause?.kind !== JS.Kind.NamedExports) {
-            return visited;
+        const elements = clauseOf(declaration).elements.elements;
+        return elements.some(e => this.reExportsMember(e.element))
+            ? withElements(declaration, elements.map(e => this.reExportsMember(e.element) ? this.renamed(e) : e))
+            : visited;
+    }
+
+    /**
+     * Moves the member's re-exports from `from`'s module to `to`'s. A specifier leaves a statement that
+     * re-exports something else, joins a re-export of `to` of the same kind where the file has one, and
+     * otherwise takes a statement of its own right after the one it left. A statement it empties goes.
+     */
+    private withReExportsMoved(cu: JS.CompilationUnit): JS.CompilationUnit {
+        const statements = [...cu.statements];
+        let changed = false;
+        for (let i = 0; i < statements.length; i++) {
+            const declaration = reExportFrom(statements[i].element, this.from.module);
+            const elements = declaration && clauseOf(declaration).elements.elements;
+            const moving = new Set(elements?.filter(e => this.reExportsMember(e.element)));
+            if (declaration === undefined || elements === undefined || moving.size === 0) {
+                continue;
+            }
+            changed = true;
+            const staying = new Set(elements.filter(e => !moving.has(e)));
+            const target = statements.findIndex((s, j) =>
+                j !== i && reExportFrom(s.element, this.to.module)?.typeOnly.element === declaration.typeOnly.element);
+            if (target < 0 && staying.size === 0) {
+                // Alone in its statement with nothing to join: the statement moves as it is
+                statements[i] = {...statements[i], element: this.respecified(withElements(declaration, elements.map(e => this.renamed(e))))};
+                continue;
+            }
+            const moved = without(elements, staying).map(e => this.renamed(e));
+            if (target >= 0) {
+                const into = statements[target].element as JS.ExportDeclaration;
+                statements[target] = {...statements[target], element: withElements(into, appended(clauseOf(into).elements.elements, moved))};
+            } else {
+                statements.splice(i + 1, 0, this.ownStatement(statements[i], declaration, moved));
+            }
+            if (staying.size > 0) {
+                statements[i] = {...statements[i], element: withElements(declaration, without(elements, moving))};
+            } else {
+                // The statement after takes the place, and the layout, of the one that goes
+                const next = statements[i + 1];
+                if (next !== undefined) {
+                    statements[i + 1] = {...next, element: {...next.element, prefix: declaration.prefix}};
+                }
+                statements.splice(i--, 1);
+            }
         }
-        const specifiers = (clause as JS.NamedExports).elements.elements;
-        const moving = specifiers.map(s => this.reExportsMember(s.element));
-        // A re-export that moves to another module takes its statement along, so it has to be alone in it
-        if (!moving.some(Boolean) || !this.withinModule && specifiers.length !== 1) {
-            return visited;
-        }
+        return changed ? {...cu, statements} : cu;
+    }
+
+    /** A statement re-exporting `moved` from `to`, laid out on the line after the one it came from. */
+    private ownStatement(stmt: J.RightPadded<Statement>, declaration: JS.ExportDeclaration,
+                         moved: J.RightPadded<Expression>[]): J.RightPadded<Statement> {
+        const indent = declaration.prefix.whitespace.slice(declaration.prefix.whitespace.lastIndexOf("\n") + 1);
+        const clause = clauseOf(declaration);
+        const own = this.respecified({
+            ...declaration,
+            id: randomId(),
+            prefix: {...declaration.prefix, comments: [], whitespace: "\n" + indent},
+            exportClause: {...clause, id: randomId(), elements: {...clause.elements, elements: moved}} as JS.NamedExports
+        });
+        return {...stmt, element: own, markers: {...stmt.markers, id: randomId()}};
+    }
+
+    /** `declaration` re-exporting from `to`'s module, its specifier spelled the way the file spells modules. */
+    private respecified(declaration: JS.ExportDeclaration): JS.ExportDeclaration {
         return produce(declaration, draft => {
-            const elements = (draft.exportClause as Draft<JS.NamedExports>).elements.elements;
-            elements.forEach((element, i) => {
-                // A member keeping its name keeps its specifier as written; only the module moves
-                if (!moving[i] || this.to.member === this.from.member) {
-                    return;
-                }
-                const specifier = element.element as Draft<JS.ExportSpecifier>;
-                if (specifier.specifier.kind === JS.Kind.Alias) {
-                    // `export {Old as X}`: only the member it reads changes, X is the module's own name for it.
-                    // A fresh identifier, since `export {"Old" as X}` spells the member as a string literal.
-                    const name = (specifier.specifier as Draft<JS.Alias>).propertyName;
-                    name.element = {...newIdentifier(this.to.member), prefix: name.element.prefix} as Draft<J.Identifier>;
-                } else {
-                    // `export {Old}` keeps publishing `Old`, now as `export {New as Old}`
-                    specifier.specifier = aliasing(specifier.specifier as J.Identifier, this.to.member) as Draft<JS.Alias>;
-                }
-            });
-            if (!this.withinModule) {
-                const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
-                respecify(literal, spelledLike(this.to.module, String(literal.value)));
+            const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
+            literal.id = randomId();
+            respecify(literal, spelledLike(this.to.module, String(literal.value)));
+        });
+    }
+
+    /** The specifier reading `to.member` where it read `from.member`, still publishing the name it published. */
+    private renamed(element: J.RightPadded<Expression>): J.RightPadded<Expression> {
+        // A member keeping its name keeps its specifier as written; only the module moves
+        if (this.to.member === this.from.member) {
+            return element;
+        }
+        return produce(element, draft => {
+            const specifier = draft.element as Draft<JS.ExportSpecifier>;
+            if (specifier.specifier.kind === JS.Kind.Alias) {
+                // `export {Old as X}`: only the member it reads changes, X is the module's own name for it.
+                // A fresh identifier, since `export {"Old" as X}` spells the member as a string literal.
+                const name = (specifier.specifier as Draft<JS.Alias>).propertyName;
+                name.element = {...newIdentifier(this.to.member), prefix: name.element.prefix} as Draft<J.Identifier>;
+            } else {
+                // `export {Old}` keeps publishing `Old`, now as `export {New as Old}`
+                specifier.specifier = aliasing(specifier.specifier as J.Identifier, this.to.member) as Draft<JS.Alias>;
             }
         });
     }
@@ -160,4 +222,52 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return (read.kind === J.Kind.Identifier || read.kind === J.Kind.Literal) &&
             moduleExportName(read as J.Identifier | J.Literal) === this.from.member;
     }
+}
+
+/** `statement` as an `export {…} from "<module>"` declaration, where it is one. */
+function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclaration | undefined {
+    if (statement?.kind !== JS.Kind.ExportDeclaration) {
+        return undefined;
+    }
+    const declaration = statement as JS.ExportDeclaration;
+    const source = declaration.moduleSpecifier?.element;
+    return source?.kind === J.Kind.Literal && typeof (source as J.Literal).value === "string" &&
+        sameModule(moduleNameOf(source as J.Literal), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
+        ? declaration : undefined;
+}
+
+function clauseOf(declaration: JS.ExportDeclaration): JS.NamedExports {
+    return declaration.exportClause as JS.NamedExports;
+}
+
+function withElements(declaration: JS.ExportDeclaration, elements: J.RightPadded<Expression>[]): JS.ExportDeclaration {
+    const clause = clauseOf(declaration);
+    return {...declaration, exportClause: {...clause, elements: {...clause.elements, elements}} as JS.NamedExports};
+}
+
+/** `elements` without `dropped`, keeping the space after `{`, and the space and any trailing comma before `}`. */
+function without<T extends J>(elements: J.RightPadded<T>[], dropped: ReadonlySet<J.RightPadded<T>>): J.RightPadded<T>[] {
+    const kept = elements.filter(e => !dropped.has(e));
+    const first = elements[0], last = elements[elements.length - 1];
+    return kept.map((e, i) => ({
+        ...e,
+        element: i === 0 ? {...e.element, prefix: first.element.prefix} : e.element,
+        ...(i === kept.length - 1 ? {after: last.after, markers: last.markers} : {})
+    }));
+}
+
+/** `elements` with `added` at the end, separated as `elements` are, the trailing comma and space before `}` moving last. */
+function appended<T extends J>(elements: J.RightPadded<T>[], added: J.RightPadded<T>[]): J.RightPadded<T>[] {
+    const last = elements[elements.length - 1];
+    const separator = elements[1]?.element.prefix ??
+        (elements[0].element.prefix.whitespace.includes("\n") ? elements[0].element.prefix : singleSpace);
+    const plain = (markers: J.RightPadded<T>["markers"]) =>
+        ({...markers, markers: markers.markers.filter(m => m.kind !== J.Markers.TrailingComma)});
+    return [
+        ...elements.slice(0, -1),
+        {...last, after: emptySpace, markers: plain(last.markers)},
+        ...added.map((e, i) => i === added.length - 1
+            ? {...e, element: {...e.element, prefix: separator}, after: last.after, markers: last.markers}
+            : {...e, element: {...e.element, prefix: separator}, after: emptySpace, markers: plain(e.markers)})
+    ];
 }

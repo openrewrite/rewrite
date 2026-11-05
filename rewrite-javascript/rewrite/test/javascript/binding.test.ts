@@ -1137,6 +1137,18 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
     });
 }
 
+/** Queues one `maybeRebind` per move from the compilation unit, as a recipe moving several members does. */
+function rebindEach(moves: MaybeRebindOptions[]) {
+    return fromVisitor(new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            for (const move of moves) {
+                maybeRebind(this, move);
+            }
+            return super.visitJsCompilationUnit(cu, p);
+        }
+    });
+}
+
 describe("maybeBind and type-only imports", () => {
     /** Binds `options` once, from the compilation unit, recording the name it answers with. */
     function bindOnce(options: MaybeBindOptions, bound: {name?: string}) {
@@ -3191,7 +3203,7 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
-    test("a re-export moves to another module only where it re-exports nothing else", async () => {
+    test("a re-export moving to another module leaves what else its statement re-exports, and joins a re-export of the target", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
         await spec.rewriteRun(typescript(
@@ -3200,8 +3212,67 @@ describe("maybeRebind and the member's other spellings", () => {
                 export { Old as O, Other } from "m";
             `,
             `
-                export { New as Old } from "m2";
-                export { Old as O, Other } from "m";
+                export { New as Old, New as O } from "m2";
+                export { Other } from "m";
+            `
+        ));
+    });
+
+    test("a re-export with no re-export of the target to join takes a statement of its own after the one it left", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export {
+                    Other,
+                    Old,
+                } from "m";
+                const x = 1;
+            `,
+            `
+                export {
+                    Other,
+                } from "m";
+                export {
+                    New as Old,
+                } from "m2";
+                const x = 1;
+            `
+        ));
+    });
+
+    test("re-exports whose every member moves end up as one statement of the target", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindEach([
+            {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
+            {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
+        ]);
+        await spec.rewriteRun(typescript(
+            `
+                export { Validator, ValidationMap } from "react";
+            `,
+            `
+                export { Validator, ValidationMap } from "prop-types";
+            `
+        ));
+    });
+
+    test("moved members leave the rest behind and join the target's re-export of the same kind", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindEach([
+            {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
+            {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
+        ]);
+        await spec.rewriteRun(typescript(
+            `
+                export type { Validator as V, ReactNode, ValidationMap } from "react";
+                export { checkPropTypes } from "prop-types";
+                export type { Requireable } from "prop-types";
+            `,
+            `
+                export type { ReactNode } from "react";
+                export { checkPropTypes } from "prop-types";
+                export type { Requireable, Validator as V, ValidationMap } from "prop-types";
             `
         ));
     });
@@ -3211,14 +3282,10 @@ describe("maybeRebind and the member's other spellings", () => {
         spec.recipe = rebindTo({module: "m2", member: "Old"}, {});
         await spec.rewriteRun(typescript(
             `
-                export { Old } from "m";
-                export { Old as Renamed } from "m";
-                export { "Old" as Quoted } from "m";
+                export { Old, Old as Renamed, "Old" as Quoted } from "m";
             `,
             `
-                export { Old } from "m2";
-                export { Old as Renamed } from "m2";
-                export { "Old" as Quoted } from "m2";
+                export { Old, Old as Renamed, "Old" as Quoted } from "m2";
             `
         ));
     });
