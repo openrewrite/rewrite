@@ -48,25 +48,32 @@ export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 /** The module of the file every template and pattern parses as. */
 export const TEMPLATE_MODULE = 'template';
 
-/** How template code is parsed: as statements (`false`), as an expression (`true`), or as a type where it replaces one. */
-export type TemplateSlot = boolean | 'type';
+/** How template code is parsed: as statements (`false`), an expression (`true`), or the type or member it replaces. */
+export type TemplateSlot = boolean | 'type' | 'member';
 
 /**
- * `'type'` where `tree`, at `cursor`, stands in a type position, so template code replacing it parses
- * as a type: `A | B` is a union there, not a bitwise or. An `extends` or `implements` entry is an
+ * The slot `tree`, at `cursor`, fills where template code replacing it parses as something other than
+ * statements: `'type'` in a type position, so `A | B` is a union there, not a bitwise or, and `'member'`
+ * in a class body, so `declare x: T;` is a property there. An `extends` or `implements` entry is an
  * expression with type arguments, which the expression parse already builds.
  */
-export function typeSlotOf(tree: J, cursor: Cursor | undefined): 'type' | undefined {
-    if (cursor?.value?.id !== tree.id || !isTypePosition(cursor)) {
+export function slotOf(tree: J, cursor: Cursor | undefined): 'type' | 'member' | undefined {
+    if (cursor?.value?.id !== tree.id) {
         return undefined;
     }
-    return (cursor.parentTree()?.value as J | undefined)?.kind === J.Kind.ClassDeclaration ? undefined : 'type';
+    const parent = cursor.parentTree();
+    if (parent?.value.kind === J.Kind.Block && parent.parentTree()?.value.kind === J.Kind.ClassDeclaration) {
+        return 'member';
+    }
+    return isTypePosition(cursor) && parent?.value.kind !== J.Kind.ClassDeclaration ? 'type' : undefined;
 }
 
 /** Template or pattern code as the body of the wrapper function, in the form its {@link TemplateSlot} parses. */
 export function wrapCode(code: string, expression: TemplateSlot): string {
     if (expression === 'type') {
         return `function ${WRAPPER_FUNCTION_NAME}() { type __T = ${code}; }`;
+    } else if (expression === 'member') {
+        return `class ${WRAPPER_FUNCTION_NAME} { ${code} }`;
     }
     return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
 }
@@ -372,6 +379,11 @@ export class PlaceholderUtils {
      * @returns The extracted AST node
      */
     static extractFromWrapper(lastStatement: J, contextName: string, expression: TemplateSlot = false): J {
+        if (expression === 'member' && lastStatement.kind === J.Kind.ClassDeclaration) {
+            // One member is that member, and several are the class body, as several statements are a block
+            const body = (lastStatement as J.ClassDeclaration).body;
+            return body.statements.length === 1 ? body.statements[0].element : body;
+        }
         let extracted: J;
 
         // Since we always wrap in function __WRAPPER__() { code }, look for it

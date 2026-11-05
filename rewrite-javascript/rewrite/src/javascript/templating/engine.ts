@@ -18,7 +18,7 @@ import {emptySpace, J, Statement, Type, TypedTree} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {
-    CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, TemplateSlot, treeIds, typeSlotOf, wrapCode
+    CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, slotOf, TEMPLATE_MODULE, TemplateSlot, treeIds, wrapCode
 } from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
@@ -954,7 +954,7 @@ export class TemplateApplier {
 
         const originalTree = tree as J;
         const parentTree = await replacedParent(originalTree, this.cursor);
-        const typeSlot = typeSlotOf(originalTree, this.cursor) === 'type';
+        const typeSlot = slotOf(originalTree, this.cursor) === 'type';
         // A replaced node spliced back in as a capture carries its own trailing markers. A type's `?` marks
         // the tuple element it fills instead, so `${t}<any>` replacing `X` in `[X?]` gives `[X<any>?]`.
         const trailing = trailingMarkers(originalTree);

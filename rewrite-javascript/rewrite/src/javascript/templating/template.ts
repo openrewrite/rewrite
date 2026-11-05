@@ -21,7 +21,7 @@ import {ModuleScopeBinding} from '../add-import';
 import {opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, TemplateSlot, typeSlotOf, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, slotOf, TemplateSlot, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -428,7 +428,7 @@ export class Template {
             }
         }
 
-        const expression: TemplateSlot = typeSlotOf(tree, cursor) ??
+        const expression: TemplateSlot = slotOf(tree, cursor) ??
             (opensWithBrace(this.templateParts) && await replacedByObjectLiteral(tree, cursor));
         const ast = await this.getTemplateTree(expression, normalizedValues);
 
