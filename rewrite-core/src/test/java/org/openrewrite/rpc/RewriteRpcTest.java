@@ -1151,7 +1151,8 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void batchedScanVisitsOnlyWhatAnUnbatchedScanAccepts() {
         // A peer moves a serializable scan precondition out of its scanner, so only this side applies it
-        TreeVisitor<?, ExecutionContext> notExcluded = Preconditions.not(new FindSourceFiles("excluded.txt").getVisitor());
+        TreeVisitor<?, ExecutionContext> notExcluded =
+          Preconditions.not(new FindSourceFiles("excluded.txt").getVisitor());
         List<Throwable> errors = new CopyOnWriteArrayList<>();
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
@@ -1172,10 +1173,13 @@ class RewriteRpcTest implements RewriteTest {
 
     @Test
     void batchedPreconditionWritesNoDataTableRows() {
-        TreeVisitor<?, ExecutionContext> mentionsKept = new Find("kept", null, null, null, null, null, null, null).getVisitor();
+        TreeVisitor<?, ExecutionContext> mentionsKept =
+          new Find("kept", null, null, null, null, null, null, null).getVisitor();
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
-          new CompositeRecipe(List.of(scanThenEditGatedBy(mentionsKept, mentionsKept), scanThenEditGatedBy(mentionsKept, mentionsKept))),
+          new CompositeRecipe(List.of(
+            scanThenEditGatedBy(mentionsKept, mentionsKept),
+            scanThenEditGatedBy(mentionsKept, mentionsKept))),
           new InMemoryLargeSourceSet(List.of(PlainText.builder().text("kept").sourcePath(Path.of("kept.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 

@@ -254,9 +254,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                     if (((RpcRecipe) recipe).reachesScanVisitor(source, ctx, rootCursor)) {
                                         scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
                                         scanBatch.recipeStacks.add(recipeStack);
-                                        if (scanBatch.originalBeforeBatch == null) {
-                                            scanBatch.originalBeforeBatch = source;
-                                        }
                                         scanBatch.rpc = currentRpc;
                                     }
 
