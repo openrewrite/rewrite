@@ -954,15 +954,18 @@ export class TemplateApplier {
 
         const originalTree = tree as J;
         const parentTree = await replacedParent(originalTree, this.cursor);
-        let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
-        // A replaced node spliced back in as a capture carries its own trailing markers
+        const typeSlot = typeSlotOf(originalTree, this.cursor) === 'type';
+        // A replaced node spliced back in as a capture carries its own trailing markers. A type's `?` marks
+        // the tuple element it fills instead, so `${t}<any>` replacing `X` in `[X?]` gives `[X<any>?]`.
         const trailing = trailingMarkers(originalTree);
-        const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
+        const spliced = (await treeIds(this.ast)).has(originalTree.id);
+        const ast = trailing && spliced && typeSlot ? await withoutTrailingMarkers(this.ast, originalTree.id) : this.ast;
+        let resultToUse = this.wrapTree(originalTree, ast, parentTree);
+        const slotMarkers = trailing && (typeSlot || !spliced) ? trailing : undefined;
         if (slotMarkers) {
             resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
         }
         // A comment inside a replaced type, `R./* why */ReactChild`, stays with what replaces it
-        const typeSlot = typeSlotOf(originalTree, this.cursor) === 'type';
         const inner = typeSlot ? innerComments(originalTree) : [];
         if (typeSlot) {
             // A type replacing a type: parenthesized by the type slot's own rules, not an expression's
@@ -1094,6 +1097,19 @@ export class TemplateApplier {
 function trailingMarkers(replaced: J): Markers | undefined {
     const trailing = replaced.markers.markers.filter(isTrailingMarker);
     return trailing.length === 0 ? undefined : markers(...trailing);
+}
+
+/** `tree` with the trailing markers taken off the node `id` names. */
+async function withoutTrailingMarkers(tree: J, id: string): Promise<J> {
+    return (await new class extends JavaScriptVisitor<undefined> {
+        protected override async preVisit(t: J): Promise<J | undefined> {
+            if (t.id !== id) {
+                return t;
+            }
+            this.stopAfterPreVisit();
+            return {...t, markers: {...t.markers, markers: t.markers.markers.filter(m => !isTrailingMarker(m))}};
+        }
+    }().visit<J>(tree, undefined))!;
 }
 
 /** `own`, plus each marker of `added` whose kind `own` does not already hold. */

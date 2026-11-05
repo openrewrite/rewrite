@@ -158,6 +158,26 @@ describe("template replacing a type", () => {
         ));
     });
 
+    test("an optional tuple element keeps its `?` after the type a template splices back in", () => {
+        const name = capture('name');
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                const bare = identifier.simpleName === "ReactElement" &&
+                    this.cursor.parentTree()?.value.kind !== J.Kind.ParameterizedType;
+                return bare ? await template`${name}<any>`.apply(identifier, this.cursor, {values: {name: identifier}}) : identifier;
+            }
+        });
+        //language=typescript
+        return spec.rewriteRun(typescript(
+            `
+                let a: [string, ReactElement?];
+            `,
+            `
+                let a: [string, ReactElement<any>?];
+            `
+        ));
+    });
+
     test("an implements or extends entry is still built as the parser builds one", () => {
         spec.recipe = replaceOld`Base<string>`;
         //language=typescript
