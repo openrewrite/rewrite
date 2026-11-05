@@ -1656,6 +1656,9 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
             case Comma:
                 keyword = ",";
                 break;
+            case Exponentiation:
+                keyword = "**";
+                break;
         }
 
         visitSpace(binary.getPadding().getOperator().getBefore(), p);

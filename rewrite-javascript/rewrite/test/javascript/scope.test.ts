@@ -703,7 +703,7 @@ describe('isWrite', () => {
         expect(await answersAt(`
             let target = 1; target; f(target); target.p = 1; target[0] = 1; o.target = 1; -target;
             for (const target of xs) {} ({[target]: v} = o); ({k: v = target} = o); [v = target] = arr;
-            v = target; { const {target} = o; } ({target: v} = o);
+            v = target; { const {target} = o; } ({target: v} = o); target ** 2; v = target ** 2;
         `, 'target', isWrite)).not.toContain(true);
     });
 });

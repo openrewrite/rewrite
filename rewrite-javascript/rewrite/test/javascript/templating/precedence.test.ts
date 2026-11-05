@@ -272,6 +272,18 @@ describe('template precedence', () => {
                 `));
         });
 
+        test('`**` binds tighter than `*` but looser than a prefix operator', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`wrap(${x})`,
+                after: template`-${x} * ${x}`
+            })));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = wrap(n ** m);`,
+                `const a = -(n ** m) * n ** m;`));
+        });
+
         test('a sign may not fuse with the sign that precedes it', () => {
             const x = capture();
             spec.recipe = onCall(rewrite(() => ({

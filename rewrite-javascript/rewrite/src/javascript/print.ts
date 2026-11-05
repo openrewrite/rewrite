@@ -1624,6 +1624,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             case JS.Binary.Type.Comma:
                 keyword = ",";
                 break;
+            case JS.Binary.Type.Exponentiation:
+                keyword = "**";
+                break;
         }
 
         await this.visitSpace(binary.operator.before, p);

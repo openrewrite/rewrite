@@ -1829,7 +1829,8 @@ public interface JS extends J {
             IdentityNotEquals,
             In,
             QuestionQuestion,
-            Comma
+            Comma,
+            Exponentiation
         }
 
         public JS.Binary.Padding getPadding() {
@@ -5121,6 +5122,10 @@ public interface JS extends J {
             QuestionQuestion,
             And,
             Or,
+            /**
+             * @deprecated {@code a ** b} is a {@link JS.Binary} of type {@link JS.Binary.Type#Exponentiation}.
+             */
+            @Deprecated
             Power,
             Exp
         }

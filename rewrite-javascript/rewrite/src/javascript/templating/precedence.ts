@@ -94,13 +94,10 @@ export function precedenceOf(expression: J): number {
         case JS.Kind.As:
         case JS.Kind.SatisfiesExpression:
             return Precedence.Relational;
-        case JS.Kind.AssignmentOperation:
-            // `**` is the odd one out: every other JS.AssignmentOperation is a compound assignment
-            return (expression as JS.AssignmentOperation).operator.element === JS.AssignmentOperation.Type.Power ?
-                Precedence.Exponentiation : Precedence.Assignment;
         case J.Kind.Ternary:
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
+        case JS.Kind.AssignmentOperation:
         case J.Kind.Lambda:
         case J.Kind.Yield:
         case JS.Kind.ArrowFunction:
@@ -160,6 +157,13 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
             if (precedence === undefined) {
                 return undefined;
             }
+            if (binary.operator.element === JS.Binary.Type.Exponentiation) {
+                // Right-associative, and `-a ** b` is a syntax error
+                if (binary.left?.id === childId) {
+                    return {precedence: Precedence.Postfix};
+                }
+                return binary.right?.id === childId ? {precedence} : undefined;
+            }
             if (binary.left?.id === childId) {
                 return {precedence};
             }
@@ -195,25 +199,13 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
             return assignment.assignment?.element?.id === childId ? {precedence: Precedence.Assignment} : undefined;
         }
 
-        case J.Kind.AssignmentOperation: {
+        case J.Kind.AssignmentOperation:
+        case JS.Kind.AssignmentOperation: {
             const assignment = parent as J.AssignmentOperation;
             if (assignment.variable?.id === childId) {
                 return {precedence: Precedence.Call};
             }
             return assignment.assignment?.id === childId ? {precedence: Precedence.Assignment} : undefined;
-        }
-
-        case JS.Kind.AssignmentOperation: {
-            const assignment = parent as JS.AssignmentOperation;
-            const power = assignment.operator.element === JS.AssignmentOperation.Type.Power;
-            if (assignment.variable?.id === childId) {
-                // `-a ** b` is a syntax error, and `**` is right-associative besides
-                return {precedence: power ? Precedence.Postfix : Precedence.Call};
-            }
-            if (assignment.assignment?.id === childId) {
-                return {precedence: power ? Precedence.Exponentiation : Precedence.Assignment};
-            }
-            return undefined;
         }
 
         case J.Kind.FieldAccess: {
@@ -468,6 +460,8 @@ function jsBinaryPrecedence(operator: JS.Binary.Type): number | undefined {
             return Precedence.LogicalOr;
         case JS.Binary.Type.Comma:
             return Precedence.Comma;
+        case JS.Binary.Type.Exponentiation:
+            return Precedence.Exponentiation;
         default:
             return undefined;
     }
