@@ -63,6 +63,8 @@ public class RewriteRpcServer
 
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    // Visitor names (edit:<id>, scan:<id>) whose Check precondition the host evaluates, as hoisted by PrepareRecipe
+    private readonly ConcurrentDictionary<string, bool> _hoistedVisitors = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
 
     private volatile IDataTableStore? _configuredDataTableStore;
@@ -1507,57 +1509,51 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
-    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
-    /// on the visitor type so Java only sends compatible files.
+    /// Hands the host each precondition that has a Java implementation, so it skips the files that
+    /// precondition rejects, and the language gate of a C# visitor. A scanning recipe's editor depends
+    /// on its accumulator, so only its scanner is hoisted.
     /// </summary>
     private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
     {
         try
         {
-            var visitor = recipe.GetVisitor();
-
-            var innerVisitor = visitor;
-            if (visitor is Check check)
+            if (recipe is IScanningRecipe scanning)
             {
-                // Try to emit the precondition's wire identity so the Java
-                // host can evaluate it locally and skip the visit RPC for
-                // non-matching files. RecipeCheck is the only shape we can
-                // serialize today (recipe identity); Check wrapping a bare
-                // visitor or a composite has no recipe-name to point Java
-                // at, so we fall through and let the gate run C#-side.
-                if (check is RecipeCheck recipeCheck && _preparedRecipes.Values.Contains(recipeCheck.Recipe))
-                {
-                    var entry = ConditionWireEntry(recipeCheck.Precondition);
-                    if (entry != null)
-                    {
-                        response.EditPreconditions.Add(entry);
-                    }
-                }
-                else
-                {
-                    var entry = ConditionWireEntry(check.Precondition);
-                    if (entry != null)
-                    {
-                        response.EditPreconditions.Add(entry);
-                    }
-                }
-                innerVisitor = check.Visitor;
+                var scanner = scanning.Scanner(scanning.InitialValue(new ExecutionContext()));
+                HoistPreconditions(scanner, response.ScanVisitor!, response.ScanPreconditions);
             }
-
-            // Add tree type precondition so Java only sends files this visitor can handle
-            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            else
             {
-                response.EditPreconditions.Add(new Precondition
-                {
-                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
-                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
-                });
+                HoistPreconditions(recipe.GetVisitor(), response.EditVisitor, response.EditPreconditions);
             }
         }
         catch
         {
-            // Some recipes may fail during GetVisitor() — skip precondition detection
+            // Some recipes fail to build a visitor outside a run — skip precondition detection
+        }
+    }
+
+    private void HoistPreconditions(ITreeVisitor<ExecutionContext> visitor, string visitorName,
+        List<Precondition> preconditions)
+    {
+        if (visitor is Check check)
+        {
+            var entry = ConditionWireEntry(check.Precondition);
+            if (entry != null)
+            {
+                preconditions.Add(entry);
+                _hoistedVisitors[visitorName] = true;
+            }
+            visitor = check.Visitor;
+        }
+
+        if (visitor is CSharpVisitor<ExecutionContext>)
+        {
+            preconditions.Add(new Precondition
+            {
+                VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+            });
         }
     }
 
@@ -1745,43 +1741,13 @@ public class RewriteRpcServer
             return new VisitResponse { Modified = false };
         }
 
-        // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
-        var parts = request.VisitorName.Split(':', 2);
-        if (parts.Length != 2)
-        {
-            throw new ArgumentException($"Invalid visitor name format: {request.VisitorName}");
-        }
-
-        var phase = parts[0]; // "edit" or "scan"
-        var recipeId = parts[1];
-
-        if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
-        {
-            throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
-        }
+        var ctx = GetOrCreateExecutionContext(request.PId);
+        var visitor = VisitorFor(request.VisitorName, ctx);
 
         // Fetch tree from the remote (Java) process
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
-
-        if (phase != "scan" && phase != "edit")
-        {
-            throw new ArgumentException($"Unknown visitor phase: {phase}");
-        }
-
-        var ctx = GetOrCreateExecutionContext(request.PId);
-        ITreeVisitor<ExecutionContext> visitor;
-
-        if (recipe is IScanningRecipe scanning)
-        {
-            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
-        }
-        else
-        {
-            visitor = recipe.GetVisitor();
-        }
 
         var result = visitor.Visit(tree, ctx, cursor);
 
@@ -1796,6 +1762,43 @@ public class RewriteRpcServer
         }
 
         return new VisitResponse { Modified = modified };
+    }
+
+    /// <summary>
+    /// The visitor that <see cref="Visit"/> and <see cref="BatchVisit"/> run for a prepared recipe's
+    /// <c>edit:&lt;id&gt;</c> or <c>scan:&lt;id&gt;</c>, without the precondition the host evaluates.
+    /// </summary>
+    internal ITreeVisitor<ExecutionContext> VisitorFor(string visitorName, ExecutionContext ctx)
+    {
+        var parts = visitorName.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            throw new ArgumentException($"Invalid visitor name format: {visitorName}");
+        }
+
+        var phase = parts[0];
+        var recipeId = parts[1];
+        if (phase != "scan" && phase != "edit")
+        {
+            throw new ArgumentException($"Unknown visitor phase: {phase}");
+        }
+
+        if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
+        }
+
+        ITreeVisitor<ExecutionContext> visitor;
+        if (recipe is IScanningRecipe scanning)
+        {
+            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
+        }
+        else
+        {
+            visitor = recipe.GetVisitor();
+        }
+        return visitor is Check check && _hoistedVisitors.ContainsKey(visitorName) ? check.Visitor : visitor;
     }
 
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
@@ -1832,27 +1835,7 @@ public class RewriteRpcServer
 
         foreach (var item in request.Visitors)
         {
-            // Parse visitor name and instantiate
-            var parts = item.Visitor.Split(':', 2);
-            if (parts.Length != 2)
-                throw new ArgumentException($"Invalid visitor name format: {item.Visitor}");
-
-            var phase = parts[0];
-            var recipeId = parts[1];
-
-            if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
-                throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
-
-            ITreeVisitor<ExecutionContext> visitor;
-            if (recipe is IScanningRecipe scanning)
-            {
-                var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-                visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
-            }
-            else
-            {
-                visitor = recipe.GetVisitor();
-            }
+            var visitor = VisitorFor(item.Visitor, ctx);
 
             var visitStart = sw.ElapsedMilliseconds;
             var result = visitor.Visit(tree, ctx, cursor);
@@ -2124,6 +2107,7 @@ public class RewriteRpcServer
         _refCheckpoints.Clear();
         _preparedRecipes.Clear();
         _recipeAccumulators.Clear();
+        _hoistedVisitors.Clear();
         _executionContexts.Clear();
     }
 
