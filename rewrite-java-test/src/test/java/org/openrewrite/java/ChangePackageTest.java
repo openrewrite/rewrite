@@ -2394,4 +2394,176 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", null)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link org.openrewrite.somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  org.openrewrite.somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.*;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.*;
+              import org.openrewrite.somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameToSubpackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "somepkg.sub", false)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package somepkg.sub;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import somepkg.sub.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
 }
