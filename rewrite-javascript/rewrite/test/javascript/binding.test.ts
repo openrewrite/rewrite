@@ -3206,6 +3206,23 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
+    test("a re-export moving to another module under the member's own name keeps its specifier as written", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "Old"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { Old } from "m";
+                export { Old as Renamed } from "m";
+                export { "Old" as Quoted } from "m";
+            `,
+            `
+                export { Old } from "m2";
+                export { Old as Renamed } from "m2";
+                export { "Old" as Quoted } from "m2";
+            `
+        ));
+    });
+
     test.each([
         'const {Old, ...rest} = require("m");',
         'const {Old}: any = require("m");'
