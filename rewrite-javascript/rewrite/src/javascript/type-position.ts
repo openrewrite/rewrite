@@ -19,8 +19,9 @@ import {JS, JSX} from "./tree";
 
 /**
  * Whether a type may stand where the cursor is: a type annotation, an array element type, a union or
- * intersection member, a type argument, a bound, `as` and `satisfies`, `implements`, a tuple element,
- * a `keyof` operand. A value read, a `typeof` operand and a JSX tag are not.
+ * intersection member, a type argument, a bound, `as` and `satisfies`, `implements`, a tuple element or
+ * rest, a `keyof` operand, an index type, a mapped type's key remapping. A value read, a `typeof` operand
+ * and a JSX tag are not.
  */
 export function isTypePosition(cursor: Cursor): boolean {
     const name = cursor.value as J;
@@ -35,11 +36,16 @@ export function isTypePosition(cursor: Cursor): boolean {
         case JS.Kind.Tuple:
         case JS.Kind.TypeOperator:
         case JS.Kind.IndexedAccessType:
+        case JS.Kind.IndexedAccessTypeIndexType:
         case JS.Kind.MappedType:
         case J.Kind.ArrayType:
             return true;
         case JS.Kind.MappedTypeParameter:
             return (parent as JS.MappedType.Parameter).iterateType.element === name;
+        case JS.Kind.MappedTypeKeysRemapping:
+            return (parent as JS.MappedType.KeysRemapping).nameType?.element === name;
+        case JS.Kind.Spread:
+            return grandparentKind() === JS.Kind.Tuple;
         case JS.Kind.TemplateExpressionSpan: {
             const template = parentCursor!.parentTree();
             return (parent as JS.TemplateExpression.Span).expression === name && template !== undefined && isTypePosition(template);
@@ -66,6 +72,12 @@ export function isTypePosition(cursor: Cursor): boolean {
             return holds((parent as J.ParameterizedType).typeParameters);
         case J.Kind.MethodInvocation:
             return holds((parent as J.MethodInvocation).typeParameters);
+        case JS.Kind.FunctionCall:
+            return holds((parent as JS.FunctionCall).typeParameters);
+        case JS.Kind.ImportType:
+            return holds((parent as JS.ImportType).typeArguments);
+        case JS.Kind.TypeQuery:
+            return holds((parent as JS.TypeQuery).typeArguments);
         case JS.Kind.ExpressionWithTypeArguments:
             return holds((parent as JS.ExpressionWithTypeArguments).typeArguments);
         case JS.Kind.JsxTag:

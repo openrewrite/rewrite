@@ -58,6 +58,40 @@ describe("template replacing a type", () => {
         ));
     });
 
+    test("a union replacing a type argument of an import type, a type query or a call is a union type", () => {
+        spec.recipe = replaceOld`number | string`;
+        //language=typescript
+        return spec.rewriteRun(typescript(
+            `
+                let a: import('react').RefObject<Old>;
+                let b: typeof f<Old>;
+                let c = handlers[key]<Old>();
+            `,
+            `
+                let a: import('react').RefObject<number | string>;
+                let b: typeof f<number | string>;
+                let c = handlers[key]<number | string>();
+            `
+        ));
+    });
+
+    test("a union replacing an index type, a key remapping or a tuple rest is a union type", () => {
+        spec.recipe = replaceOld`number | string`;
+        //language=typescript
+        return spec.rewriteRun(typescript(
+            `
+                let a: T[Old];
+                type B = {[K in keyof T as Old]: T[K]};
+                let c: [boolean, ...Old];
+            `,
+            `
+                let a: T[number | string];
+                type B = {[K in keyof T as number | string]: T[K]};
+                let c: [boolean, ...number | string];
+            `
+        ));
+    });
+
     test("a union is parenthesized where its slot binds tighter", () => {
         spec.recipe = replaceOld`number | string`;
         //language=typescript
