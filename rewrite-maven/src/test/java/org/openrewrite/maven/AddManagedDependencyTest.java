@@ -33,7 +33,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void onlyAddedWhenUsing() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
+            "pom", null,null, null, "org.apache.logging.log4j:*", false, null)),
           pomXml(
             """
             <project>
@@ -82,7 +82,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void propertiesAsGAVCoordinates() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
-            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
+            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null, null)),
           pomXml(
             """
             <project>
@@ -126,7 +126,7 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void validation()  {
         var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "org.apache.logging:*", true);
+          "pom", null, null, null, "org.apache.logging:*", true, null);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
@@ -134,7 +134,7 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void validationAllowsDashesInOnlyIfUsing()  {
         var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "something-with:dashes-is-ok*", true);
+          "pom", null, null, null, "something-with:dashes-is-ok*", true, null);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
@@ -142,7 +142,7 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void badCharactersInOnlyIfUsingAreInvalid() {
         var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "spaced group:*", true);
+          "pom", null, null, null, "spaced group:*", true, null);
         Validated<Object> validated = recipe.validate();
         assertThat(validated.isValid()).isFalse();
         assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
@@ -152,7 +152,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void doNotAddIfTypeNotUsed() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
+            "pom", null,null, null, "org.apache.logging.log4j:*", false, null)),
           pomXml(
             """
             <project>
@@ -169,7 +169,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void addedToRootPom() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, null, true)),
+            "pom", null,null, null, null, true, null)),
           pomXml(
             """
             <project>
@@ -257,7 +257,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void versionSelectionTakesExistingIntoAccount() {
         rewriteRun(
           spec -> spec.recipes(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.patch", null,
-            null, null, null, null, null, true)),
+            null, null, null, null, null, true, null)),
           //language=xml
           pomXml(
             """
@@ -305,7 +305,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void doesNotAddManagedDependencyIfTransitiveVersionIsTheSameAsRequested() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.18.0", null,
-            null, null, null, null, null, false)),
+            null, null, null, null, null, false, null)),
           pomXml(
             """
               <project>
@@ -329,7 +329,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void addsWhenVersionIsHigherThanTransitiveVersion() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.19.0", null,
-            null, null, null, null, null, false)),
+            null, null, null, null, null, false, null)),
           pomXml(
             """
               <project>
@@ -376,7 +376,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void doesNotDowngradeVersionIfTransitiveDependencyAppearsOnceInTree() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.15.3", null,
-            null, null, null, null, null, false)),
+            null, null, null, null, null, false, null)),
           pomXml(
             """
               <project>
@@ -401,7 +401,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void doesNotDowngradeVersionIfTransitiveDependencyAppearsInTreeWithDifferentVersions(String requestedVersion) {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", requestedVersion, null,
-            null, null, null, null, null, false)),
+            null, null, null, null, null, false, null)),
           pomXml(
             """
               <project>

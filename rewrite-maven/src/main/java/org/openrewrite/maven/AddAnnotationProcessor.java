@@ -330,7 +330,7 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                             String lookupVersion = oldVersionUsesProperty ?
                                                     currentMrr.getPom().getValue(oldVersion.trim()) : oldVersion;
                                             VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
-                                            if (comparator.compare(version, lookupVersion) > 0) {
+                                            if (comparator.compare(null, version, lookupVersion) > 0) {
                                                 if (oldVersionUsesProperty) {
                                                     // A maven property is used here, update in properties section later
                                                     maybePropertyUpdate.set(new ChangePropertyValue(oldVersion, version, null, null).getVisitor());
