@@ -94,10 +94,11 @@ export function precedenceOf(expression: J): number {
         case JS.Kind.As:
         case JS.Kind.SatisfiesExpression:
             return Precedence.Relational;
+        case JS.Kind.AssignmentOperation:
+            return isLegacyPower(expression as JS.AssignmentOperation) ? Precedence.Exponentiation : Precedence.Assignment;
         case J.Kind.Ternary:
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
-        case JS.Kind.AssignmentOperation:
         case J.Kind.Lambda:
         case J.Kind.Yield:
         case JS.Kind.ArrowFunction:
@@ -197,10 +198,12 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case J.Kind.AssignmentOperation:
         case JS.Kind.AssignmentOperation: {
             const assignment = parent as J.AssignmentOperation;
+            const power = parent.kind === JS.Kind.AssignmentOperation && isLegacyPower(parent as JS.AssignmentOperation);
             if (assignment.variable?.id === childId) {
-                return {precedence: Precedence.Call};
+                return {precedence: power ? Precedence.Postfix : Precedence.Call};
             }
-            return assignment.assignment?.id === childId ? {precedence: Precedence.Assignment} : undefined;
+            return assignment.assignment?.id === childId ?
+                {precedence: power ? Precedence.Exponentiation : Precedence.Assignment} : undefined;
         }
 
         case J.Kind.FieldAccess: {
@@ -460,6 +463,11 @@ function jsBinaryPrecedence(operator: JS.Binary.Type): number | undefined {
         default:
             return undefined;
     }
+}
+
+/** `a ** b` as parsed before it was a {@link JS.Binary}, which trees from an older parser still hold. */
+function isLegacyPower(assignment: JS.AssignmentOperation): boolean {
+    return assignment.operator.element === JS.AssignmentOperation.Type.Power;
 }
 
 function isUpdateOperator(operator: J.Unary.Type): boolean {

@@ -802,3 +802,36 @@ describe('referencesOf', () => {
         expect(call.name).toBe(references[1].identifier);
     });
 });
+
+describe('isWrite on a `**` parsed before it was a `JS.Binary`', () => {
+    test('the base of the old `JS.AssignmentOperation` shape is read, not written', async () => {
+        // given
+        const cu = await new class extends JavaScriptVisitor<undefined> {
+            override async visitBinaryExtensions(binary: JS.Binary, p: undefined): Promise<J | undefined> {
+                return {
+                    kind: JS.Kind.AssignmentOperation,
+                    id: binary.id,
+                    prefix: binary.prefix,
+                    markers: binary.markers,
+                    variable: binary.left,
+                    operator: {...binary.operator, element: JS.AssignmentOperation.Type.Power},
+                    assignment: binary.right
+                } as JS.AssignmentOperation;
+            }
+        }().visit(await parse('target ** 2;'), undefined) as JS.CompilationUnit;
+
+        // when
+        const writes: boolean[] = [];
+        await new class extends JavaScriptVisitor<undefined> {
+            override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+                if (identifier.simpleName === 'target') {
+                    writes.push(isWrite(this.cursor, identifier));
+                }
+                return identifier;
+            }
+        }().visit(cu, undefined);
+
+        // then
+        expect(writes).toEqual([false]);
+    });
+});

@@ -411,8 +411,11 @@ function writes(node: Tree, key: string): boolean {
     switch (node.kind) {
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
-        case JS.Kind.AssignmentOperation:
             return key === 'variable';
+        case JS.Kind.AssignmentOperation:
+            // `a ** b` as parsed before it was a JS.Binary assigns nothing
+            return key === 'variable' &&
+                (node as JS.AssignmentOperation).operator.element !== JS.AssignmentOperation.Type.Power;
         case J.Kind.Unary:
             return key === 'expression' && incrementing.has((node as J.Unary).operator.element);
         case J.Kind.ForEachLoopControl:

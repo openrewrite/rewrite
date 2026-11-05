@@ -1820,6 +1820,19 @@ public interface JS extends J {
 
         @Transient
         @Override
+        public List<J> getSideEffects() {
+            List<J> rightSideEffects = right.getSideEffects();
+            if (getOperator() == Type.QuestionQuestion && !rightSideEffects.isEmpty()) {
+                return singletonList(this);
+            }
+            List<J> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(left.getSideEffects());
+            sideEffects.addAll(rightSideEffects);
+            return sideEffects;
+        }
+
+        @Transient
+        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
