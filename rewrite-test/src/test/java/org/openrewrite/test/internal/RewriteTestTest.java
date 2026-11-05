@@ -2130,47 +2130,51 @@ class RewriteTestTest implements RewriteTest {
 
         @Test
         void rejectVisitorInStaticFieldOfRecipe() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipe(new KeepsVisitorInStaticField()),
               text("foo")
-            ));
-            assertThat(e).hasMessageStartingWith("A recipe should create its visitors in getVisitor() and keep none " +
-                                                 "in static fields")
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageStartingWith(
+                "A recipe should create its visitors in getVisitor() and keep none in static fields")
               .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor")
               .hasMessageContaining("noStaticVisitors(false)");
         }
 
         @Test
         void rejectPreconditionInStaticField() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipe(new KeepsPreconditionInStaticField()),
               text("foo")
-            ));
-            assertThat(e).hasMessageContaining("KeepsPreconditionInStaticField.PRECONDITION -> Preconditions.Or");
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsPreconditionInStaticField.PRECONDITION -> Preconditions.Or");
         }
 
         @Test
         void rejectVisitorInStaticFieldOfNestedClass() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipe(new KeepsVisitorInStaticFieldOfNestedClass()),
               text("foo")
-            ));
-            assertThat(e).hasMessageContaining(
-              "KeepsVisitorInStaticFieldOfNestedClass.Outer.INNER -> KeepsVisitorInStaticFieldOfNestedClass.Inner");
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining(
+                "KeepsVisitorInStaticFieldOfNestedClass.Outer.INNER -> KeepsVisitorInStaticFieldOfNestedClass.Inner");
         }
 
         @Test
         void rejectVisitorsInStaticList() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipe(new KeepsVisitorsInStaticList()),
               text("foo")
-            ));
-            assertThat(e).hasMessageContaining("KeepsVisitorsInStaticList.VISITORS[1] -> PlainTextVisitor");
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorsInStaticList.VISITORS[1] -> PlainTextVisitor");
         }
 
         @Test
         void rejectVisitorInStaticFieldOfDeclarativeRecipeStep() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipeFromYaml("""
                 type: specs.openrewrite.org/v1beta/recipe
                 name: org.openrewrite.test.ListsRecipeWithStaticVisitor
@@ -2180,13 +2184,14 @@ class RewriteTestTest implements RewriteTest {
                   - org.openrewrite.test.internal.KeepsVisitorInStaticField
                 """, "org.openrewrite.test.ListsRecipeWithStaticVisitor"),
               text("foo")
-            ));
-            assertThat(e).hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
         }
 
         @Test
         void rejectVisitorInStaticFieldOfDeclarativeRecipePrecondition() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+            assertThatThrownBy(() -> rewriteRun(
               spec -> spec.recipeFromYaml("""
                 type: specs.openrewrite.org/v1beta/recipe
                 name: org.openrewrite.test.PreconditionWithStaticVisitor
@@ -2198,8 +2203,9 @@ class RewriteTestTest implements RewriteTest {
                   - org.openrewrite.test.internal.KeepsMatchersInStaticFields
                 """, "org.openrewrite.test.PreconditionWithStaticVisitor"),
               text("foo")
-            ));
-            assertThat(e).hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
+            ))
+              .isInstanceOf(AssertionError.class)
+              .hasMessageContaining("KeepsVisitorInStaticField.VISITOR -> KeepsVisitorInStaticField.Visitor");
         }
 
         @Test
