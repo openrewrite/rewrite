@@ -1025,9 +1025,9 @@ public final class UvLockEngine {
          * {@code PyProjectToml::is_package} decides. A lock recording the other kind no longer satisfies the manifest.
          */
         private UvLockSource rootSource(UvLockSource recorded) {
-            Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
-            Boolean declared = uv == null ? null : UvLockToml.literalBoolean(uv, "package");
-            boolean isPackage = declared != null ? declared : UvLockToml.findTable(pyproject, "build-system") != null;
+            boolean isPackage = Optional.ofNullable(UvLockToml.findTable(pyproject, "tool.uv"))
+                    .map(uv -> UvLockToml.literalBoolean(uv, "package"))
+                    .orElseGet(() -> UvLockToml.findTable(pyproject, "build-system") != null);
             UvLockSource.Type type = isPackage ? UvLockSource.Type.EDITABLE : UvLockSource.Type.VIRTUAL;
             return recorded.getType() == type ? recorded : recorded.withType(type);
         }
