@@ -26,7 +26,6 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class IsBuildGradleTest implements RewriteTest {
 
-    /** What the Gradle plugin records for a project whose build file was renamed in settings. */
     private static final GradleProject RENAMED = GradleProject.builder()
             .buildFilePath("api.gradle")
             .build();
