@@ -83,13 +83,13 @@ describe("PythonResolutionResult over RPC", () => {
         };
     }
 
-    async function roundTrip<T>(value: T): Promise<{ received: T, next: RpcObjectState }> {
+    function roundTrip<T>(value: T): { received: T, next: RpcObjectState } {
         const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
-        const batch = await sq.generate(value, undefined);
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
-        const received = await rq.receive<T>(undefined);
+        const batch = sq.generate(value, undefined);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
+        const received = rq.receive<T>(undefined);
         // Every message of the object must have been consumed, or later objects desynchronize
-        const next = await rq.take();
+        const next = rq.take();
         return {received, next: next.state};
     }
 
@@ -168,12 +168,12 @@ describe("PythonResolutionResult over RPC", () => {
         {state: END_OF_OBJECT}
     ];
 
-    test("receives the messages the Java codec sends", async () => {
+    test("receives the messages the Java codec sends", () => {
         const rq = new RpcReceiveQueue(new Map(), undefined,
-            async () => structuredClone(javaWire), undefined, false);
-        const received = await rq.receive<PythonResolutionResult>(undefined);
+            [structuredClone(javaWire)], undefined, false);
+        const received = rq.receive<PythonResolutionResult>(undefined);
 
-        expect((await rq.take()).state).toBe(END_OF_OBJECT);
+        expect(rq.take().state).toBe(END_OF_OBJECT);
         expect(received.path).toBe("pyproject.toml");
         expect(received.buildRequires.map(d => d.name)).toEqual(["hatchling"]);
         expect(received.dependencies[0].resolved).toBe(received.resolvedDependencies[0]);
@@ -184,9 +184,9 @@ describe("PythonResolutionResult over RPC", () => {
         expect(received.sourceIndexes![0].defaultIndex).toBe(true);
     });
 
-    test("sends the messages the Java codec receives", async () => {
+    test("sends the messages the Java codec receives", () => {
         const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
-        const sent = await sq.generate(marker(), undefined);
+        const sent = sq.generate(marker(), undefined);
 
         // Ref ids only have to agree within one side's stream; Java numbers from 1, TypeScript from 0
         const refIds = new Map<number, number>();
@@ -202,8 +202,8 @@ describe("PythonResolutionResult over RPC", () => {
         expect(normalized).toEqual(javaWire);
     });
 
-    test("round trips every field and consumes exactly the messages sent", async () => {
-        const {received, next} = await roundTrip(marker());
+    test("round trips every field and consumes exactly the messages sent", () => {
+        const {received, next} = roundTrip(marker());
 
         expect(next).toBe(RpcObjectState.END_OF_OBJECT);
         expect(received.kind).toBe(PRR);
@@ -243,7 +243,7 @@ describe("PythonResolutionResult over RPC", () => {
         expect(received.resolvedDependencies[1].name).toBe("urllib3");
     });
 
-    test("a cyclic resolved-dependency graph closes onto the populated instance", async () => {
+    test("a cyclic resolved-dependency graph closes onto the populated instance", () => {
         const a: PythonResolvedDependency = {kind: `${PRR}$ResolvedDependency`, name: "a", version: "1.0.0", dependencies: []};
         const b: PythonResolvedDependency = {kind: `${PRR}$ResolvedDependency`, name: "b", version: "1.0.0", dependencies: [a]};
         a.dependencies!.push(b);
@@ -253,7 +253,7 @@ describe("PythonResolutionResult over RPC", () => {
             resolvedDependencies: [a, b]
         };
 
-        const {received, next} = await roundTrip(cyclic);
+        const {received, next} = roundTrip(cyclic);
 
         expect(next).toBe(RpcObjectState.END_OF_OBJECT);
         const receivedA = received.dependencies[0].resolved!;
@@ -263,7 +263,7 @@ describe("PythonResolutionResult over RPC", () => {
         expect(receivedB.dependencies![0]).toBe(receivedA);
     });
 
-    test("absent optional fields round trip", async () => {
+    test("absent optional fields round trip", () => {
         const sparse: PythonResolutionResult = {
             kind: PRR,
             id: "0d6c9a57-54a0-4b8a-a2a8-5a0f5b1e1c3a",
@@ -277,7 +277,7 @@ describe("PythonResolutionResult over RPC", () => {
             resolvedDependencies: []
         };
 
-        const {received, next} = await roundTrip(sparse);
+        const {received, next} = roundTrip(sparse);
 
         expect(next).toBe(RpcObjectState.END_OF_OBJECT);
         expect(received.name).toBeUndefined();
@@ -289,7 +289,7 @@ describe("PythonResolutionResult over RPC", () => {
         expect(received.sourceIndexes).toEqual([]);
     });
 
-    test("the marker in a source file's markers leaves the queue in sync", async () => {
+    test("the marker in a source file's markers leaves the queue in sync", () => {
         const markers: Markers = {
             kind: MarkersKind.Markers,
             id: "5f2f4b0a-3c0e-4e59-8d59-3f4f1c7a7e21",
@@ -297,11 +297,11 @@ describe("PythonResolutionResult over RPC", () => {
         };
 
         const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
-        const batch = await sq.generate(markers, undefined);
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
-        const received = await rq.receiveMarkers(undefined);
+        const batch = sq.generate(markers, undefined);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
+        const received = rq.receiveMarkers(undefined);
 
         expect((received.markers[0] as PythonResolutionResult).dependencies[0].resolved!.name).toBe("requests");
-        expect((await rq.take()).state).toBe(RpcObjectState.END_OF_OBJECT);
+        expect(rq.take().state).toBe(RpcObjectState.END_OF_OBJECT);
     });
 });

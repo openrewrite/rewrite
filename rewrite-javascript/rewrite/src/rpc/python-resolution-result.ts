@@ -105,103 +105,103 @@ const dependencyId = (dep: PythonDependency) => `${dep.name}@${dep.versionConstr
 const resolvedId = (resolved: PythonResolvedDependency) => `${resolved.name}@${resolved.version}`;
 
 RpcCodecs.registerCodec(PythonDependencyKind, {
-    async rpcReceive(before: PythonDependency, q: RpcReceiveQueue): Promise<PythonDependency> {
+    rpcReceive(before: PythonDependency, q: RpcReceiveQueue): PythonDependency {
         // Populated in place: the receive queue registered this instance for its ref before
         // calling the codec, so a back-reference resolves to the finished object.
         const dep = castDraft(before);
-        dep.name = await q.receive(before.name);
-        dep.versionConstraint = await q.receive(before.versionConstraint);
-        dep.extras = await q.receive(before.extras);
-        dep.marker = await q.receive(before.marker);
-        dep.resolved = await q.receive(before.resolved);
+        dep.name = q.receive(before.name);
+        dep.versionConstraint = q.receive(before.versionConstraint);
+        dep.extras = q.receive(before.extras);
+        dep.marker = q.receive(before.marker);
+        dep.resolved = q.receive(before.resolved);
         return before;
     },
 
-    async rpcSend(after: PythonDependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.versionConstraint);
-        await q.getAndSend(after, a => a.extras);
-        await q.getAndSend(after, a => a.marker);
-        await q.getAndSend(after, a => asRef(a.resolved));
+    rpcSend(after: PythonDependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.versionConstraint);
+        q.getAndSend(after, a => a.extras);
+        q.getAndSend(after, a => a.marker);
+        q.getAndSend(after, a => asRef(a.resolved));
     }
 });
 
 RpcCodecs.registerCodec(PythonResolvedDependencyKind, {
-    async rpcReceive(before: PythonResolvedDependency, q: RpcReceiveQueue): Promise<PythonResolvedDependency> {
+    rpcReceive(before: PythonResolvedDependency, q: RpcReceiveQueue): PythonResolvedDependency {
         const resolved = castDraft(before);
-        resolved.name = await q.receive(before.name);
-        resolved.version = await q.receive(before.version);
-        resolved.source = await q.receive(before.source);
-        resolved.dependencies = castDraft(await q.receiveList(before.dependencies));
+        resolved.name = q.receive(before.name);
+        resolved.version = q.receive(before.version);
+        resolved.source = q.receive(before.source);
+        resolved.dependencies = castDraft(q.receiveList(before.dependencies));
         return before;
     },
 
-    async rpcSend(after: PythonResolvedDependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSend(after, a => a.source);
+    rpcSend(after: PythonResolvedDependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSend(after, a => a.source);
         // Java sends an absent list as an empty one
-        await q.getAndSendList(after, a => (a.dependencies ?? []).map(d => asRef(d)), resolvedId);
+        q.getAndSendList(after, a => (a.dependencies ?? []).map(d => asRef(d)), resolvedId);
     }
 });
 
 RpcCodecs.registerCodec(PythonSourceIndexKind, {
-    async rpcReceive(before: PythonSourceIndex, q: RpcReceiveQueue): Promise<PythonSourceIndex> {
+    rpcReceive(before: PythonSourceIndex, q: RpcReceiveQueue): PythonSourceIndex {
         return updateIfChanged(before, {
-            name: await q.receive(before.name),
-            url: await q.receive(before.url),
-            defaultIndex: await q.receive(before.defaultIndex),
+            name: q.receive(before.name),
+            url: q.receive(before.url),
+            defaultIndex: q.receive(before.defaultIndex),
         });
     },
 
-    async rpcSend(after: PythonSourceIndex, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.url);
-        await q.getAndSend(after, a => a.defaultIndex);
+    rpcSend(after: PythonSourceIndex, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.url);
+        q.getAndSend(after, a => a.defaultIndex);
     }
 });
 
 RpcCodecs.registerCodec(PythonResolutionResultKind, {
-    async rpcReceive(before: PythonResolutionResult, q: RpcReceiveQueue): Promise<PythonResolutionResult> {
+    rpcReceive(before: PythonResolutionResult, q: RpcReceiveQueue): PythonResolutionResult {
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            description: await q.receive(before.description),
-            license: await q.receive(before.license),
-            path: await q.receive(before.path),
-            requiresPython: await q.receive(before.requiresPython),
-            buildBackend: await q.receive(before.buildBackend),
-            buildRequires: await q.receiveListDefined(before.buildRequires),
-            dependencies: await q.receiveListDefined(before.dependencies),
-            optionalDependencies: await q.receive(before.optionalDependencies),
-            dependencyGroups: await q.receive(before.dependencyGroups),
-            constraintDependencies: await q.receiveListDefined(before.constraintDependencies),
-            overrideDependencies: await q.receiveListDefined(before.overrideDependencies),
-            resolvedDependencies: await q.receiveListDefined(before.resolvedDependencies),
-            packageManager: await q.receive(before.packageManager),
-            sourceIndexes: await q.receiveList(before.sourceIndexes),
+            id: q.receive(before.id),
+            name: q.receive(before.name),
+            version: q.receive(before.version),
+            description: q.receive(before.description),
+            license: q.receive(before.license),
+            path: q.receive(before.path),
+            requiresPython: q.receive(before.requiresPython),
+            buildBackend: q.receive(before.buildBackend),
+            buildRequires: q.receiveListDefined(before.buildRequires),
+            dependencies: q.receiveListDefined(before.dependencies),
+            optionalDependencies: q.receive(before.optionalDependencies),
+            dependencyGroups: q.receive(before.dependencyGroups),
+            constraintDependencies: q.receiveListDefined(before.constraintDependencies),
+            overrideDependencies: q.receiveListDefined(before.overrideDependencies),
+            resolvedDependencies: q.receiveListDefined(before.resolvedDependencies),
+            packageManager: q.receive(before.packageManager),
+            sourceIndexes: q.receiveList(before.sourceIndexes),
         });
     },
 
-    async rpcSend(after: PythonResolutionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSend(after, a => a.description);
-        await q.getAndSend(after, a => a.license);
-        await q.getAndSend(after, a => a.path);
-        await q.getAndSend(after, a => a.requiresPython);
-        await q.getAndSend(after, a => a.buildBackend);
-        await q.getAndSendList(after, a => a.buildRequires.map(d => asRef(d)), dependencyId);
-        await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)), dependencyId);
-        await q.getAndSend(after, a => a.optionalDependencies);
-        await q.getAndSend(after, a => a.dependencyGroups);
-        await q.getAndSendList(after, a => a.constraintDependencies.map(d => asRef(d)), dependencyId);
-        await q.getAndSendList(after, a => a.overrideDependencies.map(d => asRef(d)), dependencyId);
-        await q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)), resolvedId);
-        await q.getAndSend(after, a => a.packageManager);
+    rpcSend(after: PythonResolutionResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSend(after, a => a.description);
+        q.getAndSend(after, a => a.license);
+        q.getAndSend(after, a => a.path);
+        q.getAndSend(after, a => a.requiresPython);
+        q.getAndSend(after, a => a.buildBackend);
+        q.getAndSendList(after, a => a.buildRequires.map(d => asRef(d)), dependencyId);
+        q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)), dependencyId);
+        q.getAndSend(after, a => a.optionalDependencies);
+        q.getAndSend(after, a => a.dependencyGroups);
+        q.getAndSendList(after, a => a.constraintDependencies.map(d => asRef(d)), dependencyId);
+        q.getAndSendList(after, a => a.overrideDependencies.map(d => asRef(d)), dependencyId);
+        q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)), resolvedId);
+        q.getAndSend(after, a => a.packageManager);
         // Java sends an absent list as an empty one
-        await q.getAndSendList(after, a => a.sourceIndexes ?? [], si => si.name);
+        q.getAndSendList(after, a => a.sourceIndexes ?? [], si => si.name);
     }
 });
