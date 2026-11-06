@@ -291,7 +291,9 @@ export class PackageJsonParser extends Parser {
                 lockContent,
                 workspacePackagePaths,
                 packageManager,
-                npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+                npmrcConfigs.length > 0 ? npmrcConfigs : undefined,
+                path.relative(this.selectedRoots.get(path.resolve(absoluteDir)) ?? absoluteDir, absoluteDir)
+                    .split(path.sep).join("/")
             );
         } catch (error) {
             if (error instanceof PackageManagerSelectionError) this.selectionFailures.set(dir, error.message);
@@ -507,6 +509,7 @@ export class PackageJsonParser extends Parser {
         for (const dir of dirs) {
             const parsed = await this.walkNodeModules(dir);
             if (parsed) {
+                this.selectedRoots.set(path.resolve(startDir), dir);
                 return { content: parsed, packageManager: PackageManager.Npm };
             }
         }
