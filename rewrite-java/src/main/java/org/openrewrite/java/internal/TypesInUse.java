@@ -687,7 +687,8 @@ public class TypesInUse {
                         usedMethods.add((JavaType.Method) javaType);
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda)) {
+                        !(cursor.getValue() instanceof J.Lambda) &&
+                        !(cursor.getValue() instanceof JavaSourceFile)) {
                     if (isFullyQualifiedJavaDocReference(cursor)) {
                         if (javaType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
