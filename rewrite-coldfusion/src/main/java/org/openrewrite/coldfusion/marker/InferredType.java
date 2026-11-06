@@ -43,8 +43,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * The name of a call or of a declaration shares the marker of its call or declaration. Any other tree without the
  * marker has only the types the parser's own rules give.
  * <p>
- * Every tree with the same evidence shares one marker, which {@link #of} gives. So an LST stores each kind once, and a
- * marked tree costs only a reference to it.
+ * Every tree with the same evidence shares one marker, which {@link #of} gives and which reading an LST gives back. So
+ * an LST stores each kind once, and a marked tree costs only a reference to it.
  */
 @Value
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -70,10 +70,10 @@ public class InferredType implements Marker {
         return SHARED.get(evidence);
     }
 
+    // the id stays a parameter so that a reader never writes one into the shared marker's field
     @JsonCreator
     private static InferredType read(@JsonProperty("id") UUID id, @JsonProperty("evidence") Evidence evidence) {
-        InferredType shared = of(evidence);
-        return shared.id.equals(id) ? shared : new InferredType(id, evidence);
+        return of(evidence);
     }
 
     /**
