@@ -170,7 +170,7 @@ public class RemoveUnusedImports extends Recipe {
                         SortedSet<String> unfoldedMethodsAndFields = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
-                            usedStaticWildcardImports.add(elem.getTypeName());
+                            usedStaticWildcardImports.add(target);
                         } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             List<JRightPadded<J.Import>> unfolded = new ArrayList<>();
@@ -195,7 +195,7 @@ public class RemoveUnusedImports extends Recipe {
                             replaceWithUnfolded(anImport, unfolded, checkedImports);
                             changed = true;
                         } else {
-                            usedStaticWildcardImports.add(elem.getTypeName());
+                            usedStaticWildcardImports.add(target);
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> fullyQualifiedNamesAreEqual(elem.getTypeName(), c.getFullyQualifiedName())) ||
                             (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
@@ -274,7 +274,7 @@ public class RemoveUnusedImports extends Recipe {
                 J.Import elem = anImport.imports.get(0).getElement();
                 if (!"*".equals(elem.getQualid().getSimpleName())) {
                     if (elem.isStatic()) {
-                        if (usedStaticWildcardImports.contains(elem.getTypeName()) &&
+                        if (usedStaticWildcardImports.contains(elem.getQualid().getTarget().toString()) &&
                                 !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
                             anImport.used = false;
                             changed = true;

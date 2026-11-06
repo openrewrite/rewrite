@@ -118,6 +118,46 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @Test
+    void staticMemberOfStaticallyImportedNestedType() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new AddImport<>("a.Rel$Kind", "COBOL", false)))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class Rel {
+                    public enum Kind { ASSEMBLER, COBOL, JCL }
+                }
+                """
+            )),
+          java(
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.ASSEMBLER;
+
+              class User {
+                  Kind kind = ASSEMBLER;
+              }
+              """,
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.ASSEMBLER;
+              import static a.Rel.Kind.COBOL;
+
+              class User {
+                  Kind kind = ASSEMBLER;
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void dontDuplicateImports2() {
         rewriteRun(

@@ -16,14 +16,21 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.UncheckedConsumer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.emptySet;
@@ -445,6 +452,209 @@ class OrderImportsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void staticImportOfNestedTypeAndItsMembers(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.ASSEMBLER;
+              import static a.Rel.Kind.COBOL;
+
+              class User {
+                  Kind typeOf(boolean b) {
+                      return b ? ASSEMBLER : COBOL;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void foldStaticMembersOfNestedType(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              // Nested type
+              import static a.Rel.Kind;
+              // Enum constants
+              import static a.Rel.Kind.ASSEMBLER;
+              import static a.Rel.Kind.COBOL;
+              import static a.Rel.Kind.JCL;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """,
+            """
+              package b;
+
+              // Nested type
+              import static a.Rel.Kind;
+              // Enum constants
+              import static a.Rel.Kind.*;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void staticImportOfNestedTypeAndWildcard(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.*;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void foldStaticImportsOfNestedTypes(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public static class A {}
+                  public static class B {}
+                  public static class C {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.A;
+              import static a.Rel.B;
+              import static a.Rel.C;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+              }
+              """,
+            """
+              package b;
+
+              import static a.Rel.*;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @Test
+    void doNotFoldNestedTypeConflictingWithJavaLang() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withNestedTypeOnClasspath()),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public static class A {}
+                  public static class B {}
+                  public static class C {}
+                  public static class String {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.A;
+              import static a.Rel.B;
+              import static a.Rel.C;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+                  String s;
+              }
+              """
+          )
+        );
+    }
+
+    private static UncheckedConsumer<List<SourceFile>> withNestedTypeOnClasspath() {
+        return sourceFiles -> {
+            withSourceTypesOnClasspath().accept(sourceFiles);
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sourceFile = sourceFiles.get(i);
+                final int index = i;
+                sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                    List<JavaType.FullyQualified> classpath = new ArrayList<>(sourceSet.getClasspath());
+                    classpath.add(JavaType.ShallowClass.build("a.Rel$String"));
+                    classpath.add(JavaType.ShallowClass.build("java.lang.String"));
+                    sourceFiles.set(index, sourceFile.withMarkers(sourceFile.getMarkers().computeByType(
+                            sourceSet.withClasspath(classpath), (original, updated) -> updated)));
+                });
+            }
+        };
     }
 
     @Test
