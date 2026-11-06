@@ -150,6 +150,18 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     @Override
     public J visitUnary(J.Unary unary, ExecutionContext ctx) {
+        if (unary.getOperator() == J.Unary.Type.Not &&
+            unary.getExpression().unwrap() instanceof J.Unary &&
+            ((J.Unary) unary.getExpression().unwrap()).getOperator() == J.Unary.Type.Not) {
+            SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+            // Avoid a dependency from rewrite-java to rewrite-groovy. The tree type, rather than
+            // the file extension, identifies Groovy even when a source path has been changed.
+            if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+                // Spock's compiler uses double logical negation to disable condition rendering.
+                // Preserve the whole expression before visiting children can invert a comparison.
+                return unary;
+            }
+        }
         J j = super.visitUnary(unary, ctx);
         if (j instanceof J.Unary) {
             J.Unary asUnary = (J.Unary) j;
