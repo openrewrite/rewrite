@@ -346,6 +346,95 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void wildcardAfterKeySelectsMembersOfItsObject() {
+        assertMatched(
+          "$.root.*",
+          simple,
+          List.of(
+            "\"literal\": \"$.root.literal\"",
+            """
+                  "object": {
+                    "literal": "$.root.object.literal",
+                    "list": [{
+                      "literal": "$.root.object.list[0]"
+                    }]
+                  }
+              """,
+            """
+                  "list": [{
+                    "literal": "$.root.list[0]"
+                  }]
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterNestedKeySelectsMembersOfItsObject() {
+        assertMatched(
+          "$.root.object.*",
+          simple,
+          List.of(
+            "\"literal\": \"$.root.object.literal\"",
+            """
+                  "list": [{
+                    "literal": "$.root.object.list[0]"
+                  }]
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterKeySelectsElementsOfItsArray() {
+        assertMatched(
+          "$.list.*",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item1": "index0",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void wildcardAfterQuotedKeysSelectsEachMember() {
+        assertMatched(
+          "$['sap.ui5'].dependencies.libs.*",
+          List.of(
+            //language=json
+            """
+              {
+                "sap.ui5": {
+                  "dependencies": {
+                    "libs": {
+                      "sap.m": {},
+                      "sap.f": {}
+                    }
+                  }
+                }
+              }
+              """
+          ),
+          List.of("\"sap.m\": {}", "\"sap.f\": {}")
+        );
+    }
+
+    @Test
     void allPropertiesInKeyFromRoot() {
         assertMatched(
           // This produces two false positives from $.literal and $.list.literal.

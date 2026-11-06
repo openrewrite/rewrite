@@ -48,8 +48,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     String sourceFilePath;
 
     @Option(displayName = "Destination key path",
-            description = "A [JSONPath](https://www.rfc-editor.org/rfc/rfc9535.html) expression to locate the *parent* JSON entry.",
-            example = "'$.subjects.*' or '$.' or '$.x[1].y.*' etc.")
+            description = "A [JSONPath](https://www.rfc-editor.org/rfc/rfc9535.html) expression to locate the *parent* JSON object, " +
+                          "either the object itself or the key holding it. A trailing `.*` is ignored, so `$.x.y.*` is the same as `$.x.y`.",
+            example = "'$.subjects' or '$' or '$.x[1].y' etc.")
     String destinationKeyPath;
 
     @Option(displayName = "Destination key",
