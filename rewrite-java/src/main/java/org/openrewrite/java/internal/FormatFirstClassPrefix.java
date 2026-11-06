@@ -23,7 +23,7 @@ public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-        if (classDecl == cu.getClasses().get(0)) {
+        if (!cu.getClasses().isEmpty() && classDecl == cu.getClasses().get(0)) {
             return autoFormat(classDecl, classDecl.getName(), p, getCursor().getParentOrThrow());
         }
         return classDecl;
