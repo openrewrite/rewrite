@@ -115,6 +115,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.reset();
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
@@ -123,10 +127,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         );
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName) {
         return installRecipes(packageName, null);
     }
 
+    /**
+     * @throws org.openrewrite.rpc.IncompatibleRecipeBundleException if the package's peer range
+     * for {@code @openrewrite/rewrite} excludes the JavaScript host's version
+     */
     public InstallRecipesResponse installRecipes(String packageName, @Nullable String version) {
         return send(
                 "InstallRecipes",

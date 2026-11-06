@@ -19,6 +19,7 @@ import {asRef} from "../reference";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {castDraft} from "mutative";
 import {updateIfChanged} from "../util";
+import {registerHeavyweight} from "../heavyweight";
 import * as semver from "semver";
 import * as fsp from "fs/promises";
 import * as path from "path";
@@ -48,6 +49,8 @@ export interface PackageJsonContent {
  * Package entry in a package-lock.json packages map.
  */
 export interface PackageLockEntry {
+    readonly name?: string;
+    readonly link?: boolean;
     readonly version?: string;
     readonly resolved?: string;
     readonly integrity?: string;
@@ -259,6 +262,8 @@ export interface NodeResolutionResult extends Marker {
     readonly npmrcConfigs?: Npmrc[];
 }
 
+registerHeavyweight(NodeResolutionResultKind);
+
 /**
  * Creates a NodeResolutionResult marker from a package.json file.
  * Should be called during parsing to attach to JS.CompilationUnit.
@@ -272,6 +277,7 @@ export interface NodeResolutionResult extends Marker {
  * @param workspacePackagePaths Optional resolved paths to workspace package.json files (only for workspace root)
  * @param packageManager Optional package manager that was detected from lock file
  * @param npmrcConfigs Optional npm configuration from various scopes
+ * @param packagePath Manifest directory relative to the selected lock root, never the marker/source root
  */
 export function createNodeResolutionResultMarker(
     path: string,
@@ -279,7 +285,10 @@ export function createNodeResolutionResultMarker(
     packageLockContent?: PackageLockContent,
     workspacePackagePaths?: string[],
     packageManager?: PackageManager,
-    npmrcConfigs?: Npmrc[]
+    npmrcConfigs?: Npmrc[],
+    // Construction-only context: directory of the manifest relative to the selected lock root.
+    // Marker paths are relative to the source root, which may contain independent lock roots.
+    packagePath: string = ""
 ): NodeResolutionResult {
     // Cache for deduplicating resolved dependencies with the same name+version.
     const resolvedDependencyCache = new Map<string, ResolvedDependency>();
@@ -469,12 +478,13 @@ export function createNodeResolutionResultMarker(
                 break; // Already at root
             }
 
-            // Remove the last /node_modules/pkg segment to go up one level
-            const lastNodeModules = currentPath.lastIndexOf('/node_modules/');
-            if (lastNodeModules === -1) {
-                currentPath = ''; // Try root level next
-            } else {
-                currentPath = currentPath.substring(0, lastNodeModules);
+            // NODE_MODULES_PATHS visits every directory ancestor, including workspace
+            // directories, but never looks inside node_modules/node_modules.
+            const slash = currentPath.lastIndexOf('/');
+            currentPath = slash < 0 ? '' : currentPath.substring(0, slash);
+            if (currentPath === 'node_modules' || currentPath.endsWith('/node_modules')) {
+                const parentSlash = currentPath.lastIndexOf('/');
+                currentPath = parentSlash < 0 ? '' : currentPath.substring(0, parentSlash);
             }
         }
 
@@ -590,14 +600,23 @@ export function createNodeResolutionResultMarker(
             : convertV1DependencyTree(lockContent.dependencies);
         if (!packages) return [];
 
+        // npm may omit a workspace target's name when it matches its directory.
+        // The node_modules link records the installed (possibly scoped) package name.
+        const linkedNames = new Map<string, string>();
+        for (const [pkgPath, entry] of Object.entries(packages)) {
+            if (entry.link && entry.resolved) linkedNames.set(entry.resolved, extractPackageInfo(pkgPath).name);
+        }
+
         // First pass: Create all ResolvedDependency placeholders and build path map
         const packageInfos: Array<{ path: string; name: string; version: string; entry: PackageLockEntry }> = [];
         for (const [pkgPath, pkgEntry] of Object.entries(packages)) {
             // Skip the root package (empty string key)
-            if (pkgPath === '') continue;
+            if (pkgPath === '' || pkgEntry.link) continue;
 
             const pkgInfo = extractPackageInfo(pkgPath);
-            const name = pkgInfo.name;
+            const name = pkgPath.includes('node_modules/')
+                ? pkgInfo.name
+                : pkgEntry.name || linkedNames.get(pkgPath) || pkgInfo.name;
             // Use version from path if available, otherwise from entry
             const version = pkgInfo.version || pkgEntry.version;
 
@@ -605,6 +624,24 @@ export function createNodeResolutionResultMarker(
                 const resolved = getOrCreateResolvedDependency(name, version, pkgEntry);
                 pathToResolved.set(pkgPath, resolved);
                 packageInfos.push({path: pkgPath, name, version, entry: pkgEntry});
+            }
+        }
+
+        // npm workspace/file links resolve from the target's real directory. Alias
+        // the link to the target placeholder before resolving any dependency edges.
+        for (const [pkgPath, entry] of Object.entries(packages)) {
+            if (!entry.link) continue;
+            let target = entry.resolved;
+            const seen = new Set<string>([pkgPath]);
+            while (target && !seen.has(target)) {
+                seen.add(target);
+                const resolved = pathToResolved.get(target);
+                if (resolved) {
+                    pathToResolved.set(pkgPath, resolved);
+                    break;
+                }
+                const next = packages[target];
+                target = next?.link ? next.resolved : undefined;
             }
         }
 
@@ -640,14 +677,14 @@ export function createNodeResolutionResultMarker(
     // Parse resolved dependencies first (before dependencies) so we can link them
     const resolvedDependencies = packageLockContent ? parseResolutions(packageLockContent) : [];
 
-    // Now parse dependencies from package.json - they resolve from root context ("")
-    const dependencies = parseDependencies(packageJsonContent.dependencies, '');
-    const devDependencies = parseDependencies(packageJsonContent.devDependencies, '');
-    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies, '');
-    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies, '');
+    // Resolve manifest dependencies relative to the selected lock root.
+    const dependencies = parseDependencies(packageJsonContent.dependencies, packagePath);
+    const devDependencies = parseDependencies(packageJsonContent.devDependencies, packagePath);
+    const peerDependencies = parseDependencies(packageJsonContent.peerDependencies, packagePath);
+    const optionalDependencies = parseDependencies(packageJsonContent.optionalDependencies, packagePath);
     const bundledDependencies = parseBundledDependencies(
         packageJsonContent.bundledDependencies || packageJsonContent.bundleDependencies,
-        ''
+        packagePath
     );
 
     return {

@@ -220,6 +220,21 @@ class JavaScriptParserTest {
     }
 
     @Test
+    void stringLiteralModuleExportNames() {
+        @Language("js")
+        String script = """
+          import { "a-b" as ab, "\\0 add" as add } from "./x";
+          export { ab as "c-d", "e f" as "g h" } from "./y";
+          export { "link-a-class" as linkAClass } from "./z.module.css";
+          export { "a-b" } from "./w";
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("module-export-names.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(javascript.get().printAll()).isEqualTo(script);
+    }
+
+    @Test
     @Disabled
     void complexTypeScript() throws Exception {
         URL url = URI.create("https://raw.githubusercontent.com/sinclairzx81/typebox/f958156785350aa052c5f822bc2970d0945d887b/src/syntax/parser.ts").toURL();

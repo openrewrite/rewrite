@@ -18,11 +18,54 @@ package org.openrewrite.hcl.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.hcl.HclIsoVisitor;
+import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class FindAndReplaceLiteralTest implements RewriteTest {
+
+    @Test
+    void replacementIsWrittenAsGivenAndReadWithTheEscapesOfWhereItStands() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplaceLiteral("old", "a\\\\nb", true, null)),
+          //language=hcl
+          hcl(
+            """
+              resource "old" x {
+                quoted = "old"
+                heredoc = <<EOT
+              old
+              EOT
+              }
+              """,
+            """
+              resource "a\\nb" x {
+                quoted = "a\\nb"
+                heredoc = <<EOT
+              a\\nb
+              EOT
+              }
+              """,
+            spec -> spec.afterRecipe(config -> {
+                List<Object> values = new ArrayList<>();
+                new HclIsoVisitor<List<Object>>() {
+                    @Override
+                    public Hcl.Literal visitLiteral(Hcl.Literal literal, List<Object> found) {
+                        found.add(literal.getValue());
+                        return literal;
+                    }
+                }.visit(config, values);
+                assertThat(values).containsExactly("a\nb", "a\nb", "a\\nb");
+            })
+          )
+        );
+    }
 
     @DocumentExample
     @Test

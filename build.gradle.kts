@@ -58,12 +58,16 @@ subprojects {
 
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
+            // a module under the Moderne Source Available License names its header on the license extension
+            val headerFile = project.provider {
+                project.extensions.findByType<LicenseExtension>()?.header ?: rootProject.file("gradle/licenseHeader.txt")
+            }
             doLast {
                 val idx = args?.indexOf("-o") ?: return@doLast
                 if (idx < 0 || idx + 1 >= args!!.size) return@doLast
                 val rootPrefix = rootProject.projectDir.absolutePath.replace("\\", "/") + "/"
                 val year = Calendar.getInstance().get(Calendar.YEAR)
-                val licenseHeader = "/*\n" + rootProject.file("gradle/licenseHeader.txt")
+                val licenseHeader = "/*\n" + headerFile.get()
                     .readText().trim()
                     .replace("\${year}", year.toString())
                     .lines()

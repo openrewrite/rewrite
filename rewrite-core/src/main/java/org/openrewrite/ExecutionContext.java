@@ -68,9 +68,27 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext>, Heavyweigh
 
     <T> @Nullable T getMessage(String key);
 
+    /**
+     * Returns the message stored under {@code key}, storing the result of {@code defaultValue} first if there is none.
+     * The function may read and write this context, including through this method.
+     * A {@code null} result is returned without being stored.
+     * When threads race on an absent key, the function may run in each of them, and all get the first value stored.
+     */
     default <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+        // ConcurrentHashMap.computeIfAbsent forbids its mapping function from writing to the map.
+        Map<String, @Nullable Object> messages = getMessages();
+        Object value = messages.get(key);
+        if (value == null) {
+            value = defaultValue.apply(key);
+            if (value != null) {
+                Object stored = messages.putIfAbsent(key, value);
+                if (stored != null) {
+                    value = stored;
+                }
+            }
+        }
         //noinspection unchecked
-        return (T) getMessages().computeIfAbsent(key, defaultValue);
+        return (T) value;
     }
 
     default <V, T> T computeMessage(String key, @Nullable V value, Supplier<T> defaultValue, BiFunction<@Nullable V, ? super T, ? extends T> remappingFunction) {

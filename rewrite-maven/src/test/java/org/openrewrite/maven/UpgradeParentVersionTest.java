@@ -42,7 +42,7 @@ class UpgradeParentVersionTest implements RewriteTest {
               "1.125",
               null,
               null))
-            .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+            .executionContext(MavenCentralMirrorExtension.withMavenCentralMirror(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
                 .setRepositories(List.of(

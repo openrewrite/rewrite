@@ -48,6 +48,74 @@ class NpmLockRegeneratorTest {
                                        "3,\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": " +
                                        "\"a\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
 
+    private static final String UPDATE_REGISTRY =
+      "{\"compiler\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}," +
+      "\"builder\":{\"latest\":\"2.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"dependencies\":{\"tools\":\"1.0.0\"},\"peerDependencies\":{\"compiler\":\"1\"}}," +
+      "\"2.0.0\":{\"dependencies\":{\"tools\":\"2.0.0\"},\"peerDependencies\":{\"compiler\":\"2\"}}}}," +
+      "\"tools\":{\"latest\":\"2.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"compiler\":\"1\"}}," +
+      "\"2.0.0\":{\"peerDependencies\":{\"compiler\":\"2\"}}}}," +
+      "\"legacy-consumer\":{\"latest\":\"1.0.0\",\"versions\":{" +
+      "\"1.0.0\":{\"peerDependencies\":{\"compiler\":\"1\"}}}}}";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateRecoversOnlyPeersFromPackagesBeingReplaced(String release) {
+        PackumentSource registry = localRegistry(UPDATE_REGISTRY);
+        String before = updateManifest("1.0.0", false);
+        Result original = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(ROOT_ONLY_LOCK).manifest("", before).now(Instant.EPOCH).build(), registry).regenerate();
+        assertThat(original.isSuccess()).as(original.getErrorMessage()).isTrue();
+        NpmLockRegenerator.Inputs edited = NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(original.getLockFileContent()).manifest("", updateManifest("2.0.0", false))
+          .now(Instant.EPOCH).build();
+        Result strict = new NpmLockRegenerator(edited, registry).regenerate();
+        assertThat(strict.getFailure()).isNotNull();
+        assertThat(strict.getFailure().getReason()).isEqualTo(Reason.PEER_CONFLICT);
+        Result recovered = new NpmLockRegenerator(edited, registry).regenerateForUpdate();
+        assertThat(recovered.isSuccess()).as(recovered.getErrorMessage()).isTrue();
+        assertThat(recovered.getLockFileContent()).contains("\"version\": \"2.0.0\"");
+        Result installed = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(recovered.getLockFileContent()).manifest("", updateManifest("2.0.0", false))
+          .now(Instant.EPOCH).build(), registry).regenerate();
+        assertThat(installed.getLockFileContent()).isEqualTo(recovered.getLockFileContent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7.24.2", "8.19.4", "9.9.4", "10.9.4", "11.19.1", "12.2.1"})
+    void coordinatedUpdateReportsTheRealBlockingPeerFromTheNoLockResolution(String release) {
+        PackumentSource registry = localRegistry(UPDATE_REGISTRY);
+        Result original = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(ROOT_ONLY_LOCK).manifest("", updateManifest("1.0.0", true)).now(Instant.EPOCH).build(), registry).regenerate();
+        assertThat(original.isSuccess()).as(original.getErrorMessage()).isTrue();
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+          .lock(original.getLockFileContent()).manifest("", updateManifest("2.0.0", true))
+          .now(Instant.EPOCH).build(), registry).regenerateForUpdate();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.PEER_CONFLICT);
+        assertThat(result.getFailure().getDetail()).contains("legacy-consumer");
+        assertThat(result.getLockFileContent()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "not JSON"})
+    void coordinatedUpdateDoesNotRetryMissingOrMalformedLocks(String lock) {
+        NpmLockRegenerator regeneration = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(lock).manifest("", MANIFEST).now(Instant.EPOCH).build(), NO_REGISTRY);
+        Result plain = regeneration.regenerate();
+        Result update = regeneration.regenerateForUpdate();
+        assertThat(update.getFailure()).isNotNull();
+        assertThat(update.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+        assertThat(update.getErrorMessage()).isEqualTo(plain.getErrorMessage());
+    }
+
+    private static String updateManifest(String version, boolean blocker) {
+        return "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{" +
+          "\"builder\":\"" + version + "\",\"compiler\":\"" + version + "\"" +
+          (blocker ? ",\"legacy-consumer\":\"1.0.0\"" : "") + "}}";
+    }
+
     private static final PackumentSource NO_REGISTRY = new PackumentSource() {
         @Override
         public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {

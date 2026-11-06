@@ -60,36 +60,42 @@ export class GetObject {
         );
 
         if (pageChannel) {
-            // The main thread answers each GetObject with the next page this traversal hands over
-            pageChannel.onServe(async (request, sink) => {
-                const objId = request.id;
-                if (!localObjects.has(objId)) {
-                    sink([{state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
-                    return;
-                }
-                const objectOrGenerator = localObjects.get(objId)!;
-                if (typeof objectOrGenerator === 'function') {
-                    localObjects.set(objId, await objectOrGenerator(objId));
-                }
-                const after = localObjects.get(objId);
-                const before = remoteObjects.get(objId);
-                const savedRefCount = localRefs.snapshot();
-                latestTransfer = {id: objId, refCount: savedRefCount};
-                try {
-                    new RpcSendQueue(localRefs, request.sourceFileType, trace())
-                        .drainEvery(batchSize, sink)
-                        .generate(after, before);
-                    remoteObjects.set(objId, after);
-                } catch (e: any) {
-                    // An abort is rolled back by the AbortGetObject that follows it
-                    if (!(e instanceof PageAbortedError)) {
-                        remoteObjects.delete(objId);
-                        localRefs.rollbackTo(savedRefCount);
-                        latestTransfer = undefined;
+            // The main thread answers each GetObject with the next page this traversal hands over.
+            // One metrics row covers the whole transfer, however many pages it takes.
+            pageChannel.onServe((params, sink) => withMetrics<typeof params, void>(
+                "GetObject",
+                metricsCsv,
+                context => async request => {
+                    const objId = request.id;
+                    if (!localObjects.has(objId)) {
+                        sink([{state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
+                        return;
                     }
-                    throw e;
+                    const objectOrGenerator = localObjects.get(objId)!;
+                    if (typeof objectOrGenerator === 'function') {
+                        localObjects.set(objId, await objectOrGenerator(objId));
+                    }
+                    const after = localObjects.get(objId);
+                    context.target = extractSourcePath(after);
+                    const before = remoteObjects.get(objId);
+                    const savedRefCount = localRefs.snapshot();
+                    latestTransfer = {id: objId, refCount: savedRefCount};
+                    try {
+                        new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                            .drainEvery(batchSize, sink)
+                            .generate(after, before);
+                        remoteObjects.set(objId, after);
+                    } catch (e: any) {
+                        // An abort is rolled back by the AbortGetObject that follows it
+                        if (!(e instanceof PageAbortedError)) {
+                            remoteObjects.delete(objId);
+                            localRefs.rollbackTo(savedRefCount);
+                            latestTransfer = undefined;
+                        }
+                        throw e;
+                    }
                 }
-            });
+            )(params));
         }
 
         connection.onRequest(

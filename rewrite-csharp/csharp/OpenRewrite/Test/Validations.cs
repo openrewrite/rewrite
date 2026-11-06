@@ -59,10 +59,44 @@ public sealed class Validations
     /// </summary>
     public bool ReportingMarkersOnly { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to leave the execution context, which every recipe and source file in a run
+    /// shares, unchanged. Default: enabled.
+    /// </summary>
+    public bool ExecutionContextUnchanged { get; init; } = true;
+
+    /// <summary>
+    /// Whether a ScanningRecipe's scanner is validated to make no edits, which the scanning phase discards.
+    /// Default: enabled.
+    /// </summary>
+    public bool NoEditsInScanningPhase { get; init; } = true;
+
+    /// <summary>
+    /// Whether a ScanningRecipe's accumulator is validated to keep values, such as paths, names and ids, and no
+    /// <see cref="OpenRewrite.Core.IHeavyweight"/> objects, such as trees, cursors and visitors, which would stay in
+    /// memory all cycle. Default: enabled.
+    /// </summary>
+    public bool LightweightAccumulators { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to produce the tree that the parser makes of the text the recipe's output
+    /// prints, such as a Primitive and not an Identifier for <c>int</c>. Default: enabled.
+    /// </summary>
+    public bool ParserShapedTrees { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to format only what it changed, not a whole source file, namespace or class
+    /// that existed before the run. Default: enabled.
+    /// </summary>
+    public bool MinimalFormatting { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
-    /// <summary>All validations disabled except <see cref="ReportingMarkersOnly"/>.</summary>
+    /// <summary>
+    /// The parse, print and formatting reconciliation checks disabled, and the checks of what the recipe does, such
+    /// as <see cref="ReportingMarkersOnly"/>, left on.
+    /// </summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,

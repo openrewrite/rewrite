@@ -248,6 +248,7 @@ public class GroovyParserVisitor {
                     // Inner classes will be visited as part of visiting their containing class
                     continue;
                 }
+                addEmptyStatements(statements);
                 JRightPadded<Statement> statement = convertTopLevelStatement(unit, entry.getValue());
                 if (statements.isEmpty() && pkg == null &&
                     (statement.getElement() instanceof J.Import || statement.getElement() instanceof G.AnnotatedImport)) {
@@ -266,6 +267,7 @@ public class GroovyParserVisitor {
                                 source.substring(cursor, Math.min(source.length(), cursor + 250)), t);
             }
         }
+        addEmptyStatements(statements);
 
         return new G.CompilationUnit(
                 randomId(),
@@ -613,7 +615,7 @@ public class GroovyParserVisitor {
                         while (i < len && !source.startsWith(d.close, i)) {
                             i++;
                         }
-                        i += d.close.length();
+                        i = closingDelimiterIndex(i, d.close) + d.close.length();
                         continue;
                     }
                 }
@@ -1835,6 +1837,7 @@ public class GroovyParserVisitor {
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
             List<org.codehaus.groovy.ast.stmt.Statement> blockStatements = block.getStatements();
             for (int i = 0; i < blockStatements.size(); i++) {
+                addEmptyStatements(statements);
                 ASTNode statement = blockStatements.get(i);
                 J expr = doVisit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
@@ -1860,6 +1863,7 @@ public class GroovyParserVisitor {
 
                 statements.add(stat);
             }
+            addEmptyStatements(statements);
             queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace()));
             if (!withinClosure) {
                 skip("}");
@@ -2298,12 +2302,26 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitNotExpression(NotExpression expression) {
+            visitPrefixOperator(expression, "!", J.Unary.Type.Not, expression.getExpression());
+        }
+
+        @Override
+        public void visitUnaryMinusExpression(UnaryMinusExpression expression) {
+            visitPrefixOperator(expression, "-", J.Unary.Type.Negative, expression.getExpression());
+        }
+
+        @Override
+        public void visitUnaryPlusExpression(UnaryPlusExpression expression) {
+            visitPrefixOperator(expression, "+", J.Unary.Type.Positive, expression.getExpression());
+        }
+
+        private void visitPrefixOperator(org.codehaus.groovy.ast.expr.Expression expression, String operator,
+                                         J.Unary.Type type, org.codehaus.groovy.ast.expr.Expression operand) {
             queue.add(insideParentheses(expression, fmt -> {
-                skip("!");
-                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
+                skip(operator);
+                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, type);
                 // Groovy 3+ does not set _INSIDE_PARENTHESES_LEVEL on PropertyExpression / MethodCallExpression,
-                // so when `!` directly wraps such an expression in parentheses, detect the parentheses from the source.
-                org.codehaus.groovy.ast.expr.Expression operand = expression.getExpression();
+                // so when the operator directly wraps such an expression in parentheses, detect the parentheses from the source.
                 int savedCursor = cursor;
                 Space beforeParen = whitespace();
                 Expression expr;
@@ -2494,14 +2512,16 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitIfElse(IfStatement ifElse) {
-            Space fmt = sourceBefore("if");
-            J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
-                    JRightPadded.build((Expression) doVisit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
-            JRightPadded<Statement> then = maybeSemicolon(doVisit(ifElse.getIfBlock()));
-            J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
-                    new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
-                            maybeSemicolon(doVisit(ifElse.getElseBlock())));
-            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_));
+            queue.add(labeled(ifElse, () -> {
+                Space fmt = sourceBefore("if");
+                J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                        JRightPadded.build((Expression) doVisit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
+                JRightPadded<Statement> then = maybeSemicolon(doVisit(ifElse.getIfBlock()));
+                J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+                        new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
+                                maybeSemicolon(doVisit(ifElse.getElseBlock())));
+                return new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_);
+            }));
         }
 
         @Override
@@ -2556,6 +2576,12 @@ public class GroovyParserVisitor {
         }
 
         private J visitGStringValue(org.codehaus.groovy.ast.expr.Expression value) {
+            if (value instanceof ClosureExpression && !sourceStartsWith("{")) {
+                J.Lambda closure = doVisit(value);
+                // The interpolation owns the closure's braces in `${ -> value }`.
+                cursor--;
+                return closure.withMarkers(closure.getMarkers().add(new OmitBraces(randomId())));
+            }
             // Groovy compiles `${ statement; statement }` into an implicit `{ statement; statement }.call()`
             if (value instanceof MethodCallExpression) {
                 MethodCallExpression call = (MethodCallExpression) value;
@@ -2592,6 +2618,18 @@ public class GroovyParserVisitor {
         public void visitMapEntryExpression(MapEntryExpression expression) {
             Space prefix = whitespace();
             Expression key;
+            if (expression.getKeyExpression() instanceof SpreadMapExpression) {
+                // Groovy also exposes the spread operand as this entry's value. Visiting the
+                // synthetic key would consume that operand twice and lose the '*'.
+                skip("*");
+                key = new G.Unary(randomId(), EMPTY, Markers.EMPTY,
+                        JLeftPadded.build(G.Unary.Type.Spread),
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY), null);
+                queue.add(new G.MapEntry(randomId(), prefix, Markers.EMPTY,
+                        JRightPadded.build(key).withAfter(sourceBefore(":")),
+                        doVisit(expression.getValueExpression()), null));
+                return;
+            }
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
             Integer keyParenLevel = getInsideParenthesesLevel(expression.getKeyExpression());
@@ -4126,7 +4164,23 @@ public class GroovyParserVisitor {
                 "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
             );
         }
-        return source.substring(beginIndex, endIndex);
+        return source.substring(beginIndex, closingDelimiterIndex(endIndex, untilDelim));
+    }
+
+    /// Groovy reads one or two quotes directly before the closing delimiter of a triple-quoted string as part of
+    /// its content, so `'''a''''` is the string `a'`.
+    ///
+    /// @param index where the first occurrence of `close` starts
+    /// @return where the closing delimiter actually starts
+    private int closingDelimiterIndex(int index, String close) {
+        if (!"'''".equals(close) && !"\"\"\"".equals(close)) {
+            return index;
+        }
+        int run = 0;
+        while (index + run < source.length() && source.charAt(index + run) == close.charAt(0)) {
+            run++;
+        }
+        return run == 4 || run == 5 ? index + run - 3 : index;
     }
 
     /**
@@ -4258,6 +4312,7 @@ public class GroovyParserVisitor {
                     i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
             } else if (source.startsWith(delimiter.close, i)) {
+                i = closingDelimiterIndex(i, delimiter.close);
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;
             }
@@ -4370,6 +4425,19 @@ public class GroovyParserVisitor {
         }
 
         return paddedG;
+    }
+
+    /**
+     * Groovy drops empty statements from its AST, so a stray {@code ;} that no statement claims as its terminator
+     * is mapped to a {@link J.Empty} here.
+     */
+    private void addEmptyStatements(List<JRightPadded<Statement>> statements) {
+        while (sourceStartsWith(";")) {
+            Space prefix = whitespace();
+            skip(";");
+            JRightPadded<Statement> empty = JRightPadded.build(new J.Empty(randomId(), prefix, Markers.EMPTY));
+            statements.add(empty.withMarkers(empty.getMarkers().add(new Semicolon(randomId()))));
+        }
     }
 
     private String name() {
@@ -4690,7 +4758,7 @@ public class GroovyParserVisitor {
         }
         matcher.appendTail(sb);
         String multiLineRemoved = sb.toString();
-        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
+        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open, -1)[0])
                 .collect(joining("\n"));
     }
 

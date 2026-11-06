@@ -359,12 +359,31 @@ public interface G extends J {
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 imports = preserveAnnotatedImports(imports);
+                // Groovy permits statements before imports, for example Jenkins' @Library declaration.
+                // Keep those statements (and their leading license comments) before the import block.
+                int insertionIdx = 0;
+                for (JRightPadded<Statement> statement : t.statements) {
+                    if (statement.getElement() instanceof J.Import || statement.getElement() instanceof AnnotatedImport) {
+                        break;
+                    }
+                    insertionIdx++;
+                }
+                if (insertionIdx == t.statements.size()) {
+                    insertionIdx = 0;
+                }
+                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
+                if (insertionIdx > 0 && !imports.isEmpty()) {
+                    // Java import layout assumes imports start the file and may clear this space.
+                    String beforeImports = originalImports.get(0).getElement().getPrefix().getWhitespace();
+                    imports = ListUtils.mapFirst(imports, i -> i.map(imp ->
+                            imp.withPrefix(imp.getPrefix().withWhitespace(beforeImports))));
+                }
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.Import) &&
                                      !(s.getElement() instanceof AnnotatedImport))
                         .collect(toList());
                 //noinspection unchecked
-                statements.addAll(0, imports.stream()
+                statements.addAll(insertionIdx, imports.stream()
                         .map(i -> {
                             for (JRightPadded<Statement> original : t.statements) {
                                 if (original.getElement() instanceof AnnotatedImport) {
@@ -381,7 +400,6 @@ public interface G extends J {
                         })
                         .collect(toList()));
 
-                List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
                 if (originalImports.size() != imports.size()) {
                     return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 } else {

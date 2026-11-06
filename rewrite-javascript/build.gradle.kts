@@ -39,7 +39,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     // For `:rewrite-javascript:generateTestClasspath` — bundles org.openrewrite.maven.rpc.JavaRewriteRpc,
     // the main class spawned by JavaRpcTestServer in test/rpc/.
     testRuntimeOnly(project(":rewrite-maven"))
@@ -308,11 +308,12 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-java-25"))
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
                 implementation(project(":rewrite-yaml"))
+                implementation(project(":rewrite-xml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
@@ -471,7 +472,7 @@ extensions.configure<LicenseExtension> {
 // The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
 // live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
 // Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
-val lockFixturesCommit = "8533f9639291673cad34703ed76178eb46bc72cf"
+val lockFixturesCommit = "823a54607ef70007511fb9668e4e761186e26f54"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
     inputs.property("commit", lockFixturesCommit)

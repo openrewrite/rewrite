@@ -14,6 +14,7 @@ export class GetLanguages {
                         "org.openrewrite.text.PlainText",
                         "org.openrewrite.json.tree.Json$Document",
                         "org.openrewrite.yaml.tree.Yaml$Documents",
+                        "org.openrewrite.xml.tree.Xml$Document",
                         // TODO Support for Javadoc comments is not yet implemented
                         // "org.openrewrite.java.tree.J$CompilationUnit",
                         "org.openrewrite.javascript.tree.JS$CompilationUnit",

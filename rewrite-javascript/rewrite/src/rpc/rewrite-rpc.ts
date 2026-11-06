@@ -49,7 +49,7 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
-import type {WorkerPageChannel} from "./worker-transport";
+import {endsTransfer, type WorkerPageChannel} from "./worker-transport";
 
 // Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
 export const DEFAULT_BATCH_SIZE = 5000;
@@ -256,8 +256,6 @@ export class RewriteRpc {
         try {
             // The codecs receive synchronously. Over the worker transport each page is pulled when the
             // previous one runs out. Otherwise the whole transfer is fetched before any of it is read.
-            // A page ending in END_OF_OBJECT has no successor. The remote drops its transfer state
-            // when it sends that marker, so asking again would restart the transfer.
             let pages: RpcObjectData[][] | (() => readonly RpcObjectData[]);
             if (this.pageChannel) {
                 pages = this.pageChannel.pages(id, sourceFileType);
@@ -270,7 +268,7 @@ export class RewriteRpc {
                         new GetObject(id, sourceFileType),
                     );
                     pages.push(page);
-                } while (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT);
+                } while (!endsTransfer(page));
             }
 
             q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, pages, this.logger,

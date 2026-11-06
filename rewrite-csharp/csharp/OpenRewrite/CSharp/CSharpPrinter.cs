@@ -104,6 +104,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
+            case IndexerDeclaration { ExpressionBody: not null }:
+            case ConversionOperatorDeclaration { ExpressionBody: not null }:
+                p.Append(';');
+                break;
+
             // AnnotatedStatement: delegate to inner statement
             case AnnotatedStatement ann:
                 PrintStatementTerminator(ann.Statement, p);
@@ -1751,9 +1756,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             {
                 Visit(paddedInit.Element, p);
             }
+            VisitSpace(paddedInit.After, p);
             if (i < fl.LoopControl.Init.Count - 1)
             {
-                VisitSpace(paddedInit.After, p);
                 p.Append(',');
             }
         }
@@ -3920,7 +3925,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(indexerDeclaration.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(indexerDeclaration.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (indexerDeclaration.Accessors != null)
         {
@@ -4069,7 +4073,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(conversion.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(conversion.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (conversion.Body != null)
         {

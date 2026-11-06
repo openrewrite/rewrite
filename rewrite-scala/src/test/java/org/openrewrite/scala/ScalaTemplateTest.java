@@ -207,4 +207,57 @@ class ScalaTemplateTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void parenthesizeWithScalaPrecedence() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  String template = switch (method.getSimpleName()) {
+                      case "both" -> "#{any(boolean)} & #{any(boolean)}";
+                      case "either" -> "#{any(boolean)} | #{any(boolean)}";
+                      case "differ" -> "#{any(boolean)} ^ #{any(boolean)}";
+                      case "shl" -> "#{any(int)} << #{any(int)}";
+                      default -> null;
+                  };
+                  if (template == null) {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+                  return ScalaTemplate.builder(template)
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+              }
+          })),
+          scala(
+            """
+              object T {
+                def both(a: Boolean, b: Boolean): Boolean = a & b
+                def either(a: Boolean, b: Boolean): Boolean = a | b
+                def differ(a: Boolean, b: Boolean): Boolean = a ^ b
+                def shl(a: Int, b: Int): Int = a << b
+                def f(p: Boolean, x: Boolean, y: Boolean, a: Int, b: Int, c: Int): Unit = {
+                  val strict = p && both(x, y)
+                  val loose = either(x, y) && p
+                  val odd = p && differ(x, y)
+                  val shifted = a < shl(b, c)
+                }
+              }
+              """,
+            """
+              object T {
+                def both(a: Boolean, b: Boolean): Boolean = a & b
+                def either(a: Boolean, b: Boolean): Boolean = a | b
+                def differ(a: Boolean, b: Boolean): Boolean = a ^ b
+                def shl(a: Int, b: Int): Int = a << b
+                def f(p: Boolean, x: Boolean, y: Boolean, a: Int, b: Int, c: Int): Unit = {
+                  val strict = p && (x & y)
+                  val loose = (x | y) && p
+                  val odd = p && (x ^ y)
+                  val shifted = a < (b << c)
+                }
+              }
+              """
+          ));
+    }
 }

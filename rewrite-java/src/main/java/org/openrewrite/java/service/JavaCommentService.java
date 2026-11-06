@@ -79,6 +79,11 @@ public class JavaCommentService extends CommentService {
         // existing AddCommentTo* recipes); callers can override it (e.g. for a top-of-file element
         // whose prefix is empty) via the suffix parameter.
         String indent = suffix != null ? suffix : j.getPrefix().getWhitespace();
+        // A line comment runs to the end of its line, so without a line break it would swallow the element,
+        // as when the element shares a line with its parent (`int i = bar();`). The formatter below indents it.
+        if (!multiline && !indent.contains("\n")) {
+            indent = "\n" + indent;
+        }
         String commentText = multiline ? text : NEWLINE.matcher(text).replaceAll(" ");
 
         TextComment comment = new TextComment(multiline, commentText, indent, Markers.EMPTY);

@@ -40,7 +40,10 @@ public class AddJUnitPlatformLauncher extends ScanningRecipe<AddDependency.Scann
 
     @Override
     public AddDependency.Scanned getInitialValue(ExecutionContext ctx) {
-        return addDependency("1.x").getInitialValue(ctx);
+        AddDependency.Scanned acc = addDependency("1.x").getInitialValue(ctx);
+        // The launcher's version follows the platform's, so an existing one is left alone
+        acc.upgradeState = null;
+        return acc;
     }
 
     @Override

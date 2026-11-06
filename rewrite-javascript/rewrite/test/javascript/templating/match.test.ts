@@ -221,14 +221,21 @@ describe('match extraction', () => {
         });
 
         await spec.rewriteRun(
-            typescript(`declare function foo(a: any): void;\nconst s = "x";\nfoo(s);`)
+            //language=typescript
+            typescript(`
+                declare function foo(a: any): void;
+                const s = "x";
+                foo(s);`)
         );
         expect(matched).toBe(true);
 
         matched = false;
         const util = typescript(`export function foo(a: any): void {}`);
         util.path = 'util.ts';
-        const main = typescript(`import {foo} from './util';\nfoo("x");`);
+        //language=typescript
+        const main = typescript(`
+            import {foo} from './util';
+            foo("x");`);
         main.path = 'main.ts';
         await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
         expect(matched).toBe(true);
@@ -252,13 +259,19 @@ describe('match extraction', () => {
         });
 
         await spec.rewriteRun(
-            typescript(`function isDate(value: unknown): boolean { return false; }\nconst result = isDate(new Date());`)
+            //language=typescript
+            typescript(`
+                function isDate(value: unknown): boolean { return false; }
+                const result = isDate(new Date());`)
         );
         expect(calls).toBe(1);
         expect(capturedArgs).toBeUndefined();
 
         await spec.rewriteRun(
-            typescript(`import {isDate as checkDate} from 'node:util/types';\nconst result = checkDate(new Date());`)
+            //language=typescript
+            typescript(`
+                import {isDate as checkDate} from 'node:util/types';
+                const result = checkDate(new Date());`)
         );
         expect(capturedArgs).toHaveLength(1);
     });

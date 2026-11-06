@@ -29,7 +29,8 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {getLockFileDetectionConfig, getLockFileName, runList, runVersion} from "./package-manager";
+import {getLockFileDetectionConfig, getLockFileName, PackageManagerSelectionError, runList, runVersion, selectPackageManager} from "./package-manager";
+import {markupWarn} from "../markers";
 import picomatch from "picomatch";
 import {DEFAULT_DIR_EXCLUSIONS, walkDirs} from "../path-utils";
 
@@ -79,6 +80,9 @@ export class PackageJsonParser extends Parser {
 
     /** The NodeRuntime of each project root, by package manager and root directory, for the parser's lifetime */
     private readonly runtimes = new Map<string, NodeRuntime>();
+
+    private readonly selectedRoots = new Map<string, string>();
+    private readonly selectionFailures = new Map<string, string>();
 
     /** Fields to copy from package.json that contain dependency maps */
     private static readonly DEPENDENCY_FIELDS = [
@@ -173,13 +177,15 @@ export class PackageJsonParser extends Parser {
             const runtime = this.nodeRuntime(dir, marker?.packageManager);
 
             // Attach the markers to the JSON document: every one gets the NodeRuntime of its project
-            yield {
+            const out: Json.Document = {
                 ...jsonDoc,
                 markers: {
                     ...jsonDoc.markers,
                     markers: [...jsonDoc.markers.markers, ...(marker ? [marker] : []), runtime]
                 }
             };
+            const failure = this.selectionFailures.get(dir);
+            yield failure === undefined ? out : markupWarn(out, failure);
         }
     }
 
@@ -190,7 +196,8 @@ export class PackageJsonParser extends Parser {
      */
     private nodeRuntime(dir: string, packageManager?: PackageManager): NodeRuntime {
         const absoluteDir = path.resolve(this.relativeTo ?? '', dir);
-        const root = packageManager === undefined ? absoluteDir : this.projectRoot(absoluteDir, packageManager);
+        const root = packageManager === undefined ? absoluteDir :
+            this.selectedRoots.get(absoluteDir) ?? this.projectRoot(absoluteDir, packageManager);
         const key = `${packageManager ?? ''}:${root}`;
         let runtime = this.runtimes.get(key);
         if (!runtime) {
@@ -222,6 +229,8 @@ export class PackageJsonParser extends Parser {
      * Creates a NodeResolutionResult marker from the package.json content and optional lock file.
      */
     private async createMarker(input: ParserInput, dir: string): Promise<NodeResolutionResult | null> {
+        this.selectionFailures.delete(dir);
+        this.selectedRoots.delete(path.resolve(this.relativeTo ?? "", dir));
         try {
             const content = parserInputRead(input);
             const packageJson = JSON.parse(content);
@@ -241,7 +250,7 @@ export class PackageJsonParser extends Parser {
                 const absoluteDir = this.relativeTo && !path.isAbsolute(dir)
                     ? path.resolve(this.relativeTo, dir)
                     : dir;
-                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo);
+                const lockResult = await this.tryReadLockFileWithWalkUp(absoluteDir, this.relativeTo, packageJson);
                 lockContent = lockResult?.content;
                 packageManager = lockResult?.packageManager;
             }
@@ -282,9 +291,12 @@ export class PackageJsonParser extends Parser {
                 lockContent,
                 workspacePackagePaths,
                 packageManager,
-                npmrcConfigs.length > 0 ? npmrcConfigs : undefined
+                npmrcConfigs.length > 0 ? npmrcConfigs : undefined,
+                path.relative(this.selectedRoots.get(path.resolve(absoluteDir)) ?? absoluteDir, absoluteDir)
+                    .split(path.sep).join("/")
             );
         } catch (error) {
+            if (error instanceof PackageManagerSelectionError) this.selectionFailures.set(dir, error.message);
             console.warn(`Failed to create NodeResolutionResult marker: ${error}`);
             return null;
         }
@@ -464,8 +476,16 @@ export class PackageJsonParser extends Parser {
      */
     private async tryReadLockFileWithWalkUp(
         startDir: string,
-        rootDir?: string
+        rootDir?: string,
+        manifest?: unknown
     ): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+        const selected = selectPackageManager(startDir, rootDir, manifest);
+        if (selected) {
+            this.selectedRoots.set(path.resolve(startDir), selected.root);
+            if (selected.lockFile) return this.tryReadLockFile(selected.root, selected.packageManager);
+            const installed = await this.walkNodeModules(selected.root);
+            return {content: installed ?? {lockfileVersion: 0, packages: {}}, packageManager: selected.packageManager};
+        }
         // Normalize paths for comparison
         const normalizedRoot = rootDir ? path.resolve(rootDir) : undefined;
 
@@ -484,21 +504,12 @@ export class PackageJsonParser extends Parser {
             currentDir = parentDir;
         }
 
-        // A lock file names the package manager, wherever it is on the way up. An installed
-        // workspace member has node_modules of its own and no lock: its workspace's lock, above it,
-        // says which package manager installed them.
-        for (const dir of dirs) {
-            const result = await this.tryReadLockFile(dir);
-            if (result) {
-                return result;
-            }
-        }
-
         // Fallback: node_modules without a lock file anywhere above (e.g., symlinked from another
         // workspace). Walk them for resolved dependency information, and assume npm.
         for (const dir of dirs) {
             const parsed = await this.walkNodeModules(dir);
             if (parsed) {
+                this.selectedRoots.set(path.resolve(startDir), dir);
                 return { content: parsed, packageManager: PackageManager.Npm };
             }
         }
@@ -512,9 +523,10 @@ export class PackageJsonParser extends Parser {
      *
      * @returns Object with parsed lock file content and detected package manager, or undefined if no lock file found
      */
-    private async tryReadLockFile(dir: string): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
+    private async tryReadLockFile(dir: string, selected?: PackageManager): Promise<{ content: PackageLockContent; packageManager: PackageManager } | undefined> {
         // Use shared lock file detection config (first match wins based on priority)
         for (const config of getLockFileDetectionConfig()) {
+            if (selected !== undefined && config.filename !== getLockFileName(selected)) continue;
             const lockPath = path.join(dir, config.filename);
             if (!fs.existsSync(lockPath)) {
                 continue;

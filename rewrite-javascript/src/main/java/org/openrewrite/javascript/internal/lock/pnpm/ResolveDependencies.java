@@ -753,7 +753,7 @@ final class ResolveDependencies {
                 return Promise.resolved(ctx.getLoop(), new RootResult(addressesOf(byImporters), time));
             }
             WorkspaceRootDeps workspaceRootDeps = new WorkspaceRootDeps(new ArrayList<>(), new ArrayList<>());
-            if (ctx.isResolvePeersFromWorkspaceRoot()) {
+            if (ctx.isResolvePeersFromWorkspaceRoot() && ctx.getRelease().hoistsPeersFromTheWorkspaceRoot()) {
                 for (int i = 0; i < importers.size(); i++) {
                     if (".".equals(importers.get(i).getOptions().getParentIds().get(0))) {
                         // 11.2.2 reads the root's own list, which the loop below grows; 11.12.0 a copy of it
@@ -2741,6 +2741,25 @@ final class ResolveDependencies {
             Map<String, PreferredVersions.Selector> preferred = allPreferred == null ? null :
                     allPreferred.get(peerName);
             if (preferred != null) {
+                if (!release.readsWeightedRequiredPeerSelectors()) {
+                    List<String> legacyVersions = new ArrayList<>();
+                    List<String> legacyNonVersions = new ArrayList<>();
+                    for (Map.Entry<String, PreferredVersions.Selector> selector : preferred.entrySet()) {
+                        if (selector.getValue().getWeight() == null &&
+                            "version".equals(selector.getValue().getSelectorType())) {
+                            legacyVersions.add(selector.getKey());
+                        } else {
+                            legacyNonVersions.add(selector.getKey());
+                        }
+                    }
+                    String highest = release.underSemver(semver -> NodeSemver.maxSatisfying(legacyVersions, "*",
+                            NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
+                    List<String> parts = new ArrayList<>();
+                    parts.add(highest == null ? "" : highest);
+                    parts.addAll(legacyNonVersions);
+                    dependencies.put(peerName, String.join(" || ", parts));
+                    continue;
+                }
                 List<String> versions = new ArrayList<>();
                 List<String> nonVersions = new ArrayList<>();
                 for (Map.Entry<String, PreferredVersions.Selector> selector : preferred.entrySet()) {

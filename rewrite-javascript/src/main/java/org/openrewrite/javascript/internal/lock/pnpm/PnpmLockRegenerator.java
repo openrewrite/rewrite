@@ -217,6 +217,9 @@ public final class PnpmLockRegenerator {
      * main.ts up to the command, then the install command up to the resolution of the lock.
      */
     Install.Result install() {
+        if (inputs.getRelease() != null) {
+            Pnpm10Profile.requireSupported(inputs, inputs.getRelease());
+        }
         Main main = new Main(inputs, envInstaller, stores, lockFile);
         PnpmOptions config = main.config();
         boolean workspace = config.getWorkspacePackagePatterns() != null;
@@ -226,6 +229,7 @@ public final class PnpmLockRegenerator {
         // the release pnpm hands the install to reads the same files into its own config
         PnpmOptions options = (release.equals(main.running()) ? config : main.config(release))
                 .withPackageManagerVersion(installs).withRelease(release);
+        Pnpm10Profile.requireSupported(inputs, release);
         Main.FilterResults filterResults;
         try {
             main.checkRuntimes(options);

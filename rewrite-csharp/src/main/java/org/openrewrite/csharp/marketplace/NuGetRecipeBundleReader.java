@@ -32,6 +32,11 @@ public class NuGetRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final CSharpRewriteRpc rpc;
 
+    /**
+     * Whether resolving this bundle kept the publish output of an earlier install.
+     */
+    private final @Getter boolean unchanged;
+
     @Override
     public RecipeMarketplace read() {
         return rpc.getMarketplace(bundle);

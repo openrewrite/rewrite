@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 
 from rewrite.data_table import DataTable
 from rewrite.recipe import Recipe
-from rewrite.tree import Tree
+from rewrite.tree import SourceFile, Tree
 from rewrite.visitor import TreeVisitor
 
 logger = logging.getLogger(__name__)
@@ -255,6 +255,11 @@ class JavaRecipeVisitor(TreeVisitor[Tree, Any]):
         """
         if tree is None:
             return None
+
+        from rewrite.python.tree import Py
+        if isinstance(tree, SourceFile) and not isinstance(tree, Py):
+            # Java reads a Python source file only, so a file the parser failed on stays as it is.
+            return tree
 
         from rewrite.execution import ExecutionContext
         from .server import local_object, local_objects, get_object_from_java

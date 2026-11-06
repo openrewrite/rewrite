@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 
 @Value
@@ -55,12 +56,14 @@ public class ChangeKey extends Recipe {
 
                 if (matcher.matches(getCursor()) && kv.getKey() instanceof Toml.Identifier) {
                     String newKeyName = newKey;
-                    if ((newKeyName.startsWith("\"") && newKeyName.endsWith("\"")) ||
-                        (newKeyName.startsWith("'") && newKeyName.endsWith("'"))) {
+                    if (newKeyName.startsWith("\"") && newKeyName.endsWith("\"")) {
+                        newKeyName = TomlString.decodeBasic(newKeyName.substring(1, newKeyName.length() - 1), false);
+                    } else if (newKeyName.startsWith("'") && newKeyName.endsWith("'")) {
                         newKeyName = newKeyName.substring(1, newKeyName.length() - 1);
                     }
 
-                    String formattedKey = newKeyName.matches("^[A-Za-z0-9_-]+$") ? newKeyName : "\"" + newKeyName + "\"";
+                    String formattedKey = newKeyName.matches("^[A-Za-z0-9_-]+$") ? newKeyName :
+                            "\"" + TomlString.quoteBasic(newKeyName) + "\"";
                     return kv.withKey(((Toml.Identifier) kv.getKey())
                             .withName(newKeyName)
                             .withSource(formattedKey));

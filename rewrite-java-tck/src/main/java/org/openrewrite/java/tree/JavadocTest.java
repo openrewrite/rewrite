@@ -2626,6 +2626,30 @@ class JavadocTest implements RewriteTest {
         assertThat(parsed).hasSize(2).allMatch(J.CompilationUnit.class::isInstance);
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/pull/1438")
+    @Test
+    void multiVariableFieldDeclaration() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /** Dangling. */
+                  /** Documents both {@link String fields}. */
+                  private String a, b;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assertThat(field.getVariables()).hasSize(2);
+                List<Comment> comments = field.getPrefix().getComments();
+                assertThat(comments).hasSize(2);
+                assertThat(comments.get(0)).isInstanceOf(TextComment.class);
+                assertThat(comments.get(1)).isInstanceOf(Javadoc.DocComment.class);
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {

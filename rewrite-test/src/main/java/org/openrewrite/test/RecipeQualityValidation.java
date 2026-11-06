@@ -110,6 +110,14 @@ public class RecipeQualityValidation {
     private boolean orderStepsForEarlierChanges = true;
 
     /**
+     * Controls whether the recipe is validated to keep no {@link org.openrewrite.TreeVisitor} in a static field, where
+     * every thread visiting source files in parallel would share its state. Recipes a composite lists from dependency
+     * jars are left to the builds of the projects that own them.
+     */
+    @Builder.Default
+    private boolean noStaticVisitors = true;
+
+    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -140,6 +148,7 @@ public class RecipeQualityValidation {
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
+                .noStaticVisitors(quality.noStaticVisitors())
                 .build();
     }
 }

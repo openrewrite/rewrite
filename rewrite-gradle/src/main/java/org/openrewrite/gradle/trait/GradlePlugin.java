@@ -48,6 +48,20 @@ public class GradlePlugin implements Trait<J> {
 
     boolean applied;
 
+    /**
+     * A plugin Gradle itself ships, which can be named in a `plugins` block with no version and needs nothing on the
+     * `buildscript` classpath. That distinction decides whether an `apply plugin:` statement can be rewritten into a
+     * `plugins` block without also resolving a version for it.
+     */
+    public static boolean isCorePlugin(String pluginId) {
+        for (String pluginName : Matcher.CORE_PLUGIN_NAMES) {
+            if (pluginName.equals(pluginId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static class Matcher extends GradleTraitMatcher<GradlePlugin> {
         private static final MethodMatcher ALIAS_DSL_MATCHER = new MethodMatcher("* alias(..)", false);
         private static final MethodMatcher APPLY_DSL_MATCHER = new MethodMatcher("* apply(..)", false);
@@ -274,12 +288,7 @@ public class GradlePlugin implements Trait<J> {
         }
 
         private boolean isCorePlugin(String pluginId) {
-            for (String pluginName : CORE_PLUGIN_NAMES) {
-                if (pluginName.equals(pluginId)) {
-                    return true;
-                }
-            }
-            return false;
+            return GradlePlugin.isCorePlugin(pluginId);
         }
 
         private @Nullable GradlePlugin maybeGradlePlugin(Cursor cursor, @Nullable String pluginId, @Nullable String pluginClass, @Nullable String version, boolean applied) {

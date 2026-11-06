@@ -783,6 +783,65 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void quotedNamesAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> jest = List.of(
+          //language=json
+          """
+            {
+              "moduleNameMapper": {
+                "\\\\.(css|less)$": "identity-obj-proxy"
+              },
+              "testRegex": ["\\\\.test\\\\.js$"]
+            }
+            """
+        );
+        assertMatched(
+          "$.moduleNameMapper['\\\\.(css|less)$']",
+          jest,
+          List.of("\"\\\\.(css|less)$\": \"identity-obj-proxy\"")
+        );
+        assertMatched(
+          "$.testRegex[?(@ == '\\\\.test\\\\.js$')]",
+          jest,
+          List.of("\"testRegex\": [\"\\\\.test\\\\.js$\"]")
+        );
+    }
+
+    @Test
+    void quotedNamesAndFilterStringsMatchSurrogateEscapes() {
+        List<String> surrogates = List.of(
+          //language=json
+          """
+            {
+              "\\uD800": "unpaired",
+              "strings": ["a\\ud800b"],
+              "emoji": ["\\ud83d\\ude00"]
+            }
+            """
+        );
+        assertMatched(
+          "$['\\\\ud800']",
+          surrogates,
+          List.of("\"\\uD800\": \"unpaired\"")
+        );
+        assertMatched(
+          "$.strings[?(@ == 'a\\\\ud800b')]",
+          surrogates,
+          List.of("\"strings\": [\"a\\ud800b\"]")
+        );
+        assertMatched(
+          "$.strings[?(@ =~ '.*ud800.*')]",
+          surrogates,
+          List.of("\"a\\ud800b\"")
+        );
+        assertMatched(
+          "$.emoji[?(@ == '😀')]",
+          surrogates,
+          List.of("\"emoji\": [\"\\ud83d\\ude00\"]")
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1607")
     @Test
     void unaryExpressionByBracketOperator() {

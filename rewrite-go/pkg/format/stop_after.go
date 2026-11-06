@@ -23,7 +23,7 @@
 //   - SpacesVisitor            — token-level spacing fixes (binary operators,
 //     commas, etc.)
 //   - RemoveTrailingWhitespaceVisitor — strip trailing space/tab from
-//     line endings inside Whitespace
+//     line endings inside Whitespace and comment suffixes
 //
 // AutoFormatVisitor composes the four into a fixed pipeline via
 // DoAfterVisit. Each is independently usable for recipes that only need

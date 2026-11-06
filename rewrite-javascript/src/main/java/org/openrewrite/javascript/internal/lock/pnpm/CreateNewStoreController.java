@@ -96,7 +96,9 @@ final class CreateNewStoreController {
      * 11.13.0 nothing ({@link PnpmRelease#fetchesFullMetadataForLibcAndNoDowngrade}).
      */
     NpmResolver createInstallStoreController(PnpmOptions options) {
-        return createNewStoreController(options, options.getFetchFullMetadata(), options.get("fetchFullMetadata"));
+        return createNewStoreController(options,
+                options.getRelease().fetchesFullMetadataForConfiguredLibc() ? options.getFetchFullMetadata() : null,
+                options.get("fetchFullMetadata"));
     }
 
     /**
@@ -143,7 +145,7 @@ final class CreateNewStoreController {
                 before : after;
         PnpmRelease release = options.getRelease();
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
-        return new NpmResolver(registry, options.getRegistries(), namedRegistries(options),
+        return new NpmResolver(registry.withOptions(options), options.getRegistries(), namedRegistries(options),
                 options.get("saveWorkspaceProtocol"),
                 !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata, now, release,
                 minimumReleaseAge != null && minimumReleaseAge != 0 && !minimumReleaseAge.isNaN() &&
@@ -172,7 +174,7 @@ final class CreateNewStoreController {
                         .trustPolicyIgnoreAfter(options.getNumber("trustPolicyIgnoreAfter"))
                         .registries(options.getRegistries())
                         .namedRegistries(options.getNamedRegistries())
-                        .fetch(registry)
+                        .fetch(registry.withOptions(options))
                         .now(now)
                         .release(options.getRelease())
                         .build());

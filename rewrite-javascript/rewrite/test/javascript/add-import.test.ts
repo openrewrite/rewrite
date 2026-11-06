@@ -489,6 +489,128 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('imports follow directives, but not template or parenthesized strings', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useId', onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    'use strict';
+                    'use client';
+
+                    export const id = useId();
+                    `,
+                    `
+                    'use strict';
+                    'use client';
+
+                    import {useId} from 'react';
+
+                    export const id = useId();
+                    `
+                ),
+                typescript(
+                    `
+                    \`use client\`;
+                    `,
+                    `
+                    import {useId} from 'react';
+
+                    \`use client\`;
+                    `
+                ),
+                typescript(
+                    `
+                    ('use server');
+                    `,
+                    `
+                    import {useId} from 'react';
+
+                    ('use server');
+                    `
+                )
+            );
+        });
+
+        test('imports follow shebangs and triple-slash directives, leaving later comments on their statement', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+            for (const directive of [
+                '/// <reference types="node" />',
+                '/// <amd-module name="x" />',
+                '/// <amd-dependency path="y" />'
+            ]) {
+                await spec.rewriteRun(typescript(
+                    `
+                    #!/usr/bin/env node
+                    /// <reference lib="es2022" />
+                    /* Copyright Acme */
+                    ${directive}
+                    /// plain
+                    //// <reference types="other" />
+                    export const c = useState(0);
+                    `,
+                    `
+                    #!/usr/bin/env node
+                    /// <reference lib="es2022" />
+                    /* Copyright Acme */
+                    ${directive}
+                    import {useState} from 'react';
+
+                    /// plain
+                    //// <reference types="other" />
+                    export const c = useState(0);
+                    `
+                ));
+            }
+        });
+
+        test('drops an empty export, which the import makes redundant', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+                    `
+                )
+            );
+        });
+
+        test('keeps an empty export that carries a comment', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "path", member: "join"}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `,
+                    `
+                        import {join} from 'path';
+
+                        const a = join('x');
+
+                        // keep this a module
+                        export {};
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
@@ -550,8 +672,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n    zzz,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                        zzz,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -563,8 +696,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n    zzz\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                        zzz
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -576,8 +720,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    readdir,\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readdir,
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -589,8 +744,19 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`,
-                    `import {\n    access,\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        access,
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -602,8 +768,17 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import {\n    readFile,\n} from 'fs';\n`,
-                    `import {\n    readFile,\n    stat,\n} from 'fs';\n`
+                    `
+                    import {
+                        readFile,
+                    } from 'fs';
+                    `,
+                    `
+                    import {
+                        readFile,
+                        stat,
+                    } from 'fs';
+                    `
                 )
             );
         });
@@ -828,8 +1003,14 @@ describe('AddImport visitor', () => {
             //language=typescript
             await spec.rewriteRun(
                 typescript(
-                    `import { join } from 'path';\nimport {} from 'fs';\n`,
-                    `import { join } from 'path';\nimport { readFile } from 'fs';\n`
+                    `
+                    import { join } from 'path';
+                    import {} from 'fs';
+                    `,
+                    `
+                    import { join } from 'path';
+                    import { readFile } from 'fs';
+                    `
                 )
             );
         });
@@ -956,6 +1137,39 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const fs = require('fs');
+                    `
+                )
+            );
+        });
+
+        test('requires follow directives and triple-slash directives after a shebang', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                javascript(
+                    `
+                    'use client';
+                    module.exports = readFile;
+                    `,
+                    `
+                    'use client';
+                    const {readFile} = require('fs');
+
+                    module.exports = readFile;
+                    `
+                ),
+                javascript(
+                    `
+                    #!/usr/bin/env node
+                    /// <reference types="node" />
+                    module.exports = readFile;
+                    `,
+                    `
+                    #!/usr/bin/env node
+                    /// <reference types="node" />
+                    const {readFile} = require('fs');
+
+                    module.exports = readFile;
                     `
                 )
             );
@@ -1153,6 +1367,26 @@ describe('AddImport visitor', () => {
 
                         readFile('test.txt', () => {});
                         const write = writeFile;
+                    `
+                )
+            );
+        });
+
+        test('should not add import for a module member a dynamic import binds locally', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'writeFile'}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {readFile} from 'fs';
+
+                        export async function write() {
+                            const {writeFile} = await import('fs');
+                            writeFile('test.txt', '', () => {});
+                            readFile('test.txt', () => {});
+                        }
                     `
                 )
             );
@@ -2194,6 +2428,79 @@ describe('AddImport visitor', () => {
                                 function example() {
                                     const schema = z.string();
                                 }
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test.each([
+            [`top level`, `
+                const {z} = await import('zod');
+                export const s = z.string();
+            `],
+            [`a function`, `
+                export async function schema() {
+                    const {z} = await import('zod');
+                    return z.string();
+                }
+            `]
+        ])('should not add import for zod z bound by a dynamic import at %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'z', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(source),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "zod": "^3.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should not add import for a zod member only read through a namespace', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'zod', member: 'string', onlyIfReferenced: true}));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ZodError} from 'zod';
+                                import * as zz from 'zod';
+
+                                export const s = zz.string();
+                                export const e = ZodError;
                             `
                         ),
                         //language=json
@@ -3671,72 +3978,163 @@ describe('AddImport follows the file it lands in', () => {
     test('a semicolon-free file gets an import without one', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import got from 'got'\nimport http from 'http'\n\nconst x = 1\n`,
-            `import got from 'got'\nimport http from 'http'\nimport {b} from 'n'\n\nconst x = 1\n`
+            `
+            import got from 'got'
+            import http from 'http'
+
+            const x = 1
+            `,
+            `
+            import got from 'got'
+            import http from 'http'
+            import {b} from 'n'
+
+            const x = 1
+            `
         ));
     });
 
     test('a semicolon-free file without imports is judged by its other statements', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `const x = 1\nconsole.log(x)\n`,
-            `import {b} from 'n'\n\nconst x = 1\nconsole.log(x)\n`
+            `
+            const x = 1
+            console.log(x)
+            `,
+            `
+            import {b} from 'n'
+
+            const x = 1
+            console.log(x)
+            `
         ));
     });
 
     test('a file with semicolons keeps them', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import got from 'got';\nimport http from 'http';\n\nconst x = 1;\n`,
-            `import got from 'got';\nimport http from 'http';\nimport {b} from 'n';\n\nconst x = 1;\n`
+            `
+            import got from 'got';
+            import http from 'http';
+
+            const x = 1;
+            `,
+            `
+            import got from 'got';
+            import http from 'http';
+            import {b} from 'n';
+
+            const x = 1;
+            `
         ));
     });
 
     test('Prettier semi:false outranks the semicolons the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({semi: false, singleQuote: true}));
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport { b } from 'n'\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import { b } from 'n'
+
+            const x = [a];
+            `
         ));
     });
 
     test('a file whose imports are spaced gets a spaced import', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import { a } from "m";\nimport { c } from "o";\n\nconst x = [a, c];\n`,
-            `import { a } from "m";\nimport { c } from "o";\nimport { b } from "n";\n\nconst x = [a, c];\n`
+            `
+            import { a } from "m";
+            import { c } from "o";
+
+            const x = [a, c];
+            `,
+            `
+            import { a } from "m";
+            import { c } from "o";
+            import { b } from "n";
+
+            const x = [a, c];
+            `
         ));
     });
 
     test('a one-per-line import list is no evidence of brace spacing', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport());
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import {\n    a,\n    c,\n} from "m";\n\nconst x = [a, c];\n`,
-            `import {\n    a,\n    c,\n} from "m";\nimport {b} from "n";\n\nconst x = [a, c];\n`
+            `
+            import {
+                a,
+                c,
+            } from "m";
+
+            const x = [a, c];
+            `,
+            `
+            import {
+                a,
+                c,
+            } from "m";
+            import {b} from "n";
+
+            const x = [a, c];
+            `
         ));
     });
 
     test('Prettier bracketSpacing:false outranks the spacing the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({bracketSpacing: false, singleQuote: true}));
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport {b} from 'n';\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import {b} from 'n';
+
+            const x = [a];
+            `
         ));
     });
 
     test('Prettier singleQuote:false outranks the quote the file writes', async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addImport({singleQuote: false}));
+        //language=typescript
         await spec.rewriteRun(typescript(
-            `import { a } from 'm';\n\nconst x = [a];\n`,
-            `import { a } from 'm';\nimport { b } from "n";\n\nconst x = [a];\n`
+            `
+            import { a } from 'm';
+
+            const x = [a];
+            `,
+            `
+            import { a } from 'm';
+            import { b } from "n";
+
+            const x = [a];
+            `
         ));
     });
 });

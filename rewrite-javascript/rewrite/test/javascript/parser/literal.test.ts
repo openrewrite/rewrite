@@ -74,6 +74,28 @@ describe('property key literal types', () => {
         }));
 });
 
+describe('bigint literal values', () => {
+    test.each([
+        ['1n', BigInt(1)],
+        ['0x1fn', BigInt(31)],
+        ['1_000n', BigInt(1000)],
+        ['0o17n', BigInt(15)],
+        ['0b101n', BigInt(5)],
+        ['123456789012345678901234567890n', BigInt("123456789012345678901234567890")],
+    ])('%s holds the bigint it denotes', (valueSource, expectedValue) =>
+        spec.rewriteRun({
+            ...typescript(`const n = ${valueSource};`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const decl = cu.statements[0].element as J.VariableDeclarations;
+                const lit = decl.variables[0].element.initializer!.element as Literal;
+                expect(typeof lit.value).toBe('bigint');
+                expect(lit.value).toBe(expectedValue);
+                expect(lit.valueSource).toBe(valueSource);
+                expect(lit.type).toBe(Type.Primitive.BigInt);
+            }
+        }));
+});
+
 describe('Old-style octal literals (error 1121)', () => {
     test('should parse in .js files', () => spec.rewriteRun({
         ...javascript('0777'),
