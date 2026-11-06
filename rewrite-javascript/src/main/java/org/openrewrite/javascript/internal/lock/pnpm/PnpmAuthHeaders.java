@@ -44,9 +44,10 @@ public final class PnpmAuthHeaders {
                         .put(match.group(2), Js.string(config.get(key)));
             }
         }
-        // Before rescoping, unscoped credentials belong to the merged default registry.
+        // Before rescoping, unscoped credentials are applied last to the merged default registry.
+        Map<String, String> defaults = new LinkedHashMap<>();
+        String defaultRegistry = null;
         if (!release.rescopesUnscopedCredentials()) {
-            Map<String, String> defaults = new LinkedHashMap<>();
             for (String attr : new String[]{"_authToken", "_auth", "username", "_password", "tokenHelper"}) {
                 if (config.get(attr) != null) {
                     defaults.put(attr, Js.string(config.get(attr)));
@@ -54,7 +55,7 @@ public final class PnpmAuthHeaders {
             }
             String registry = WhatwgUrl.parse(Js.string(config.get("registry"))).getHost();
             String path = WhatwgUrl.parse(Js.string(config.get("registry"))).getPathname();
-            groups.putIfAbsent("//" + registry + path, defaults);
+            defaultRegistry = "//" + registry + path;
         }
         Map<String, Map<String, Map<String, String>>> byScope = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, String>> group : groups.entrySet()) {
@@ -72,6 +73,12 @@ public final class PnpmAuthHeaders {
                     String key = registry.getKey();
                     target.put(key.endsWith("/") ? key : key + "/", header);
                 }
+            }
+        }
+        if (defaultRegistry != null) {
+            String header = header(defaults, release);
+            if (header != null) {
+                headers.put(defaultRegistry.endsWith("/") ? defaultRegistry : defaultRegistry + "/", header);
             }
         }
     }

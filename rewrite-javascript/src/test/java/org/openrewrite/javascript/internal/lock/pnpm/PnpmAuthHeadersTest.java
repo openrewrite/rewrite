@@ -97,6 +97,17 @@ class PnpmAuthHeadersTest {
         assertThat(auth.authorization("https://private.example.evil/", "p")).isNull();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
+      "11.5.3", "11.10.0", "11.16.0"})
+    void defaultUnscopedCredentialsHaveTheNativesPrecedence(String version) {
+        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0").contains(version);
+        PnpmAuthHeaders auth = options("registry=" + URL + "\n" + KEY + "synthetic-scoped\n" +
+          "_authToken=synthetic-default", null, Map.of(), PnpmRelease.of(version)).authHeaders();
+        assertThat(auth.authorization(URL, "p"))
+          .isEqualTo(rescoped ? "Bearer synthetic-scoped" : "Bearer synthetic-default");
+    }
+
     @Test
     void bootstrapUsesTrustedCredentialsEvenWhenRegistryRoutesAreTheSame() {
         PnpmOptions options = options(KEY + "project", KEY + "user", Map.of(), PnpmRelease.of("11.10.0"));
