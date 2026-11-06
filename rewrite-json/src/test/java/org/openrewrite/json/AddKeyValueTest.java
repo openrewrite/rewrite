@@ -254,4 +254,46 @@ class AddKeyValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keyThatReadsLikeASurrogateEscapeIsWrittenAsPlainText() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "\\ud800", "\"value\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "y"
+              }
+              """,
+            """
+              {
+                  "x": "y",
+                  "\\\\ud800": "value"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void membersWithUnpairedSurrogatesPrintAsWritten() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "added", "\"v\\ud800\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "\\ud800": "\\udfff"
+              }
+              """,
+            """
+              {
+                  "\\ud800": "\\udfff",
+                  "added": "v\\ud800"
+              }
+              """
+          )
+        );
+    }
 }
