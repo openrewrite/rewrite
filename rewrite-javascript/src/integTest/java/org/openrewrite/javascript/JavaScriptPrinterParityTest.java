@@ -208,6 +208,58 @@ class JavaScriptPrinterParityTest {
         assertThat(withoutCursor).containsExactly("{ a: 1 b: 2 }", "(string)", "items?", "a?");
     }
 
+    @Test
+    void wordKeywordsAreSeparatedFromOperandsARecipeMovedNextToThem() {
+        JS.CompilationUnit cu = (JS.CompilationUnit) JavaScriptParser.builder().build()
+          .parseInputs(List.of(Parser.Input.fromString(Paths.get("keywords.ts"),
+            """
+              async function* f(a, b, xs) {
+                  typeof(a); void(a); delete(a.b); await(a); yield(a); new(A); throw(a);
+                  a in(b); a instanceof(B); for (const x of(xs)) {} for (const x in(xs)) {}
+                  switch (a) { case(1): break; }
+                  if (a) {} else(a); do(a); while (b); typeof(𝑥);
+                  const c = (b)in a, d = (b)instanceof B, e = (b)as any, g = (b)satisfies B;
+                  for ((b)of xs) {}
+              }
+              type N<O> = (O)extends string ? 1 : 2;
+              type P<Q> = keyof(Q);
+              export default(1);
+              """)),
+            null, new InMemoryExecutionContext())
+          .findFirst()
+          .orElseThrow();
+
+        J unwrapped = new JavaScriptVisitor<Integer>() {
+            @Override
+            public <T extends J> J visitParentheses(J.Parentheses<T> parens, Integer p) {
+                J visited = super.visitParentheses(parens, p);
+                return visited instanceof J.Parentheses ?
+                  ((J.Parentheses<?>) visited).getTree().withPrefix(visited.getPrefix()) : visited;
+            }
+
+            @Override
+            public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parens, Integer p) {
+                return parens.getParenthesizedType().getTree().withPrefix(parens.getPrefix());
+            }
+        }.visitNonNull(cu, 0);
+
+        String expected = """
+          async function* f(a, b, xs) {
+              typeof a; void a; delete a.b; await a; yield a; new A; throw a;
+              a in b; a instanceof B; for (const x of xs) {} for (const x in xs) {}
+              switch (a) { case 1: break; }
+              if (a) {} else a; do a; while (b); typeof 𝑥;
+              const c = b in a, d = b instanceof B, e = b as any, g = b satisfies B;
+              for (b of xs) {}
+          }
+          type N<O> = O extends string ? 1 : 2;
+          type P<Q> = keyof Q;
+          export default 1;
+          """;
+        assertThat(((JS.CompilationUnit) unwrapped).printAll()).isEqualTo(expected);
+        assertThat(rpc().print((JS.CompilationUnit) unwrapped)).isEqualTo(expected);
+    }
+
     /**
      * A tree type that is added to the model, or that the printer gains a method for, needs a file under
      * {@code printer-parity} that uses it.
