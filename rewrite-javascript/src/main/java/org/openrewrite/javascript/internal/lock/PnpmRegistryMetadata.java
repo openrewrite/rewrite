@@ -45,7 +45,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
 
     @Override
     public RegistryMetadata withOptions(PnpmOptions options) {
-        return new PnpmRegistryMetadata(registries, client, options.authHeaders());
+        return new PnpmRegistryMetadata(registries, client.withTransport(options.transport()), options.authHeaders());
     }
 
     private NodeRegistry request(String name, String url) {
