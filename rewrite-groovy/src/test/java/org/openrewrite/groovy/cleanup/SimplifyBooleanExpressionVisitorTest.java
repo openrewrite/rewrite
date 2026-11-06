@@ -31,6 +31,24 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("ALL")
 class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\"foo\" == null", "null == \"foo\"", "1 == 2", "3 == 4",
+      "!(1 == 2)", "(1 == 2) || (3 == 4)", "!false", "\"foo\".equals(\"bar\")"})
+    void preserveAssertDiagnosticInput(String condition) {
+        rewriteRun(
+          groovy(
+            """
+              class Conditions {
+                  void check() {
+                      assert %1$s
+                      assert %1$s : "diagnostic message"
+                  }
+              }
+              """.formatted(condition)
+          )
+        );
+    }
+
     @Test
     void preserveNestedNegationPrecedence() {
         rewriteRun(
@@ -251,11 +269,11 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
           groovy(
             """
               assert !!(1 == 2)
-              assert !false
+              boolean simplified = !false
               """,
             """
               assert !!(1 == 2)
-              assert true
+              boolean simplified = true
               """,
             spec -> spec.path("conditions.java")
           )

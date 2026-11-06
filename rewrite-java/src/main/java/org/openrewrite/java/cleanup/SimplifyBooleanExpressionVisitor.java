@@ -32,6 +32,19 @@ import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
     @Override
+    public J visitAssert(J.Assert assertion, ExecutionContext ctx) {
+        SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+        // Groovy power assertions (including Spock conditions) render the source expression
+        // and record intermediate values. Preserve their input before visiting children,
+        // even when a simplification would preserve the boolean result.
+        // Use the tree type to avoid a dependency from rewrite-java to rewrite-groovy.
+        if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+            return assertion;
+        }
+        return super.visitAssert(assertion, ctx);
+    }
+
+    @Override
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
         J.Binary asBinary = (J.Binary) j;
