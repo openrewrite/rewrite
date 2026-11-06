@@ -80,6 +80,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private static final Map<String, Modifier> MODIFIER_BY_KEYWORD =
             Stream.of(Modifier.values()).collect(toUnmodifiableMap(Modifier::toString, Function.identity()));
 
+    // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+    private static final Method GET_COMMENT_TREE = getCommentTreeMethod();
 
     private final Path sourcePath;
 
@@ -1907,12 +1909,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
+    private static Method getCommentTreeMethod() {
+        try {
+            return DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException("Failed to find getCommentTree method", ex);
+        }
+    }
+
     private @Nullable DocCommentTree commentTree(JCTree t) {
         try {
-            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            return (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            return (DocCommentTree) GET_COMMENT_TREE.invoke(docCommentTable, t);
+        } catch (InvocationTargetException | IllegalAccessException ex) {
             reportJavaParsingException(ex);
             throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         }
