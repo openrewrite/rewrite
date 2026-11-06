@@ -72,7 +72,7 @@ export interface RemoveAtOptions {
 /**
  * Whether an object or array holds nothing, which the LST represents as a single `Json.Empty`.
  */
-export function isEmpty(container: Json.Object | Json.Array): boolean {
+export function isEmptyContainer(container: Json.Object | Json.Array): boolean {
     const elements: Json.RightPadded<Json>[] = isObject(container) ? container.members : container.values;
     return elements.length === 0 || (elements.length === 1 && elements[0].element.kind === Json.Kind.Empty);
 }
@@ -80,15 +80,15 @@ export function isEmpty(container: Json.Object | Json.Array): boolean {
 /**
  * The members of an object, without the `Json.Empty` of an empty object or a trailing comma.
  */
-export function members(obj: Json.Object): Json.Member[] {
+export function membersOf(obj: Json.Object): Json.Member[] {
     return obj.members.map(m => m.element).filter(isMember);
 }
 
 /**
  * The first member of an object with the given key, matched by {@link getMemberKeyName}.
  */
-export function member(obj: Json.Object, key: string): Json.Member | undefined {
-    return members(obj).find(m => getMemberKeyName(m) === key);
+export function findMember(obj: Json.Object, key: string): Json.Member | undefined {
+    return membersOf(obj).find(m => getMemberKeyName(m) === key);
 }
 
 /**
@@ -100,7 +100,7 @@ export function valueAt(root: JsonRoot, path: readonly string[]): Json.Value | u
         if (current === undefined || !isObject(current)) {
             return undefined;
         }
-        current = member(current, key)?.value;
+        current = findMember(current, key)?.value;
     }
     return current;
 }
@@ -128,7 +128,7 @@ export function toPlain(json: Json): unknown {
     }
     if (isObject(json)) {
         const entries: [string, unknown][] = [];
-        for (const m of members(json)) {
+        for (const m of membersOf(json)) {
             const key = getMemberKeyName(m);
             const value = toPlain(m.value);
             if (key === undefined || value === undefined) {
@@ -301,7 +301,7 @@ export function removeAt<T extends JsonRoot>(root: T, path: readonly string[], o
 /**
  * A literal with its `source` written as JSON and its `value` set.
  */
-export function literal(value: string | number | boolean | null, prefix: Json.Space = emptySpace): Json.Literal {
+export function jsonLiteral(value: string | number | boolean | null, prefix: Json.Space = emptySpace): Json.Literal {
     if (typeof value === "number" && !Number.isFinite(value)) {
         throw new RangeError(`${value} can't be written as JSON`);
     }
@@ -325,7 +325,7 @@ export function fromPlain(value: unknown, indent: string, depth: number = 0): Js
         return fromPlain((value as { toJSON(): unknown }).toJSON(), indent, depth);
     }
     if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-        return literal(value);
+        return jsonLiteral(value);
     }
     const inner = space("\n" + indent.repeat(depth + 1));
     const closing = space("\n" + indent.repeat(depth));
@@ -417,7 +417,7 @@ function newMember(key: string, value: Json.Value, prefix: Json.Space, keyAfter:
         id: randomId(),
         prefix,
         markers: emptyMarkers,
-        key: rightPadded<Json.Key>(literal(key), keyAfter),
+        key: rightPadded<Json.Key>(jsonLiteral(key), keyAfter),
         value: withPrefix(value, valuePrefix)
     };
 }
@@ -440,11 +440,11 @@ function sameData(a: Json.Value, b: Json.Value): boolean {
         return as.length === bs.length && as.every((v, i) => sameData(v, bs[i]));
     }
     if (isObject(a) && isObject(b)) {
-        const as = members(a);
-        const bs = members(b);
+        const as = membersOf(a);
+        const bs = membersOf(b);
         return as.length === bs.length && as.every(m => {
             const key = getMemberKeyName(m);
-            const other = key === undefined ? undefined : member(b, key);
+            const other = key === undefined ? undefined : findMember(b, key);
             return other !== undefined && sameData(m.value, other.value);
         });
     }
@@ -606,7 +606,7 @@ function editRoot<T extends JsonRoot>(root: T, path: readonly string[], options:
 }
 
 function documentIndent(doc: Json.Document, obj: Json.Object): string | undefined {
-    const first = members(obj)[0];
+    const first = membersOf(obj)[0];
     if (first === undefined) {
         return detectIndent(doc);
     }
@@ -620,7 +620,7 @@ function setIn(obj: Json.Object, path: readonly string[], value: Json.Value, opt
         return setMember(obj, key, value, options);
     }
     const nested = {...options, depth: (options.depth ?? 0) + 1};
-    const child = member(obj, key)?.value;
+    const child = findMember(obj, key)?.value;
     if (child === undefined) {
         return options.createMissing ?
             setMember(obj, key, setIn(emptyObject(), rest, value, nested), {...options, position: options.parentPosition ?? "last"}) :
@@ -642,7 +642,7 @@ function removeIn(obj: Json.Object, path: readonly string[], pruneEmptyParents: 
     if (rest.length === 0) {
         return removeMember(obj, key);
     }
-    const child = member(obj, key)?.value;
+    const child = findMember(obj, key)?.value;
     if (child === undefined || !isObject(child)) {
         return obj;
     }
@@ -650,5 +650,5 @@ function removeIn(obj: Json.Object, path: readonly string[], pruneEmptyParents: 
     if (updated === child) {
         return obj;
     }
-    return pruneEmptyParents && isEmpty(updated) ? removeMember(obj, key) : updateMember(obj, key, () => updated);
+    return pruneEmptyParents && isEmptyContainer(updated) ? removeMember(obj, key) : updateMember(obj, key, () => updated);
 }
