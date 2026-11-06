@@ -102,6 +102,21 @@ class TypeUtilsTest implements RewriteTest {
         assertThat(first).isNotEqualTo(second.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT));
     }
 
+    @Test
+    void inferenceContextRecognizesRebuiltRecursiveGraphs() {
+        var first = recursiveTypeVariable();
+        var second = recursiveTypeVariable();
+        var rebuiltFirst = recursiveTypeVariable();
+        var rebuiltSecond = recursiveTypeVariable();
+        var context = TypeUtils.ComparisonContext.INFER.enterComparison(first, second);
+
+        assertThat(context.isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.flipInference().isComparing(rebuiltFirst, rebuiltSecond)).isTrue();
+        assertThat(context.isComparing(rebuiltFirst, recursiveTypeVariable("NativeType"))).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withName("U"), rebuiltSecond)).isFalse();
+        assertThat(context.isComparing(rebuiltFirst.withVariance(JavaType.GenericTypeVariable.Variance.INVARIANT), rebuiltSecond)).isFalse();
+    }
+
     private static JavaType.GenericTypeVariable recursiveTypeVariable() {
         return recursiveTypeVariable("RealType");
     }
