@@ -37,6 +37,28 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("ALL")
 class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
+    @Test
+    void preserveNestedNegationPrecedence() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean same(String left, String right) {
+                      return !!(left == right);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean same(String left, String right) {
+                      return left == right;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));

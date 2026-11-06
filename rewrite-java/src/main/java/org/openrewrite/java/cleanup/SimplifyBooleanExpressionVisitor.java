@@ -156,7 +156,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
-                if (j instanceof J.Ternary) {
+                if (j instanceof Expression) {
                     j = ParenthesizeVisitor.maybeParenthesize((Expression) j, getCursor());
                 }
             }
