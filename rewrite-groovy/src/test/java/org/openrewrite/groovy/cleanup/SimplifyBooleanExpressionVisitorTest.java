@@ -52,6 +52,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preserveNonBooleanDuplicateOperands() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                  def nullOr() { return null || null }
+                  def nullAnd() { return null && null }
+                  def stringOr(String value) { return value || value }
+                  def stringAnd(String value) { return value && value }
+              }
+              """
+          )
+        );
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
