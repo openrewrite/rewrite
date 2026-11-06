@@ -57,7 +57,8 @@ public final class RegistryTransport {
         Map<String, String> values = new LinkedHashMap<>();
         for (String key : Arrays.asList("https_proxy", "http_proxy", "proxy", "no_proxy",
                 "npm_config_https_proxy", "npm_config_proxy", "npm_config_noproxy", "npm_config_ca", "npm_config_cafile",
-                "npm_config_cert", "npm_config_key", "npm_config_local_address", "npm_config_strict_ssl")) {
+                "npm_config_cert", "npm_config_key", "npm_config_local_address", "npm_config_strict_ssl",
+                "npm_config_offline", "npm_config_fetch_timeout")) {
             for (String spelling : Arrays.asList(key, key.toUpperCase(java.util.Locale.ROOT))) {
                 String value = environment.getenv(spelling);
                 if (value != null) {
@@ -69,6 +70,7 @@ public final class RegistryTransport {
     }
 
     public static RegistryTransport npm(Map<String, ?> config, Map<String, String> env) {
+        requireNpmRequestPolicy(config, env);
         Map<String, Object> capabilities = new LinkedHashMap<>(config);
         for (String key : Arrays.asList("ca", "cafile", "cert", "key", "local-address", "strict-ssl")) {
             String value = env(env, "npm_config_" + key.replace('-', '_'));
@@ -88,6 +90,23 @@ public final class RegistryTransport {
         return new RegistryTransport(proxy != null ? proxy : first(env(env, "https_proxy"),
                 first(env(env, "http_proxy"), env(env, "proxy"))),
                 proxy != null ? proxy : env(env, "https_proxy"), bypass, customTls);
+    }
+
+    /** Do not turn an offline install or an explicit deadline into an ordinary live request. */
+    private static void requireNpmRequestPolicy(Map<String, ?> config, Map<String, String> environment) {
+        Object offline = config.get("offline");
+        String requested = env(environment, "npm_config_offline");
+        if (requested != null && !requested.isEmpty()) {
+            requested = requested.trim();
+            offline = !"false".equals(requested) && !"null".equals(requested) && !"undefined".equals(requested);
+        }
+        if (offline != null && !Boolean.FALSE.equals(offline)) {
+            throw new CannotKnow("npm network policy requires its offline registry cache, which this transport cannot safely apply");
+        }
+        String timeout = env(environment, "npm_config_fetch_timeout");
+        if (config.containsKey("fetch-timeout") || timeout != null && !timeout.isEmpty()) {
+            throw new CannotKnow("npm network policy requires fetch-timeout, which this transport cannot safely apply");
+        }
     }
 
     public static RegistryTransport pnpm(Map<String, ?> config, Map<String, String> env) {

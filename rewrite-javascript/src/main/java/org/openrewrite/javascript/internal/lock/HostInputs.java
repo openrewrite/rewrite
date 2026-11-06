@@ -199,6 +199,10 @@ public class HostInputs {
         // through a project's settings or silently discarded.
         if (network != NetworkConfig.NONE && registries.isEmpty()) {
             List<String> networkKeys = new ArrayList<>(Arrays.asList("proxy", "https-proxy", "ca", "ca[]", "cert", "key", "local-address"));
+            if (network == NetworkConfig.NPM) {
+                networkKeys.add("offline");
+                networkKeys.add("fetch-timeout");
+            }
             if (network != NetworkConfig.PNPM_11) {
                 networkKeys.add("noproxy");
                 networkKeys.add("noproxy[]");

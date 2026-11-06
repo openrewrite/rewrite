@@ -70,7 +70,8 @@ public class NpmOptions {
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
             "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global", "location", "registry",
-            "scope", "proxy", "https-proxy", "noproxy", "ca", "cafile", "cert", "key", "strict-ssl", "local-address");
+            "scope", "proxy", "https-proxy", "noproxy", "ca", "cafile", "cert", "key", "strict-ssl", "local-address",
+            "offline", "fetch-timeout");
     private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
     // @npmcli/config definitions.js: every key npm 12.0.0 defines, in its order, which no release to 12.2.0 changes
@@ -400,6 +401,12 @@ public class NpmOptions {
             }
             Object value = entry.getValue();
             switch (key) {
+                case "offline":
+                    network.put(key, booleanField(value, env, validated));
+                    break;
+                case "fetch-timeout":
+                    network.put(key, parseField(value, Type.NUMBER, env));
+                    break;
                 case "proxy":
                 case "https-proxy":
                 case "noproxy":
