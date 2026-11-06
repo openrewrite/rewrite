@@ -123,6 +123,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         ));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"value.equals(value)", "next().equals(next())", "holder.value.equals(holder.value)", "values[index].equals(values[index])"})
+    void preserveStringSelfEqualsEvaluation(String expression) {
+        rewriteRun(java(
+          """
+            class A {
+                String value;
+                String next() { return value; }
+                boolean f(String value, A holder, String[] values, int index) {
+                    return %s;
+                }
+            }
+            """.formatted(expression)
+        ));
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
@@ -1063,7 +1079,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       String foo = "foo";
                       if (true) {}
-                      if (true) {}
+                      if (foo.equals(foo)) {}
                       if (foo.equals("foo")) {}
                       if ("foo".equals(foo)) {}
                       if (false) {}
