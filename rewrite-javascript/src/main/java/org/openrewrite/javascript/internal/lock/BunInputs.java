@@ -65,7 +65,9 @@ final class BunInputs implements Port {
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new BunLockRegenerator(inputs, new BunRegistryManifests(host.transport(), client)).regenerate();
+        return new BunLockRegenerator(inputs, new BunRegistryManifests(host.transport(), client,
+                NetworkPolicy.environment(host.getSystem(),
+                        "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR"))).regenerate();
     }
 
     /**

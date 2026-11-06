@@ -22,6 +22,9 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * The packuments a Bun install reads, through the run's {@link NpmRegistryClient}, from the registry Bun's own
  * configuration names for each package, with the credentials bun gives that registry.
@@ -30,14 +33,27 @@ final class BunRegistryManifests implements ManifestSource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
+    private final Map<String, String> hostNetwork;
 
     BunRegistryManifests(NodeRegistries registries, NpmRegistryClient client) {
+        this(registries, client, Collections.emptyMap());
+    }
+
+    BunRegistryManifests(NodeRegistries registries, NpmRegistryClient client, Map<String, String> hostNetwork) {
         this.registries = registries;
         this.client = client;
+        this.hostNetwork = hostNetwork;
+    }
+
+    @Override
+    public ManifestSource withNetworkSettings(Map<String, ?> settings) {
+        NetworkPolicy.requireDirect("Bun", settings);
+        return this;
     }
 
     @Override
     public @Nullable String packument(String registry, String name, boolean extended) {
+        NetworkPolicy.requireDirect("Bun", hostNetwork);
         try {
             return client.getPackumentText(scope(name, registry), name, extended);
         } catch (NodeRegistryException e) {

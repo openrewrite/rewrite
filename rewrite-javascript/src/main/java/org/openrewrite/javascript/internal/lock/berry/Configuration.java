@@ -181,6 +181,23 @@ public final class Configuration {
         DEFINITIONS.put("enableTransparentWorkspaces", Definition.of(Type.BOOLEAN, true));
         DEFINITIONS.put("enableHardenedMode", Definition.of(Type.BOOLEAN, false));
         DEFINITIONS.put("enableOfflineMode", Definition.of(Type.BOOLEAN, false));
+        // Configuration.ts coreDefinitions: these request policies must reach the live registry adapter too.
+        DEFINITIONS.put("enableNetwork", Definition.of(Type.BOOLEAN, true));
+        DEFINITIONS.put("enableStrictSsl", Definition.of(Type.BOOLEAN, true));
+        Map<String, Definition> network = new LinkedHashMap<>();
+        for (String key : Arrays.asList("httpProxy", "httpsProxy")) {
+            Definition definition = Definition.of(Type.STRING, null);
+            DEFINITIONS.put(key, definition);
+            network.put(key, definition);
+        }
+        for (String key : Arrays.asList("httpsCaFilePath", "httpsKeyFilePath", "httpsCertFilePath")) {
+            Definition definition = Definition.of(Type.ABSOLUTE_PATH, null);
+            DEFINITIONS.put(key, definition);
+            network.put(key, definition);
+        }
+        network.put("enableNetwork", Definition.of(Type.BOOLEAN, null));
+        DEFINITIONS.put("networkSettings", Definition.map(Definition.shape(network)));
+
         DEFINITIONS.put("checksumBehavior", Definition.of(Type.STRING, "throw"));
 
         Map<String, Definition> peerMeta = new LinkedHashMap<>();

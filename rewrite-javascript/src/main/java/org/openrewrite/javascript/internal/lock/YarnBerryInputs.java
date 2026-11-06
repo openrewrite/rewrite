@@ -73,7 +73,12 @@ final class YarnBerryInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
+        return new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client,
+                NetworkPolicy.environment(host.getSystem(),
+                        "YARN_HTTP_PROXY", "YARN_HTTPS_PROXY", "YARN_HTTPS_CA_FILE_PATH",
+                        "YARN_HTTPS_CERT_FILE_PATH", "YARN_HTTPS_KEY_FILE_PATH", "YARN_ENABLE_NETWORK",
+                        "YARN_ENABLE_OFFLINE_MODE", "YARN_ENABLE_STRICT_SSL", "NODE_EXTRA_CA_CERTS",
+                        "SSL_CERT_FILE", "SSL_CERT_DIR")))
                 .regenerate();
     }
 

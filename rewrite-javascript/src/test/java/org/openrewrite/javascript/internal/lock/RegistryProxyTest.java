@@ -49,6 +49,44 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
     @ParameterizedTest
+    @ValueSource(strings = {"yarn1", "yarn4", "bun"})
+    void anUnboundManagerPolicyCannotSendDirectRequests(String manager) {
+        AtomicInteger sent = new AtomicInteger();
+        String registry = "http://registry.invalid/";
+        String proxy = "http://synthetic-user:synthetic-password@127.0.0.1:1";
+        Request.RequestBuilder request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"@proxy-control/synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"));
+        if ("yarn1".equals(manager)) {
+            request.lock("# yarn lockfile v1\n")
+                    .packageManagerFile(Paths.get(".npmrc"), "registry=" + registry + "\n")
+                    .packageManagerFile(Paths.get(".yarnrc"), "proxy \"" + proxy + "\"\n");
+        } else if ("yarn4".equals(manager)) {
+            request.lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n")
+                    .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: " + registry + "\nhttpProxy: " + proxy + "\nunsafeHttpWhitelist: [registry.invalid]\n");
+        } else {
+            request.lock("{\"lockfileVersion\":1,\"workspaces\":{\"\":{\"name\":\"proxy-control\"}},\"packages\":{}}")
+                    .packageManagerFile(Paths.get(".npmrc"), "registry=" + registry + "\n");
+        }
+        Environment environment = new Environment() {
+            public String getenv(String name) { return "bun".equals(manager) && "HTTP_PROXY".equals(name) ? proxy : null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager("yarn4".equals(manager) ? PackageManager.YarnBerry : "yarn1".equals(manager) ? PackageManager.YarnClassic : PackageManager.Bun)
+                .packageManagerVersion("yarn4".equals(manager) ? "4.17.0" : "yarn1".equals(manager) ? "1.22.22" : "1.3.14").build();
+        Result result = ("yarn1".equals(manager) ? YarnClassicInputs.PORT : "yarn4".equals(manager) ? YarnBerryInputs.PORT : BunInputs.PORT).regenerate(
+                LockDirectory.of(request.build()), host, new NpmRegistryClient(r -> {
+                    sent.incrementAndGet();
+                    throw new IllegalStateException("a direct request escaped the configured proxy policy");
+                }));
+        assertThat(sent).hasValue(0);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("network policy").doesNotContain("synthetic-password");
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"cafile", "strict-ssl"})
     void trustedHostTlsSettingsReachTheExistingRegistryGuard(String setting) {
         HostInputs host = HostInputs.builder().now(Instant.EPOCH)

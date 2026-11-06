@@ -230,7 +230,13 @@ public final class YarnClassicLockRegenerator {
             return lock;
         }
         Config config = new Config(these, flags);
-        String saved = new Install(these, config, flags, registry).run();
+        Map<String, Object> network = config.networkSettings();
+        for (String key : java.util.Arrays.asList("proxy", "httpsProxy", "cafile", "ca", "cert", "key", "networkTimeout")) {
+            if (flags.containsKey(key)) {
+                network.put(key, flags.get(key));
+            }
+        }
+        String saved = new Install(these, config, flags, registry.withNetworkSettings("Yarn Classic", network)).run();
         return saved == null ? lock : saved;
     }
 

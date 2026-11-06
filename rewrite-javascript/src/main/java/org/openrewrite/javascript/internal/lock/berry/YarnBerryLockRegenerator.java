@@ -32,6 +32,7 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.NetworkPolicy;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
@@ -272,8 +273,18 @@ public final class YarnBerryLockRegenerator {
         if (hardened) {
             project.lockfileNeedsRefresh = true;
         }
-        project.resolveEverything(loaded.getLegacyMigrationResolver(), registry, hardened);
-        project.fetchEverything(registry);
+        Map<String, Object> network = NetworkPolicy.select(
+                project.configuration.getValues(), "httpProxy", "httpsProxy", "networkSettings", "httpsCaFilePath",
+                "httpsKeyFilePath", "httpsCertFilePath", "enableOfflineMode");
+        if (project.configuration.getKeySources().containsKey("httpTimeout")) {
+            network.put("httpTimeout", true);
+        }
+        if (!project.configuration.getBoolean("enableNetwork") || !project.configuration.getBoolean("enableStrictSsl")) {
+            network.put("restricted network or custom TLS", true);
+        }
+        RegistrySource requests = registry.withNetworkSettings("Yarn Modern", network);
+        project.resolveEverything(loaded.getLegacyMigrationResolver(), requests, hardened);
+        project.fetchEverything(requests);
         String written = write(project);
         return written == null ? lock : written;
     }
