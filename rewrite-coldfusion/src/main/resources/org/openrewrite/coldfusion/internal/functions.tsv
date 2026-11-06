@@ -1,0 +1,815 @@
+# The built-in functions of Lucee 7.1: its core function library (core-base.fld), its ESAPI, image and
+# Hibernate extensions, and the functions it writes in CFML. Each is its name, its return type, the member
+# functions it is as @receiver.name, with ! when it returns its receiver, or - for none, then each argument as
+# name:type.
+___setYear	datetime	@datetime.setYear	date:datetime	year:number	timezone:timezone
+__arrayDuplicate	any	@array.duplicate	array:array	deepCopy:boolean
+__dateTimeDuplicate	any	@datetime.duplicate	datetime:datetime	deepCopy:boolean
+__queryDuplicate	any	@query.duplicate	query:query	deepCopy:boolean
+__setDay	datetime	@datetime.setDay	date:datetime	day:number	timezone:timezone
+__setHour	datetime	@datetime.setHour	date:datetime	hour:number	timezone:timezone
+__setMilliSecond	datetime	@datetime.setMilliSecond	date:datetime	millisecond:number	timezone:timezone
+__setMinute	datetime	@datetime.setMinute	date:datetime	minute:number	timezone:timezone
+__setMonth	datetime	@datetime.setMonth	date:datetime	month:number	timezone:timezone
+__setSecond	datetime	@datetime.setSecond	date:datetime	second:number	timezone:timezone
+_createComponent	any	-
+_dump	void	-	value:any	label:string	expand:boolean	show:string	hide:string	output:string	format:string	keys:number	metaInfo:boolean	showUDFs:boolean
+_GetStaticScope	any	-	cfc:string	type:string
+_GetSuperStaticScope	struct	-
+_InternalRequest	struct	-	template:string	method:string	urls:any	forms:any	cookies:struct	headers:struct	body:any	charset:string	addToken:boolean	throwonerror:boolean
+_jsonArray	array	-
+_jsonStruct	struct	-
+_literalArray	array	-
+_literalOrderedStruct	struct	-
+_literalStruct	struct	-
+_valueList	string	@query.valueList	query:query	columnName:string	delimiter:string
+abs	number	@number.abs	number:number
+aCos	number	@number.aCos	number:number
+AddSOAPRequestHeader	boolean	-	webservice:object	namespace:string	name:string	value:object	mustUnderstand:boolean
+addSOAPResponseHeader	boolean	-	namespace:string	name:string	value:object	mustUnderstand:boolean
+AIGetMetaData	struct	-	name:any	detailed:boolean
+AIHas	boolean	-	name:string
+AjaxLink	string	-	url:string
+AjaxOnLoad	void	-	functionName:string
+ApplicationPathCacheClear	void	-
+ApplicationStartTime	date	-
+ApplicationStop	void	-
+array	array	-
+arrayAppend	boolean	@array.append!	array:array	value:any	merge:boolean
+arrayAvg	number	@array.avg	array:array
+arrayClear	boolean	@array.clear!	array:array
+ArrayContains	number	@array.contains	haystack:array	needle:object	substringMatch:boolean
+ArrayContainsNoCase	number	@array.containsNoCase	haystack:array	needle:object	substringMatch:boolean
+arrayDelete	boolean	@array.delete!	array:array	value:object	scope:string
+arrayDeleteAt	boolean	@array.deleteAt!	array:array	position:number
+arrayDeleteNoCase	boolean	@array.deleteNoCase!	array:array	value:object	scope:string
+arrayEach	void	@array.each!	array:array	closure:function	parallel:boolean	maxThreads:number
+arrayEvery	boolean	@array.every	array:array	closure:function	parallel:boolean	maxThreads:number
+arrayFilter	array	@array.filter	array:array	filter:function	parallel:boolean	maxThreads:number
+arrayFind	number	@array.find	array:array	value_or_closure:any
+arrayFindAll	array	@array.findAll	array:array	value_or_closure:any
+arrayFindAllNoCase	array	@array.findAllNoCase	array:array	value:any
+arrayFindNoCase	number	@array.findNoCase	array:array	value:any
+arrayFirst	any	@array.first	array:array
+ArrayIndexExists	boolean	@array.indexExists	array:array	index:number
+arrayInsertAt	boolean	@array.insertAt!	array:array	position:number	value:any
+ArrayIsDefined	boolean	@array.isDefined	array:array	index:number
+arrayIsEmpty	boolean	@array.isEmpty	array:array
+arrayLast	any	@array.last	array:array
+arrayLen	number	@array.len	array:array
+arrayMap	array	@array.map	array:array	closure:function	parallel:boolean	maxThreads:number
+arrayMax	number	@array.max	array:array
+arrayMedian	number	@array.median	array:array
+arrayMerge	array	@array.merge	array1:array	array2:array	leaveIndex:boolean
+arrayMid	array	@array.mid	array:array	start:number	count:number
+arrayMin	number	@array.min	array:array
+arrayNew	array	-	dimension:number	type:string	synchronized:boolean
+arrayPop	any	@array.pop	array:array	defaultValue:any
+arrayPrepend	boolean	@array.prepend!	array:array	value:any	merge:boolean
+arrayPush	numeric	@array.push	array:array	value:any
+arrayReduce	any	@array.reduce	array:array	closure:function	initialValue:object
+ArrayRemoveDuplicates	array	@array.removeDuplicates	array:array	ignoreCase:boolean
+arrayResize	boolean	@array.resize!	array:array	minimum_size:number
+arrayReverse	array	@array.reverse	array:array
+arraySet	boolean	@array.set!	array:array	start_pos:number	end_pos:number	value:any
+arrayShift	any	@array.shift	array:array	defaultValue:any
+arraySlice	array	@array.slice	array:array	offset:number	length:number
+arraySome	boolean	@array.some	array:array	closure:function	parallel:boolean	maxThreads:number
+arraySort	boolean	@array.sort!	array:object	sortType_or_closure:object	sort_order:string	locale_sensitive:boolean
+ArraySplice	array	@array.splice	array:array	index:numeric	length:numeric	replacements:array
+arraySum	number	@array.sum	array:array
+arraySwap	boolean	@array.swap!	array:array	position1:number	position2:number
+arrayToList	string	@array.toList	array:array	delimiter:string
+arrayToStruct	struct	@array.toStruct	array:array	valueAsKey:boolean
+arrayUnShift	numeric	@array.unShift,@array.unshift	array:array	value:any
+asc	number	@string.asc	string:string	position:number
+aSin	number	@number.aSin	number:number
+astFromPath	struct	-	path:any
+astFromString	struct	-	cfmlCode:string	mode:string
+atn	number	@number.atn	number:number
+beat	number	-	time:any
+binaryDecode	binary	-	encoded_binary:string	binaryEncoding:string	precise:boolean
+binaryEncode	string	-	binary:binary	encoding:string
+bitAnd	number	@number.bitAnd	number1:number	number2:number
+bitMaskClear	number	@number.bitMaskClear	number:number	start:number	length:number
+bitMaskRead	number	@number.bitMaskRead	number:number	start:number	length:number
+bitMaskSet	number	@number.bitMaskSet	number:number	mask:number	start:number	length:number
+bitNot	number	@number.bitNot	number:number
+bitOr	number	@number.bitOr	number1:number	number2:number
+bitSHLN	number	@number.bitSHLN	number:number	count:number
+bitSHRN	number	@number.bitSHRN	number:number	count:number
+bitXor	number	@number.bitXor	number1:number	number2:number
+booleanFormat	string	@boolean.booleanFormat	value:any
+breakpoint	boolean	-	label:string	condition:boolean
+BundleInfo	struct	-	object:any
+CacheClear	number	-	filterOrTags:any	cacheName:string
+CacheCount	number	-	cacheName:string
+CacheDelete	void	-	id:object	throwOnError:boolean	cacheName:string
+CachedWithinFlush	boolean	-	cacheObject:any	arguments:any
+CachedWithinId	string	-	cacheObject:any	arguments:any
+cacheGet	object	-	id:string	throwWhenNotExist:object	cacheName:string
+CacheGetAll	struct	-	filter:string	cacheName:string
+CacheGetAllIds	array	-	filter:string	cacheName:string
+CacheGetDefaultCacheName	string	-	type:string
+CacheGetMetadata	struct	-	id:string	cacheName:string
+CacheGetProperties	array	-	type:string
+CacheIdExists	boolean	-	id:string	cacheName:string
+CacheKeyExists	boolean	-	key:string	cacheName:string
+cachePut	void	-	id:string	value:object	timeSpan:timespan	idleTime:timespan	cacheName:string
+CacheRegionExists	boolean	-	cacheName:string	password:string
+CacheRegionNew	void	-	cacheName:string	properties:any	throwOnError:any	password:string
+CacheRegionRemove	void	-	cacheName:string	password:string
+cacheRemove	void	-	ids:object	throwOnError:boolean	cacheName:string
+CacheRemoveAll	number	-	cacheName:string
+CacheSetProperties	void	-	propsStruct:struct
+CallStackDump	void	-	output:string
+CallStackGet	any	-	type:string	offset:number	maxFrames:number
+Canonicalize	string	-	input:string	restrictMultiple:boolean	restrictMixed:boolean	throwOnError:boolean
+ceiling	number	@number.ceiling	number:number
+cfusion_decrypt	string	-	string:string	key:string
+cfusion_encrypt	string	-	string:string	key:string
+charsetDecode	binary	-	encoded_binary:string	encoding:string
+charsetEncode	string	-	binary:binary	encoding:string
+chr	string	-	number:number
+cJustify	string	@string.cJustify	string:string	length:number
+clearTimeZone	void	-
+collectionEach	void	-	collection:object	closure:function
+collectionEvery	boolean	-	collection:object	closure:function	parallel:boolean	maxThreads:number
+collectionFilter	object	-	collection:object	filter:function	parallel:boolean	maxThreads:number
+collectionMap	object	-	collection:object	closure:function	parallel:boolean	maxThreads:number
+collectionReduce	any	-	collection:object	closure:function	initialValue:object
+collectionSome	boolean	-	collection:object	closure:function	parallel:boolean	maxThreads:number
+compare	number	@string.compare	string1:string	string2:string
+compareNoCase	number	@string.compareNoCase	string1:string	string2:string
+compileToBytecode	struct	-	path:string	keepSource:boolean	privateKey:string	recursive:boolean
+componentCacheClear	void	-
+componentCacheList	struct	-
+componentInfo	struct	-	component:component
+ComponentListPackage	array	-	package:string
+compress	boolean	-	format:string	source:string	target:string	includeBaseFolder:boolean	mode:string
+ConfigImport	struct	-	path:any	type:string	password:string	params:struct	flushExistingData:boolean	charset:string
+ConfigMerge	struct	-	left:struct	right:struct
+ConfigTranslate	struct	-	source:string	target:string	type:string	mode:string	charset:string
+ContractPath	string	-	path:string	placeholder:boolean
+cos	number	@number.cos	number:number
+CreateAISession	object	-	name:string	systemMessage:string	limit:numeric	temperature:numeric
+createDate	datetime	-	year:number	month:number	day:number	timezone:timezone
+createDateTime	datetime	-	year:number	month:number	day:number	hour:number	minute:number	second:number	millisecond:number	timezone:timezone
+CreateDynamicProxy	any	-	cfc:object	interfaces:object
+createGUID	string	-
+createObject	any	-	type:string	classname:object	context:object	delimiterOrVersion:object
+createODBCDate	datetime	-	date:datetime	timezone:timezone
+createODBCDateTime	datetime	-	date:datetime
+createODBCTime	datetime	-	date:datetime
+createPageContext	any	-	serverName:string	scriptName:string	queryString:string	cookies:struct	headers:struct	parameters:struct	attributes:struct
+createTime	datetime	-	hour:number	minute:number	second:number	millisecond:number	timezone:timezone
+createTimeSpan	timespan	-	days:number	hours:number	minutes:number	seconds:number	milliseconds:number
+createULID	string	-	type:string	input1:number	input2:string
+CreateUniqueId	string	-	type:string
+createUUID	string	-
+CSRFGenerateToken	string	-	key:string	forceNew:boolean
+CSRFVerifyToken	boolean	-	token:string	key:string	remove:boolean
+ctCacheClear	void	-
+ctCacheList	struct	-
+datasourceFlushMetaCache	boolean	-	datasourceName:string
+dateAdd	datetime	@datetime.add	datePart:string	number:number	date:datetime
+dateCompare	number	@datetime.compare	date1:datetime	date2:datetime	datePart:string
+dateConvert	datetime	-	conversion_type:string	date:datetime
+dateDiff	number	@datetime.diff	datePart:string	date1:datetime	date2:datetime
+dateFormat	string	@date.dateFormat	date:any	mask:string	timezone:timezone
+datePart	number	@datetime.part	datePart:string	date:datetime	timezone:timezone
+dateTimeFormat	string	-	datetime:any	mask:string	timezone:timezone
+day	number	@datetime.day	date:datetime	timezone:timezone
+dayOfWeek	number	@datetime.dayOfWeek	date:datetime	timezone:timezone
+dayOfWeekAsString	string	-	day_of_week:number	locale:locale
+dayOfWeekShortAsString	string	-	day_of_week:number	locale:locale
+dayOfYear	number	@datetime.dayOfYear	date:datetime	timezone:timezone
+daysInMonth	number	@datetime.daysInMonth	date:datetime	timezone:timezone
+daysInYear	number	@datetime.daysInYear	date:datetime	timezone:timezone
+dbPoolClear	boolean	-	datasource:string	force:boolean
+dE	string	-	string:string
+debugAdd	void	-	category:string	data:struct
+decimalFormat	string	-	number:any
+decodeForHTML	string	@string.decodeForHTML	string:string
+decodeFromURL	string	@string.decodeFromURL	string:string
+decrementValue	number	@number.decrementValue	number:number
+decrypt	string	-	encrypted_string:string	key:string	algorithm:string	encoding:string	IVorSalt:any	iterations:number	precise:boolean
+decryptBinary	any	-	binaryData:any	key:string	algorithm:string	IVorSalt:any	iterations:number	precise:boolean
+deleteClientVariable	boolean	-	name:string
+DeserializeJSON	any	@string.deserializeJSON	JSONVar:string	strictMapping:boolean	format:string
+DirectoryCopy	void	-	source:string	destination:string	recurse:boolean	filter:any	createPath:boolean
+DirectoryCreate	void	-	path:string	createPath:boolean	ignoreExists:boolean	mode:string
+DirectoryDelete	void	-	path:string	recurse:boolean
+DirectoryEvery	any	-	path:string	component:component	recurse:boolean
+directoryExists	boolean	-	path:string	allowRealPath:object
+DirectoryInfo	struct	-	source:string
+DirectoryList	any	-	path:string	recurse:boolean	listInfo:string	filter:any	sort:string	type:string
+DirectoryRename	string	-	oldPath:string	newPath:string	createPath:boolean
+dollarFormat	string	-	number:string	useBrackets:boolean
+DotNetToCFType	any	-	input:any
+dump	void	-	var:object	expand:boolean	format:string	hide:string	keys:numeric	label:string	metainfo:boolean	output:string	show:string	showUDFs:boolean	top:numeric	abort:boolean	eval:string
+dumpStruct	struct	-	value:any	top:number	show:string	hide:string	keys:number	metaInfo:boolean	showUDFs:boolean	label:string
+duplicate	any	@struct.duplicate	object:any	deepCopy:boolean
+each	void	-	collection:object	closure:function
+echo	boolean	-	string:string
+Empty	boolean	-	variable:variablestring
+encodeForCSS	string	@string.encodeForCSS	string:string	canonicalize:boolean
+encodeForDN	string	@string.encodeForDN	string:string	canonicalize:boolean
+encodeForHTML	string	@string.encodeForHTML	string:string	canonicalize:boolean
+encodeForHTMLAttribute	string	@string.encodeForHTMLAttribute	string:string	canonicalize:boolean
+encodeForJavaScript	string	@string.encodeForJavascript	string:string	canonicalize:boolean
+encodeForLDAP	string	@string.encodeForLDAP	string:string	canonicalize:boolean
+encodeForSQL	string	@string.encodeForSQL	string:string	dialect:string	canonicalize:boolean
+encodeForURL	string	@string.encodeForURL	string:string	canonicalize:boolean
+encodeForXML	string	@string.encodeForXML	string:string	canonicalize:boolean
+encodeForXMLAttribute	string	@string.encodeForXMLAttribute	string:string	canonicalize:boolean
+encodeForXPath	string	@string.encodeForXPath	string:string	canonicalize:boolean
+encrypt	string	@string.encrypt	string:string	key:string	algorithm:string	encoding:string	IVorSalt:any	iterations:number	precise:boolean
+encryptBinary	any	-	bytes:any	key:string	algorithm:string	IVorSalt:any	iterations:number	precise:boolean
+EntityDelete	void	-	name:object
+entityLoad	any	-	name:string	idOrFilter:any	uniqueOrOrder:any	options:any
+EntityLoadByExample	any	-	sampleEntity:object	unique:boolean
+EntityLoadByPK	any	-	name:string	id:any	unique:boolean
+EntityMerge	any	-	entity:any
+EntityNameArray	array	-
+EntityNameList	string	-	delimiter:string
+EntityNew	any	-	entityName:string	properties:struct
+EntityReload	void	-	entity:object
+EntitySave	void	-	entity:object	forceInsert:boolean
+EntityToQuery	query	-	entity:object	name:string
+ESAPIDecode	string	-	decodeFrom:string	string:string
+ESAPIEncode	string	-	encodeFor:string	string:string	canonicalize:boolean	dialect:string
+evaluate	any	-
+evaluateComponent	any	-	name:string	md5:string	thisData:struct	variablesData:struct
+evaluateJava	any	-	stringOrBinary:any
+exp	number	@number.exp	number:number
+expandPath	string	-	relative_path:string
+ExtensionExists	boolean	-	id:string	version:string
+ExtensionInfo	struct	-	id:string
+ExtensionList	query	-	imageObject:boolean
+extract	boolean	-	format:string	source:string	target:string
+FileAppend	void	-	file:any	data:any	charset:string
+fileClose	void	-	file:any
+fileCopy	void	-	source:any	destination:any
+FileDelete	void	-	file:any
+FileExists	boolean	-	source:any	allowRealPath:object
+FileGetMimeType	string	-	file:any	strict:boolean
+FileInfo	struct	-	file:string
+FileIsEOF	boolean	-	file:any
+FileModeToSymbolic	string	-	mode:string
+fileMove	void	-	source:any	destination:any
+fileOpen	any	-	file:string	mode:string	charset:string	seekable:boolean
+fileRead	any	-	file:any	charsetOrBufferSize:any
+FileReadBinary	any	-	file:any
+fileReadLine	string	-	file:any
+FileSeek	void	-	file:any	pos:number
+FileSetAccessMode	void	-	file:any	mode:string
+FileSetAttribute	void	-	file:any	attribute:string
+FileSetLastModified	void	-	file:any	date:date
+FileSkipBytes	void	-	file:any	len:number
+fileTouch	void	-	file:any	createPath:boolean
+FileUpload	struct	-	destination:string	fileField:string	accept:string	nameConflict:string	strict:boolean	allowedExtensions:any	blockedExtensions:any	mode:string	attributes:string	acl:object
+FileUploadAll	array	-	destination:string	accept:string	nameConflict:string	strict:boolean	allowedExtensions:any	blockedExtensions:any	mode:string	attributes:string	acl:object
+FileWrite	void	-	file:any	data:any	charset:string
+FileWriteLine	void	-	file:any	data:string
+find	number	@string.find	substring:string	string:string	start:number
+findLast	number	@string.findLast	substring:string	string:string	start:number
+findLastNoCase	number	@string.findLastNoCase	substring:string	string:string	start:number
+findNoCase	number	@string.findNoCase	substring:string	string:string	start:number
+findOneOf	number	@string.findOneOf	set:string	string:string	start:number
+firstDayOfMonth	number	@datetime.firstDayOfMonth	date:datetime	timezone:timezone
+fix	number	@number.fix	number:number
+floor	number	@number.floor	number:number
+formatBaseN	string	@number.formatBaseN	number:number	radix:number
+GatewayAction	string	-	gatewayID:string	action:string	waitForIt:boolean	timeout:timespan
+GatewayState	string	-	gatewayID:string
+generate3DesKey	string	-	input:string
+GeneratePBKDFKey	string	-	algorithm:string	passphrase:string	salt:string	iterations:numeric	keySize:numeric
+GenerateRSAKeys	struct	-	key_size:number
+GenerateSecretKey	string	-	algorithm:string	keySize:number
+GetApplicationMetadata	struct	-
+GetApplicationSettings	struct	-	suppressFunction:boolean	onlySupported:boolean
+getAuthUser	string	-
+getBaseTagData	struct	-	tagName:string	instanceNumber:number
+getBaseTagList	string	-	delimiter:string
+getBaseTemplatePath	string	-
+GetBuiltInFunction	any	-	name:string
+GetCanonicalPath	string	-	path:string
+getClassPath	array	-
+getClientVariablesList	string	-
+GetComponentMetaData	struct	-	pathOrCFC:object
+GetComponentStaticScope	struct	-	component:string
+getContextInfo	struct	-
+getContextRoot	string	-
+GetCPUUsage	number	-	time:number
+getCurrentContext	array	-
+getCurrentTemplatePath	string	-
+getDirectoryFromPath	string	-	path:string
+getEncoding	string	-	scope:string
+getException	throwable	-	object:any
+getFileFromPath	string	-	path:string
+GetFileInfo	struct	-	file:any
+GetFreeSpace	numeric	-	file:object
+GetFunctionCalledName	string	-
+getFunctionData	struct	-	functionName:string
+getFunctionKeywords	array	-
+getFunctionList	struct	-
+getGatewayHelper	any	-	gatewayID:string
+getHTTPRequestData	struct	-	includeBody:boolean
+getHTTPRequestHeaders	struct	-
+getHttpTimeString	string	-	date:datetime
+getK2ServerDocCount	number	-
+getK2ServerDocCountLimit	number	-
+getLocale	string	-
+getLocaleDisplayName	string	@locale.displayName	locale:locale	dspLocale:locale
+getLocaleInfo	struct	@locale.info	locale:locale	dspLocale:locale
+GetLocalHostIP	any	-	all:boolean	refresh:boolean
+GetLuceeId	struct	-
+GetMemoryUsage	query	-	type:string
+getMetadata	any	@any.getMetadata	object:any	source:boolean
+getMetricData	any	-	monitor_name:string
+getNumericDate	number	-	arg1:any
+GetORMTransactionIsolation	string	-
+getPageContext	any	-
+GetPrinterInfo	struct	-	printer:string
+GetPrinterList	string	-	delimiters:string
+getProfileSections	struct	-	iniFile:string
+getProfileString	string	-	iniPath:string	section:string	entry:string
+getPropertyFile	struct	-	filePath:string	encoding:string
+getPropertyString	string	-	filePath:string	key:string	encoding:string
+GetReadableImageFormats	string	-
+GetSafeHTML	string	@string.getSafeHTML	input:string	policy:string	throwOnError:boolean
+getSOAPRequest	any	-	webservice:any
+getSOAPRequestHeader	any	-	namespace:string	name:string	asXML:boolean
+getSOAPResponse	any	-	webservice:any
+getSOAPResponseHeader	any	-	webservice:any	namespace:string	name:string	asXML:boolean
+GetSystemFreeMemory	number	-
+GetSystemMetrics	struct	-
+GetSystemPropOrEnvVar	any	-	property:string
+GetSystemTotalMemory	number	-
+getTagData	struct	-	nameSpaceWithSeparator:string	tagName:string
+getTagList	struct	-
+getTempDirectory	string	-	unique:string
+getTempFile	string	-	dir:string	prefix:string	extension:string
+getTemplatePath	any	-
+getTickCount	number	-	unit:string
+getTimeZone	timezone	-
+getTimeZoneInfo	struct	@timezone.info	timezone:timezone	locale:locale
+getToken	string	@string.getToken	string:string	index:number	delimiters:string
+GetTotalSpace	numeric	-	file:object
+getTransactionIsolation	string	-	datasource:string
+GetUserRoles	string	-
+getVariable	any	-	name:string
+GetVFSMetaData	struct	-	scheme:string
+GetWriteableImageFormats	string	-
+GuardDecode	string	-	decodeFrom:string	string:string
+GuardEncode	string	-	encodeFor:string	string:string	canonicalize:boolean	dialect:string
+hash	string	@string.hash	input:any	algorithm:string	encoding:string	numIterations:number
+hash40	string	-	input:any	algorithm:string	encoding:string	numIterations:number
+HMAC	string	-	message:object	key:object	algorithm:string	encoding:string
+hour	number	@datetime.hour	Date:datetime	timezone:timezone
+hTMLCodeFormat	string	-	string:string	version:number
+hTMLEditFormat	string	-	string:string	version:number
+htmlParse	xml	-	html:string	caseSensitive:boolean
+iIf	any	-	condition:boolean	string_expression1:string	string_expression2:string
+ImageAddBorder	void	@image.addBorder	image:any	thickness:number	color:string	borderType:string	inside:boolean
+ImageBlur	void	@image.blur!	image:any	blurRadius:number
+ImageCaptcha	any	-	text:string	height:numeric	width:numeric	difficulty:string	fonts:any	fontsize:numeric	fontcolor:string
+ImageClearRect	void	@image.clearRect!	image:object	x:number	y:number	width:number	height:number
+ImageCoderInfo	struct	@image.coderInfo	image:any
+ImageCopy	any	@image.copy	image:any	x:number	y:number	width:number	height:number	dx:number	dy:number
+ImageCrop	void	@image.crop!	image:any	x:number	y:number	width:number	height:number
+ImageDrawArc	void	@image.drawArc!	image:any	x:number	y:number	width:number	height:number	startAngle:number	arcAngle:number	filled:boolean
+ImageDrawBeveledRect	void	@image.drawBeveledRect!	image:any	x:number	y:number	width:number	height:number	raised:boolean	filled:boolean
+ImageDrawCubicCurve	void	@image.drawCubicCurve!	image:any	x1:number	y1:number	ctrlx1:number	ctrly1:number	ctrlx2:number	ctrly2:number	x2:number	y2:number
+ImageDrawImage	void	@image.drawImage!	image:any	image:any	x:number	y:number
+ImageDrawLine	void	@image.drawLine!	image:any	x1:number	y1:number	x2:number	y2:number
+ImageDrawLines	void	@image.drawDrawLines!	image:any	xcoords:array	ycoords:array	isPolygon:boolean	filled:boolean
+ImageDrawOval	void	@image.drawOval!	image:any	x:number	y:number	width:number	height:number	filled:boolean
+ImageDrawPoint	void	@image.drawPoint!	image:any	x:number	y:number
+ImageDrawQuadraticCurve	void	@image.drawQuadraticCurve!	image:any	x1:number	y1:number	ctrlx:number	ctrly:number	x2:number	y2:number
+ImageDrawRect	void	@image.drawRect!	image:any	x:number	y:number	width:number	height:number	filled:boolean
+ImageDrawRoundRect	void	@image.drawRoundRect!	image:any	x:number	y:number	width:number	height:number	arcWidth:number	arcHeight:number	filled:boolean
+ImageDrawText	void	@image.drawText!	image:any	string:string	x:number	y:number	attributeCollection:struct
+ImageFilter	void	@image.filter!	image:any	filtername:string	parameters:struct
+ImageFilterColorMap	any	@image.filterColorMap	type:string	lineColor1:string	lineColor2:string
+ImageFilterCurves	any	-
+ImageFilterKernel	any	-	width:number	height:number	data:any
+ImageFilterWarpGrid	any	-	rows:number	cols:number	width:number	height:number
+ImageFlip	void	@image.flip!	image:any	transpose:string
+ImageFonts	array	-
+ImageFormats	struct	-	detailed:boolean
+ImageGetBlob	any	@image.getBlob	image:any
+ImageGetBufferedImage	any	@image.getBufferedImage	image:any
+ImageGetEXIFMetadata	struct	@image.getEXIFMetadata	image:any
+ImageGetEXIFTag	any	@image.getEXIFTag	image:any	tagName:string
+ImageGetHeight	number	@image.getHeight	image:any
+ImageGetIptcMetadata	struct	@image.getIptcMetadata	image:any
+ImageGetIPTCTag	any	@image.getIPTCTag	image:any	tagName:string
+ImageGetPoint	void	@image.getPoint	image:any	x:number	y:number
+ImageGetWidth	number	@image.getWidth	image:any
+ImageGrayscale	void	@image.grayscale!	image:any
+ImageInfo	struct	@image.info	image:any
+ImageNegative	void	@image.negative!	image:any
+ImageNew	any	-	source:any	width:string	height:string	imageType:string	canvasColor:string
+ImageOverlay	void	@image.overlay!	source1:any	source2:any
+ImagePaste	void	@image.paste!	image1:any	image2:any	x:number	y:number
+ImageRead	any	-	path:any
+ImageReadBase64	any	@image.readBase64	b64str:string
+ImageResize	void	@image.resize!	image:any	width:string	height:string	interpolation:string	blurFactor:number
+ImageRotate	void	@image.rotate!	image:any	x:string	y:string	angle:string	interpolation:string
+ImageRotateDrawingAxis	void	@image.rotateDrawingAxis!	image:any	angle:number	x:number	y:number
+ImageScaleToFit	void	@image.scaleToFit!	image:any	fitWidth:string	fitHeight:string	interpolation:string	blurFactor:number
+ImageSetAntialiasing	void	@image.setAntialiasing!	image:any	antialias:string
+ImageSetBackgroundColor	void	@image.setBackgroundColor!	image:any	color:string
+ImageSetDrawingAlpha	void	@image.setDrawingAlpha!	image:any	alpha:number
+ImageSetDrawingColor	void	@image.setDrawingColor!	image:any	color:string
+ImageSetDrawingStroke	void	@image.setDrawingStroke!	image:any	attributeCollection:struct
+ImageSetDrawingTransparency	void	@image.setDrawingTransparency!	image:any	percent:number
+ImageSharpen	void	@image.sharpen!	image:any	gain:number
+ImageShear	void	@image.shear!	image:any	shear:number	direction:string	interpolation:string
+ImageShearDrawingAxis	void	@image.shearDrawingAxis!	image:any	shx:number	shy:number
+ImageTranslate	void	@image.translate!	image:any	xTrans:number	yTrans:number	interpolation:string
+ImageTranslateDrawingAxis	void	@image.translateDrawingAxis!	image:any	x:number	y:number
+ImageWrite	void	@image.write!	image:any	destination:string	quality:number	overwrite:boolean	noMetaData:boolean
+ImageWriteBase64	string	@image.writeBase64	image:any	destination:string	format:string	inHTMLFormat:boolean
+ImageWriteToBrowser	void	@image.writeToBrowser	image:any
+ImageXORDrawingMode	void	@image.XORDrawingMode!	image:any	color:string
+ImportJavaSettings	void	-	javasettings:any
+incrementValue	number	@number.incrementValue	number:number
+inputBaseN	number	-	string:string	radix:number
+InquiryAISession	string	-	session:any	question:any	listener:function
+insert	string	@string.insert	substring:string	string:string	position:number
+inspectTemplates	boolean	-
+int	number	@number.int	number:number
+IntergralContext	struct	-
+InternalRequest	struct	-	template:string	method:string	urls:any	forms:any	cookies:struct	headers:struct	body:any	charset:string	addToken:boolean	throwonerror:boolean
+Invoke	object	-	object:any	name:string	arguments:any
+isArray	boolean	-	value:any	dimension:number
+isBinary	boolean	-	value:any
+isBoolean	boolean	-	value:any
+IsClosure	boolean	-	object:any
+isCustomFunction	boolean	-	name:any	type:string
+isDate	boolean	-	value:any
+IsDDX	boolean	-	pathOrString:string
+isDebuggerEnabled	boolean	-
+isDebugMode	boolean	-
+isDefined	boolean	-	value:string
+IsEmpty	boolean	-	value:any
+isFileObject	boolean	-	value:any
+IsFlushed	boolean	-
+IsImage	boolean	-	image:any
+IsImageFile	boolean	-	path:string
+IsInstanceOf	boolean	-	obj:any	type:string
+isInThread	boolean	-
+IsIPInRange	boolean	-	ips:any	ip:string
+IsIPv6	boolean	-	hostname:string
+IsJson	boolean	-	var:any	format:string
+isK2ServerABroker	boolean	-
+isK2ServerDocCountExceeded	boolean	-
+isK2ServerOnline	boolean	-
+isLeapYear	boolean	-	year:number
+isLocalHost	boolean	-	ip:string
+isNotMap	boolean	-	obj:any
+isNull	boolean	-	object:any
+isNumeric	boolean	-	string:any
+isNumericDate	boolean	-	number:any
+isObject	boolean	-	value:any
+isQuery	boolean	-	value:any
+isSimpleValue	boolean	-	value:any
+IsSOAPRequest	boolean	-
+isStruct	boolean	-	variable:any
+IsThreadInterrupted	boolean	-	threadName:string
+isUserInAnyRole	boolean	-	role_list:string
+isUserInRole	boolean	-	role_name:any
+IsUserLoggedIn	boolean	-
+isValid	boolean	-	type:string	value:any	min_or_pattern:any	max:any
+isWddx	boolean	-	value:any
+IsWithinORMTransaction	boolean	-
+isWithinTransaction	boolean	-
+isXML	boolean	-	value:any	xmlFeatures:struct
+IsXmlAttribute	boolean	-	value:any
+isXmlDoc	boolean	-	value:any
+isXmlElem	boolean	-	value:any
+IsXmlNode	boolean	-	value:any
+isXmlRoot	boolean	-	value:any
+IsZipFile	boolean	-	path:string
+javaCast	any	-	type:string	variable:any	javaSettings:struct
+jSStringFormat	string	-	string:string
+lCase	string	@string.lCase	string:string
+left	string	@string.left	string:string	count:number
+len	number	-	value:object
+listAppend	string	@string.listAppend	list:string	value:string	delimiters:string	includeEmptyFields:boolean
+listAvg	number	@string.listAvg	list:string	delimiters:string	multiCharacterDelimiter:boolean
+listChangeDelims	string	@string.listChangeDelims,@string.changeDelims	list:string	new_delimiter:string	delimiters:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+ListCompact	string	@string.listCompact	list:string	delimiters:string	multiCharacterDelimiter:boolean
+listContains	number	@string.listContains	list:string	substring:string	delimiters:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+listContainsNoCase	number	@string.listContainsNoCase	list:string	substring:string	delimiters:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+listDeleteAt	string	@string.listDeleteAt	list:string	position:number	delimiters:string	includeEmptyFields:boolean
+listEach	void	@string.listEach	list:string	closure:function	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean	parallel:boolean	maxThreads:number
+listEvery	boolean	@string.listEvery	list:string	closure:function	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean	parallel:boolean	maxThreads:number
+listFilter	string	@string.listFilter	list:string	filter:function	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean	parallel:boolean	maxThreads:number
+listFind	number	@string.listFind	list:string	value:string	delimiters:string	includeEmptyFields:boolean
+listFindNoCase	number	@string.listFindNoCase	list:string	value:string	delimiters:string	includeEmptyFields:boolean
+listFirst	string	@string.listFirst	list:string	delimiters:string	includeEmptyFields:boolean	count:number
+listGetAt	string	@string.listGetAt	list:string	position:number	delimiters:string	includeEmptyFields:boolean
+ListGetDuplicates	string	@string.listGetDuplicates	list:string	delimiters:string	ignoreCase:boolean	includeEmptyFields:boolean
+ListIndexExists	boolean	@string.listIndexExists	list:string	index:number	delimiter:string	includeEmptyFields:boolean
+listInsertAt	string	@string.listInsertAt	list:string	position:number	value:string	delimiters:string	includeEmptyFields:boolean
+ListItemTrim	string	@string.listItemTrim	list:string	delimiters:string	includeEmptyFields:boolean
+listLast	string	@string.listLast	list:string	delimiters:string	includeEmptyFields:boolean	count:number
+listLen	number	@string.ListLen	list:string	delimiters:string	includeEmptyFields:boolean
+listMap	string	@string.listMap	list:string	closure:function	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean	parallel:boolean	maxThreads:number
+listPrepend	string	@string.listPrepend	list:string	value:string	delimiters:string	includeEmptyFields:boolean
+ListQualifiedToArray	array	@string.listQualifiedToArray	list:string	delimiter:string	qualifier:string	qualifierRequired:boolean	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+listQualify	string	@string.listQualify	list:string	qualifier:string	delimiters:string	elements:string	includeEmptyFields:boolean
+ListReduce	any	@string.listReduce	list:string	closure:function	initialValue:object	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+ListRemoveDuplicates	string	@string.listRemoveDuplicates	list:string	delimiters:string	ignoreCase:boolean
+listRest	string	@string.listRest	list:string	delimiters:string	includeEmptyFields:boolean	offset:number
+listSetAt	string	@string.listSetAt	list:string	position:number	value:string	delimiters:string	includeEmptyFields:boolean
+ListSome	boolean	@string.listSome	list:string	closure:function	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean	parallel:boolean	maxThreads:number
+listSort	string	@string.listSort	list:string	sort_type:string	sort_order:string	delimiters:string	includeEmptyFields:boolean
+listToArray	array	@string.listToArray	list:string	delimiter:string	includeEmptyFields:boolean	multiCharacterDelimiter:boolean
+listTrim	string	-	list:string	delimiters:string
+listValueCount	number	@string.listValueCount	list:string	value:string	delimiter:string	includeEmptyFields:boolean
+listValueCountNoCase	number	@string.listValueCountNoCase	list:string	value:string	delimiter:string	includeEmptyFields:boolean
+lJustify	string	@string.lJustify	string:string	length:number
+LoadAISession	any	-	name:string	data:any
+location	void	-	url:string	addToken:boolean	statusCode:numeric	encode:boolean
+log	number	@number.log	number:number
+log10	number	@number.log10	number:number
+LogAllThreads	void	-	path:string	interval:number	duration:number
+lSCurrencyFormat	string	-	number:object	type:string	locale:locale	useBrackets:boolean
+LSDateFormat	string	@date.lSDateFormat	date:any	mask:string	locale:locale	timezone:timezone
+lSDateTimeFormat	string	@date.lSDateTimeFormat	date:any	mask:string	locale:locale	timezone:timezone
+lsDayOfWeek	number	@datetime.lsDayOfWeek	date:datetime	locale:locale	timezone:timezone
+lSEuroCurrencyFormat	string	-	number:object	type:string	locale:locale	useBrackets:boolean
+lSIsCurrency	boolean	-	number:string	locale:locale
+LSIsDate	boolean	-	date:any	locale:locale	timezone:timezone
+lSIsNumeric	boolean	-	number:string	locale:locale
+LSLCase	string	-	string:string	locale:locale
+lSNumberFormat	string	-	number:any	mask:string	locale:locale
+lSParseCurrency	string	-	string:string	locale:locale
+lSParseDateTime	datetime	-	date:object	locale:locale	timezone:string	format:string
+lSParseEuroCurrency	string	-	number:string	locale:locale
+lSParseNumber	number	-	number:string	locale:locale
+lSTimeFormat	string	@date.lSTimeFormat	time:any	mask:string	locale:locale	timezone:timezone
+lSUCase	string	-	string:string	locale:locale
+lsWeek	number	-	date:datetime	locale:locale	timezone:timezone
+lTrim	string	@string.ltrim	string:string
+LuceeAIGetNameForDefault	string	-	name:string
+LuceeExtension	any	-	group:string	artifact:string	version:string	download:boolean
+luceeStructInfo	struct	-	struct:struct
+LuceeValueRef	any	-	ref:function
+LuceeVersionsDetail	struct	-	version:string
+LuceeVersionsDetailMvn	struct	-	version:string
+LuceeVersionsDetailS3	struct	-	version:string
+LuceeVersionsList	array	-	type:string
+LuceeVersionsListMvn	array	-	type:string
+LuceeVersionsListS3	array	-	type:string
+ManifestRead	struct	-	str:string
+MarkdownToHTML	string	@string.MarkdownToHTML	string:string	safeMode:boolean	encoding:string
+MavenExists	any	-	groupId:string	artifactId:string	version:string
+MavenExport	any	-
+MavenImport	any	-	pomPath:string	includeTransitive:boolean	includeOptional:boolean
+MavenInfo	any	-	groupId:string	artifactId:string	version:string	scopes:array	includeOptional:boolean	validateURL:boolean
+MavenLoad	any	-	input:any	includeOptional:boolean
+max	number	@number.max	number1:number	number2:number
+metaphone	string	-	str:string
+mid	string	@string.mid	string:string	start:number	count:number
+millisecond	number	@datetime.millisecond	date:datetime	timezone:timezone
+min	number	@number.min	number1:number	number2:number
+minute	number	@datetime.minute	date:datetime	timezone:timezone
+month	number	@datetime.month	Date:datetime	timezone:timezone
+monthAsString	string	-	month:number	locale:locale
+monthShortAsString	string	-	monthNumber:number	locale:locale
+newLine	string	-	includeCROnWindows:boolean
+now	datetime	-
+nowServer	datetime	-
+nullValue	any	-
+numberFormat	string	@any.numberFormat	number:any	mask:string
+ObjectEquals	boolean	-	left:any	right:any	caseSensitive:boolean
+ObjectLoad	any	-	input:any
+ObjectSave	any	-	input:any	filepath:string
+ORMClearSession	void	-	datasource:string
+ORMCloseAllSessions	void	-
+ORMCloseSession	void	-	datasource:string
+ORMEvictCollection	void	-	entityName:string	collectionName:string	primaryKey:string
+ORMEvictEntity	void	-	entityName:string	primaryKey:string
+ORMEvictQueries	void	-	cacheName:string	datasource:string
+ORMExecuteQuery	any	-	hql:string	paramsOrUnique:any	uniqueOrQueryOptions:any	queryOptions:any
+ORMFlush	void	-	datasource:string
+ORMFlushAll	void	-
+ORMGetSession	object	-	datasource:string
+ORMGetSessionFactory	object	-	datasource:string
+ORMIndex	void	-	entity:object
+ORMIndexPurge	void	-	entity:object
+ORMQueryExecute	any	-	hql:string	paramsOrUnique:any	uniqueOrQueryOptions:any	queryOptions:any
+ORMReload	void	-
+ORMSearch	array	-	query:string	entityName:string	options:struct
+ORMSearchOffline	array	-	query:string	entityName:string	options:struct
+pagePoolClear	boolean	-	force:boolean
+pagePoolList	array	-
+paragraphFormat	string	@string.paragraphFormat	string:string
+parameterExists	boolean	-	parameter:variablestring
+parseDateTime	datetime	@string.parseDateTime	date:object	format:string	timezone:timezone
+parseNumber	number	-	number:string	radix:string
+pi	number	-
+PrecisionEvaluate	any	-
+preserveSingleQuotes	string	-	string:string
+quarter	number	@datetime.quarter	date:datetime	timezone:timezone
+query	query	-
+queryAddColumn	number	@query.addColumn!	query:query	column:string	datatype_or_array:any	array:any
+queryAddRow	number	@query.addRow!	query:query	numberOrData:any
+queryAppend	query	@query.append	query1:query	query2:query
+QueryClear	query	@query.clear	query:query
+queryClose	boolean	-	query:query
+queryColumnArray	array	@query.columnArray	query:query
+queryColumnCount	number	@query.columnCount	query:query
+queryColumnData	array	@query.columnData,@query.valueArray	query:query	columnName:string	closure:function
+queryColumnExists	boolean	@query.columnExists	query:query	column:string
+queryColumnList	string	@query.columnList	query:query	delimiter:string
+QueryConvertForGrid	struct	-	query:query	page:number	pageSize:number
+queryCurrentRow	numeric	@query.currentRow	query:query
+QueryDeleteColumn	array	@query.deleteColumn!	query:query	column:string
+QueryDeleteRow	boolean	@query.deleteRow!	query:query	row:number
+queryEach	void	@query.each!	query:query	closure:function	parallel:boolean	maxThreads:number
+queryEvery	boolean	@query.every	query:query	closure:function	parallel:boolean	maxThreads:number
+QueryExecute	any	-	sql:string	params:any	options:struct	name:string
+queryFilter	query	@query.filter	query:query	filter:function	parallel:boolean	maxThreads:number
+queryGetCell	any	@query.getCell	query:query	column_name:string	row_number:number
+queryGetCellByIndex	any	@query.getCellByIndex	query:query	column_name:string	index:string	defaultValue:any
+QueryGetRow	any	@query.getRow	query:query	rowNumber:number
+QueryInsertAt	query	@query.insertAt	query:query	value:any	index:numeric
+QueryIsEmpty	boolean	@query.isEmpty	query:query
+queryKeyExists	boolean	@query.keyExists	query:query	column:string
+QueryLazy	void	-	sql:string	listener:function	params:any	options:struct
+QueryMap	query	@query.map	query:query	closure:function	resQuery:query	parallel:boolean	maxThreads:number
+queryNew	query	-	columnNames:object	columnTypes:object	data:any
+QueryPrepend	query	@query.prepend	query1:query	query2:query
+queryRecordCount	number	@query.recordCount	query:query
+QueryReduce	any	@query.reduce	query:query	closure:function	initialValue:object
+queryRenameColumn	void	@query.renameColumn	query:query	column:string	newColumnName:string
+QueryReverse	query	@query.reverse	query:query
+queryRowByIndex	numeric	@query.rowByIndex	query:query	index:string	defaultValue:numeric
+queryRowData	any	@query.rowData	query:query	rowNumber:number	format:string
+queryRowDataByIndex	struct	@query.rowDataByIndex	query:query	index:string	defaultValue:struct
+QueryRowSwap	query	@query.rowSwap	query:query	source:numeric	destination:numeric
+querySetCell	boolean	@query.setCell!	query:query	column_name:string	value:any	row_number:number
+querySetRow	boolean	@query.setRow	query:query	rowNumber:number	rowData:any
+querySlice	query	@query.slice	query:query	offset:number	length:number
+QuerySome	boolean	@query.some	query:query	closure:function	parallel:boolean	maxThreads:number
+querySort	boolean	@query.sort!	query:query	columnNameOrSortFunc:any	direction:string
+queryToStruct	struct	@query.ToStruct	query:query	columnKey:string	structType:string	valueRowNumber:boolean
+quotedValueList	string	-	query_column:querycolumn	delimiter:string
+rand	number	-	algorithm:string
+randomize	number	-	number:number	algorithm:string
+randRange	number	-	number1:number	number2:number	algorithm:string
+REEscape	string	@string.reEscape	string:string
+rEFind	any	@string.reFind	reg_expression:string	string:string	start:number	returnSubExpressions:boolean	scope:string	multiline:boolean
+rEFindNoCase	any	@string.reFindNoCase	reg_expression:string	string:string	start:number	returnSubExpressions:boolean	scope:string	multiline:boolean
+releaseComObject	any	-	comObject:any
+REMatch	array	@string.REMatch	regex:string	string:string	multiline:boolean
+REMatchNoCase	array	@string.REMatchNoCase	reg_expression:string	string:string	multiline:boolean
+removeChars	string	@string.removeChars	string:string	start:number	count:number
+render	string	-	code:string
+repeatString	string	@string.repeatString	string:string	count:number
+replace	string	@string.replace	string:string	substring:any	replacement:any	scope:string
+replaceList	string	@string.replaceList	string:string	list1:string	list2:string	delimiter_list1:string	delimiter_list2:string	includeEmptyFields:boolean
+replaceListNoCase	string	@string.replaceListNoCase	string:string	list1:string	list2:string	delimiter_list1:string	delimiter_list2:string	includeEmptyFields:boolean
+replaceNoCase	string	@string.replaceNoCase	string:string	substring:any	replacement:string	scope:string
+rEReplace	string	@string.rEReplace	string:string	regex:string	substring:string	scope:string
+rEReplaceNoCase	string	@string.rEReplaceNoCase	string:string	regex:string	substring:string	scope:string
+RestDeleteApplication	void	-	dirPath:string	password:string
+RestInitApplication	void	-	dirPath:string	serviceMapping:string	default:boolean	password:string
+restoreToSource	struct	-	path:string	recursive:boolean
+RestSetResponse	void	-	response:struct
+reverse	string	@string.reverse	string:string
+right	string	@string.right	string:string	count:number
+rJustify	string	@string.rJustify	string:string	length:number
+round	number	@number.round	number:number	precision:number
+rTrim	string	@string.rTrim	string:string
+RunAsync	object	-	closure:object	timeout:number
+sanitize	string	@string.second	text:string	replacement:string
+sanitizeHTML	string	@string.sanitizeHTML	string:string	policy:any
+second	number	@datetime.second	date:datetime	timezone:timezone
+SecretProviderGet	any	-	key:string	name:string	resolve:boolean
+SecretProviderList	struct	-	name:string	resolve:boolean
+SecretProviderListNames	array	-	name:string
+SecretProviderRemove	void	-	key:string	name:string
+SecretProviderSet	void	-	key:string	value:any	name:string
+SendGatewayMessage	string	-	gatewayID:string	data:struct
+serialize	string	-	object:any
+SerializeAISession	string	-	session:any	maxlength:numeric	condense:boolean
+SerializeJSON	string	@any.toJson	var:any	queryFormat:any	useSecureJSONPrefixOrCharset:any	compact:boolean
+SessionCommit	void	-
+SessionExists	boolean	-
+SessionInvalidate	void	-
+SessionRotate	void	-
+SessionStartTime	date	-
+SessionTouch	void	-
+setEncoding	string	-	scope:string	encoding:string
+setLocale	locale	-	new_locale:locale
+setProfileString	string	-	iniPath:string	section:string	entry:string	value:string
+setPropertyString	string	-	filePath:string	key:string	value:string	encoding:string
+setTimeZone	timezone	-	timezone:timezone
+setVariable	any	-	name:string	value:any
+sgn	number	@number.sgn	number:number
+sin	number	@number.sin	number:number
+sizeOf	any	-	obj:object	complex:boolean
+Sleep	void	-	duration:number
+soundex	string	-	str:string
+spanExcluding	string	@string.spanExcluding	string:string	set:string
+spanIncluding	string	@string.spanIncluding	string:string	set:string
+sqr	number	@number.sqr	number:number
+SSLCertificateInstall	void	-	host:string	port:number	cacertPath:any	password:string
+SSLCertificateList	query	-	host:string	port:number
+StringEach	void	@string.each	string:string	closure:function
+StringEvery	boolean	@string.every	string:string	closure:function
+StringFilter	string	@string.filter	string:string	closure:function
+StringHasPrefix	boolean	@string.hasPrefix	value:string	prefix:string	ignoreCase:boolean
+StringHasSuffix	boolean	@string.hasSuffix	value:string	suffix:string	ignoreCase:boolean
+StringIsEmpty	boolean	@string.isEmpty	value:string
+stringLen	number	@string.len	string:string
+StringMap	string	@string.map	string:string	closure:function
+StringReduce	any	@string.reduce	string:string	closure:function	initialVal:any
+StringSome	boolean	@string.some	string:string	closure:function
+StringSort	string	@string.sort	inputString:string
+stripCr	string	@string.stripCr	string:string
+struct	struct	-
+structAppend	boolean	@struct.append!	Struct1:struct	Struct2:struct	OverwriteFlag:boolean
+structClear	boolean	@struct.clear!	struct:struct
+structCopy	object	@struct.copy	struct:struct
+structCount	number	@struct.len,@struct.count	struct:struct
+structDelete	boolean	@struct.delete!	struct:struct	key:string	indicateNotExisting:boolean
+structEach	void	@struct.each!	struct:struct	closure:function	parallel:boolean	maxThreads:number
+structEvery	boolean	@struct.every	struct:struct	closure:function	parallel:boolean	maxThreads:number
+structFilter	struct	@struct.filter	struct:struct	filter:function	parallel:boolean	maxThreads:number
+structFind	any	@struct.find	struct:struct	key:any	defaultValue:any
+structFindKey	array	@struct.findKey	Top:struct	Key:string	Scope:string
+structFindValue	array	@struct.findValue	Top:struct	Key:string	Scope:string
+structGet	any	-	PathDesired:string
+structInsert	boolean	@struct.insert!	struct:struct	key:string	value:any	allowOverwrite:boolean
+structIsEmpty	boolean	@struct.isEmpty	struct:struct
+structKeyArray	array	@struct.keyArray	struct:struct
+structKeyExists	boolean	@struct.keyExists	struct:struct	key:string
+structKeyList	string	@struct.keyList	struct:struct	delimiter:string
+structKeyTranslate	number	@struct.keyTranslate	struct:struct	deepTranslation:boolean	leaveOriginalKey:boolean
+structMap	struct	@struct.map	struct:struct	closure:function	parallel:boolean	maxThreads:number
+structNew	struct	-	type:string	onMissingKey:function
+structReduce	any	@struct.reduce	struct:struct	closure:function	initialValue:object
+structSome	boolean	@struct.some	struct:struct	closure:function	parallel:boolean	maxThreads:number
+structSort	array	@struct.sort	base:struct	sortTypeOrSortFunc:any	sortOrder:string	pathToSubElement:string
+structToSorted	struct	@struct.toSorted	base:struct	sortTypeOrSortFunc:any	sortOrder:string	localeSensitive:boolean
+structUpdate	boolean	@struct.update!	struct:struct	key:string	value:any
+structValueArray	array	@struct.valueArray	struct:struct
+SystemCacheClear	void	-	cacheName:string
+SystemExitClean	void	-	source:string	target:string
+SystemExitHas	boolean	-	jar:string
+SystemExitScan	struct	-	jar:string
+SystemOutput	boolean	-	obj:object	addNewLine:boolean	doErrorStream:boolean
+tan	number	@number.tan	number:number
+ThreadData	struct	-
+ThreadInterrupted	boolean	-
+threadJoin	void	-	name:string	timeout:numeric
+ThreadTerminate	void	-	name:string
+throw	void	-	message:any	type:string	detail:string	errorcode:string	extendedInfo:string	object:any	cause:any
+timeFormat	string	@date.timeFormat	time:any	mask:string	timezone:timezone
+toBase64	string	@string.toBase64	strOrBin:any	encoding:string
+toBinary	binary	-	data:any	charset:string
+ToNumeric	number	-	value:any	radix:any
+ToScript	string	-	cfvar:any	javascriptVar:string	outputFormat:boolean	ASFormat:boolean
+toString	string	-	value:any	encoding:string
+trace	void	-	caller:struct	var:string	text:string	type:string	category:string	inline:boolean	abort:boolean	follow:boolean	var:string	text:string	type:string	category:string	inline:boolean	abort:boolean
+trim	string	@string.trim	string:string
+TrimWhiteSpace	string	@string.trimWhiteSpace	input:string
+trueFalseFormat	string	-	value:any
+uCase	string	@string.uCase	string:string
+ucFirst	string	@string.ucFirst	string:string	doAll:boolean	doLowerIfAllUppercase:boolean
+unserializeJava	any	-	string:string
+uRLDecode	string	@string.uRLDecode	string:string	charset:string	strict:boolean
+URLEncode	string	@string.URLEncode	string:string	charset:string	force:boolean
+uRLEncodedFormat	string	@string.uRLEncodedFormat	string:string	charset:string	force:boolean
+uRLSessionFormat	string	-	url:string
+val	number	@string.val	value:string
+valueArray	array	-	query_column:querycolumn
+valueList	string	-	query_column:querycolumn	delimiter:string
+ValueRef	any	-	ref:function
+VerifyClient	void	-
+WebserviceNew	any	-	url:string	args:struct
+week	number	@datetime.week	date:datetime	timezone:timezone
+wrap	string	@string.wrap	string:string	limit:number	strip:boolean
+writeDump	void	-	var:object	expand:boolean	format:string	hide:string	keys:numeric	label:string	metainfo:boolean	output:string	show:string	showUDFs:boolean	top:numeric	abort:boolean	eval:string
+writeLog	void	-	text:string	type:string	application:boolean	file:string	log:string
+writeOutput	boolean	-	string:string	encodeFor:string
+xmlChildPos	number	@xml.childPos	node:xml	childName:string	index:number
+xmlElemNew	org.w3c.dom.element	@xml.elemNew	xmlObj:xml	namespace_or_childName:string	childName:string
+xMLFormat	string	-	string:string
+XmlGetNodeType	string	@xml.getNodeType	xml:xml
+xmlNew	xml	-	caseSensitive:boolean
+xmlParse	xml	-	xmlString:string	caseSensitive:boolean	validator:any	lenient:boolean
+xmlSearch	object	@xml.search	xml:xml	xpath:string
+xmlTransform	string	@xml.transform	xml:any	xsl:string	parameters:struct
+XmlValidate	struct	-	xmlDoc:string	validator:any
+year	number	@datetime.year	date:datetime	timezone:timezone
+yesNoFormat	string	@boolean.yesNoFormat	value:any

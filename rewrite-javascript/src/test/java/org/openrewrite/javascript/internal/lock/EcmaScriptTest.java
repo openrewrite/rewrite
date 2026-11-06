@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,73 @@ import static org.openrewrite.javascript.internal.lock.EcmaScript.UNDEFINED;
  * What Node v24.19.0 answers for the same expressions, the built-ins' rows from {@code generate/node-builtins.js}.
  */
 class EcmaScriptTest {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void jsonParseOrdersNestedObjectsAndKeepsTheLastDuplicateValue() {
+        Map<String, Object> parsed = (Map<String, Object>) EcmaScript.jsonParse(
+          "{\"b\":0,\"4294967295\":1,\"10\":2,\"2\":3,\"01\":4,\"0\":5," +
+          "\"4294967294\":6,\"b\":7,\"nested\":[{\"z\":null,\"1\":true,\"0\":false}]}");
+        assertThat(parsed).isNotNull();
+        assertThat(new ArrayList<>(parsed.keySet())).containsExactly(
+          "0", "2", "10", "4294967294", "b", "4294967295", "01", "nested");
+        assertThat(parsed.get("b")).isEqualTo(7.0);
+        Map<String, Object> nested = (Map<String, Object>) ((List<?>) parsed.get("nested")).get(0);
+        assertThat(new ArrayList<>(nested.keySet())).containsExactly("0", "1", "z");
+        assertThat(nested.get("z")).isNull();
+        assertThat(nested.get("0")).isEqualTo(false);
+        assertThat(nested.get("1")).isEqualTo(true);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void jsonParseNormalizesNumbersInEveryContainer() {
+        List<Object> numbers = (List<Object>) EcmaScript.jsonParse(
+          "[0,-0,-0.0,2147483648,9223372036854775808,9007199254740993,1e400,1e-400,{\"n\":1}]");
+        assertThat(numbers).isNotNull();
+        assertThat(numbers.subList(0, 8)).containsExactly(
+          0.0, 0.0, -0.0, 2147483648.0, 9223372036854775808.0, 9007199254740992.0,
+          Double.POSITIVE_INFINITY, 0.0);
+        assertThat(((Map<?, ?>) numbers.get(8)).get("n")).isEqualTo(1.0);
+        assertThat(EcmaScript.jsonParse("42")).isEqualTo(42.0);
+        assertThat(EcmaScript.jsonParse("null")).isNull();
+        assertThat(EcmaScript.jsonParse("[]")).isEqualTo(Collections.emptyList());
+        assertThat(EcmaScript.jsonParse("{}")).isEqualTo(Collections.emptyMap());
+    }
+
+    @Test
+    void jsonParsePreservesSyntaxErrorsAndBomPolicy() {
+        for (String text : Arrays.asList("", "[1,]", "{} {}", "\ufeff{}")) {
+            assertThatThrownBy(() -> EcmaScript.jsonParse(text))
+              .isInstanceOf(EcmaScript.JsonSyntaxError.class)
+              .hasCauseInstanceOf(com.fasterxml.jackson.core.JsonProcessingException.class);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void jsonValueCopiesContainersWithoutMutatingOrSharingThem() {
+        Map<String, Object> child = new LinkedHashMap<>();
+        child.put("z", 1);
+        child.put("0", 2L);
+        List<Object> array = Collections.unmodifiableList(Arrays.asList(Collections.unmodifiableMap(child), 3));
+        Map<String, Object> input = Collections.singletonMap("array", array);
+        Map<String, Object> copied = (Map<String, Object>) EcmaScript.jsonValue(input);
+        assertThat(copied).isNotSameAs(input);
+        List<Object> copiedArray = (List<Object>) copied.get("array");
+        assertThat(copiedArray).isNotSameAs(array);
+        Map<String, Object> copiedChild = (Map<String, Object>) copiedArray.get(0);
+        assertThat(copiedChild).isNotSameAs(array.get(0));
+        assertThat(new ArrayList<>(copiedChild.keySet())).containsExactly("0", "z");
+        assertThat(copiedChild).containsEntry("z", 1.0).containsEntry("0", 2.0);
+        assertThat(copiedArray.get(1)).isEqualTo(3.0);
+        copiedChild.put("z", 99.0);
+        copiedArray.add(false);
+        assertThat(new ArrayList<>(child.keySet())).containsExactly("z", "0");
+        assertThat(child).containsEntry("z", 1).containsEntry("0", 2L);
+        assertThat(array).hasSize(2);
+        assertThat(array.get(1)).isEqualTo(3);
+    }
 
     @Test
     void stringOfPrimitives() {

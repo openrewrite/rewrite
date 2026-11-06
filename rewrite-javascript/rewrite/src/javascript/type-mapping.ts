@@ -116,6 +116,11 @@ export class JavaScriptTypeMapping {
             // Fall through to regular type checking if not a variable
         }
 
+        // The checker asserts when asked for the type of the `import.defer` in `import.defer(...)`
+        if (this.isImportDefer(node)) {
+            return undefined;
+        }
+
         // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
         // Everything else — expressions, declarations, specifiers, bindings, etc. —
         // uses getTypeAtLocation which works for virtually all node kinds.
@@ -707,11 +712,16 @@ export class JavaScriptTypeMapping {
         node = this.unparenthesized(node);
         if (ts.isAwaitExpression(node)) {
             const call = this.unparenthesized(node.expression);
-            return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword ?
+            return ts.isCallExpression(call) &&
+                (call.expression.kind === ts.SyntaxKind.ImportKeyword || this.isImportDefer(call.expression)) ?
                 this.moduleSpecifierArgument(call) : undefined;
         }
         return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require' ?
             this.moduleSpecifierArgument(node) : undefined;
+    }
+
+    private isImportDefer(node: ts.Node): boolean {
+        return ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword && node.name.text === 'defer';
     }
 
     private unparenthesized(node: ts.Expression): ts.Expression {
@@ -1047,6 +1057,10 @@ export class JavaScriptTypeMapping {
         let methodName: string;
         let declaringType: Type.FullyQualified;
         let declaredFormalTypeNames: string[] = [];
+
+        if (ts.isCallExpression(node) && this.isImportDefer(node.expression)) {
+            return undefined;
+        }
 
         // Handle different kinds of nodes that represent methods or method invocations
         if (ts.isCallOrNewExpression(node)) {

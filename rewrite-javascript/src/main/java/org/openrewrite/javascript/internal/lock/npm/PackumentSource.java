@@ -22,6 +22,11 @@ import java.util.Map;
  */
 public interface PackumentSource {
 
+    /** Bind host-backed requests after npm has loaded its configuration; fixture sources remain unchanged. */
+    default PackumentSource withOptions(NpmOptions options) {
+        return this;
+    }
+
     /**
      * {@code GET /<name>}: the abbreviated packument, or the full one (with {@code time}) when {@code fullMetadata}.
      * @throws NpmRejection {@code E404} when the registry has no such package

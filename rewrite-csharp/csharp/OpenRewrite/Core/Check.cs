@@ -55,7 +55,7 @@ public class RecipeCheck : Check
     public Recipe Recipe { get; }
 
     internal RecipeCheck(Recipe check, ITreeVisitor<ExecutionContext> visitor)
-        : base(check.GetVisitor(), visitor)
+        : base(Preconditions.AsPrecondition(check), visitor)
     {
         Recipe = check;
     }

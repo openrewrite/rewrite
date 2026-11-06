@@ -129,6 +129,29 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     }
 
     /**
+     * Lenient matching lets the code have a type annotation that the pattern leaves out, but not the
+     * other way round: `const ${x}: number = ${v}` must not match `const a = 1`. The check is here,
+     * not in the parent class, because the parent also compares the two places a repeated capture
+     * binds. Neither of those is the pattern, so there both sides are treated alike.
+     */
+    override async visitVariableDeclarations(pattern: J.VariableDeclarations, other: J): Promise<J | undefined> {
+        if (pattern.typeExpression && other.kind === J.Kind.VariableDeclarations &&
+            !(other as J.VariableDeclarations).typeExpression) {
+            return this.structuralMismatch<J>('typeExpression');
+        }
+        return super.visitVariableDeclarations(pattern, other);
+    }
+
+    /** The same for a return type: `function ${f}(): string {…}` must not match `function a() {…}`. */
+    override async visitMethodDeclaration(pattern: J.MethodDeclaration, other: J): Promise<J | undefined> {
+        if (pattern.returnTypeExpression && other.kind === J.Kind.MethodDeclaration &&
+            !(other as J.MethodDeclaration).returnTypeExpression) {
+            return this.typeMismatch('returnTypeExpression');
+        }
+        return super.visitMethodDeclaration(pattern, other);
+    }
+
+    /**
      * Builds the constraint context with the cursor and current captures.
      * @param cursor The cursor to include in the context
      * @returns The constraint context for evaluating capture constraints

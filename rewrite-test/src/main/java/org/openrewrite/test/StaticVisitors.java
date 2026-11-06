@@ -25,6 +25,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.security.CodeSource;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -41,6 +44,9 @@ final class StaticVisitors {
     private static final ClassValue<List<Field>> STATIC_FIELDS = new ClassValue<List<Field>>() {
         @Override
         protected List<Field> computeValue(Class<?> type) {
+            if (!underTest(type)) {
+                return emptyList();
+            }
             Field[] declared;
             try {
                 declared = type.getDeclaredFields();
@@ -113,6 +119,19 @@ final class StaticVisitors {
         }
         for (Recipe child : r.getRecipeList()) {
             collectRecipeClasses(child, classes, seen);
+        }
+    }
+
+    private static boolean underTest(Class<?> c) {
+        CodeSource source = c.getProtectionDomain().getCodeSource();
+        URL location = source == null ? null : source.getLocation();
+        if (location == null) {
+            return false;
+        }
+        try {
+            return CompositeOrder.fromModuleUnderTest(location.toURI());
+        } catch (URISyntaxException ignored) {
+            return !location.getPath().endsWith(".jar");
         }
     }
 

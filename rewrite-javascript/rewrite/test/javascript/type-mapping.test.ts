@@ -129,7 +129,7 @@ describe('JavaScript type mapping', () => {
         test('should map bigint literal', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'string') {
+                if (node?.kind === J.Kind.Literal && typeof (node as J.Literal).value === 'bigint') {
                     return formatPrimitiveType(type);
                 }
                 return null;
@@ -2922,6 +2922,30 @@ describe('JavaScript type mapping', () => {
                             /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
                             /*~~(fs#truncateSync)~~>*/truncateSync('p');
                             /*~~(fs#existsSync)~~>*/exists('p');
+                        }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('a whole module bound from an awaited import.defer() attributes like an awaited import()', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        async function f() {
+                            const fs = await import.defer('node:fs');
+                            fs.truncateSync('p');
+                        }
+                    `,
+                    //@formatter:off
+                    `
+                        async function f() {
+                            const fs = await import.defer('node:fs');
+                            /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
                         }
                     `
                     //@formatter:on

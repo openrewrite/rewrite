@@ -21,9 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.rpc.internal.FindTreesOfType;
 import org.openrewrite.rpc.request.PrepareRecipeResponse;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -167,6 +169,23 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     public boolean reachesEditVisitor(SourceFile source, ExecutionContext ctx, Cursor cursor) {
         return reachesRemote(this::editor, editVisitor, source, ctx, cursor);
+    }
+
+    /**
+     * Whether an earlier recipe's edit can change what the edit precondition decides.
+     * A lone language gate only checks the file's class, which edits keep.
+     */
+    public boolean editPreconditionReadsContent() {
+        return editPreconditionVisitor != null && !isLanguageGate(editPreconditionVisitor);
+    }
+
+    /**
+     * A peer's {@link FindTreesOfType}, or an "or" of them from a peer whose visitor handles several tree types.
+     */
+    private static boolean isLanguageGate(TreeVisitor<?, ExecutionContext> precondition) {
+        return precondition instanceof FindTreesOfType ||
+               precondition instanceof Preconditions.Or &&
+               Arrays.stream(((Preconditions.Or) precondition).getVisitors()).allMatch(RpcRecipe::isLanguageGate);
     }
 
     /**

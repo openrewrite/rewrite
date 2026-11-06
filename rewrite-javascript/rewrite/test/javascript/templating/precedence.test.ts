@@ -15,8 +15,9 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {javascript, JavaScriptVisitor, JS, RewriteRule} from "../../../src/javascript";
-import {capture, pattern, rewrite, template} from "../../../src/javascript";
-import {Expression, J} from "../../../src/java";
+import {capture, maybeParenthesize, pattern, Precedence, precedenceOf, rewrite, template} from "../../../src/javascript";
+import {emptySpace, Expression, J} from "../../../src/java";
+import {emptyMarkers} from "../../../src/markers";
 
 /** Applies `rule` to every `marker(...)` call, keeping each test's rewrite to one trigger point. */
 function onCall(rule: RewriteRule) {
@@ -270,6 +271,18 @@ describe('template precedence', () => {
                     const b = n ** m ** 2;
                     const c = (n ** m) ** 2;
                 `));
+        });
+
+        test('`**` binds tighter than `*` but looser than a prefix operator', () => {
+            const x = capture();
+            spec.recipe = onCall(rewrite(() => ({
+                before: pattern`wrap(${x})`,
+                after: template`-${x} * ${x}`
+            })));
+            //language=javascript
+            return spec.rewriteRun(javascript(
+                `const a = wrap(n ** m);`,
+                `const a = -(n ** m) * n ** m;`));
         });
 
         test('a sign may not fuse with the sign that precedes it', () => {
@@ -698,5 +711,31 @@ describe('template precedence', () => {
                 `const y = 1 + (a === b ? false : true);`,
                 `const y = 1 + (!(a === b));`));
         });
+    });
+
+    test('a `**` parsed before it was a `JS.Binary` keeps its precedence', () => {
+        // given
+        const operand = (name: string) => ({
+            kind: J.Kind.Identifier, id: name, prefix: emptySpace, markers: emptyMarkers, simpleName: name, annotations: []
+        }) as unknown as J.Identifier;
+        const product = {
+            kind: J.Kind.Binary, id: 'product', prefix: emptySpace, markers: emptyMarkers,
+            left: operand('c'),
+            operator: {kind: J.Kind.LeftPadded, before: emptySpace, element: J.Binary.Type.Multiplication, markers: emptyMarkers},
+            right: operand('d')
+        } as unknown as J.Binary;
+        const power = {
+            kind: JS.Kind.AssignmentOperation, id: 'power', prefix: emptySpace, markers: emptyMarkers,
+            variable: operand('a'),
+            operator: {kind: J.Kind.LeftPadded, before: emptySpace, element: JS.AssignmentOperation.Type.Power, markers: emptyMarkers},
+            assignment: product
+        } as unknown as JS.AssignmentOperation;
+
+        // when
+        const wrapped = maybeParenthesize(power, product.id, product);
+
+        // then
+        expect(precedenceOf(power)).toBe(Precedence.Exponentiation);
+        expect(wrapped.kind).toBe(J.Kind.Parentheses);
     });
 });

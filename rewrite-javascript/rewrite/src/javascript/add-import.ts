@@ -258,12 +258,23 @@ export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[
     return bindings;
 }
 
-/** Whether the file's syntax makes it an ES module: an import, any export form, or a top-level `await`. */
+/**
+ * Whether the file's syntax makes it an ES module: an import or any export form among its top-level
+ * statements, or an `await` belonging to the module's top level, which may sit in a nested block or
+ * expression but not in a function or type declaration. The file extension is not consulted, so a
+ * `.mjs` or `.mts` file without such syntax answers false; {@link isCommonJs} reads the extension.
+ */
 export function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
     return moduleSyntax(cu) === "esm";
 }
 
-/** Whether the file is a CommonJS module, which binds a module it gains with `require`. */
+/**
+ * Whether the file is a CommonJS module, which binds a module it gains with `require`. A `.cjs` or
+ * `.cts` file always is and a `.mjs` or `.mts` one never is. Any other file is when it has no
+ * {@link hasEsmSyntax ES module syntax} and calls `require` or reads `exports` or `module.exports`
+ * anywhere, inside a function too, except a function binding `require`, `exports` or `module` as
+ * a parameter, as an AMD factory does.
+ */
 export function isCommonJs(cu: JS.CompilationUnit): boolean {
     if (cu.sourcePath.endsWith(".cjs") || cu.sourcePath.endsWith(".cts")) {
         return true;
@@ -303,7 +314,7 @@ function readModuleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
     }
     let esm = false;
     walk(cu.statements, node => {
-        if (esm || node.kind === JS.Kind.Await) {
+        if (esm || isAwait(node)) {
             esm = true;
             return false;
         }
@@ -352,6 +363,13 @@ function isEsmStatement(element: J | undefined): boolean {
         element?.kind === JS.Kind.ExportDeclaration ||
         element?.kind === JS.Kind.ExportAssignment ||
         (modifiers?.some(m => m.keyword === "export") ?? false);
+}
+
+/** An `await` expression, a `for await` loop or an `await using` declaration. */
+function isAwait(node: {kind: string}): boolean {
+    return node.kind === JS.Kind.Await ||
+        node.kind === JS.Kind.ForOfLoop && (node as JS.ForOfLoop).await !== undefined ||
+        ((node as {modifiers?: J.Modifier[]}).modifiers?.some(m => m.keyword === "await") ?? false);
 }
 
 /** Function bodies and type declarations, where no `await` belongs to the module's top level. */
@@ -1512,6 +1530,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: undefined,
                 namedBindings: namespaceBinding
             };
@@ -1535,6 +1554,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: rightPadded(defaultName, singleSpace),
                 namedBindings: undefined
             };
@@ -1567,6 +1587,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 prefix: singleSpace,
                 markers: emptyMarkers,
                 typeOnly: this.typeOnly,
+                deferred: false,
                 name: undefined,
                 namedBindings: namedImports
             };
@@ -1822,13 +1843,23 @@ function newIdentifier(name: string): J.Identifier {
     };
 }
 
-function isDirective(statement: J | undefined): boolean {
+/**
+ * Whether `statement` has the shape of a directive such as `'use strict'`: a string literal in
+ * single or double quotes standing as a statement of its own. A parenthesized or template literal
+ * does not count. Only the run of these opening a file or function body is a directive prologue,
+ * which {@link prologueLength} measures.
+ */
+export function isDirective(statement: J | undefined): boolean {
     const expression = statement?.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
     return quoteOf(expression) !== undefined;
 }
 
-function prologueLength(cu: JS.CompilationUnit): number {
-    const statements = cu.statements;
+/**
+ * How many statements open `container` ahead of its code: the directive prologue, see
+ * {@link isDirective}, and in a file a shebang before it. A function's prologue is measured on its body.
+ */
+export function prologueLength(container: JS.CompilationUnit | J.Block): number {
+    const statements = container.statements;
     let length = 0;
     while (length < statements.length &&
         (statements[length].element?.kind === JS.Kind.Shebang || isDirective(statements[length].element))) {
@@ -2563,11 +2594,30 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
 /** Points `literal` at `name`, keeping its quotes. */
 function respecify(literal: Draft<J.Literal>, name: string): void {
-    const quoteChar = (literal.valueSource ?? '"').startsWith("'") ? "'" : '"';
     literal.value = name;
-    literal.valueSource = `${quoteChar}${name.replace(/\\/g, '\\\\').split(quoteChar).join(`\\${quoteChar}`)}${quoteChar}`;
+    literal.valueSource = quoted(name, literal.valueSource);
     literal.unicodeEscapes = undefined;
 }
+
+/**
+ * `literal` holding the string `value`, written in the single quotes it was written in, or else
+ * in double quotes. Backslashes, the quote and line terminators are escaped, and the `unicodeEscapes`
+ * describing the old source are dropped.
+ */
+export function withStringValue(literal: J.Literal, value: string): J.Literal {
+    return {...literal, value, valueSource: quoted(value, literal.valueSource), unicodeEscapes: undefined};
+}
+
+function quoted(value: string, valueSource: string | undefined): string {
+    const quoteChar = (valueSource ?? '"').startsWith("'") ? "'" : '"';
+    const escaped = value
+        .replace(/\\/g, '\\\\')
+        .split(quoteChar).join(`\\${quoteChar}`)
+        .replace(/[\n\r\u2028\u2029]/g, c => lineTerminatorEscapes[c]);
+    return `${quoteChar}${escaped}${quoteChar}`;
+}
+
+const lineTerminatorEscapes: Record<string, string> = {"\n": "\\n", "\r": "\\r", "\u2028": "\\u2028", "\u2029": "\\u2029"};
 
 function withPattern(declaration: J.VariableDeclarations, pattern: J): J.VariableDeclarations {
     return produce(declaration, draft => {

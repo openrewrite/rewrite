@@ -161,6 +161,115 @@ public class SemicolonSpacingTests : RewriteTest
     }
 
     [Fact]
+    public void ExternAliasSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                extern alias A ;
+                namespace N;
+                extern alias B ;
+                class C {
+                }
+                """
+            ),
+            CSharp(
+                """
+                namespace N {
+                    extern alias B ;
+                    class C {
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void LabeledStatementSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C {
+                    void M(int x) {
+                        L: x++ ;
+                        A: B: return ;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void JumpStatementSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                using System.Collections.Generic;
+
+                class C {
+                    IEnumerable<int> M(int x) {
+                        while (true) {
+                            if (x > 9) break ;
+                            x++;
+                            continue ;
+                        }
+                        switch (x) {
+                            case 1: goto case 2 ;
+                            case 2: goto default ;
+                            default: goto L ;
+                        }
+                        L: x++;
+                        yield return x ;
+                        try { } catch { throw ; }
+                        if (x < 0) throw new Exception() ;
+                        yield break ;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void DoWhileSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C {
+                    void M(int x) {
+                        do { } while (x < 5) ;
+
+                        do x++ ; while (x < 5) ;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void MemberSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C {
+                    event System.Action E ;
+                    int this[int i] => i ;
+                    public static implicit operator int(C c) => 1 ;
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void EmptyStatementSpaceBeforeSemicolon()
     {
         RewriteRun(

@@ -109,7 +109,7 @@ final class EnvInstaller {
             normalizeFromLockfile(envLockfile, release);
             return;
         }
-        NpmResolver resolveFromNpm = new NpmResolver(registry, registries,
+        NpmResolver resolveFromNpm = new NpmResolver(registry.withOptions(options), registries,
                 CreateNewStoreController.namedRegistries(options), null, true, false, now, release, false);
         for (Map.Entry<String, String> dep : depsToResolve.entrySet()) {
             String name = dep.getKey();
@@ -340,7 +340,7 @@ final class EnvInstaller {
         }
         Map<String, String> registries = options.getRegistries();
         PackageRequester requester = new PackageRequester(storeController, new LinkedHashMap<>(), host,
-                options.isTrue("engineStrict"), options.isTrue("force"), options.getNodeVersion(), null, registry,
+                options.isTrue("engineStrict"), options.isTrue("force"), options.getNodeVersion(), null, registry.withOptions(options),
                 options.getNodeDownloadMirrors());
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(emptyLockfile, "",
                 requester);

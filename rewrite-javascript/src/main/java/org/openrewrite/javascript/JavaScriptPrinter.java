@@ -75,7 +75,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitAwait(JS.Await await, PrintOutputCapture<P> p) {
         beforeSyntax(await, p);
         p.append("await");
-        visit(await.getExpression(), p);
+        visitAfterKeyword(await.getExpression(), p);
         afterSyntax(await, p);
         return await;
     }
@@ -97,7 +97,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitDelete(JS.Delete delete, PrintOutputCapture<P> p) {
         beforeSyntax(delete, p);
         p.append("delete");
-        visit(delete.getExpression(), p);
+        visitAfterKeyword(delete.getExpression(), p);
         afterSyntax(delete, p);
         return delete;
     }
@@ -227,6 +227,8 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         beforeSyntax(jsImportClause, p);
         if (jsImportClause.isTypeOnly()) {
             p.append("type");
+        } else if (jsImportClause.isDeferred()) {
+            p.append("defer");
         }
         if (jsImportClause.getPadding().getName() != null) {
             visitRightPadded(jsImportClause.getPadding().getName(), p);
@@ -274,7 +276,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitSatisfiesExpression(JS.SatisfiesExpression satisfiesExpression, PrintOutputCapture<P> p) {
         beforeSyntax(satisfiesExpression, p);
         visit(satisfiesExpression.getExpression(), p);
-        visitLeftPaddedLocal("satisfies", satisfiesExpression.getPadding().getSatisfiesType(), p);
+        visitLeftPaddedKeyword("satisfies", satisfiesExpression.getPadding().getSatisfiesType(), p);
         afterSyntax(satisfiesExpression, p);
         return satisfiesExpression;
     }
@@ -283,7 +285,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitVoid(JS.Void aVoid, PrintOutputCapture<P> p) {
         beforeSyntax(aVoid, p);
         p.append("void");
-        visit(aVoid.getExpression(), p);
+        visitAfterKeyword(aVoid.getExpression(), p);
         afterSyntax(aVoid, p);
         return aVoid;
     }
@@ -296,8 +298,10 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         if (delegated != null) {
             visitSpace(delegated.getPrefix(), p);
             p.append("*");
+            visit(yield.getValue(), p);
+        } else {
+            visitAfterKeyword(yield.getValue(), p);
         }
-        visit(yield.getValue(), p);
         afterSyntax(yield, p);
         return yield;
     }
@@ -394,7 +398,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitThrow(J.Throw thrown, PrintOutputCapture<P> p) {
         beforeSyntax(thrown, p);
         p.append("throw");
-        visit(thrown.getException(), p);
+        visitAfterKeyword(thrown.getException(), p);
         afterSyntax(thrown, p);
         return thrown;
     }
@@ -414,7 +418,9 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitElse(J.If.Else else_, PrintOutputCapture<P> p) {
         beforeSyntax(else_, p);
         p.append("else");
+        int bodyStart = p.out.length();
         visitStatementLocal(else_.getPadding().getBody(), p);
+        separateFromKeyword(bodyStart, p);
         afterSyntax(else_, p);
         return else_;
     }
@@ -423,7 +429,9 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, PrintOutputCapture<P> p) {
         beforeSyntax(doWhileLoop, p);
         p.append("do");
+        int bodyStart = p.out.length();
         visitStatementLocal(doWhileLoop.getPadding().getBody(), p);
+        separateFromKeyword(bodyStart, p);
         visitLeftPaddedLocal("while", doWhileLoop.getPadding().getWhileCondition(), p);
         afterSyntax(doWhileLoop, p);
         return doWhileLoop;
@@ -442,8 +450,9 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     @Override
     public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
         beforeSyntax(instanceOf, p);
-        visitRightPaddedLocalSingle(instanceOf.getPadding().getExpression(), "instanceof", p);
-        visit(instanceOf.getClazz(), p);
+        visitRightPadded(instanceOf.getPadding().getExpression(), p);
+        appendKeyword("instanceof", p);
+        visitAfterKeyword(instanceOf.getClazz(), p);
         visit(instanceOf.getPattern(), p);
         afterSyntax(instanceOf, p);
         return instanceOf;
@@ -591,7 +600,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
         beforeSyntax(return_, p);
         p.append("return");
-        visit(return_.getExpression(), p);
+        visitAfterKeyword(return_.getExpression(), p);
         afterSyntax(return_, p);
         return return_;
     }
@@ -897,7 +906,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitConditionalType(JS.ConditionalType conditionalType, PrintOutputCapture<P> p) {
         beforeSyntax(conditionalType, p);
         visit(conditionalType.getCheckType(), p);
-        visitLeftPaddedLocal("extends", conditionalType.getPadding().getCondition(), p);
+        visitLeftPaddedKeyword("extends", conditionalType.getPadding().getCondition(), p);
         afterSyntax(conditionalType, p);
         return conditionalType;
     }
@@ -998,7 +1007,11 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitExportAssignment(JS.ExportAssignment exportAssignment, PrintOutputCapture<P> p) {
         beforeSyntax(exportAssignment, p);
         p.append("export");
-        visitLeftPaddedLocal(exportAssignment.isExportEquals() ? "=" : "default", exportAssignment.getPadding().getExpression(), p);
+        if (exportAssignment.isExportEquals()) {
+            visitLeftPaddedLocal("=", exportAssignment.getPadding().getExpression(), p);
+        } else {
+            visitLeftPaddedKeyword("default", exportAssignment.getPadding().getExpression(), p);
+        }
         afterSyntax(exportAssignment, p);
         return exportAssignment;
     }
@@ -1213,7 +1226,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitTypeOf(JS.TypeOf typeOf, PrintOutputCapture<P> p) {
         beforeSyntax(typeOf, p);
         p.append("typeof");
-        visit(typeOf.getExpression(), p);
+        visitAfterKeyword(typeOf.getExpression(), p);
         afterSyntax(typeOf, p);
         return typeOf;
     }
@@ -1241,7 +1254,9 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         }
 
         p.append(keyword);
+        int operandStart = p.out.length();
         visitLeftPadded(typeOperator.getPadding().getExpression(), p);
+        separateFromKeyword(operandStart, p);
 
         afterSyntax(typeOperator, p);
         return typeOperator;
@@ -1299,7 +1314,7 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
 
         if (newClass.getClazz() != null) {
             p.append("new");
-            visit(newClass.getClazz(), p);
+            visitAfterKeyword(newClass.getClazz(), p);
 
             if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 visitContainerLocal("(", newClass.getPadding().getArguments(), ",", ")", p);
@@ -1326,11 +1341,16 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         beforeSyntax(case_, p);
 
         J elem = case_.getCaseLabels().get(0);
-        if (!(elem instanceof J.Identifier) || !"default".equals(((J.Identifier) elem).getSimpleName())) {
+        boolean keyword = !(elem instanceof J.Identifier) || !"default".equals(((J.Identifier) elem).getSimpleName());
+        if (keyword) {
             p.append("case");
         }
 
+        int labelsStart = p.out.length();
         visitContainerLocal("", case_.getPadding().getCaseLabels(), ",", "", p);
+        if (keyword) {
+            separateFromKeyword(labelsStart, p);
+        }
 
         JContainer<Statement> statements = case_.getPadding().getStatements();
         visitSpace(statements.getBefore(), p);
@@ -1408,8 +1428,8 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
     public J visitAs(JS.As as_, PrintOutputCapture<P> p) {
         beforeSyntax(as_, p);
         visitRightPadded(as_.getPadding().getLeft(), p);
-        p.append("as");
-        visit(as_.getRight(), p);
+        appendKeyword("as", p);
+        visitAfterKeyword(as_.getRight(), p);
         afterSyntax(as_, p);
         return as_;
     }
@@ -1656,12 +1676,19 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
             case Comma:
                 keyword = ",";
                 break;
+            case Exponentiation:
+                keyword = "**";
+                break;
         }
 
         visitSpace(binary.getPadding().getOperator().getBefore(), p);
-        p.append(keyword);
-
-        visit(binary.getRight(), p);
+        if (binary.getOperator() == JS.Binary.Type.In) {
+            appendKeyword(keyword, p);
+            visitAfterKeyword(binary.getRight(), p);
+        } else {
+            p.append(keyword);
+            visit(binary.getRight(), p);
+        }
 
         afterSyntax(binary, p);
         return binary;
@@ -1758,8 +1785,10 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         beforeSyntax(control, p);
         p.append('(');
         visitRightPadded(control.getPadding().getVariable(), p);
-        p.append("of");
+        appendKeyword("of", p);
+        int iterableStart = p.out.length();
         visitRightPadded(control.getPadding().getIterable(), p);
+        separateFromKeyword(iterableStart, p);
         p.append(')');
         afterSyntax(control, p);
         visitRightPadded(forOfLoop.getLoop().getPadding().getBody(), p);
@@ -1777,8 +1806,10 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         beforeSyntax(control, p);
         p.append('(');
         visitRightPadded(control.getPadding().getVariable(), p);
-        p.append("in");
+        appendKeyword("in", p);
+        int iterableStart = p.out.length();
         visitRightPadded(control.getPadding().getIterable(), p);
+        separateFromKeyword(iterableStart, p);
         p.append(')');
         afterSyntax(control, p);
         visitRightPadded(forInLoop.getPadding().getBody(), p);
@@ -1977,6 +2008,37 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
 
             p.append(suffix);
         }
+    }
+
+    private void appendKeyword(String keyword, PrintOutputCapture<P> p) {
+        if (p.out.length() > 0 && isWordChar(p.out.codePointBefore(p.out.length()))) {
+            p.append(' ');
+        }
+        p.append(keyword);
+    }
+
+    private void visitAfterKeyword(@Nullable J tree, PrintOutputCapture<P> p) {
+        int start = p.out.length();
+        visit(tree, p);
+        separateFromKeyword(start, p);
+    }
+
+    private static void separateFromKeyword(int start, PrintOutputCapture<?> p) {
+        if (p.out.length() > start && isWordChar(p.out.codePointAt(start))) {
+            p.out.insert(start, ' ');
+        }
+    }
+
+    private static boolean isWordChar(int c) {
+        return Character.isUnicodeIdentifierPart(c) && !Character.isIdentifierIgnorable(c) ||
+               c == '$' || c == '\\' || c == '\u200C' || c == '\u200D';
+    }
+
+    private void visitLeftPaddedKeyword(String keyword, JLeftPadded<? extends J> leftPadded, PrintOutputCapture<P> p) {
+        beforeSyntax(leftPadded.getBefore(), leftPadded.getMarkers(), p);
+        appendKeyword(keyword, p);
+        visitAfterKeyword(leftPadded.getElement(), p);
+        afterSyntax(leftPadded.getMarkers(), p);
     }
 
     private void visitLeftPaddedLocal(@Nullable String prefix, @Nullable JLeftPadded<?> leftPadded, PrintOutputCapture<P> p) {

@@ -854,6 +854,26 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Button_1");
     });
 
+    test("a whole-module await import.defer answers a namespace request", async () => {
+        const spec = new RecipeSpec();
+        const namespaceName: {value?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                namespaceName.value = maybeBind(this, {module: "sap/m/Button", member: "*"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            const Button = await import.defer("sap/m/Button");
+
+            target();`
+        ));
+
+        expect(namespaceName.value).toBe("Button");
+    });
+
     test("a destructured await import answers neither request but still occupies its name", async () => {
         const spec = new RecipeSpec();
         let bound: (string | undefined)[] | undefined;

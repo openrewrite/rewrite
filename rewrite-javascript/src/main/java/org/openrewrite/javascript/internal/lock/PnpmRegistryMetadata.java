@@ -16,6 +16,9 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmAuthHeaders;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.RegistryMetadata;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -28,16 +31,38 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
+    private final @Nullable PnpmAuthHeaders auth;
 
     PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client) {
+        this(registries, client, null);
+    }
+
+    private PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client, @Nullable PnpmAuthHeaders auth) {
+        this.auth = auth;
         this.registries = registries;
         this.client = client;
     }
 
     @Override
+    public RegistryMetadata withOptions(PnpmOptions options) {
+        return new PnpmRegistryMetadata(registries, client.withTransport(options.transport()), options.authHeaders());
+    }
+
+    private NodeRegistry request(String name, String url) {
+        if (auth == null) {
+            throw new IllegalStateException("pnpm registry requests require the store controller's config");
+        }
+        NodeRegistry host = registries.registryAt(name, url);
+        String authorization = auth.authorization(url, name);
+        String token = authorization != null && authorization.startsWith("Bearer ") ? authorization.substring(7) : null;
+        String basic = authorization != null && authorization.startsWith("Basic ") ? authorization.substring(6) : null;
+        return new NodeRegistry(null, url, token, null, null, basic, false, host.getCafile(), host.isStrictSsl(), false);
+    }
+
+    @Override
     public @Nullable String packument(String registry, String name, boolean fullMetadata) {
         try {
-            return client.getPackumentText(registries.registryAt(name, registry), name, fullMetadata);
+            return client.getPackumentText(request(name, registry), name, fullMetadata);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -52,7 +77,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
         String url = base + "-/npm/v1/attestations/" + (name.startsWith("@") ? name.replace("/", "%2F") : name) +
                      "@" + version;
         try {
-            return client.getDocumentText(registries.registryAt(name, registry), name, version, url);
+            return client.getDocumentText(request(name, registry), name, version, url);
         } catch (NodeRegistryException e) {
             // fetchAttestationPublishedAt answers undefined for any failure, and pnpm reads the full document instead
             return null;
@@ -62,7 +87,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     @Override
     public @Nullable String document(String url) {
         try {
-            return client.getDocumentText(registries.registryAt("", url), url, null, url);
+            return client.getDocumentText(request("", url), url, null, url);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND ||
                 e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND) {

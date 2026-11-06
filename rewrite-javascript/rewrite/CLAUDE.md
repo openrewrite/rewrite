@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the OpenRewrite Typ
 
 ## Module Overview
 
-TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON and YAML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
+TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON, YAML and XML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
 
 Self-contained Node.js project, separate from the Java monorepo build system.
 
@@ -90,6 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
@@ -108,7 +109,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser/, format/, cleanup/   # Category tests
 │   │   └── search/, templating/, migrate/
 │   ├── java/                            # Java model tests
-│   ├── json/, yaml/                     # JSON/YAML tests
+│   ├── json/, yaml/, xml/               # JSON/YAML/XML tests
 │   └── rpc/                             # RPC integration tests
 ├── tsconfig.json
 ├── vitest.config.mts

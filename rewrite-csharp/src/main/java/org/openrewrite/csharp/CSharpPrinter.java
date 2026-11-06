@@ -90,8 +90,18 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             if (property.getPadding().getExpressionBody() != null || property.getPadding().getInitializer() != null) {
                 p.append(';');
             }
+        } else if (statement instanceof Cs.IndexerDeclaration) {
+            if (((Cs.IndexerDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
+        } else if (statement instanceof Cs.ConversionOperatorDeclaration) {
+            if (((Cs.ConversionOperatorDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
         } else if (statement instanceof Cs.AnnotatedStatement) {
             printStatementTerminator(((Cs.AnnotatedStatement) statement).getStatement(), p);
+        } else if (statement instanceof J.Label) {
+            printStatementTerminator(((J.Label) statement).getStatement(), p);
         }
     }
 
@@ -1313,7 +1323,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         beforeSyntax(label, p);
         visitRightPadded(label.getPadding().getLabel(), ":", p);
         visit(label.getStatement(), p);
-        printStatementTerminator(label.getStatement(), p);
         afterSyntax(label, p);
         return label;
     }
@@ -1339,8 +1348,8 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         List<JRightPadded<Statement>> init = control.getPadding().getInit();
         for (int i = 0; i < init.size(); i++) {
             visitForLoopControlStatement(init.get(i).getElement(), p);
+            visitSpace(init.get(i).getAfter(), p);
             if (i < init.size() - 1) {
-                visitSpace(init.get(i).getAfter(), p);
                 p.append(',');
             }
         }
@@ -3027,7 +3036,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (indexerDeclaration.getAccessors() != null) {
             visitBlock(indexerDeclaration.getAccessors(), p);
         }
@@ -3158,7 +3166,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (conversionOperatorDeclaration.getBody() != null) {
             visitBlock(conversionOperatorDeclaration.getBody(), p);
         }

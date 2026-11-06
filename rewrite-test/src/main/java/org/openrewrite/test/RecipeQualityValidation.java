@@ -111,7 +111,8 @@ public class RecipeQualityValidation {
 
     /**
      * Controls whether the recipe is validated to keep no {@link org.openrewrite.TreeVisitor} in a static field, where
-     * every thread visiting source files in parallel would share its state.
+     * every thread visiting source files in parallel would share its state. Recipes a composite lists from dependency
+     * jars are left to the builds of the projects that own them.
      */
     @Builder.Default
     private boolean noStaticVisitors = true;

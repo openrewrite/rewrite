@@ -411,8 +411,11 @@ function writes(node: Tree, key: string): boolean {
     switch (node.kind) {
         case J.Kind.Assignment:
         case J.Kind.AssignmentOperation:
-        case JS.Kind.AssignmentOperation:
             return key === 'variable';
+        case JS.Kind.AssignmentOperation:
+            // `a ** b` as parsed before it was a JS.Binary assigns nothing
+            return key === 'variable' &&
+                (node as JS.AssignmentOperation).operator.element !== JS.AssignmentOperation.Type.Power;
         case J.Kind.Unary:
             return key === 'expression' && incrementing.has((node as J.Unary).operator.element);
         case J.Kind.ForEachLoopControl:
@@ -1115,6 +1118,19 @@ export function isFree(cursor: Cursor, identifier: J.Identifier): boolean {
  */
 export function isWrite(cursor: Cursor, identifier: J.Identifier): boolean {
     return position(pathTo(cursor, identifier), identifier)[1] === 'write';
+}
+
+/**
+ * Whether the node at the cursor is assigned to, in the positions {@link isWrite} names, for any node
+ * rather than only an identifier: `x.y` in `x.y = 1`, or a whole destructuring target and each part
+ * of it, as `[a = 1]` and `a = 1` are in `[a = 1] = list` and `for ([a = 1] of lists)`. A `J.Assignment`
+ * that is one is a destructuring default, ESTree's `AssignmentPattern`. A declaration's pattern, as in
+ * `const [a = 1] = list`, names rather than assigns, and so does not count.
+ */
+export function isAssignmentTarget(cursor: Cursor): boolean {
+    const path = treePath(cursor);
+    const node = path.pop();
+    return node !== undefined && node === cursor.value && path.length > 0 && position(path, node)[1] === 'write';
 }
 
 /** One identifier referring to a binding, from {@link referencesOf}. */
