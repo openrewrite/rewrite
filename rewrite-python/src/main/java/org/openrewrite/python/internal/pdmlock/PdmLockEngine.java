@@ -165,6 +165,14 @@ public final class PdmLockEngine {
         private Result run() {
             packages = new ArrayList<>(lock.getPackages());
             String newHash = PdmContentHash.hash(pyproject);
+            // a lock whose hash records another manifest than the one before the edit was already out of date, and
+            // pdm relocks that drift too, which the engine does not reproduce; refreshing the hash over it would
+            // also make a stale lock pass `pdm lock --check`
+            if (originalPyproject != null && !PdmContentHash.hash(originalPyproject).equals(lock.getContentHash())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "pdm.lock is out of date with pyproject.toml before the edit (its content_hash records " +
+                                "another manifest); pdm would relock that drift, which the native engine does not reproduce");
+            }
 
             Map<String, @Nullable PythonVersionSpecifierSet> declared = collectDirectDeps(pyproject);
             Map<String, @Nullable PythonVersionSpecifierSet> originalDeclared =

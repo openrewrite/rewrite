@@ -31,6 +31,8 @@ import org.openrewrite.python.PythonPackageIndex;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
 import org.openrewrite.python.internal.LockFileRegeneration.Result;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.tree.Toml;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -136,6 +138,13 @@ class PipenvLockEngineTest {
           Requires-Dist: certifi>=2017.4.17
           Requires-Dist: idna<4,>=2.5
           """);
+    }
+
+    /** The lock with the hash pipenv records for the Pipfile in place of its placeholder. */
+    private static String recording(String lock, String pipfile) {
+        Toml.Document parsed = (Toml.Document) new TomlParser().parse(new InMemoryExecutionContext(), pipfile)
+          .findFirst().orElseThrow();
+        return lock.replace("0".repeat(64), PipfileLockHash.hash(parsed, null, PipfileLockHash.HashVariant.LEGACY));
     }
 
     private static String baseLock() {
@@ -482,10 +491,10 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void preExistingDriftInUntouchedPackageDoesNotBlockScopedUpgrade() {
+    void lockOutOfDateBeforeTheEditIsRefused() {
         stubRequestsBaseline();
-        // click is declared in the Pipfile but predates the lock (absent from it): a pre-existing
-        // Pipfile/lock inconsistency the recipe never touched. Upgrading requests must not abort on it.
+        // click is declared in the Pipfile but absent from the lock, which records the hash of a Pipfile without it.
+        // Refreshing the hash over that drift would let `pipenv install --deploy` accept a lock missing click.
         String original = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -501,12 +510,12 @@ class PipenvLockEngineTest {
           """;
         String edited = original.replace(">=2.31.0", ">=2.32.0");
 
-        Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
+        Result result = PipenvLockEngine.regenerate(edited, original,
+          recording(baseLock(), original.replace("click = \">=8.3.2\"\n", "")), ctx);
 
-        assertThat(result.getErrorMessage()).isNull();
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(result.getLockFileContent()).contains("\"version\": \"==2.32.4\"");
-        assertThat(result.getLockFileContent()).doesNotContain("click");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("out of date");
     }
 
     /**
@@ -532,7 +541,7 @@ class PipenvLockEngineTest {
         String lock = baseLock().replace("            \"index\": \"pypi\",\n", "");
         assertThat(lock).doesNotContain("index");
 
-        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+        Result result = PipenvLockEngine.regenerate(edited, original, recording(lock, original), ctx);
 
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.getDetail()).contains("ORPHANS_RETAINED");
@@ -610,7 +619,7 @@ class PipenvLockEngineTest {
           }
           """.formatted(CERTIFI, "1".repeat(64), IDNA, WHEEL_2310, SDIST_2310);
 
-        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+        Result result = PipenvLockEngine.regenerate(edited, original, recording(lock, original), ctx);
 
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.isSuccess()).isTrue();
@@ -658,7 +667,7 @@ class PipenvLockEngineTest {
           }
           """.formatted(CERTIFI, IDNA, WHEEL_2310, SDIST_2310, WHEEL_2310, SDIST_2310);
 
-        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+        Result result = PipenvLockEngine.regenerate(edited, original, recording(lock, original), ctx);
 
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.isSuccess()).isTrue();
@@ -702,7 +711,7 @@ class PipenvLockEngineTest {
           python_version = "3.11"
           """;
 
-        Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
+        Result result = PipenvLockEngine.regenerate(edited, original, recording(baseLock(), original), ctx);
 
         assertThat(result.getErrorMessage()).isNull();
         assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.0.3\""));

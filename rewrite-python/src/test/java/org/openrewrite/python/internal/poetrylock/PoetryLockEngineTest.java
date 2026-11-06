@@ -132,19 +132,19 @@ class PoetryLockEngineTest {
     }
 
     @Test
-    void unrelatedMissingDependencyDoesNotBlockScopedUpgrade() {
+    void lockOutOfDateBeforeTheEditIsRefused() {
         stubPypiSix();
-        // attrs is declared but absent from the lock (pre-existing drift). Bumping six — which the
-        // recipe actually changed — must succeed and leave attrs alone, not abort on it.
+        // attrs is declared but absent from the lock, whose hash records the manifest without it. poetry relocks that
+        // drift too, and refreshing the hash over it would make the stale lock pass `poetry check --lock`.
         String original = resource("i-upgrade/pyproject.toml.before")
                 .replace("six = \"1.16.0\"", "six = \"1.16.0\"\nattrs = \"25.1.0\"");
         String edited = resource("i-upgrade/pyproject.toml.after")
                 .replace("six = \"1.17.0\"", "six = \"1.17.0\"\nattrs = \"25.1.0\"");
         Result result = PoetryLockEngine.regenerate(edited, original, resource("i-upgrade/poetry.lock.before"), ctx);
-        assertThat(result.getErrorMessage()).isNull();
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(result.getLockFileContent()).contains("version = \"1.17.0\"");
-        assertThat(result.getLockFileContent()).doesNotContain("attrs");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("out of date");
+        assertThat(http.requests).isEmpty();
     }
 
     @Test
