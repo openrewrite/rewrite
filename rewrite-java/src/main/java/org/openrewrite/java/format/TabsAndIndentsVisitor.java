@@ -142,12 +142,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-        // FIXME fix formatting of control sections
-        return control;
-    }
-
-    @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         getCursor().putMessage("lastLocation", loc);
         boolean alignToAnnotation = false;
@@ -345,6 +339,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR:
                     case ARRAY_INDEX:
+                    case FOREACH_ITERABLE:
                     case PARENTHESES:
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
