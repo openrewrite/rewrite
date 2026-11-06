@@ -55,6 +55,11 @@ export interface SetMemberOptions {
 }
 
 export interface SetAtOptions extends SetMemberOptions {
+    /**
+     * Where the objects that {@link createMissing} creates go among their siblings: `"last"` (the default),
+     * `"first"`, or `"sorted"`. {@link SetMemberOptions.position} applies to the last key of the path only.
+     */
+    parentPosition?: "first" | "last" | "sorted";
     /** Whether to create the objects missing along the path. Otherwise a missing step leaves the root unchanged. */
     createMissing?: boolean;
 }
@@ -185,15 +190,23 @@ export function setMember(obj: Json.Object, key: string, value: Json.Value, opti
             present.length;
     const neighbour = obj.members[present[Math.min(insertAt, present.length - 1)]].element as Json.Member;
     const following = followingWhitespace(obj, present);
-    const added = newMember(key, value, space(insertAt === 0 ? leadingWhitespace(neighbour) : following),
-        neighbour.key.after, space(neighbour.value.prefix.whitespace));
+    const added = newMember(key, value, space(following), neighbour.key.after, space(neighbour.value.prefix.whitespace));
 
     const elements = [...obj.members];
-    if (insertAt === 0) {
-        elements[present[0]] = {...elements[present[0]], element: withLeadingWhitespace(neighbour, following)};
-    }
     if (insertAt < present.length) {
-        elements.splice(present[insertAt], 0, rightPadded<Json>(added, emptySpace));
+        const at = present[insertAt];
+        const next = elements[at].element as Json.Member;
+        const nextSpace = leadingSpace(next);
+        const {ending, rest} = splitAtLineEnd(nextSpace);
+        if (ending.length > 0) {
+            elements[at] = {...elements[at], element: withLeadingSpace(next, rest)};
+            elements.splice(at, 0, rightPadded<Json>({...added, prefix: withLeadingComments(nextSpace.whitespace, ending, added.prefix)}, emptySpace));
+        } else if (insertAt === 0) {
+            elements[at] = {...elements[at], element: withLeadingWhitespace(next, following)};
+            elements.splice(at, 0, rightPadded<Json>({...added, prefix: space(leadingWhitespace(next))}, emptySpace));
+        } else {
+            elements.splice(at, 0, rightPadded<Json>(added, emptySpace));
+        }
     } else {
         const last = present[present.length - 1];
         if (last === elements.length - 1) {
@@ -228,6 +241,8 @@ export function updateMember(obj: Json.Object, key: string, fn: (old: Json.Value
 /**
  * Removes a member. The space before the closing brace stays where it is, a removed first member's
  * indentation passes to the next one, and an object left without members holds a single `Json.Empty`.
+ * A comment on the line before the member stays, and one on the member's own line goes with it.
+ * An object left without members prints as `{}` unless a comment remains in it.
  */
 export function removeMember(obj: Json.Object, key: string): Json.Object {
     const index = indexOfMember(obj, key);
@@ -236,22 +251,24 @@ export function removeMember(obj: Json.Object, key: string): Json.Object {
     }
     const removed = obj.members[index];
     const removedMember = removed.element as Json.Member;
-    const kept = commentsEndingPreviousLine(removedMember.prefix);
-    const keep = (to: Json.Space) => withLeadingComments(removedMember.prefix.whitespace, kept, to);
+    const removedSpace = leadingSpace(removedMember);
+    const kept = commentsEndingPreviousLine(removedSpace);
+    const keep = (to: Json.Space) => withLeadingComments(removedSpace.whitespace, kept, splitAtLineEnd(to).rest);
     const elements = obj.members.filter((_, i) => i !== index);
     const present = elements.filter(m => m.element.kind !== Json.Kind.Empty);
 
     if (present.length === 0) {
-        const closing = elements.length > 0 ? elements[elements.length - 1].after : removed.after;
-        return {...obj, members: [rightPadded<Json>(emptyElement(), keep(closing))]};
+        const closing = keep(elements.length > 0 ? elements[elements.length - 1].after : removed.after);
+        return {...obj, members: [rightPadded<Json>(emptyElement(), closing.comments.length === 0 ? emptySpace : closing)]};
     }
-    if (index < elements.length) {
-        const next = elements[index].element;
-        const element = kept.length > 0 ? {...next, prefix: keep(next.prefix)} :
-            index === 0 && isMember(next) ? withLeadingWhitespace(next, leadingWhitespace(removedMember)) : next;
-        elements[index] = {...elements[index], element};
-    } else {
+    if (index === elements.length) {
         elements[index - 1] = {...elements[index - 1], after: keep(removed.after)};
+    } else if (!isMember(elements[index].element)) {
+        elements[index] = {...elements[index], after: keep(elements[index].after)};
+    } else {
+        const next = withLeadingSpace(elements[index].element as Json.Member, keep(leadingSpace(elements[index].element)));
+        const element = kept.length === 0 && index === 0 ? withLeadingWhitespace(next, leadingWhitespace(removedMember)) : next;
+        elements[index] = {...elements[index], element};
     }
     return {...obj, members: elements};
 }
@@ -448,10 +465,18 @@ function sameInteger(a: string, b: string): boolean {
  */
 function followingWhitespace(obj: Json.Object, present: number[]): string {
     if (present.length > 1) {
-        return leadingWhitespace(obj.members[present[1]].element as Json.Member);
+        const second = leadingSpace(obj.members[present[1]].element);
+        return lastLineBreak(second) ?? second.whitespace;
     }
-    const first = leadingWhitespace(obj.members[present[0]].element as Json.Member);
-    return first.includes("\n") ? first : " ";
+    return lastLineBreak(leadingSpace(obj.members[present[0]].element)) ?? " ";
+}
+
+/**
+ * The line break and indentation that the last line of a space starts with, looking past its comments.
+ */
+function lastLineBreak(s: Json.Space): string | undefined {
+    const text = [s.whitespace, ...s.comments.map(c => c.suffix)].filter(t => t.includes("\n")).pop();
+    return text === undefined ? undefined : "\n" + text.substring(text.lastIndexOf("\n") + 1);
 }
 
 function sortedIndex(obj: Json.Object, present: number[], key: string): number {
@@ -490,6 +515,17 @@ function commentsEndingPreviousLine(prefix: Json.Space): Json.Comment[] {
     return end < 0 ? [] : prefix.comments.slice(0, end + 1);
 }
 
+function splitAtLineEnd(s: Json.Space): { ending: Json.Comment[], rest: Json.Space } {
+    const ending = commentsEndingPreviousLine(s);
+    if (ending.length === 0) {
+        return {ending, rest: s};
+    }
+    return {
+        ending,
+        rest: {kind: Json.Kind.Space, whitespace: ending[ending.length - 1].suffix, comments: s.comments.slice(ending.length)}
+    };
+}
+
 function withLeadingComments(whitespace: string, comments: Json.Comment[], to: Json.Space): Json.Space {
     if (comments.length === 0) {
         return to;
@@ -503,9 +539,9 @@ function withLeadingComments(whitespace: string, comments: Json.Comment[], to: J
 }
 
 function emptyObjectLayout(closing: Json.Space, options: SetMemberOptions): { member: string, closing: Json.Space } {
-    const lineBreak = [closing.whitespace, ...closing.comments.map(c => c.suffix)].filter(s => s.includes("\n")).pop();
+    const lineBreak = lastLineBreak(closing);
     if (lineBreak !== undefined) {
-        return {member: "\n" + lineBreak.substring(lineBreak.lastIndexOf("\n") + 1) + (options.indent ?? "    "), closing};
+        return {member: lineBreak + (options.indent ?? "    "), closing};
     }
     if (options.indent !== undefined) {
         const base = "\n" + options.indent.repeat(options.depth ?? 0);
@@ -519,6 +555,23 @@ function emptyObjectLayout(closing: Json.Space, options: SetMemberOptions): { me
  */
 function indentationOnKey(m: Json.Member): boolean {
     return m.prefix.whitespace === "" && m.prefix.comments.length === 0 && m.key.element.prefix.whitespace !== "";
+}
+
+/**
+ * The space a member starts with: its prefix, or its key's prefix where the indentation is on the key.
+ */
+function leadingSpace(element: Json): Json.Space {
+    return isMember(element) && indentationOnKey(element) ? element.key.element.prefix : element.prefix;
+}
+
+function withLeadingSpace(m: Json.Member, prefix: Json.Space): Json.Member {
+    if (leadingSpace(m) === prefix) {
+        return m;
+    }
+    if (indentationOnKey(m)) {
+        return {...m, key: {...m.key, element: {...m.key.element, prefix}}};
+    }
+    return {...m, prefix};
 }
 
 function leadingWhitespace(m: Json.Member): string {
@@ -569,7 +622,9 @@ function setIn(obj: Json.Object, path: readonly string[], value: Json.Value, opt
     const nested = {...options, depth: (options.depth ?? 0) + 1};
     const child = member(obj, key)?.value;
     if (child === undefined) {
-        return options.createMissing ? setMember(obj, key, setIn(emptyObject(), rest, value, nested), options) : obj;
+        return options.createMissing ?
+            setMember(obj, key, setIn(emptyObject(), rest, value, nested), {...options, position: options.parentPosition ?? "last"}) :
+            obj;
     }
     return isObject(child) ? updateMember(obj, key, () => setIn(child, rest, value, nested)) : obj;
 }

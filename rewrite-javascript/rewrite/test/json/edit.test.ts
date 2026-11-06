@@ -319,6 +319,45 @@ describe("setMember", () => {
 }`);
     });
 
+    test("inserts before a member with a comment in its prefix on its own line", async () => {
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "c": 3
+}`, obj => setMember(obj, "b", literal(2), {position: "sorted"}))).toBe(`{
+  "a": 1, // about a
+  "b": 2,
+  "c": 3
+}`);
+    });
+
+    test("inserts before a comment on the line above the next member", async () => {
+        expect(await editRoot(`{
+  "a": 1,
+  // about c
+  "c": 3
+}`, obj => setMember(obj, "b", literal(2), {position: "sorted"}))).toBe(`{
+  "a": 1,
+  "b": 2,
+  // about c
+  "c": 3
+}`);
+    });
+
+    test("prepends below a comment on the line of the opening brace", async () => {
+        expect(await editRoot(`{ // config
+  "a": 1
+}`, obj => setMember(obj, "b", literal(2), {position: "first"}))).toBe(`{ // config
+  "b": 2,
+  "a": 1
+}`);
+        expect(await editRoot(`{ // config
+  "a": 1
+}`, obj => setMember(obj, "b", literal(2)))).toBe(`{ // config
+  "a": 1,
+  "b": 2
+}`);
+    });
+
     test("adds to a single-member object", async () => {
         expect(await editRoot(`{"a": 1}`, obj => setMember(obj, "b", literal(2)))).toBe(`{"a": 1, "b": 2}`);
     });
@@ -446,8 +485,7 @@ describe("removeMember", () => {
 
         // then
         expect(isEmpty(removed)).toBe(true);
-        expect(await TreePrinters.print({...await parse(`{}`), value: removed} as Json.Document)).toBe(`{
-}`);
+        expect(await TreePrinters.print({...await parse(`{}`), value: removed} as Json.Document)).toBe(`{}`);
     });
 
     test("removes the first member when the indentation is on the keys", async () => {
@@ -479,6 +517,43 @@ describe("removeMember", () => {
   "b": 2
 }`, obj => removeMember(obj, "b"))).toBe(`{
   "a": 1 // about a
+}`);
+    });
+
+    test("removes the removed member's own comment with it", async () => {
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "b": 2, // about b
+  "c": 3
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1, // about a
+  "c": 3
+}`);
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "b": 2 // about b
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1 // about a
+}`);
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "b": 2, // about b
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1, // about a
+}`);
+        expect(await editRoot(`{
+  "a": 1 // about a
+}`, obj => removeMember(obj, "a"))).toBe(`{}`);
+    });
+
+    test("keeps a comment on the previous line when the indentation is on the keys", async () => {
+        expect(await editDocument(`{
+  "a": 1, // about a
+  "b": 2,
+  "c": 3
+}`, doc => removeAt(withIndentationOnKeys(doc), ["b"]))).toBe(`{
+  "a": 1, // about a
+  "c": 3
 }`);
     });
 
@@ -562,8 +637,7 @@ describe("path edits", () => {
         expect(await editDocument(manifest, doc => removeAt(doc, ["sap.ui5", "resources", "js"]))).toBe(`{
     "_version": "1.12.0",
     "sap.ui5": {
-        "resources": {
-        },
+        "resources": {},
         "dependencies": {
             "libs": {
                 "sap.m": {},
@@ -613,6 +687,30 @@ describe("path edits", () => {
     }
 }
 `);
+    });
+
+    test("setAt places the objects it creates by parentPosition", async () => {
+        const text = `{
+  "name": "x",
+  "version": "1.0.0",
+  "main": "index.js"
+}`;
+        expect(await editDocument(text, doc => setAt(doc, ["dependencies", "lodash"], literal("^4"), {createMissing: true, position: "sorted"}))).toBe(`{
+  "name": "x",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "lodash": "^4"
+  }
+}`);
+        expect(await editDocument(text, doc => setAt(doc, ["dependencies", "lodash"], literal("^4"), {createMissing: true, parentPosition: "first"}))).toBe(`{
+  "dependencies": {
+    "lodash": "^4"
+  },
+  "name": "x",
+  "version": "1.0.0",
+  "main": "index.js"
+}`);
     });
 
     test("setAt leaves the root unchanged for a missing step without createMissing", async () => {
