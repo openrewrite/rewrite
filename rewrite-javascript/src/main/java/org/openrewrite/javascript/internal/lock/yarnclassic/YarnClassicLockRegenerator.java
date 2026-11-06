@@ -236,6 +236,8 @@ public final class YarnClassicLockRegenerator {
                 network.put(key, flags.get(key));
             }
         }
+        network.putAll(Rc.networkSettings(Rc.getRcConfigForCwd(
+                these.configFilesFromCwd(), these.getHomeFiles(), these.installsAs())));
         String saved = new Install(these, config, flags, registry.withNetworkSettings("Yarn Classic", network)).run();
         return saved == null ? lock : saved;
     }

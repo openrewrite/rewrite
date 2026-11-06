@@ -50,6 +50,39 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
     @ParameterizedTest
+    @ValueSource(strings = {"--proxy", "--https-proxy", "--network-timeout",
+            "--install.proxy", "--install.https-proxy", "--install.network-timeout"})
+    void commandStyleYarnRequestOptionsCannotDisappearBeforeTheLiveAdapter(String option) {
+        AtomicInteger sent = new AtomicInteger();
+        String value = option.endsWith("network-timeout") ? "1500" : "http://127.0.0.1:1";
+        Request request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"))
+                .packageManagerFile(Paths.get(".npmrc"), "registry=http://registry.invalid/\n")
+                .packageManagerFile(Paths.get(".yarnrc"), option + " \"" + value + "\"\n")
+                .lock("# yarn lockfile v1\n").build();
+        Environment environment = new Environment() {
+            public String getenv(String name) { return null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager(PackageManager.YarnClassic).packageManagerVersion("1.22.22").build();
+        Result result;
+        try {
+            result = YarnClassicInputs.PORT.regenerate(LockDirectory.of(request), host,
+                    new NpmRegistryClient(r -> {
+                        sent.incrementAndGet();
+                        throw new IllegalStateException("synthetic sender boundary");
+                    }));
+        } catch (NodeRegistryException e) {
+            result = Result.failure(LockOnlyInstall.failure(e));
+        }
+        assertThat(sent).hasValue(0);
+        assertThat(result.getErrorMessage()).contains("network policy");
+    }
+
+    @ParameterizedTest
     @CsvSource({"YARN_ENABLE_OFFLINE_MODE,false", "YARN_ENABLE_OFFLINE_MODE,0",
             "YARN_ENABLE_NETWORK,true", "YARN_ENABLE_NETWORK,1",
             "YARN_ENABLE_STRICT_SSL,true", "YARN_ENABLE_STRICT_SSL,1"})
