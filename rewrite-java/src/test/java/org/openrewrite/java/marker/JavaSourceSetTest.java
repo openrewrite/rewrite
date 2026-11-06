@@ -23,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -107,5 +109,14 @@ class JavaSourceSetTest {
           ".gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar");
         assertThat(JavaSourceSet.gavFromPath(p))
           .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
+    }
+
+    @Test
+    void addingAnArtifactAgainWithTheSameTypesChangesNothing() {
+        String gav = "com.example:lib:1.0";
+        JavaSourceSet jss = new JavaSourceSet(UUID.randomUUID(), "main", List.of(), Map.of())
+          .addTypesForGav(gav, List.of(JavaType.ShallowClass.build("com.example.Lib")));
+
+        assertThat(jss.addTypesForGav(gav, List.of(JavaType.ShallowClass.build("com.example.Lib")))).isSameAs(jss);
     }
 }

@@ -22,6 +22,7 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
@@ -78,11 +79,11 @@ public class NoStaticImport extends Recipe {
                             // Do not replace when we can not determine the enclosing class, such as in build.gradle files
                             enclosingClass == null || enclosingClass.getType() == null ||
                             // Do not replace if receiverType is the same as surrounding class
-                            enclosingClass.getType().equals(receiverType) ||
+                            TypeUtils.isOfType(enclosingClass.getType(), receiverType) ||
                             // Do not replace if method is in a wrapping outer class; not looking up more than one level
-                            enclosingClass.getType().getOwningClass() != null && enclosingClass.getType().getOwningClass().equals(receiverType) ||
+                            enclosingClass.getType().getOwningClass() != null && TypeUtils.isOfType(enclosingClass.getType().getOwningClass(), receiverType) ||
                             // Do not replace if class extends receiverType
-                            enclosingClass.getType().getSupertype() != null && enclosingClass.getType().getSupertype().equals(receiverType)
+                            enclosingClass.getType().getSupertype() != null && TypeUtils.isOfType(enclosingClass.getType().getSupertype(), receiverType)
 
                     ) {
                         return m;

@@ -34,6 +34,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SourceSet;
 
 import java.beans.ConstructorProperties;
@@ -172,7 +173,7 @@ public class JavaSourceSet implements SourceSet, Heavyweight {
      */
     public JavaSourceSet addTypesForGav(String gavKey, List<JavaType.FullyQualified> types) {
         List<JavaType.FullyQualified> existing = gavToTypes.get(gavKey);
-        if (existing != null && existing.equals(types)) {
+        if (existing != null && isOfTypes(existing, types)) {
             return this;
         }
 
@@ -183,6 +184,18 @@ public class JavaSourceSet implements SourceSet, Heavyweight {
         newGavToTypes.put(gavKey, types);
 
         return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    private static boolean isOfTypes(List<JavaType.FullyQualified> types1, List<JavaType.FullyQualified> types2) {
+        if (types1.size() != types2.size()) {
+            return false;
+        }
+        for (int i = 0; i < types1.size(); i++) {
+            if (!TypeUtils.isOfType(types1.get(i), types2.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

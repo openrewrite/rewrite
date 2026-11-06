@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 
@@ -1190,35 +1191,6 @@ public class TypeUtils {
         return t;
     }
 
-    static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
-
-        if (ts1 == null || ts2 == null) {
-            return ts1 == null && ts2 == null;
-        }
-
-        if (ts1.size() != ts2.size()) {
-            return false;
-        }
-
-        for (int i = 0; i < ts1.size(); i++) {
-            JavaType t1 = ts1.get(i);
-            JavaType t2 = ts2.get(i);
-            if (t1 == null) {
-                if (t2 != null) {
-                    return false;
-                }
-            } else if (!deepEquals(t1, t2)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
-        return t == null ? t2 == null : t == t2 || t.equals(t2);
-    }
-
     public static String toString(JavaType type) {
         return toString(type, new IdentityHashMap<>());
     }
@@ -1323,8 +1295,27 @@ public class TypeUtils {
         }
 
         public boolean isComparing(JavaType to, JavaType from) {
-            return Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
+            return isSameType(this.to, to) && isSameType(this.from, from) ||
                     parent != null && parent.isComparing(to, from);
+        }
+
+        /**
+         * Distinct copies of one recursive type, as two parsers or a template produce, can revisit a
+         * pair of types being compared without revisiting the same instances. A signature comparison
+         * recognizes such a pair, which ends the recursion.
+         */
+        private static boolean isSameType(@Nullable JavaType t1, @Nullable JavaType t2) {
+            if (t1 == t2) {
+                return true;
+            } else if (t1 == null || t2 == null) {
+                return false;
+            } else if (t1 instanceof JavaType.FullyQualified && t2 instanceof JavaType.FullyQualified &&
+                       !fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) t1).getFullyQualifiedName(),
+                               ((JavaType.FullyQualified) t2).getFullyQualifiedName())) {
+                return false;
+            }
+            return new DefaultJavaTypeSignatureBuilder().signature(t1)
+                    .equals(new DefaultJavaTypeSignatureBuilder().signature(t2));
         }
 
         public ComparisonContext enterComparison(JavaType to, JavaType from) {

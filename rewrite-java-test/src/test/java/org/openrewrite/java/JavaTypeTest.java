@@ -223,4 +223,27 @@ class JavaTypeTest implements RewriteTest {
         // path depends on this (see ChangeTypeTest.doesNotModifyInnerClassesIfIgnoreDefinitionTrue)
         assertThat(JavaType.ShallowClass.build("Test.InnerB").getOwningClass()).isNull();
     }
+
+    @Test
+    void distinctCopiesOfACyclicTypeAreOfTheSameTypeButNotEqual() {
+        // java.lang.Enum<E extends Enum<E>>, from two parsers that share no type cache
+        JavaType.FullyQualified enum1 = enumSupertype();
+        JavaType.FullyQualified enum2 = enumSupertype();
+
+        assertThat(enum1).isNotEqualTo(enum2);
+        assertThat(TypeUtils.isOfType(enum1, enum2)).isTrue();
+
+        JavaType.FullyQualified rawEnum1 = ((JavaType.Parameterized) enum1).getType();
+        JavaType.FullyQualified rawEnum2 = ((JavaType.Parameterized) enum2).getType();
+        assertThat(rawEnum1).isNotEqualTo(rawEnum2);
+        assertThat(TypeUtils.isOfType(rawEnum1, rawEnum2)).isTrue();
+    }
+
+    private static JavaType.FullyQualified enumSupertype() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("enum A { X }")
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+        return cu.getClasses().getFirst().getType().getSupertype();
+    }
 }
