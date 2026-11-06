@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {foundSearchResult} from "../../../src";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
@@ -742,6 +743,34 @@ describe('a type annotation the pattern spells out', () => {
                 `
                 let a: number = 1;
                 const b = 2;
+                `
+            )
+        );
+    });
+
+    test('a repeated capture matches whichever occurrence has the annotation', () => {
+        const x = capture('x');
+        const pat = pattern`f(${x}, ${x})`.configure({lenientTypeMatching: true});
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(invocation: J.MethodInvocation): Promise<J | undefined> {
+                return await pat.match(invocation, this.cursor) ? foundSearchResult(invocation) : invocation;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                f((n: number) => n, (n) => n);
+                f((n) => n, (n: number) => n);
+                f(function (): number { return 1; }, function () { return 1; });
+                f(function () { return 1; }, function (): number { return 1; });
+                `,
+                `
+                /*~~>*/f((n: number) => n, (n) => n);
+                /*~~>*/f((n) => n, (n: number) => n);
+                /*~~>*/f(function (): number { return 1; }, function () { return 1; });
+                /*~~>*/f(function () { return 1; }, function (): number { return 1; });
                 `
             )
         );
