@@ -125,7 +125,7 @@ class AutoFormatCorpusTest {
         Path relative = repository.relativize(path);
         try (InputStream in = Files.newInputStream(path);
              EncodingDetectingInputStream is = new EncodingDetectingInputStream(in)) {
-            String source = is.readFully();
+            String source = ColdFusionParser.text(relative, is);
             Cf.CompilationUnit cu = ColdFusionParser.parse(relative, source, null, is.getCharset(), false);
             return cu.printAll().equals(source) ? new Parsed(repository, relative, source, cu) : null;
         } catch (Throwable t) {

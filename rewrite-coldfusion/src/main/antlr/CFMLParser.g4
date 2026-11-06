@@ -145,6 +145,9 @@ import java.util.Set;
     protected void markAttribute(boolean named) {
         if (la(1) != ATTRIBUTE_WORD && (attributeAhead() || !named && bareAttribute())) {
             retype(1, ATTRIBUTE_WORD);
+        } else if (!named && la(1) == COMMA && la(2) != ATTRIBUTE_WORD && attributeAt(2)) {
+            // the engines take a comma between the attributes of a tag written as a statement
+            retype(2, ATTRIBUTE_WORD);
         }
     }
 
@@ -288,7 +291,25 @@ import java.util.Set;
         if (function < 0) {
             return false;
         }
-        int i = 1;
+        int i = modifiers(1, function);
+        if (i < function) {
+            int last = i;
+            while (la(last + 1) == DOT && isWord(lt(last + 2))) {
+                last += 2;
+            }
+            retype(last, TYPE_WORD);
+            // the engines take a return type before the access modifier too, as `boolean public function f()`
+            i = last + 1;
+            if ((la(i) == LBRACKET || la(i) == INDEX_LBRACKET) && la(i + 1) == RBRACKET) {
+                i += 2;
+            }
+            modifiers(i, function);
+        }
+        return true;
+    }
+
+    // Retypes the modifiers from token i on, before the function keyword at token function, and returns where they end.
+    private int modifiers(int i, int function) {
         while (i < function && la(i) == IDENTIFIER) {
             int modifier = modifier(lower(lt(i)));
             if (modifier < 0) {
@@ -297,14 +318,7 @@ import java.util.Set;
             retype(i, modifier);
             i++;
         }
-        if (i < function) {
-            int last = i;
-            while (la(last + 1) == DOT && isWord(lt(last + 2))) {
-                last += 2;
-            }
-            retype(last, TYPE_WORD);
-        }
-        return true;
+        return i;
     }
 
     private static int modifier(String word) {
@@ -545,7 +559,7 @@ staticInitializer
     ;
 
 scriptTag
-    : SCRIPT_TAG_NAME { markAttribute(false); } (statementAttribute { markAttribute(false); })* { bodyBrace(); } bodyBlock?
+    : SCRIPT_TAG_NAME { markAttribute(false); } (COMMA? statementAttribute { markAttribute(false); })* { bodyBrace(); } bodyBlock?
     | EXPRESSION_TAG_NAME expression { markAttribute(true); } (statementAttribute { markAttribute(true); })* { bodyBrace(); }
       bodyBlock?
     ;
@@ -557,8 +571,8 @@ expressionStatement
 // A function without a body ends with a semicolon. Letting it end with nothing would make every
 // function body a candidate for a block statement after it, and prediction would scan each one.
 functionDeclaration
-    : functionModifier* returnType? FUNCTION anyWord (LPAREN | CALL_LPAREN) parameters? RPAREN headerAttribute*
-      (block SEMI? | SEMI)
+    : functionModifier* (returnType functionModifier*)? FUNCTION anyWord (LPAREN | CALL_LPAREN) parameters? RPAREN
+      headerAttribute* (block SEMI? | SEMI)
     ;
 
 functionModifier

@@ -26,6 +26,12 @@ component. Every other file is a template:
   `<cfquery>` and `<cfmail>`. Elsewhere in a template it is text.
 - A `<cfscript>` body is script statements.
 
+A tree prints the file's bytes back. A UTF-8 byte order mark is the `Cf.CompilationUnit`'s `charsetBomMarked`, which
+prints even in a file of nothing else, and a second U+FEFF after it is text. A file whose bytes do not decode to text
+that encodes back to them, in the charset detected for them, fails to parse. So no recipe rewrites a zip archive or a
+template `cfencode` encrypted. The check that a tree prints its file compares bytes, where comparing the text read with
+the text printed would miss a lost byte order mark.
+
 Syntax the grammar does not accept throws a `ColdFusionParsingException` naming the unexpected token.
 Nothing maps to `J.Unknown`.
 
@@ -61,6 +67,8 @@ Nothing maps to `J.Unknown`.
 | `::` | `J.FieldAccess`, `J.MethodInvocation` + `DoubleColon` | `Util::format(x)` |
 | `var` outside a declaration | `J.Assignment`, `J.AssignmentOperation`, `Cf.AssignmentOperation`, `NamedVariable` + `VarKeyword` | `var local.x = 1`, `var sql &= "x"`, `catch (any var e)` |
 | A missing comma | `JRightPadded` + `OmitComma` | parameters on separate lines, `cfparam(name="x" default=1)` |
+| A comma between the attributes of a tag written as a statement | `Cf.TagAttribute` + `AttributeComma` | `thread name="t", action="run" { }` |
+| A return type before a modifier | `J.MethodDeclaration` + `ReturnTypePosition` | `boolean public function isPackage()` |
 | An attribute naming a part of a declaration | `J.ClassDeclaration`'s `extends` and `implements`, a declaration's name or type + `AttributeClause` | `extends="models.Base"`, `implements="IFoo, IBar"`, `name="init"`, `type="string"` |
 | A declaration written as a tag | `J.ClassDeclaration`, `J.MethodDeclaration`, `J.VariableDeclarations` + `TagSyntax` | `<cfcomponent>`, `<cffunction name="init">`, `<cfargument name="id">`, `<cfproperty name="x">` |
 | A type a `TypeInference` gave, not the parser | the tree it typed, as a `J.MethodInvocation`, + `InferredType` | `variables.dao.find(id)` typed from what flows into `dao` |
@@ -295,7 +303,9 @@ public void defaults(RecipeSpec spec) {
 
 Each package is `slug` for its newest release or `slug@range` with CommandBox's ranges. It downloads from ForgeBox once
 into `~/.rewrite/cache/forgebox` and is a mapping at the path CommandBox installs it to: `coldbox`, `testbox`, or
-`modules/<slug>` for a ColdBox module. A JVM asks ForgeBox once for each package and indexes each set of packages
+`modules/<slug>` for a ColdBox module. A version whose download is a GitHub repository, written as CommandBox writes
+one, `owner/repo#ref`, comes from GitHub's archive of that ref. CommandBox clones the repository and checks the ref
+out, or `master`, else `main`, when there is none, which leaves the same files. A JVM asks ForgeBox once for each package and indexes each set of packages
 once. When ForgeBox cannot be reached, the newest cached version the range allows stands in.
 `ForgeBoxDependenciesTest` downloads from ForgeBox.
 
@@ -334,8 +344,6 @@ bound across a large corpus.
 
 These throw a `ColdFusionParsingException` today:
 
-- Commas between the attributes of a tag written as a statement, `thread name="t", action="run" { }`.
-- A return type written before an access modifier, `boolean public function f()`.
 - A self-closing tag with a space inside its `/ >`.
 - A catch with a dotted or quoted type and no variable, `catch (java.lang.Exception)`.
 - A function without a body or a semicolon, as the last statement of an interface.

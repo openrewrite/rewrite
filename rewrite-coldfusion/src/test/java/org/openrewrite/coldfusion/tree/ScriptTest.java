@@ -16,7 +16,9 @@
 package org.openrewrite.coldfusion.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.coldfusion.marker.AttributeComma;
 import org.openrewrite.coldfusion.marker.KeywordSpelling;
+import org.openrewrite.coldfusion.marker.ReturnTypePosition;
 import org.openrewrite.coldfusion.marker.VarKeyword;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.tree.J;
@@ -27,6 +29,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.coldfusion.Assertions.cfc;
 import static org.openrewrite.coldfusion.Assertions.cfm;
 
 class ScriptTest implements RewriteTest {
@@ -253,6 +256,64 @@ class ScriptTest implements RewriteTest {
                 assertThat(shorthand.getExpression()).isInstanceOf(J.Assignment.class);
                 Cf.ScriptTag lock = (Cf.ScriptTag) statements.get(3);
                 assertThat(lock.getBody()).isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void commasBetweenAScriptTagsAttributes() {
+        rewriteRun(
+          cfm(
+            """
+              <cfscript>
+                  thread name="install" slug="cbauth", version="1.0.0" , action="run" {
+                      install();
+                  }
+              </cfscript>
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                Cf.ScriptTag thread = (Cf.ScriptTag) script(cu).get(0);
+                assertThat(thread.getAttributes()).extracting(a -> a.getName().getSimpleName())
+                  .containsExactly("name", "slug", "version", "action");
+                assertThat(thread.getAttributes()).extracting(a -> a.getMarkers().findFirst(AttributeComma.class)
+                    .map(comma -> comma.getBefore().getWhitespace()).orElse(null))
+                  .containsExactly(null, null, "", " ");
+                assertThat(thread.getBody()).isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void returnTypeBeforeAccessModifier() {
+        rewriteRun(
+          cfc(
+            """
+              component {
+                  boolean public function isPackage(required string directory) {
+                      return true;
+                  }
+                  string public static function name() {
+                      return "x";
+                  }
+                  public numeric function count() {
+                      return 1;
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                List<Statement> functions = cu.getClasses().get(0).getBody().getStatements();
+                J.MethodDeclaration isPackage = (J.MethodDeclaration) functions.get(0);
+                assertThat(isPackage.getReturnTypeExpression()).isInstanceOf(J.Identifier.class);
+                assertThat(isPackage.getModifiers()).extracting(J.Modifier::getType).containsExactly(J.Modifier.Type.Public);
+                assertThat(isPackage.getMarkers().findFirst(ReturnTypePosition.class).map(ReturnTypePosition::getPosition))
+                  .contains(0);
+                J.MethodDeclaration name = (J.MethodDeclaration) functions.get(1);
+                assertThat(name.getModifiers()).hasSize(2);
+                // a return type after the modifiers needs no marker
+                J.MethodDeclaration count = (J.MethodDeclaration) functions.get(2);
+                assertThat(count.getMarkers().findFirst(ReturnTypePosition.class)).isEmpty();
             })
           )
         );

@@ -96,8 +96,8 @@ class LstShapeCorpusTest {
                 Path inRepository = repository.getKey().relativize(path);
                 try (InputStream in = Files.newInputStream(path);
                      EncodingDetectingInputStream is = new EncodingDetectingInputStream(in)) {
-                    index.add(inRepository, ColdFusionParser.parse(inRepository, is.readFully(), null, is.getCharset(),
-                            is.isCharsetBomMarked()));
+                    index.add(inRepository, ColdFusionParser.parse(inRepository, ColdFusionParser.text(inRepository, is),
+                            null, is.getCharset(), is.isCharsetBomMarked()));
                 } catch (Throwable ignored) {
                     // reported when the file is parsed again
                 }
@@ -126,13 +126,21 @@ class LstShapeCorpusTest {
         Cf.CompilationUnit cu;
         try (InputStream in = Files.newInputStream(path);
              EncodingDetectingInputStream is = new EncodingDetectingInputStream(in)) {
-            source = is.readFully();
+            source = ColdFusionParser.text(repository.relativize(path), is);
             cu = TypeAttribution.attribute(ColdFusionParser.parse(repository.relativize(path), source, null,
                     is.getCharset(), is.isCharsetBomMarked()), index);
         } catch (Throwable t) {
             return 0;
         }
-        // the byte order mark that reading the file dropped is no part of the tree
+        try {
+            if (!Arrays.equals(cu.printAllAsBytes(), Files.readAllBytes(path))) {
+                findings.add("print", "does not print back its bytes", relative, "");
+                return 0;
+            }
+        } catch (IOException e) {
+            return 0;
+        }
+        // the byte order mark that reading the file dropped is no part of the text compared next
         cu = cu.withCharsetBomMarked(false);
         String printed = cu.printAll();
         if (!printed.equals(source)) {
