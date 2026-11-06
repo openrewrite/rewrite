@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -2568,6 +2569,47 @@ class ChangePackageTest implements RewriteTest {
               class A {
                   Test a;
                   Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursiveKeepsUnresolvedFieldAccess() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
               }
               """
           )

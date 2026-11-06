@@ -187,6 +187,7 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
+        private final boolean singleSegmentOldPackage = !oldPackageName.contains(".");
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
@@ -210,15 +211,18 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                             return f;
                         }
                     }
-                    return TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                            .withPrefix(f.getPrefix());
+                    return newPackageTypeTree(f.getPrefix());
                 }
-                if (!oldPackageName.contains(".") && isSingleSegmentOldPackageTarget(fieldAccess, fa)) {
-                    return fa.withTarget(TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                            .withPrefix(fa.getTarget().getPrefix()));
+                if (singleSegmentOldPackage && isSingleSegmentOldPackageTarget(fieldAccess, fa)) {
+                    return fa.withTarget(newPackageTypeTree(fa.getTarget().getPrefix()));
                 }
             }
             return f;
+        }
+
+        private Expression newPackageTypeTree(Space prefix) {
+            Expression tree = TypeTree.build(newPackageType.getFullyQualifiedName());
+            return tree.withPrefix(prefix);
         }
 
         private boolean isSingleSegmentOldPackageTarget(J.FieldAccess original, J.FieldAccess visited) {
@@ -237,7 +241,8 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                     return false;
                 }
             }
-            return isRecursive() || namesTypeDirectlyInOldPackage(original);
+            return namesTypeDirectlyInOldPackage(original) ||
+                   isRecursive() && getCursor().getParentTreeCursor().getValue() instanceof J.FieldAccess;
         }
 
         /**
