@@ -20,8 +20,11 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
@@ -124,7 +127,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                                 "    \"@angular/build\": \"21.x\"\n" +
                                 "  }\n" +
                                 "}\n",
-                                s -> s.afterRecipe(capturedAfter::set)),
+                                // npm before 11.6.0 fails this edit in loadPeerSet, so it must not depend on the local npm
+                                s -> s.mapBeforeRecipe(UpgradeDependencyVersionTest::installedByNpm11)
+                                        .afterRecipe(capturedAfter::set)),
                         text(lockFileContent, s -> s.path("package-lock.json").after(actual -> actual).noTrim())));
 
         Json.Document after = capturedAfter.get();
@@ -142,5 +147,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 .as("@angular/build should resolve to a real 21.x release after regeneration")
                 .isNotNull()
                 .satisfies(d -> assertThat(d.getVersion()).startsWith("21."));
+    }
+
+    private static Json.Document installedByNpm11(Json.Document doc) {
+        return doc.withMarkers(doc.getMarkers().withMarkers(ListUtils.map(doc.getMarkers().getMarkers(),
+                m -> m instanceof NodeRuntime ?
+                        ((NodeRuntime) m).withPackageManager(PackageManager.Npm).withPackageManagerVersion("11.17.0") :
+                        m)));
     }
 }

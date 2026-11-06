@@ -159,4 +159,29 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renamingIdentifierKeepsConstructorType() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  A(int i) {
+                  }
+              }
+              class B extends A {
+                  B() {
+                      super(1);
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                var ctor = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
+                var superCall = (J.MethodInvocation) ctor.getBody().getStatements().get(0);
+                var renamed = superCall.withName(superCall.getName().withPrefix(Space.SINGLE_SPACE));
+                assertThat(renamed.getMethodType().isConstructor()).isTrue();
+            })
+          )
+        );
+    }
 }

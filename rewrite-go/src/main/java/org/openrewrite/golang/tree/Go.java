@@ -167,9 +167,7 @@ public interface Go extends J {
                 return withImportsContainer(JContainer.build(Space.EMPTY,
                         JRightPadded.withElements(emptyList(), imports), Markers.EMPTY));
             }
-            return withImportsContainer(JContainer.build(this.imports.getBefore(),
-                    JRightPadded.withElements(this.imports.getPadding().getElements(), imports),
-                    this.imports.getMarkers()));
+            return withImportsContainer(JContainer.withElements(this.imports, imports));
         }
 
         List<JRightPadded<Statement>> statements;

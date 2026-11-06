@@ -24,6 +24,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.json.internal.JsonString;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -43,7 +44,7 @@ public class AddKeyValue extends Recipe {
     String keyPath;
 
     @Option(displayName = "Key",
-            description = "The key to create.",
+            description = "The key to create, as the text it stands for. It is written with the escapes JSON needs, so `\\.` is written `\\\\.`.",
             example = "myKey")
     String key;
 
@@ -75,20 +76,27 @@ public class AddKeyValue extends Recipe {
                 obj = super.visitObject(obj, ctx);
 
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
-                    List<Json> originalMembers = obj.getMembers();
-                    boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
-
+                    List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
+                    boolean jsonIsEmpty = members.isEmpty() || members.get(0).getElement() instanceof Json.Empty;
+                    Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ?
+                            members.get(0).getElement().getPrefix() : Space.build("\n", emptyList());
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
 
+                    // Format the new member as the only one in the object, leaving the other members as they are
+                    Json.JsonObject formatted = autoFormat(obj.withMembers(singletonList(newMember)), ctx,
+                            getCursor().getParentOrThrow());
                     if (jsonIsEmpty) {
-                        return autoFormat(obj.withMembers(singletonList(newMember)), ctx, getCursor().getParent());
+                        return formatted;
                     }
-
-                    List<Json> newMembers = Boolean.TRUE.equals(prepend) ?
-                            ListUtils.concat(newMember, originalMembers) :
-                            ListUtils.concat(originalMembers, newMember);
-                    return autoFormat(obj.withMembers(newMembers), ctx, getCursor().getParent());
+                    Json added = formatted.getMembers().get(0);
+                    if (Boolean.TRUE.equals(prepend)) {
+                        return obj.getPadding().withMembers(ListUtils.concat(
+                                new JsonRightPadded<>(added, Space.EMPTY, Markers.EMPTY), members));
+                    }
+                    Space beforeClosingBrace = members.get(members.size() - 1).getAfter();
+                    return obj.getPadding().withMembers(ListUtils.concat(
+                            ListUtils.mapLast(members, m -> m.withAfter(Space.EMPTY)),
+                            new JsonRightPadded<>(added, beforeClosingBrace, Markers.EMPTY)));
                 }
                 return obj;
             }
@@ -102,7 +110,7 @@ public class AddKeyValue extends Recipe {
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
                 return new JsonRightPadded<>(
-                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, "\"" + key + "\"", key),
+                        new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, JsonString.quote(key), key),
                         Space.EMPTY, Markers.EMPTY
                 );
             }

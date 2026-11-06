@@ -31,4 +31,10 @@ public class InstallRecipesResponse {
      * the bundle again without a registry. Null for a loose assembly.
      */
     @Nullable Path publishDir;
+
+    /**
+     * Whether a NuGet install kept the publish output an earlier install built from the same
+     * package contents.
+     */
+    boolean unchanged;
 }

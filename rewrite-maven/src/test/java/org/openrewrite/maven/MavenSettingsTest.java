@@ -15,7 +15,10 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.assertj.core.api.Condition;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.ThrowingConsumer;
@@ -28,9 +31,11 @@ import org.junit.jupiter.api.parallel.Isolated;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
+import org.openrewrite.RecipeSerializer;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.SemanticallyEqual;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
@@ -40,6 +45,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
@@ -984,7 +990,7 @@ class MavenSettingsTest {
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        MavenXmlMapper.writeMapper()
+        MavenXmlMapper.writeMapper().copy()
           .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
           .writerWithDefaultPrettyPrinter()
           .writeValue(baos, settings);
@@ -995,6 +1001,95 @@ class MavenSettingsTest {
           .isNotNull()
           .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
           .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9353")
+    @Test
+    void modulesShareOneCopyWhenSerialized() throws IOException {
+        ObjectMapper mapper = new RecipeSerializer().getMapper();
+
+        MavenResolutionResult parent = mapper.readValue(mapper.writeValueAsBytes(parseReactor()),
+          MavenResolutionResult.class);
+
+        assertThat(parent.getMavenSettings().getMirrors().getMirrors())
+          .singleElement()
+          .extracting(MavenSettings.Mirror::getUrl)
+          .isEqualTo("https://mirror.example.com");
+        assertThat(parent.getModules())
+          .hasSize(2)
+          .allSatisfy(module -> assertThat(module.getMavenSettings()).isSameAs(parent.getMavenSettings()));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9353")
+    @Test
+    void readsModulesSerializedWithoutObjectIds() throws IOException {
+        ObjectMapper olderWriter = new RecipeSerializer().getMapper().addMixIn(MavenSettings.class, NoObjectId.class);
+
+        MavenResolutionResult parent = new RecipeSerializer().getMapper()
+          .readValue(olderWriter.writeValueAsBytes(parseReactor()), MavenResolutionResult.class);
+
+        assertThat(parent.getModules())
+          .hasSize(2)
+          .allSatisfy(module -> assertThat(module.getMavenSettings().getMirrors().getMirrors())
+            .singleElement()
+            .extracting(MavenSettings.Mirror::getUrl)
+            .isEqualTo("https://mirror.example.com"));
+    }
+
+    private MavenResolutionResult parseReactor() {
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+          //language=xml
+          """
+            <settings>
+                <mirrors>
+                    <mirror>
+                        <id>mirror</id>
+                        <url>https://mirror.example.com</url>
+                        <mirrorOf>*</mirrorOf>
+                    </mirror>
+                </mirrors>
+            </settings>
+            """
+        ), ctx));
+        List<Parser.Input> poms = List.of(
+          Parser.Input.fromString(Path.of("pom.xml"),
+            //language=xml
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+              </project>
+              """),
+          Parser.Input.fromString(Path.of("a/pom.xml"),
+            //language=xml
+            """
+              <project>
+                  <parent>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>a</artifactId>
+              </project>
+              """),
+          Parser.Input.fromString(Path.of("b/pom.xml"),
+            //language=xml
+            """
+              <project>
+                  <parent>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <artifactId>b</artifactId>
+              </project>
+              """)
+        );
+        return MavenParser.builder().build().parseInputs(poms, null, ctx)
+          .findFirst().orElseThrow()
+          .getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
     }
 
     private void createSettingsSecurityFile() throws IOException {
@@ -1047,5 +1142,9 @@ class MavenSettingsTest {
         assertThat(proxy.getUsername()).isEqualTo("proxyuser");
         assertThat(proxy.getPassword()).isEqualTo("proxypass");
         assertThat(proxy.getNonProxyHosts()).isEqualTo("localhost|*.example.com");
+    }
+
+    @JsonIdentityInfo(generator = ObjectIdGenerators.None.class)
+    private interface NoObjectId {
     }
 }

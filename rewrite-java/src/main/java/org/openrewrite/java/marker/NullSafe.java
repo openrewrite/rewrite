@@ -29,6 +29,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.beans.ConstructorProperties;
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 /**
  * Marker indicating null-safe navigation (?. operator).
  * Used by languages with safe navigation: C#, Kotlin, Groovy.
@@ -58,7 +61,7 @@ public class NullSafe implements Marker, RpcCodec<NullSafe> {
     @Override
     public void rpcSend(NullSafe after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, NullSafe::getDotPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getDotPrefix()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

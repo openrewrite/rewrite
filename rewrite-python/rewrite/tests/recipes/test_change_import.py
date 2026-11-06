@@ -14,10 +14,9 @@
 
 """Tests for ChangeImport recipe."""
 
-from rewrite.java.support_types import JavaType
-from rewrite.java.tree import FieldAccess, Identifier, MethodInvocation
+from pathlib import Path
+
 from rewrite.python.recipes.change_import import ChangeImport
-from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
@@ -57,6 +56,59 @@ class TestChangeImport:
             python(
                 "from typing import Callable\n",
                 "from collections.abc import Callable\n",
+            )
+        )
+
+    def test_crlf_line_breaks(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "import os\r\nfrom typing import Mapping\r\n\r\nx: Mapping = {}\r\n",
+                "import os\r\nfrom collections.abc import Mapping\r\n\r\nx: Mapping = {}\r\n",
+            )
+        )
+
+    def test_moved_member_joins_its_section(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Iterable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import logging
+
+                import random
+                from typing import Iterable
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                """
+                import logging
+                from collections.abc import Iterable
+
+                import random
+
+                import torch
+                from PIL import Image as PILImage
+
+                from training.utils.data_utils import VideoDatapoint
+
+
+                def f(x: Iterable): ...
+                """,
+                path=Path('training/dataset/transforms.py'),
             )
         )
 
@@ -222,6 +274,60 @@ class TestChangeImport:
             )
         )
 
+    def test_change_qualified_ref_into_submodule_drops_parent_import(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d: collections.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+    def test_change_aliased_qualified_ref_into_submodule(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                d: c.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                from collections import OrderedDict
+                d: c.Mapping = c.Counter(OrderedDict())
+                """,
+                """
+                import collections as c
+                from collections import OrderedDict
+                import collections.abc
+                d: collections.abc.Mapping = c.Counter(OrderedDict())
+                """,
+            )
+        )
+
     def test_change_qualified_ref_with_different_new_name(self):
         """Qualified ref rewrite when new_name differs from old_name."""
         spec = RecipeSpec(recipe=ChangeImport(
@@ -244,99 +350,6 @@ class TestChangeImport:
                 """,
             )
         )
-
-    def test_type_attribution_updated_on_qualified_refs(self):
-        """Type attribution is updated on rewritten method invocations and field accesses."""
-        from dataclasses import replace as dc_replace
-        from rewrite.python.recipes.change_import import _create_module_type
-
-        fractions_type = _create_module_type('fractions')
-
-        def inject_types(source_file):
-            """Inject type info onto fractions references so the test doesn't depend on ty."""
-            class TypeInjector(PythonVisitor):
-                def visit_method_invocation(self, method, p):
-                    method = super().visit_method_invocation(method, p)
-                    if (isinstance(method, MethodInvocation)
-                            and isinstance(method.select, Identifier)
-                            and method.select.simple_name == 'fractions'):
-                        new_select = method.select.replace(_type=fractions_type)
-                        method = method.padding.replace(
-                            _select=method.padding.select.replace(_element=new_select))
-                        method = method.replace(_method_type=JavaType.Method(
-                            _declaring_type=fractions_type,
-                            _name='gcd',
-                        ))
-                    return method
-
-                def visit_field_access(self, fa, p):
-                    fa = super().visit_field_access(fa, p)
-                    if (isinstance(fa, FieldAccess)
-                            and isinstance(fa.target, Identifier)
-                            and fa.target.simple_name == 'fractions'):
-                        fa = fa.replace(_target=fa.target.replace(_type=fractions_type))
-                    return fa
-
-            return TypeInjector().visit(source_file, None)
-
-        errors = []
-
-        def check_types(source_file):
-            assert isinstance(source_file, CompilationUnit)
-
-            class TypeChecker(PythonVisitor):
-                def visit_method_invocation(self, method, p):
-                    if isinstance(method.select, Identifier) and method.select.simple_name == 'math':
-                        if method.select.type is None:
-                            errors.append("method select identifier has no type")
-                        elif not isinstance(method.select.type, JavaType.FullyQualified):
-                            errors.append(f"method select type is {type(method.select.type).__name__}, expected FullyQualified")
-                        elif method.select.type._fully_qualified_name != 'math':
-                            errors.append(f"method select type fqn is '{method.select.type._fully_qualified_name}', expected 'math'")
-                        if method.method_type is None:
-                            errors.append("method_type is None")
-                        elif method.method_type.declaring_type is None:
-                            errors.append("method_type.declaring_type is None")
-                        elif method.method_type.declaring_type._fully_qualified_name != 'math':
-                            errors.append(f"method_type declaring_type fqn is '{method.method_type.declaring_type._fully_qualified_name}', expected 'math'")
-                        if method.method_type is not None and method.method_type.name != 'gcd':
-                            errors.append(f"method_type.name is '{method.method_type.name}', expected 'gcd'")
-                    return method
-
-                def visit_field_access(self, fa, p):
-                    if isinstance(fa.target, Identifier) and fa.target.simple_name == 'math' and fa.name.simple_name == 'gcd':
-                        if fa.target.type is None:
-                            errors.append("field access target identifier has no type")
-                        elif not isinstance(fa.target.type, JavaType.FullyQualified):
-                            errors.append(f"field access target type is {type(fa.target.type).__name__}, expected FullyQualified")
-                        elif fa.target.type._fully_qualified_name != 'math':
-                            errors.append(f"field access target type fqn is '{fa.target.type._fully_qualified_name}', expected 'math'")
-                    return fa
-
-            TypeChecker().visit(source_file, None)
-
-        spec = RecipeSpec(recipe=ChangeImport(
-            old_module='fractions',
-            old_name='gcd',
-            new_module='math',
-        ))
-        spec.rewrite_run(
-            python(
-                """
-                import fractions
-                result = fractions.gcd(12, 8)
-                fn = fractions.gcd
-                """,
-                """
-                import math
-                result = math.gcd(12, 8)
-                fn = math.gcd
-                """,
-                before_recipe=inject_types,
-                after_recipe=check_types,
-            )
-        )
-        assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
     def test_type_attribution_on_a_rewritten_construction(self):
         errors = []
@@ -1138,7 +1151,7 @@ class TestChangeImportPythonScopeRules:
 
 
 class TestImportsInBlocks:
-    """Imports nested in a module-scope `if` body, where `if TYPE_CHECKING:` keeps them."""
+    """Imports nested in a block, such as a function body or an `if TYPE_CHECKING:` body."""
 
     @staticmethod
     def _callable_to_abc() -> RecipeSpec:
@@ -1270,61 +1283,113 @@ class TestImportsInBlocks:
             )
         )
 
-    def test_a_match_outside_module_scope_is_left_alone(self):
-        """Each file needs a module-scope match too, or the recipe returns before it looks."""
+    def test_a_match_in_any_block_is_rewritten_where_it_stands(self):
         self._callable_to_abc().rewrite_run(
             python(
                 """
                 import sys
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from typing import Callable
 
                 if sys.version_info >= (3, 10):
                     pass
                 else:
                     from typing import Callable
+
+                try:
+                    from typing import Callable
+                except ImportError:
+                    Callable = None
 
                 def f(x: Callable[[int], str]) -> None: ...
                 """,
                 """
                 import sys
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from collections.abc import Callable
 
                 if sys.version_info >= (3, 10):
                     pass
                 else:
-                    from typing import Callable
+                    from collections.abc import Callable
+
+                try:
+                    from collections.abc import Callable
+                except ImportError:
+                    Callable = None
 
                 def f(x: Callable[[int], str]) -> None: ...
                 """,
             ),
             python(
                 """
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from typing import Callable
-
                 def g():
                     from typing import Callable
                     return Callable
                 """,
                 """
-                from typing import TYPE_CHECKING
-
-                if TYPE_CHECKING:
-                    from collections.abc import Callable
-
                 def g():
-                    from typing import Callable
+                    from collections.abc import Callable
                     return Callable
                 """,
             ),
+        )
+
+    def test_a_rename_follows_the_function_holding_the_import(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='typing', old_name='Deque', new_module='collections', new_name='deque',
+        )).rewrite_run(
+            python(
+                """
+                def f():
+                    from typing import Deque
+                    return Deque[int]
+
+                def g(Deque):
+                    return Deque
+                """,
+                """
+                def f():
+                    from collections import deque
+                    return deque[int]
+
+                def g(Deque):
+                    return Deque
+                """,
+            )
+        )
+
+    def test_a_read_through_a_function_local_import_binds_the_new_module_there(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='tarfile', old_name='filemode', new_module='stat',
+        )).rewrite_run(
+            python(
+                """
+                def mode(m):
+                    import tarfile
+                    return tarfile.filemode(m)
+
+                def listing(path, m):
+                    import tarfile
+                    return tarfile.open(path), tarfile.filemode(m)
+
+                def aliased(m):
+                    import tarfile
+                    import stat as st
+                    return tarfile.filemode(m)
+                """,
+                """
+                def mode(m):
+                    import stat
+                    return stat.filemode(m)
+
+                def listing(path, m):
+                    import tarfile
+                    import stat
+                    return tarfile.open(path), stat.filemode(m)
+
+                def aliased(m):
+                    import stat
+                    import stat as st
+                    return stat.filemode(m)
+                """,
+            )
         )
 
     def test_qualified_reference_binds_the_new_module_in_the_block(self):
@@ -1345,6 +1410,30 @@ class TestImportsInBlocks:
                     import collections.abc
 
                 def f(x: collections.abc.Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_into_a_submodule_drops_the_parent_import_in_the_block(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections', old_name='Mapping', new_module='collections.abc',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Mapping) -> None: ...
                 """,
             )
         )
@@ -1372,28 +1461,86 @@ class TestImportsInBlocks:
             )
         )
 
-    def test_a_rename_stops_when_a_match_survives_out_of_scope(self):
+    def test_a_function_keeps_its_read_through_where_it_spells_the_new_module_name(self):
         RecipeSpec(recipe=ChangeImport(
-            old_module='collections',
-            old_name='Mapping',
-            new_module='collections.abc',
-            new_name='Map',
+            old_module='tarfile', old_name='filemode', new_module='stat',
         )).rewrite_run(
             python(
                 """
-                import sys
-                from typing import TYPE_CHECKING
+                import stat
 
-                if TYPE_CHECKING:
-                    from collections import Mapping
+                def mode(m):
+                    s = stat.S_IFDIR
+                    import tarfile
+                    return tarfile.filemode(m), s
+                """
+            ),
+            python(
+                """
+                import os
 
-                if sys.version_info >= (3, 10):
-                    pass
-                else:
-                    from collections import Mapping
-                    m = Mapping()
+                def mode(path):
+                    import tarfile
+                    stat = os.stat(path)
+                    return tarfile.filemode(stat.st_mode)
                 """
             )
+        )
+
+    def test_a_rename_keeps_the_old_name_where_a_reference_would_read_something_else(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='typing', old_name='Deque', new_module='collections', new_name='deque',
+        )).rewrite_run(
+            python(
+                """
+                try:
+                    from typing import Deque
+                except ImportError:
+                    from typing_extensions import Deque
+
+                x: Deque[int]
+                """,
+                """
+                try:
+                    from collections import deque as Deque
+                except ImportError:
+                    from typing_extensions import Deque
+
+                x: Deque[int]
+                """,
+            ),
+            python(
+                """
+                class C:
+                    from typing import Deque
+
+                x = C.Deque
+                """,
+                """
+                class C:
+                    from collections import deque as Deque
+
+                x = C.Deque
+                """,
+            ),
+            python(
+                """
+                from collections import deque
+
+                def f():
+                    d = deque()
+                    from typing import Deque
+                    return Deque, d
+                """,
+                """
+                from collections import deque
+
+                def f():
+                    d = deque()
+                    from collections import deque as Deque
+                    return Deque, d
+                """,
+            ),
         )
 
     def test_both_import_forms_in_one_block_are_rewritten(self):

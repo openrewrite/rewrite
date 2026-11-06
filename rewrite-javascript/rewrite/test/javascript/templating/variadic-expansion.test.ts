@@ -85,6 +85,18 @@ describe('variadic template expansion', () => {
         );
     });
 
+    test('expand variadic ahead of a fixed argument, leaving its trailing comma behind', () => {
+        const args = capture({ variadic: true });
+        const pat = pattern`foo(${args})`;
+        const tmpl = template`bar(${args}, 3)`;
+
+        spec.recipe = fromVisitor(matchAndReplace(pat, tmpl));
+
+        return spec.rewriteRun(
+            typescript('foo(1, 2,)', 'bar(1, 2, 3)')
+        );
+    });
+
     test('any() on both sides matches when neither side consumes anything', () => {
         const before = any({ variadic: true });
         const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});

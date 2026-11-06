@@ -373,8 +373,7 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
     }
 
     private static boolean containsGradleDevelocityDsl(JavaSourceFile cu) {
-        AtomicBoolean found = new AtomicBoolean(false);
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, AtomicBoolean atomicBoolean) {
                 if (atomicBoolean.get()) {
@@ -390,9 +389,7 @@ public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradl
                 }
                 return super.visitMethodInvocation(method, atomicBoolean);
             }
-        }.visit(cu, found);
-
-        return found.get();
+        }.reduce(cu, new AtomicBoolean(false)).get();
     }
 
     /**

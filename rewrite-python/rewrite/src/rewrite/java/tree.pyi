@@ -38,7 +38,7 @@ from .support_types import (
 
 @dataclass(frozen=True)
 class AnnotatedType(Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -67,7 +67,7 @@ class Annotation(Expression):
         @property
         def arguments(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotation_type: NameTree
@@ -90,7 +90,7 @@ class Annotation(Expression):
 
 @dataclass(frozen=True)
 class ArrayAccess(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _indexed: Expression
@@ -113,7 +113,7 @@ class ArrayAccess(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class ArrayType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _element_type: TypeTree
@@ -139,7 +139,7 @@ class ArrayType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Assert(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: Expression
@@ -168,7 +168,7 @@ class Assignment(Statement, Expression, TypedTree):
         @property
         def assignment(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variable: Expression
@@ -219,7 +219,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[AssignmentOperation.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variable: Expression
@@ -278,7 +278,7 @@ class Binary(Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Binary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _left: Expression
@@ -318,7 +318,7 @@ class Block(Statement):
         @property
         def statements(self) -> List[JRightPadded[Statement]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _static: JRightPadded[bool]
@@ -344,7 +344,7 @@ class Block(Statement):
 
 @dataclass(frozen=True)
 class Break(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: Optional[Identifier]
@@ -378,7 +378,7 @@ class Case(Statement):
         @property
         def body(self) -> Optional[JRightPadded[J]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: Type
@@ -420,7 +420,7 @@ class ClassDeclaration(Statement, TypedTree):
             Record = ...
             Value = ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _annotations: List[Annotation]
@@ -436,7 +436,7 @@ class ClassDeclaration(Statement, TypedTree):
         @property
         def type(self) -> Type: ...
 
-        def with_id(self, id: UUID) -> ClassDeclaration.Kind: ...
+        def with_id(self, id: int | UUID) -> ClassDeclaration.Kind: ...
         def with_prefix(self, prefix: Space) -> ClassDeclaration.Kind: ...
         def with_markers(self, markers: Markers) -> ClassDeclaration.Kind: ...
         def with_annotations(self, annotations: List[Annotation]) -> ClassDeclaration.Kind: ...
@@ -462,7 +462,7 @@ class ClassDeclaration(Statement, TypedTree):
         @property
         def permits(self) -> Optional[JContainer[TypeTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -521,7 +521,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
         @property
         def imports(self) -> List[JRightPadded[Import]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source_path: Path
@@ -566,7 +566,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
 
 @dataclass(frozen=True)
 class Continue(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: Optional[Identifier]
@@ -594,7 +594,7 @@ class DoWhileLoop(Loop):
         @property
         def while_condition(self) -> JLeftPadded[ControlParentheses[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _body: JRightPadded[Statement]
@@ -617,7 +617,7 @@ class DoWhileLoop(Loop):
 
 @dataclass(frozen=True)
 class Empty(Statement, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
 
@@ -631,7 +631,7 @@ class Empty(Statement, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class EnumValue(J):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -663,7 +663,7 @@ class EnumValueSet(Statement):
         @property
         def enums(self) -> List[JRightPadded[EnumValue]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _enums: List[JRightPadded[EnumValue]]
@@ -695,7 +695,7 @@ class FieldAccess(TypeTree, Expression, Statement):
         @property
         def name(self) -> JLeftPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _target: Expression
@@ -734,7 +734,7 @@ class ForEachLoop(Loop):
             @property
             def iterable(self) -> JRightPadded[Expression]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _variable: JRightPadded[Statement]
@@ -753,7 +753,7 @@ class ForEachLoop(Loop):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ForEachLoop.Control: ...
+        def with_id(self, id: int | UUID) -> ForEachLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForEachLoop.Control: ...
         def with_markers(self, markers: Markers) -> ForEachLoop.Control: ...
         def with_variable(self, variable: Statement) -> ForEachLoop.Control: ...
@@ -769,7 +769,7 @@ class ForEachLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _control: Control
@@ -807,7 +807,7 @@ class ForLoop(Loop):
             @property
             def update(self) -> List[JRightPadded[Statement]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _init: List[JRightPadded[Statement]]
@@ -829,7 +829,7 @@ class ForLoop(Loop):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ForLoop.Control: ...
+        def with_id(self, id: int | UUID) -> ForLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForLoop.Control: ...
         def with_markers(self, markers: Markers) -> ForLoop.Control: ...
         def with_init(self, init: List[Statement]) -> ForLoop.Control: ...
@@ -846,7 +846,7 @@ class ForLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _control: Control
@@ -869,7 +869,7 @@ class ForLoop(Loop):
 
 @dataclass(frozen=True)
 class ParenthesizedTypeTree(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -889,7 +889,7 @@ class ParenthesizedTypeTree(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Identifier(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -926,7 +926,7 @@ class If(Statement):
             @property
             def body(self) -> JRightPadded[Statement]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _body: JRightPadded[Statement]
@@ -942,7 +942,7 @@ class If(Statement):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> If.Else: ...
+        def with_id(self, id: int | UUID) -> If.Else: ...
         def with_prefix(self, prefix: Space) -> If.Else: ...
         def with_markers(self, markers: Markers) -> If.Else: ...
         def with_body(self, body: Statement) -> If.Else: ...
@@ -957,7 +957,7 @@ class If(Statement):
         @property
         def then_part(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _if_condition: ControlParentheses[Expression]
@@ -994,7 +994,7 @@ class Import(Statement):
         @property
         def alias(self) -> Optional[JLeftPadded[Identifier]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _static: JLeftPadded[bool]
@@ -1029,7 +1029,7 @@ class InstanceOf(Expression, TypedTree):
         @property
         def expression(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: JRightPadded[Expression]
@@ -1067,7 +1067,7 @@ class DeconstructionPattern(TypedTree):
         @property
         def nested(self) -> JContainer[J]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _deconstructor: Expression
@@ -1102,7 +1102,7 @@ class IntersectionType(TypeTree, Expression):
         @property
         def bounds(self) -> JContainer[TypeTree]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _bounds: JContainer[TypeTree]
@@ -1131,7 +1131,7 @@ class Label(Statement):
         @property
         def label(self) -> JRightPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: JRightPadded[Identifier]
@@ -1165,7 +1165,7 @@ class Lambda(Statement, Expression, TypedTree):
             @property
             def parameters(self) -> List[JRightPadded[J]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _parenthesized: bool
@@ -1184,14 +1184,14 @@ class Lambda(Statement, Expression, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> Lambda.Parameters: ...
+        def with_id(self, id: int | UUID) -> Lambda.Parameters: ...
         def with_prefix(self, prefix: Space) -> Lambda.Parameters: ...
         def with_markers(self, markers: Markers) -> Lambda.Parameters: ...
         def with_parenthesized(self, parenthesized: bool) -> Lambda.Parameters: ...
         def with_parameters(self, parameters: List[J]) -> Lambda.Parameters: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _parameters: Parameters
@@ -1231,7 +1231,7 @@ class Literal(Expression, TypedTree):
         def with_value_source_index(self, value_source_index: int) -> Literal.UnicodeEscape: ...
         def with_code_point(self, code_point: str) -> Literal.UnicodeEscape: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _value: Optional[object]
@@ -1270,7 +1270,7 @@ class MemberReference(TypedTree, MethodCall):
         @property
         def reference(self) -> JLeftPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _containing: JRightPadded[Expression]
@@ -1349,7 +1349,7 @@ class MethodDeclaration(Statement, TypedTree):
         def with_throws(self, throws: Optional[JContainer[NameTree]]) -> MethodDeclaration: ...
         def with_default_value(self, default_value: Optional[JLeftPadded[Expression]]) -> MethodDeclaration: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -1419,7 +1419,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
         @property
         def arguments(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _select: Optional[JRightPadded[Expression]]
@@ -1473,7 +1473,7 @@ class Modifier(J):
         Inline = ...
         LanguageExtension = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _keyword: Optional[str]
@@ -1505,7 +1505,7 @@ class MultiCatch(TypeTree):
         @property
         def alternatives(self) -> List[JRightPadded[NameTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _alternatives: List[JRightPadded[NameTree]]
@@ -1534,7 +1534,7 @@ class NewArray(Expression, TypedTree):
         @property
         def initializer(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type_expression: Optional[TypeTree]
@@ -1572,7 +1572,7 @@ class ArrayDimension(J):
         @property
         def index(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _index: JRightPadded[Expression]
@@ -1603,7 +1603,7 @@ class NewClass(Statement, TypedTree, MethodCall):
         @property
         def arguments(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _enclosing: Optional[JRightPadded[Expression]]
@@ -1649,7 +1649,7 @@ class NullableType(TypeTree, Expression):
         @property
         def type_tree(self) -> JRightPadded[TypeTree]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -1672,7 +1672,7 @@ class NullableType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Package(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
@@ -1701,7 +1701,7 @@ class ParameterizedType(TypeTree, Expression):
         @property
         def type_parameters(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _clazz: NameTree
@@ -1736,7 +1736,7 @@ class Parentheses(Expression, Generic[J2]):
         @property
         def tree(self) -> JRightPadded[J3]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _tree: JRightPadded[J2]
@@ -1767,7 +1767,7 @@ class ControlParentheses(Expression, Generic[J2]):
         @property
         def tree(self) -> JRightPadded[J3]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _tree: JRightPadded[J2]
@@ -1787,7 +1787,7 @@ class ControlParentheses(Expression, Generic[J2]):
 
 @dataclass(frozen=True)
 class Primitive(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: JavaType.Primitive
@@ -1804,7 +1804,7 @@ class Primitive(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Return(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Optional[Expression]
@@ -1821,7 +1821,7 @@ class Return(Statement):
 
 @dataclass(frozen=True)
 class Switch(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _selector: ControlParentheses[Expression]
@@ -1841,7 +1841,7 @@ class Switch(Statement):
 
 @dataclass(frozen=True)
 class SwitchExpression(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _selector: ControlParentheses[Expression]
@@ -1864,7 +1864,7 @@ class SwitchExpression(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Synchronized(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _lock: ControlParentheses[Expression]
@@ -1895,7 +1895,7 @@ class Ternary(Expression, Statement, TypedTree):
         @property
         def false_part(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: Expression
@@ -1924,7 +1924,7 @@ class Ternary(Expression, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class Throw(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _exception: Expression
@@ -1943,7 +1943,7 @@ class Throw(Statement):
 class Try(Statement):
     @dataclass(frozen=True)
     class Resource(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _variable_declarations: TypedTree
@@ -1959,7 +1959,7 @@ class Try(Statement):
         @property
         def terminated_with_semicolon(self) -> bool: ...
 
-        def with_id(self, id: UUID) -> Try.Resource: ...
+        def with_id(self, id: int | UUID) -> Try.Resource: ...
         def with_prefix(self, prefix: Space) -> Try.Resource: ...
         def with_markers(self, markers: Markers) -> Try.Resource: ...
         def with_variable_declarations(self, variable_declarations: TypedTree) -> Try.Resource: ...
@@ -1968,7 +1968,7 @@ class Try(Statement):
 
     @dataclass(frozen=True)
     class Catch(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _parameter: ControlParentheses[VariableDeclarations]
@@ -1984,7 +1984,7 @@ class Try(Statement):
         @property
         def body(self) -> Block: ...
 
-        def with_id(self, id: UUID) -> Try.Catch: ...
+        def with_id(self, id: int | UUID) -> Try.Catch: ...
         def with_prefix(self, prefix: Space) -> Try.Catch: ...
         def with_markers(self, markers: Markers) -> Try.Catch: ...
         def with_parameter(self, parameter: ControlParentheses[VariableDeclarations]) -> Try.Catch: ...
@@ -2002,7 +2002,7 @@ class Try(Statement):
         @property
         def finally_(self) -> Optional[JLeftPadded[Block]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _resources: Optional[JContainer[Resource]]
@@ -2031,7 +2031,7 @@ class Try(Statement):
 
 @dataclass(frozen=True)
 class TypeCast(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _clazz: ControlParentheses[TypeTree]
@@ -2060,7 +2060,7 @@ class TypeParameter(J):
         @property
         def bounds(self) -> Optional[JContainer[TypeTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -2098,7 +2098,7 @@ class TypeParameters(J):
         @property
         def type_parameters(self) -> List[JRightPadded[TypeParameter]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -2140,7 +2140,7 @@ class Unary(Statement, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Unary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _operator: JLeftPadded[Type]
@@ -2177,7 +2177,7 @@ class VariableDeclarations(Statement, TypedTree):
             @property
             def initializer(self) -> Optional[JLeftPadded[Expression]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _name: Identifier
@@ -2202,7 +2202,7 @@ class VariableDeclarations(Statement, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable: ...
+        def with_id(self, id: int | UUID) -> VariableDeclarations.NamedVariable: ...
         def with_prefix(self, prefix: Space) -> VariableDeclarations.NamedVariable: ...
         def with_markers(self, markers: Markers) -> VariableDeclarations.NamedVariable: ...
         def with_name(self, name: Identifier) -> VariableDeclarations.NamedVariable: ...
@@ -2220,7 +2220,7 @@ class VariableDeclarations(Statement, TypedTree):
         @property
         def variables(self) -> List[JRightPadded[VariableDeclarations.NamedVariable]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -2264,7 +2264,7 @@ class WhileLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: ControlParentheses[Expression]
@@ -2300,7 +2300,7 @@ class Wildcard(Expression, TypeTree):
         @property
         def bound(self) -> Optional[JLeftPadded[Wildcard.Bound]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _bound: Optional[JLeftPadded[Bound]]
@@ -2323,7 +2323,7 @@ class Wildcard(Expression, TypeTree):
 
 @dataclass(frozen=True)
 class Yield(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _implicit: bool
@@ -2345,7 +2345,7 @@ class Yield(Statement):
 class Unknown(Statement, Expression, TypeTree):
     @dataclass(frozen=True)
     class Source(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _text: str
@@ -2358,13 +2358,13 @@ class Unknown(Statement, Expression, TypeTree):
         @property
         def text(self) -> str: ...
 
-        def with_id(self, id: UUID) -> Unknown.Source: ...
+        def with_id(self, id: int | UUID) -> Unknown.Source: ...
         def with_prefix(self, prefix: Space) -> Unknown.Source: ...
         def with_markers(self, markers: Markers) -> Unknown.Source: ...
         def with_text(self, text: str) -> Unknown.Source: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source: Source
@@ -2381,7 +2381,7 @@ class Unknown(Statement, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class Erroneous(Statement, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _text: str

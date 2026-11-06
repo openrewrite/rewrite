@@ -116,7 +116,32 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 ### Import Detection
 
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
-- `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
+- `import datetime`, `import datetime as dt` and `import os.path` → a bare `Import` statement, with no `MultiImport` around it
+- `import os, sys` → `MultiImport` with `from_=None`, names contain one `Import` per module
+
+A visitor that only overrides `visit_multi_import` misses every single-module `import`.
+
+### Moving a binding: `maybe_bind` and `maybe_rebind`
+
+`binding.py` ports the JavaScript `maybeBind`/`maybeRebind`. `ChangeImport` is a thin wrapper over `maybe_rebind`.
+
+Every import of what moves is rewritten where it stands. A statement of the module is replaced through `maybe_add_import`. One in a block, such as a function or class body, a `try` or any `if` branch, is replaced in that block. A reference is renamed where it resolves to a scope holding a moved import. The JavaScript port has no counterpart. It rebinds only a top-level import or `require`.
+
+Which name a moved binding takes:
+
+- A pinned `alias` is used verbatim. If the file spells it elsewhere, nothing moves.
+- An aliased import keeps its alias.
+- An unaliased `from` import follows the new member's name. If the file spells that name for anything other than a module-scope import of that very member, it keeps its old name as an alias. A parameter or nested import of the name counts, since it would capture a renamed reference. So does an import or rebind queued earlier in the visit. In a function holding the moved import, any spelling of the name counts, since an import there makes the name local to the whole function.
+- A rename keeps the old name as an alias where it would strand a reference. That is where another import binds the old name in a scope holding a moved import, as a `try`/`except ImportError` fallback does. It is also where a class body holds the moved import, which code outside the class reads as `C.name`.
+- An unaliased `import m` follows the new module where nothing reads `m`, or where both names are single segments and the new one is free. Otherwise it keeps `m` as an alias. A dotted `import a.b` that is read refuses, since `a.b.x` has no counterpart.
+
+One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. So does one read through `import a.m`, `from a import m` or `import a`, as `a.m.member` or `m.member`. The old import stays while anything still reads through it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block. A function's import of the old module gets the new one bound beside it, and goes unless the function reads it some other way. A function's reads move only where the function spells the new module's name nowhere else, since importing it there makes that name local too. No read goes through a name bound in a `try` or in an `if` with an `else`, since the fallback may bind another module under that name.
+
+What the attribution follows:
+
+- The old identity is read from the canonical types on the import's own name and on `m.member` references, as well as from `module.member`.
+- A parse names a class or function after the module that defines it (`acme.http._client.HttpClient`). That module cannot be read off an import path, so `declared_in` names it. Without it the new names use `to_module`, which differs from a fresh parse wherever the target re-exports.
+- A whole-module move renames the module object, and with it the functions it declares and the classes declared directly in it. Classes from its submodules keep their names.
 
 ### Padding and Whitespace
 

@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
@@ -25,6 +27,23 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class InvertConditionTest implements RewriteTest {
+
+    @ParameterizedTest
+    @CsvSource({"double,<", "double,>", "double,<=", "double,>=", "float,<", "Float,>=", "Double,>"})
+    void preserveNaNWhenInverting(String type, String operator) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  return iff.withIfCondition(InvertCondition.invert(iff.getIfCondition(), getCursor()));
+              }
+          }).withMaxCycles(1)),
+          java(
+            "class A { void f(%s x, %s y) { if (x %s y) {} } }".formatted(type, type, operator),
+            "class A { void f(%s x, %s y) { if (!(x %s y)) {} } }".formatted(type, type, operator)
+          )
+        );
+    }
 
     @DocumentExample
     @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions", "InfiniteRecursion"})

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
 
@@ -193,11 +192,11 @@ public class TwoBundleVersionIsolationTest : IDisposable
         // DLL + the dep DLL (DepPlugin.dll) from the corresponding dep version. The two
         // DepPlugin.dll files are identical in name/FQN but differ in content — that's the point.
         _publishDirA = Path.Combine(_root, "publishA");
-        RunDotnet($"publish \"{Path.Combine(primaryADir, "PrimaryA.csproj")}\" " +
+        DotnetCli.Run($"publish \"{Path.Combine(primaryADir, "PrimaryA.csproj")}\" " +
                   $"-c Release -o \"{_publishDirA}\"");
 
         _publishDirB = Path.Combine(_root, "publishB");
-        RunDotnet($"publish \"{Path.Combine(primaryBDir, "PrimaryB.csproj")}\" " +
+        DotnetCli.Run($"publish \"{Path.Combine(primaryBDir, "PrimaryB.csproj")}\" " +
                   $"-c Release -o \"{_publishDirB}\"");
     }
 
@@ -208,7 +207,7 @@ public class TwoBundleVersionIsolationTest : IDisposable
     }
 
     [Fact]
-    public void TwoBundles_ResolveTheirOwnDependencyVersion()
+    public async Task TwoBundles_ResolveTheirOwnDependencyVersion()
     {
         var primaryADll = Path.Combine(_publishDirA, "PrimaryA.dll");
         var primaryBDll = Path.Combine(_publishDirB, "PrimaryB.dll");
@@ -226,19 +225,15 @@ public class TwoBundleVersionIsolationTest : IDisposable
         // Install both primaries into the same server / marketplace.
         // Each is loaded into its own PluginLoadContext (ALC), so each primary's
         // ALC holds its own copy of DepPlugin.dll.
-        server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryADll })
-            .GetAwaiter().GetResult();
-        server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryBDll })
-            .GetAwaiter().GetResult();
+        await server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryADll });
+        await server.InstallRecipes(new InstallRecipesRequest { Recipes = primaryBDll });
 
         // Whole-tree preparation: PrepareInstance calls recipe.GetRecipeList() on the live
         // instance stored in the marketplace. Because PrimaryRecipeA was created inside ALC-A,
         // its GetRecipeList() returns a DepPlugin.ChildRecipe instance from ALC-A's DepPlugin
         // (v1), not from ALC-B's DepPlugin (v2) — and vice versa for PrimaryRecipeB.
-        var a = server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryA.PrimaryRecipeA" })
-            .GetAwaiter().GetResult();
-        var b = server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryB.PrimaryRecipeB" })
-            .GetAwaiter().GetResult();
+        var a = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryA.PrimaryRecipeA" });
+        var b = await server.PrepareRecipe(new PrepareRecipeRequest { Id = "PrimaryB.PrimaryRecipeB" });
 
         // Each parent's composite child must reflect ITS OWN bundled DepPlugin version.
         // Same FQN (DepPlugin.ChildRecipe), different DisplayName proves per-ALC isolation:
@@ -247,29 +242,5 @@ public class TwoBundleVersionIsolationTest : IDisposable
         Assert.Single(b.RecipeList);
         Assert.Equal("child-v1", a.RecipeList[0].Descriptor.DisplayName);
         Assert.Equal("child-v2", b.RecipeList[0].Descriptor.DisplayName);
-    }
-
-    private static void RunDotnet(string arguments)
-    {
-        var psi = new ProcessStartInfo("dotnet", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = Process.Start(psi)
-                            ?? throw new InvalidOperationException("Failed to start dotnet process");
-
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
-        }
     }
 }

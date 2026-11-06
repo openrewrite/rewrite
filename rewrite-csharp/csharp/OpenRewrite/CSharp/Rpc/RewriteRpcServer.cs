@@ -63,6 +63,8 @@ public class RewriteRpcServer
 
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    // Visitor names (edit:<id>, scan:<id>) whose Check precondition the host evaluates, as hoisted by PrepareRecipe
+    private readonly ConcurrentDictionary<string, bool> _hoistedVisitors = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
 
     private volatile IDataTableStore? _configuredDataTableStore;
@@ -275,7 +277,7 @@ public class RewriteRpcServer
         // Remove any global.json SDK pin before running dotnet restore / loading the workspace,
         // so the latest installed SDK is used regardless of the version the repo pins. The
         // file(s) are restored verbatim when the guard is disposed at the end of this method
-        // (after all projects are parsed), and any global.json a prior crashed run left deleted
+        // (after all projects are parsed), and any global.json a prior crashed run left changed
         // is recovered from git at that point too.
         using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
 
@@ -384,6 +386,12 @@ public class RewriteRpcServer
             if (!seenProjects.Add(project.FilePath!))
                 continue;
 
+            if (solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(project.FilePath!)))
+            {
+                EmitProjectFile(project.FilePath!);
+                continue;
+            }
+
             projectIndex++;
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
@@ -416,7 +424,8 @@ public class RewriteRpcServer
             // A diagnostic can name a project that nonetheless evaluated far enough to yield its
             // documents (an unresolvable ProjectReference, say). Recovering from disk there would
             // resurrect files the project deliberately excludes, so leave those projects alone.
-            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)) ||
+                solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(projectPath)))
                 continue;
 
             var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
@@ -535,8 +544,9 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
-    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
-    /// assets nearest the target framework. References are always the shared framework.
+    /// runtime's shared framework directory; otherwise the NuGet package's compile assemblies
+    /// for the target framework (<see cref="PackageCompileAssets"/>). References are always the
+    /// shared framework.
     /// </summary>
     private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
     {
@@ -552,37 +562,17 @@ public class RewriteRpcServer
             return ([dll], bcl);
         }
 
-        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
-        var target = NuGetFramework.Parse(request.TargetFramework);
-        var own = NearestAssets(Path.Combine(package, "lib"), target)
-            ?? NearestAssets(Path.Combine(package, "ref"), target)
-            ?? throw new InvalidOperationException(
-                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        var folders = PackageCompileAssets.PackageFolders();
+        var package = PackageCompileAssets.FindPackageDirectory(request.Id, request.Version, folders)
+            ?? throw new DirectoryNotFoundException(
+                $"Package {request.Id} {request.Version} not found in {string.Join(", ", folders)}");
+        var own = PackageCompileAssets.CompileAssemblies(package, NuGetFramework.Parse(request.TargetFramework));
+        if (own.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No compile assemblies compatible with {request.TargetFramework} in {package}");
+        }
         return (own, bcl);
-    }
-
-    /// <summary>
-    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
-    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
-    /// </summary>
-    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
-    {
-        if (!Directory.Exists(assetsDir))
-        {
-            return null;
-        }
-        var candidates = Directory.GetDirectories(assetsDir)
-            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
-            .ToList();
-        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
-        if (nearest == null)
-        {
-            return null;
-        }
-        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
-        return dlls.Count == 0 ? null : dlls;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -956,6 +946,7 @@ public class RewriteRpcServer
         string? version = null;          // requested version, as supplied by the caller (never mutated)
         string? resolvedVersion = null;  // concrete version NuGet resolved it to (null for a loose assembly)
         string? publishDir = null;       // the bundle's publish output (null for a loose assembly)
+        var unchanged = false;           // whether a NuGet install kept an earlier publish output
 
         // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
         // a JSON string is a local path; a JSON object describes a NuGet package.
@@ -991,7 +982,7 @@ public class RewriteRpcServer
             var absolutePath = Path.GetFullPath(packageName);
             var context = new PluginLoadContext(absolutePath);
             var assembly = context.LoadFromAssemblyPath(absolutePath);
-            CheckVersionCompatibility(assembly);
+            CheckHostApiCompatibility(assembly, $"Recipe assembly {absolutePath}");
             ActivateAssembly(assembly, packageName);
         }
         else if (Directory.Exists(packageName))
@@ -1012,7 +1003,7 @@ public class RewriteRpcServer
             // floating/unspecified spec — restore resolves either uniformly.
             var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
             resolvedVersion = resolved;
-            publishDir = PublishBundle(stagingCsproj, resolved);
+            (publishDir, unchanged) = PublishBundle(stagingCsproj, resolved);
             ActivateBundle(publishDir, packageName);
         }
 
@@ -1020,7 +1011,8 @@ public class RewriteRpcServer
         {
             RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
             Version = resolvedVersion ?? version,
-            PublishDir = publishDir
+            PublishDir = publishDir,
+            Unchanged = unchanged
         });
     }
 
@@ -1076,15 +1068,12 @@ public class RewriteRpcServer
         var root = _recipeInstallDir
             ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes");
         // Mirror NuGet's global-packages layout: <root>/<id>/<version>/, versions as
-        // immutable siblings. Never deleted — old versions accumulate (no cleanup),
-        // matching ~/.nuget and existing Moderne/OpenRewrite practice.
+        // siblings. Old versions accumulate, as in ~/.nuget.
         var bundleDir = Path.Combine(root, Sanitize(packageName), Sanitize(version ?? "unversioned"));
         var csprojPath = Path.Combine(bundleDir, "Recipes.csproj");
         _recipesProjectDir = bundleDir;
 
-        // Reuse an already-published version dir (idempotent, like NuGet reusing an
-        // already-extracted package). Snapshots carry timestamps in their version string,
-        // so each publish lands in a fresh dir.
+        // Every install restores the staging project again, so an existing one is reused.
         if (File.Exists(csprojPath))
         {
             return csprojPath;
@@ -1167,10 +1156,11 @@ public class RewriteRpcServer
         return declaration + Environment.NewLine + doc.Root!.ToString();
     }
 
-    private static void RunDotnet(string arguments)
+    private static void RunDotnet(string workingDirectory, string arguments)
     {
         var psi = new ProcessStartInfo("dotnet", arguments)
         {
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -1203,7 +1193,7 @@ public class RewriteRpcServer
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
         if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
-        RunDotnet(addArgs);
+        RunDotnet(Path.GetDirectoryName(stagingCsproj)!, addArgs);
 
         // dotnet add package preserves the requested constraint verbatim in the csproj;
         // the resolved concrete version lives in obj/project.assets.json.
@@ -1214,20 +1204,64 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Publish stage: publish a restored staging project into its permanent, resolved-version-keyed
-    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), reusing it if already
-    /// present. Returns the publish output directory.
+    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), keeping an existing one
+    /// that was published from the package contents the restore resolved. Returns the publish
+    /// output directory and whether it was kept.
     /// </summary>
-    private static string PublishBundle(string stagingCsproj, string resolvedVersion)
+    private static (string PublishDir, bool Unchanged) PublishBundle(string stagingCsproj, string resolvedVersion)
     {
-        var bundleRoot = Directory.GetParent(Path.GetDirectoryName(stagingCsproj)!)!.FullName; // <root>/<id>
+        var stagingDir = Path.GetDirectoryName(stagingCsproj)!;
+        var bundleRoot = Directory.GetParent(stagingDir)!.FullName; // <root>/<id>
         var publishDir = Path.Combine(bundleRoot, Sanitize(resolvedVersion));
-        // The publish output is an immutable sibling: publish only when this resolved version
-        // isn't there yet. --no-restore reuses the staging project's restore.
-        if (!File.Exists(Path.Combine(publishDir, "Recipes.dll")))
+        // A package rebuilt under the same version has a different content hash.
+        if (File.Exists(Path.Combine(publishDir, "Recipes.dll")) &&
+            PublishedBundle.Read(publishDir).PackageHashes.IsSubsetOf(RestoredPackageHashes(stagingDir)))
         {
-            RunDotnet($"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
+            return (publishDir, true);
         }
-        return publishDir;
+
+        // Publish beside the old output and swap it in. A publish over it skips each file whose new copy
+        // has the old one's size and timestamp, and a failed one leaves it half-written.
+        // --no-restore reuses the staging project's restore.
+        var fresh = Path.Combine(bundleRoot, $".publish-{Guid.NewGuid():N}");
+        try
+        {
+            RunDotnet(stagingDir, $"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{fresh}\"");
+            if (Directory.Exists(publishDir))
+            {
+                var stale = Path.Combine(bundleRoot, $".stale-{Guid.NewGuid():N}");
+                Directory.Move(publishDir, stale);
+                try
+                {
+                    Directory.Move(fresh, publishDir);
+                }
+                catch
+                {
+                    Directory.Move(stale, publishDir);
+                    throw;
+                }
+                Directory.Delete(stale, true);
+            }
+            else
+            {
+                Directory.Move(fresh, publishDir);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(fresh))
+            {
+                Directory.Delete(fresh, true);
+            }
+        }
+        return (publishDir, false);
+    }
+
+    /// <summary>The content hash of each package in the staging project's restore, which publish reads.</summary>
+    private static HashSet<string> RestoredPackageHashes(string stagingDir)
+    {
+        using var assets = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(stagingDir, "obj", "project.assets.json")));
+        return PublishedBundle.PackageHashesIn(assets.RootElement.GetProperty("libraries"));
     }
 
     /// <summary>
@@ -1247,7 +1281,7 @@ public class RewriteRpcServer
         }
         foreach (var assembly in LoadPlugin(publishDir))
         {
-            CheckVersionCompatibility(assembly);
+            CheckHostApiCompatibility(assembly, $"Recipe package {bundle.PackageName} {bundle.Version}");
             if (bundle.OwnAssemblyNames.Contains(assembly.GetName().Name!))
             {
                 ActivateAssembly(assembly, origin);
@@ -1320,31 +1354,36 @@ public class RewriteRpcServer
                assemblyName.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Verify that the plugin's OpenRewrite.CSharp dependency version is compatible with the host.
-    /// Logs a warning if the plugin was compiled against a newer version than the host.
-    /// </summary>
-    private static void CheckVersionCompatibility(Assembly pluginAssembly)
+    private static readonly Lazy<HostApiSurface?> HostApi = new(() =>
     {
-        var hostAssembly = typeof(RewriteRpcServer).Assembly;
-        var hostVersion = hostAssembly.GetName().Version;
+        var hostPath = typeof(RewriteRpcServer).Assembly.Location;
+        return string.IsNullOrEmpty(hostPath) ? null : HostApiSurface.Read(hostPath);
+    });
 
-        var openRewriteRef = pluginAssembly.GetReferencedAssemblies()
-            .FirstOrDefault(a => string.Equals(a.Name, "OpenRewrite.CSharp",
-                StringComparison.OrdinalIgnoreCase));
-
-        if (openRewriteRef?.Version == null || hostVersion == null)
+    private static void CheckHostApiCompatibility(Assembly pluginAssembly, string origin)
+    {
+        if (string.IsNullOrEmpty(pluginAssembly.Location) || HostApi.Value is not { } hostApi)
             return;
 
-        var pluginRefVersion = openRewriteRef.Version;
-        if (pluginRefVersion.Major != hostVersion.Major ||
-            pluginRefVersion.Minor > hostVersion.Minor)
+        var missing = hostApi.FindMissing(pluginAssembly.Location);
+        if (missing.Count > 0)
         {
-            Log.Warning(
-                "Plugin {Plugin} references OpenRewrite.CSharp {PluginVersion} " +
-                "but host is {HostVersion}. This may cause runtime errors",
-                pluginAssembly.GetName().Name, pluginRefVersion, hostVersion);
+            throw new InvalidOperationException(
+                DescribeIncompatibility(origin, pluginAssembly.GetName().Name!, missing));
         }
+    }
+
+    private static string DescribeIncompatibility(string origin, string assemblyName, IReadOnlyList<string> missing)
+    {
+        const int shown = 5;
+        var listed = string.Join("; ", missing.Take(shown));
+        if (missing.Count > shown)
+        {
+            listed += $"; and {missing.Count - shown} more";
+        }
+        return $"{origin} cannot run on this Moderne CLI: {assemblyName} was compiled against a different " +
+               $"version of OpenRewrite.CSharp than the one this CLI bundles, and uses APIs it does not have " +
+               $"({listed}). Upgrade the Moderne CLI, or install a version of the recipe package that matches it.";
     }
 
     private static readonly string[] Languages = [
@@ -1431,7 +1470,7 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
         }
 
-        return Task.FromResult(PrepareInstance(recipe, request.Options));
+        return Task.FromResult(PrepareInstance(recipe, request.Options, request.AcceptsCausesAnotherCycle == true));
     }
 
     /// <summary>
@@ -1440,7 +1479,8 @@ public class RewriteRpcServer
     /// A child that is <see cref="IDelegatesTo"/> carries only <c>DelegatesTo</c> and
     /// no children; all other children have their own <c>RecipeList</c> populated.
     /// </summary>
-    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options)
+    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options,
+        bool acceptsCausesAnotherCycle)
     {
         // If options are provided, create a new instance with options applied.
         if (options is { Count: > 0 })
@@ -1448,12 +1488,15 @@ public class RewriteRpcServer
             recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        // Validate required options on the instantiated recipe — the root against the caller's
-        // options, and every child against the values its parent set in GetRecipeList(). Because
-        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
-        // gets validated: declarative recipes bundled in an artifact often ship without a test that
-        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
-        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        // Validate required options and the recipe's own Validate() constraints on the instantiated
+        // recipe — the root against the caller's options, and every child against the values its
+        // parent set in GetRecipeList(). Because PrepareInstance recurses, this covers the whole
+        // tree, and it's the only place the C# tree gets validated: declarative recipes bundled in
+        // an artifact often ship without a test that runs validateAll, so this is the safety net
+        // against executing a broken recipe. It is also the only place that reports a bad option
+        // once: the visitor factories run per source file, so validating there turns one
+        // misconfiguration into one error per file. Delegating recipes forward to a Java recipe that
+        // validates its own options, so they are skipped here.
         if (recipe is not IDelegatesTo)
         {
             var descriptor = recipe.GetDescriptor();
@@ -1465,6 +1508,13 @@ public class RewriteRpcServer
                         $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
                 }
             }
+
+            var validationErrors = recipe.Validate().ToList();
+            if (validationErrors.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"Invalid options for recipe `{descriptor.Name}`: {string.Join(" ", validationErrors)}");
+            }
         }
 
         var id = Tree.RandomId().ToString();
@@ -1475,7 +1525,8 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null
+            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null,
+            CausesAnotherCycle = acceptsCausesAnotherCycle && recipe.CausesAnotherCycle ? true : null
         };
 
         if (recipe is IDelegatesTo del)
@@ -1492,7 +1543,7 @@ public class RewriteRpcServer
             OptimizePreconditions(recipe, response);
             // Whole-tree preparation: children are real instances in this recipe's own ALC.
             response.RecipeList = recipe.GetRecipeList()
-                .Select(child => PrepareInstance(child, null))
+                .Select(child => PrepareInstance(child, null, acceptsCausesAnotherCycle))
                 .ToList();
         }
 
@@ -1500,57 +1551,51 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
-    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
-    /// on the visitor type so Java only sends compatible files.
+    /// Hands the host each precondition that has a Java implementation, so it skips the files that
+    /// precondition rejects, and the language gate of a C# visitor. A scanning recipe's editor depends
+    /// on its accumulator, so only its scanner is hoisted.
     /// </summary>
     private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
     {
         try
         {
-            var visitor = recipe.GetVisitor();
-
-            var innerVisitor = visitor;
-            if (visitor is Check check)
+            if (recipe is IScanningRecipe scanning)
             {
-                // Try to emit the precondition's wire identity so the Java
-                // host can evaluate it locally and skip the visit RPC for
-                // non-matching files. RecipeCheck is the only shape we can
-                // serialize today (recipe identity); Check wrapping a bare
-                // visitor or a composite has no recipe-name to point Java
-                // at, so we fall through and let the gate run C#-side.
-                if (check is RecipeCheck recipeCheck && _preparedRecipes.Values.Contains(recipeCheck.Recipe))
-                {
-                    var entry = ConditionWireEntry(recipeCheck.Precondition);
-                    if (entry != null)
-                    {
-                        response.EditPreconditions.Add(entry);
-                    }
-                }
-                else
-                {
-                    var entry = ConditionWireEntry(check.Precondition);
-                    if (entry != null)
-                    {
-                        response.EditPreconditions.Add(entry);
-                    }
-                }
-                innerVisitor = check.Visitor;
+                var scanner = scanning.Scanner(scanning.InitialValue(new ExecutionContext()));
+                HoistPreconditions(scanner, response.ScanVisitor!, response.ScanPreconditions);
             }
-
-            // Add tree type precondition so Java only sends files this visitor can handle
-            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            else
             {
-                response.EditPreconditions.Add(new Precondition
-                {
-                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
-                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
-                });
+                HoistPreconditions(recipe.GetVisitor(), response.EditVisitor, response.EditPreconditions);
             }
         }
         catch
         {
-            // Some recipes may fail during GetVisitor() — skip precondition detection
+            // Some recipes fail to build a visitor outside a run — skip precondition detection
+        }
+    }
+
+    private void HoistPreconditions(ITreeVisitor<ExecutionContext> visitor, string visitorName,
+        List<Precondition> preconditions)
+    {
+        if (visitor is Check check)
+        {
+            var entry = ConditionWireEntry(check.Precondition);
+            if (entry != null)
+            {
+                preconditions.Add(entry);
+                _hoistedVisitors[visitorName] = true;
+            }
+            visitor = check.Visitor;
+        }
+
+        if (visitor is CSharpVisitor<ExecutionContext>)
+        {
+            preconditions.Add(new Precondition
+            {
+                VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+            });
         }
     }
 
@@ -1738,43 +1783,13 @@ public class RewriteRpcServer
             return new VisitResponse { Modified = false };
         }
 
-        // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
-        var parts = request.VisitorName.Split(':', 2);
-        if (parts.Length != 2)
-        {
-            throw new ArgumentException($"Invalid visitor name format: {request.VisitorName}");
-        }
-
-        var phase = parts[0]; // "edit" or "scan"
-        var recipeId = parts[1];
-
-        if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
-        {
-            throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
-        }
+        var ctx = GetOrCreateExecutionContext(request.PId);
+        var visitor = VisitorFor(request.VisitorName, ctx);
 
         // Fetch tree from the remote (Java) process
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
-
-        if (phase != "scan" && phase != "edit")
-        {
-            throw new ArgumentException($"Unknown visitor phase: {phase}");
-        }
-
-        var ctx = GetOrCreateExecutionContext(request.PId);
-        ITreeVisitor<ExecutionContext> visitor;
-
-        if (recipe is IScanningRecipe scanning)
-        {
-            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
-        }
-        else
-        {
-            visitor = recipe.GetVisitor();
-        }
 
         var result = visitor.Visit(tree, ctx, cursor);
 
@@ -1789,6 +1804,43 @@ public class RewriteRpcServer
         }
 
         return new VisitResponse { Modified = modified };
+    }
+
+    /// <summary>
+    /// The visitor that <see cref="Visit"/> and <see cref="BatchVisit"/> run for a prepared recipe's
+    /// <c>edit:&lt;id&gt;</c> or <c>scan:&lt;id&gt;</c>, without the precondition the host evaluates.
+    /// </summary>
+    internal ITreeVisitor<ExecutionContext> VisitorFor(string visitorName, ExecutionContext ctx)
+    {
+        var parts = visitorName.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            throw new ArgumentException($"Invalid visitor name format: {visitorName}");
+        }
+
+        var phase = parts[0];
+        var recipeId = parts[1];
+        if (phase != "scan" && phase != "edit")
+        {
+            throw new ArgumentException($"Unknown visitor phase: {phase}");
+        }
+
+        if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
+        }
+
+        ITreeVisitor<ExecutionContext> visitor;
+        if (recipe is IScanningRecipe scanning)
+        {
+            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
+        }
+        else
+        {
+            visitor = recipe.GetVisitor();
+        }
+        return visitor is Check check && _hoistedVisitors.ContainsKey(visitorName) ? check.Visitor : visitor;
     }
 
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
@@ -1825,27 +1877,7 @@ public class RewriteRpcServer
 
         foreach (var item in request.Visitors)
         {
-            // Parse visitor name and instantiate
-            var parts = item.Visitor.Split(':', 2);
-            if (parts.Length != 2)
-                throw new ArgumentException($"Invalid visitor name format: {item.Visitor}");
-
-            var phase = parts[0];
-            var recipeId = parts[1];
-
-            if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
-                throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
-
-            ITreeVisitor<ExecutionContext> visitor;
-            if (recipe is IScanningRecipe scanning)
-            {
-                var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-                visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
-            }
-            else
-            {
-                visitor = recipe.GetVisitor();
-            }
+            var visitor = VisitorFor(item.Visitor, ctx);
 
             var visitStart = sw.ElapsedMilliseconds;
             var result = visitor.Visit(tree, ctx, cursor);
@@ -2117,6 +2149,7 @@ public class RewriteRpcServer
         _refCheckpoints.Clear();
         _preparedRecipes.Clear();
         _recipeAccumulators.Clear();
+        _hoistedVisitors.Clear();
         _executionContexts.Clear();
     }
 
@@ -2409,7 +2442,7 @@ public class DependencyRequest
     /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
     public string? Version { get; set; }
 
-    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    /// <summary>Framework whose compile assets to enumerate, e.g. "net10.0".</summary>
     public string TargetFramework { get; set; } = "";
 }
 
@@ -2626,12 +2659,21 @@ public class InstallRecipesResponse
     /// bundle again without a registry. Null for a loose assembly.
     /// </summary>
     public string? PublishDir { get; set; }
+
+    /// <summary>
+    /// True when a NuGet install kept the publish output an earlier install built from the same
+    /// package contents.
+    /// </summary>
+    public bool Unchanged { get; set; }
 }
 
 public class PrepareRecipeRequest
 {
     public string Id { get; set; } = "";
     public Dictionary<string, object?>? Options { get; set; }
+
+    // Older Java hosts reject unknown response fields, so CausesAnotherCycle is only sent when asked.
+    public bool? AcceptsCausesAnotherCycle { get; set; }
 }
 
 public class PrepareRecipeResponse
@@ -2644,6 +2686,7 @@ public class PrepareRecipeResponse
     public List<Precondition> ScanPreconditions { get; set; } = [];
     public DelegatesTo? DelegatesTo { get; set; }
     public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
+    public bool? CausesAnotherCycle { get; set; }
 }
 
 public class DelegatesTo

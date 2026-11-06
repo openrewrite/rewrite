@@ -1323,7 +1323,12 @@ public class TypeUtils {
         }
 
         public boolean isComparing(JavaType to, JavaType from) {
-            return Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
+            // Bound/equality comparisons track actual nodes to terminate cyclic graphs. Inference
+            // also revisits equivalent graphs rebuilt by parameter substitution, so retain structural
+            // matching there without treating distinct nodes as an active bound comparison.
+            return this.to == to && this.from == from ||
+                    inference != InferenceDirection.NONE &&
+                    Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
                     parent != null && parent.isComparing(to, from);
         }
 

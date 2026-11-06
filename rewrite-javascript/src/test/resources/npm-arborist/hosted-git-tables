@@ -1,0 +1,7501 @@
+[
+ {
+  "file": "github.js",
+  "url": "foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user@foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user:password@foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user:password@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github::password@foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github::password@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user@foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user:password@foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github:user:password@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github::password@foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "github::password@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://git@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "git"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://git@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user:password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": ":password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": ":password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user:password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": ":password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": ":password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user:password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://:password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user:password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://:password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user:password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://:password@github.com:foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user:password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://:password@github.com:foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "ssh://:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "git+https://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://:password@github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://:password@github.com/foo/bar.git",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://www.github.com/foo/bar",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar#branch with space",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch with space"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar#branch:with:colons",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch:with:colons"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar/tree/branch",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user..blerg--/..foo-js# . . . . . some . tags / / /",
+  "expected": {
+   "type": "github",
+   "user": "user..blerg--",
+   "project": "..foo-js",
+   "default": "shortcut",
+   "committish": " . . . . . some . tags / / /"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar#0d7bd85a85fa2571fa532d2fc842ed099b236ad2",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "0d7bd85a85fa2571fa532d2fc842ed099b236ad2"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar#8e3a9b3579ab330238c06b761e7f1b5dc5b4ac6e5a96da4dd2fb3b7411009df8",
+  "expected": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "8e3a9b3579ab330238c06b761e7f1b5dc5b4ac6e5a96da4dd2fb3b7411009df8"
+  }
+ },
+ {
+  "file": "github.js",
+  "url": "user@foo/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "user:password@foo/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": ":password@foo/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "foo/ bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "foo/bar/",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "github.com:foo/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "github.com/foo/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "github:foo%0N/bar",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "git+ssh://git@github.com:",
+  "expected": null
+ },
+ {
+  "file": "github.js",
+  "url": "https://github.com/foo/bar/issues",
+  "expected": null
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user@foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab:user:password@foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "gitlab::password@foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "user:password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": ":password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://user:password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+ssh://:password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://user:password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "ssh://:password@gitlab.com:foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://user:password@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "git+https://:password@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar/baz",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar/baz#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://user:password@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar/baz.git",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://:password@gitlab.com/foo/bar/baz.git#branch",
+  "expected": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo/-/something",
+  "expected": null
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/foo",
+  "expected": null
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz",
+  "expected": null
+ },
+ {
+  "file": "gitlab.js",
+  "url": "https://gitlab.com/api/v4/projects/foo%2Fbar/repository/archive.tar.gz?sha=49b393e2ded775f2df36ef2ffcb61b0359c194c9",
+  "expected": null
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user@foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist:user:password@foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "gist::password@foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://user:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git://:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "user:password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": ":password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://user:password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+ssh://:password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://user:password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "ssh://:password@gist.github.com:foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://user:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "git+https://:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/foo/feedbeef",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/foo/feedbeef#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://user:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/foo/feedbeef.git",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://:password@gist.github.com/foo/feedbeef.git#branch",
+  "expected": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/foo/feedbeef/raw/fix%2Fbug/",
+  "expected": null
+ },
+ {
+  "file": "gist.js",
+  "url": "https://gist.github.com/",
+  "expected": null
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user@foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user@foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user:password@foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user:password@foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket::password@foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket::password@foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user@foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user@foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user:password@foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket:user:password@foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket::password@foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "bitbucket::password@foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user:password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user:password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": ":password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": ":password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user:password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "user:password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": ":password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": ":password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user:password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user:password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://:password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://:password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user:password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://user:password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://:password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+ssh://:password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user:password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user:password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://:password@bitbucket.org:foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://:password@bitbucket.org:foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user:password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://user:password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://:password@bitbucket.org:foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "ssh://:password@bitbucket.org:foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user:password@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user:password@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://:password@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://:password@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user:password@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://user:password@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://:password@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git+https://:password@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user:password@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user:password@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://:password@bitbucket.org/foo/bar",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://:password@bitbucket.org/foo/bar#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user:password@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://user:password@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://:password@bitbucket.org/foo/bar.git",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://:password@bitbucket.org/foo/bar.git#branch",
+  "expected": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "git://bitbucket.org/foo/bar",
+  "expected": null
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo/bar/get/archive.tar.gz",
+  "expected": null
+ },
+ {
+  "file": "bitbucket.js",
+  "url": "https://bitbucket.org/foo",
+  "expected": null
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "sourcehut:~foo/bar",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "sourcehut:~foo/bar#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "sourcehut:~foo/bar.git",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "sourcehut:~foo/bar.git#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git@git.sr.ht:~foo/bar",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git@git.sr.ht:~foo/bar#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git@git.sr.ht:~foo/bar.git",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git@git.sr.ht:~foo/bar.git#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git+ssh://git@git.sr.ht:~foo/bar",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git+ssh://git@git.sr.ht:~foo/bar#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git+ssh://git@git.sr.ht:~foo/bar.git",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git+ssh://git@git.sr.ht:~foo/bar.git#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo/bar",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo/bar#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo/bar.git",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo/bar.git#branch",
+  "expected": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo",
+  "expected": null
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "git://git@git.sr.ht:~foo/bar",
+  "expected": null
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "ssh://git.sr.ht:~foo/bar",
+  "expected": null
+ },
+ {
+  "file": "sourcehut.js",
+  "url": "https://git.sr.ht/~foo/bar/archive/HEAD.tar.gz",
+  "expected": null
+ }
+]

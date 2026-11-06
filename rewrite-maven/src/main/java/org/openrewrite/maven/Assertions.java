@@ -29,6 +29,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 import org.opentest4j.AssertionFailedError;
 
+import javax.annotation.CheckReturnValue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,7 +41,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
+@CheckReturnValue
 public class Assertions {
+    private static final Object LOCAL_REPOSITORY = new Object();
+
     private Assertions() {
     }
 
@@ -107,8 +111,16 @@ public class Assertions {
      * @param testCode The test code to execute after publishing the POMs
      * @throws IllegalArgumentException if any POM XML doesn't contain required GAV coordinates or uses a well-known groupId
      */
-    @SuppressWarnings("ConstantValue")
     public static void withLocalRepository(@Language("xml") String[] pomXmls, Runnable testCode) {
+        // Tests run concurrently and may publish different POMs at the same coordinates, so one test at a time
+        // publishes, runs and cleans up
+        synchronized (LOCAL_REPOSITORY) {
+            publishAndRun(pomXmls, testCode);
+        }
+    }
+
+    @SuppressWarnings("ConstantValue")
+    private static void publishAndRun(String[] pomXmls, Runnable testCode) {
         if (pomXmls.length == 0) {
             throw new IllegalArgumentException("At least one POM must be provided");
         }

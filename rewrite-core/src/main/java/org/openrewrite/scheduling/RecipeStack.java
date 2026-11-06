@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 import static org.openrewrite.Recipe.PANIC;
 
@@ -55,6 +56,14 @@ class RecipeStack {
     @Nullable
     Recipe nextRecipe;
 
+    /**
+     * The recipe that is currently doing a scan/generate/edit, or null when no single recipe is responsible.
+     */
+    @NonFinal
+    @Getter
+    @Nullable
+    Recipe currentRecipe;
+
     public <T> @Nullable T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
                                   BiFunction<@Nullable T, List<Recipe>, @Nullable T> consumer, @Nullable T acc) {
         init(recipe);
@@ -70,13 +79,25 @@ class RecipeStack {
                 sourceSet.setRecipe(recipePath);
                 recurseRecipeList(recipePath);
                 this.nextRecipe = allRecipesStack.isEmpty() ? null : allRecipesStack.peek().leaf();
+                this.currentRecipe = recipePath.leaf();
                 acc = consumer.apply(acc, recipePath);
             } else {
                 this.recipePosition = recipePosition.getAndAdd(countRecipes(recipePath.leaf()));
             }
         }
         this.nextRecipe = null;
+        this.currentRecipe = null;
         return acc;
+    }
+
+    <T> T attributedTo(@Nullable Recipe recipe, Supplier<T> work) {
+        Recipe previous = currentRecipe;
+        currentRecipe = recipe;
+        try {
+            return work.get();
+        } finally {
+            currentRecipe = previous;
+        }
     }
 
     private void init(Recipe recipe) {

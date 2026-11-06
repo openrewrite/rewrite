@@ -44,7 +44,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangePackage extends Recipe {
+public class ChangePackage extends Recipe implements RenamingRecipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",
             example = "com.yourorg.foo")
@@ -65,6 +65,30 @@ public class ChangePackage extends Recipe {
 
     private boolean isRecursive() {
         return Boolean.TRUE.equals(recursive);
+    }
+
+    @Override
+    public String kindOfName() {
+        return ChangeType.JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldPackageName;
+    }
+
+    @Override
+    public String rename(String name) {
+        if (name.equals(oldPackageName)) {
+            return newPackageName;
+        } else if (name.startsWith(oldPackageName + ".")) {
+            String rest = name.substring(oldPackageName.length() + 1);
+            // a lowercase name after the package names a subpackage, and an uppercase one a type in it
+            if (isRecursive() || rest.isEmpty() || !Character.isLowerCase(rest.charAt(0))) {
+                return newPackageName + "." + rest;
+            }
+        }
+        return name;
     }
 
     @Override
@@ -163,31 +187,62 @@ public class ChangePackage extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
+        private final boolean singleSegmentOldPackage = !oldPackageName.contains(".");
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J f = super.visitFieldAccess(fieldAccess, ctx);
 
-            if (!((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
-                return f;
-            }
-            Cursor parent = getCursor().getParent();
-            if (parent == null) {
-                return f;
-            }
-            if (parent.getValue() instanceof J.FieldAccess) {
-                J.FieldAccess enclosing = (J.FieldAccess) parent.getValue();
-                if (enclosing.isFullyQualifiedClassReference(newPackageName)) {
-                    // Already rewritten to the new package.
-                    return f;
+            if (f instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) f;
+                if (fa.isFullyQualifiedClassReference(oldPackageName)) {
+                    Cursor parent = getCursor().getParent();
+                    if (parent == null) {
+                        return f;
+                    }
+                    if (parent.getValue() instanceof J.FieldAccess) {
+                        J.FieldAccess enclosing = (J.FieldAccess) parent.getValue();
+                        if (enclosing.isFullyQualifiedClassReference(newPackageName)) {
+                            // Already rewritten to the new package.
+                            return f;
+                        }
+                        if (!isRecursive() && !namesTypeDirectlyInOldPackage(enclosing)) {
+                            // Leading segments of a subpackage-qualified name such as oldPackageName.sub.Type.
+                            return f;
+                        }
+                    }
+                    return newPackageTypeTree(f.getPrefix());
                 }
-                if (!isRecursive() && !namesTypeDirectlyInOldPackage(enclosing)) {
-                    // Leading segments of a subpackage-qualified name such as oldPackageName.sub.Type.
-                    return f;
+                if (singleSegmentOldPackage && isSingleSegmentOldPackageTarget(fieldAccess, fa)) {
+                    return fa.withTarget(newPackageTypeTree(fa.getTarget().getPrefix()));
                 }
             }
-            return TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                    .withPrefix(f.getPrefix());
+            return f;
+        }
+
+        private Expression newPackageTypeTree(Space prefix) {
+            Expression tree = TypeTree.build(newPackageType.getFullyQualifiedName());
+            return tree.withPrefix(prefix);
+        }
+
+        private boolean isSingleSegmentOldPackageTarget(J.FieldAccess original, J.FieldAccess visited) {
+            if (!(visited.getTarget() instanceof J.Identifier)) {
+                return false;
+            }
+            J.Identifier target = (J.Identifier) visited.getTarget();
+            if (!target.getSimpleName().equals(oldPackageName) ||
+                    target.getFieldType() != null ||
+                    (target.getType() != null && !(target.getType() instanceof JavaType.Unknown)) ||
+                    visited.getName().getFieldType() != null) {
+                return false;
+            }
+            for (Cursor c = getCursor(); c != null && c.getValue() instanceof J.FieldAccess; c = c.getParent()) {
+                if (((J.FieldAccess) c.getValue()).isFullyQualifiedClassReference(newPackageName)) {
+                    return false;
+                }
+            }
+            return namesTypeDirectlyInOldPackage(original) ||
+                   isRecursive() && getCursor().getParentTreeCursor().getValue() instanceof J.FieldAccess;
         }
 
         /**

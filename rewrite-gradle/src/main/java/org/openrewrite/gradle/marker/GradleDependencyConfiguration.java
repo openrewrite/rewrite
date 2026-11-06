@@ -23,6 +23,7 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
@@ -52,7 +53,7 @@ import static java.util.stream.Collectors.toMap;
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleDependencyConfiguration implements Serializable, Attributed {
+public class GradleDependencyConfiguration implements Heavyweight, Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -694,7 +695,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             }
             return it;
         }, repositories, ctx);
-        if (maybeUpdated == this) {
+        if (maybeUpdated == this && (constraints == null || constraints.stream().noneMatch(it ->
+                Objects.equals(it.getArtifactId(), constraint.getArtifactId()) &&
+                Objects.equals(it.getGroupId(), constraint.getGroupId())))) {
             maybeUpdated = addConstraint(constraint, repositories, ctx);
         }
         return maybeUpdated;

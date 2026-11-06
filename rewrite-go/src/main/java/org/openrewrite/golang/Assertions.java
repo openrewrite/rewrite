@@ -30,12 +30,14 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
 
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
+@CheckReturnValue
 public final class Assertions {
     private Assertions() {
     }
@@ -51,12 +53,12 @@ public final class Assertions {
         return go;
     }
 
-    public static SourceSpecs go(@Nullable String before, String after) {
+    public static SourceSpecs go(@Nullable String before, @Nullable String after) {
         return go(before, after, s -> {
         });
     }
 
-    public static SourceSpecs go(@Nullable String before, String after,
+    public static SourceSpecs go(@Nullable String before, @Nullable String after,
                                        Consumer<SourceSpec<Go.CompilationUnit>> spec) {
         SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
         spec.accept(go);
@@ -75,12 +77,12 @@ public final class Assertions {
         return goMod;
     }
 
-    public static SourceSpecs goMod(@Nullable String before, String after) {
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after) {
         return goMod(before, after, s -> {
         });
     }
 
-    public static SourceSpecs goMod(@Nullable String before, String after,
+    public static SourceSpecs goMod(@Nullable String before, @Nullable String after,
                                     Consumer<SourceSpec<GoMod>> spec) {
         SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, s -> after);
         goMod.path("go.mod");
@@ -100,12 +102,12 @@ public final class Assertions {
         return goSum;
     }
 
-    public static SourceSpecs goSum(@Nullable String before, String after) {
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after) {
         return goSum(before, after, s -> {
         });
     }
 
-    public static SourceSpecs goSum(@Nullable String before, String after,
+    public static SourceSpecs goSum(@Nullable String before, @Nullable String after,
                                     Consumer<SourceSpec<GoSum>> spec) {
         SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, s -> after);
         goSum.path("go.sum");
@@ -126,7 +128,7 @@ public final class Assertions {
      * context, so imports of the modules it requires carry real types.
      */
     public static SourceSpecs goProject(String project, SourceSpecs... sources) {
-        return goProject(project, spec -> project(spec, project), sources);
+        return goProject(project, spec -> spec.markers(new GoProject(Tree.randomId(), project, null)), sources);
     }
 
     public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {

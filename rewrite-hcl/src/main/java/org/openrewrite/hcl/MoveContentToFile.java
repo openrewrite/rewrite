@@ -29,6 +29,7 @@ import java.util.Collection;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -53,8 +54,13 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
     String description = "Move content to another HCL file, deleting it in the original file.";
 
     static class Scanned {
+        /**
+         * The block to move, printed without the whitespace before it.
+         */
         @Nullable
-        BodyContent toMove;
+        String toMove;
+
+        Space toMovePrefix = Space.EMPTY;
 
         boolean destinationExists;
     }
@@ -85,8 +91,8 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
             public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
                 BodyContent b = super.visitBodyContent(bodyContent, ctx);
                 if (pathMatcher.matches(getCursor())) {
-                    acc.toMove = bodyContent;
-                    //noinspection ConstantConditions
+                    acc.toMove = bodyContent.withPrefix(Space.EMPTY).print(getCursor().getParentOrThrow());
+                    acc.toMovePrefix = bodyContent.getPrefix();
                 }
                 return b;
             }
@@ -98,13 +104,14 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
         if (acc.destinationExists || acc.toMove == null) {
             return emptyList();
         }
-        Hcl.ConfigFile configFile = HclParser.builder().build().parse("")
+        return singletonList(parse(acc.toMove).withSourcePath(Paths.get(destinationPath)));
+    }
+
+    private static Hcl.ConfigFile parse(String hcl) {
+        return HclParser.builder().build().parse(hcl)
                 .findFirst()
                 .map(Hcl.ConfigFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
-        configFile = configFile.withBody(singletonList(acc.toMove.withPrefix(Space.EMPTY)))
-                .withSourcePath(Paths.get(destinationPath));
-        return singletonList(configFile);
     }
 
     @Override
@@ -124,7 +131,7 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
                     //noinspection ConstantConditions
                     return null;
                 } else if (sourcePath.equals(dest) && pathMatcher.matches(getCursor())) {
-                    return acc.toMove;
+                    return parse(requireNonNull(acc.toMove)).getBody().get(0).withPrefix(acc.toMovePrefix);
                 }
                 return b;
             }

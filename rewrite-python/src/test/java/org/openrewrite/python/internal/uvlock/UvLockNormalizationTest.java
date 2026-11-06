@@ -31,6 +31,18 @@ class UvLockNormalizationTest {
     }
 
     @Test
+    void releaseSegmentsLoseTheirLeadingZeros() {
+        // PEP 440 normalization, which uv applies: pypa/abi3audit declares >= 2024.06.19
+        assertThat(normalizeRequiresDistSpecifier(">= 2024.06.19")).isEqualTo(">=2024.6.19");
+        assertThat(normalizeRequiresDistSpecifier(">=01.002.0003")).isEqualTo(">=1.2.3");
+
+        // a zero segment is still a zero, and a non-release part is left alone
+        assertThat(normalizeRequiresDistSpecifier(">=1.0.0")).isEqualTo(">=1.0.0");
+        assertThat(normalizeRequiresDistSpecifier("==1.0.0rc01")).isEqualTo("==1.0.0rc1");
+        assertThat(normalizeRequiresDistSpecifier("==2024.06.*")).isEqualTo("==2024.6.*");
+    }
+
+    @Test
     void clausesSortedByVersion() {
         // The n2-inline-width fixture's declared vs recorded specifier
         assertThat(normalizeRequiresDistSpecifier(">=3.0,<4,!=3.1.0,!=3.2.0,!=3.3.0,!=3.3.1"))
@@ -45,6 +57,25 @@ class UvLockNormalizationTest {
     @Test
     void wildcardClausesSortByBaseVersion() {
         assertThat(normalizeRequiresDistSpecifier("<4,==3.1.*")).isEqualTo("==3.1.*,<4");
+    }
+
+    /** Clauses on equal versions follow uv's operator order: {@code <=} before {@code >=}. */
+    @Test
+    void equalVersionsOrderedByOperator() {
+        assertThat(normalizeRequiresDistSpecifier(">=2.4, <=2.4.0")).isEqualTo("<=2.4.0,>=2.4");
+    }
+
+    /**
+     * uv records requires-python as a canonical range: compatible releases expand, and a range
+     * covering exactly one minor collapses to a wildcard (each form recorded from real uv 0.10.11).
+     */
+    @Test
+    void requiresPythonRecordedAsCanonicalRange() {
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.10")).isEqualTo(">=3.10, <4");
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.10.2")).isEqualTo(">=3.10.2, <3.11");
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.13.0")).isEqualTo("==3.13.*");
+        assertThat(UvLockNormalization.normalizeRequiresPython(">=3.12,<3.13")).isEqualTo("==3.12.*");
+        assertThat(UvLockNormalization.normalizeRequiresPython("<3.15,>=3.10")).isEqualTo(">=3.10, <3.15");
     }
 
     @Test

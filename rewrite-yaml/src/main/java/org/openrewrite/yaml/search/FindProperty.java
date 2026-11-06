@@ -103,9 +103,7 @@ public class FindProperty extends Recipe {
             }
         };
 
-        Set<Yaml.Block> values = new HashSet<>();
-        findVisitor.visit(y, values);
-        return values;
+        return findVisitor.reduce(y, new HashSet<>());
     }
 
     public static boolean matches(Cursor cursor, String propertyKey, @Nullable Boolean relaxedBinding) {

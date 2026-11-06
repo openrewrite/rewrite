@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import {Cursor, ExecutionContext, produceAsync} from "../../src";
-import {emptySpace, Expression, J, rightPadded} from "../../src/java";
-import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
+import {Cursor, ExecutionContext, foundSearchResult, produceAsync} from "../../src";
+import {emptySpace, Expression, J, rightPadded, Statement, TextComment} from "../../src/java";
+import {JavaScriptParser, JavaScriptVisitor, JS, sourceFileCache, template, typescript} from "../../src/javascript";
 import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
@@ -32,8 +32,10 @@ describe('JavaScript visitor formatting', () => {
                 ctx: ExecutionContext
             ): Promise<J | undefined> {
                 const original = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
+                // applied where an argument goes, so that the template makes an expression and not a statement
+                const argument = original.arguments.elements[0].element;
                 const altered = await produceAsync(original, async draft => {
-                    const newArg = await template`\`extra\``.apply(original, this.cursor) as Expression;
+                    const newArg = await template`\`extra\``.apply(argument, new Cursor(argument, this.cursor)) as Expression;
 
                     draft.arguments.elements = [
                         ...draft.arguments.elements,
@@ -51,6 +53,7 @@ describe('JavaScript visitor formatting', () => {
 
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new AddArgumentVisitor());
+        spec.cycles = 1;
 
         // when && test
         await spec.rewriteRun(
@@ -58,6 +61,33 @@ describe('JavaScript visitor formatting', () => {
             typescript(
                 'console.log("hello");',
                 'console.log("hello", `extra`);'
+            )
+        );
+    });
+
+    test('visits the space before await in for-await-of', async () => {
+        // given
+        class RenameCommentVisitor extends JavaScriptVisitor<ExecutionContext> {
+            public override async visitSpace(space: J.Space, ctx: ExecutionContext): Promise<J.Space> {
+                const s = await super.visitSpace(space, ctx);
+                return {
+                    ...s,
+                    comments: s.comments.map(c => c.kind === J.Kind.TextComment && (c as TextComment).text === ' c ' ?
+                        {...c, text: ' d '} as TextComment : c)
+                };
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new RenameCommentVisitor());
+        spec.cycles = 1;
+
+        // when && then
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'async function f(xs: AsyncIterable<number>) { for /* c */ await (const x of xs) {} }',
+                'async function f(xs: AsyncIterable<number>) { for /* d */ await (const x of xs) {} }'
             )
         );
     });
@@ -115,5 +145,89 @@ describe('JavaScript visitor formatting', () => {
                 undefined
             ]);
         });
+    });
+
+    test('visits modifiers of constructor types', async () => {
+        class MarkModifierVisitor extends JavaScriptVisitor<ExecutionContext> {
+            protected override async visitModifier(modifier: J.Modifier, ctx: ExecutionContext): Promise<J | undefined> {
+                return foundSearchResult(await super.visitModifier(modifier, ctx) as J.Modifier);
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new MarkModifierVisitor());
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'type C = abstract new () => object;',
+                'type C = /*~~>*/abstract new () => object;'
+            )
+        );
+    });
+
+    test('visits the class of a parameterized type and the type of a decorator', async () => {
+        class MarkVisitor extends JavaScriptVisitor<ExecutionContext> {
+            override async visitIdentifier(identifier: J.Identifier, ctx: ExecutionContext): Promise<J | undefined> {
+                const visited = await super.visitIdentifier(identifier, ctx) as J.Identifier;
+                return visited.simpleName === 'Box' ? foundSearchResult(visited) : visited;
+            }
+
+            override async visitArrayAccess(arrayAccess: J.ArrayAccess, ctx: ExecutionContext): Promise<J | undefined> {
+                return foundSearchResult(await super.visitArrayAccess(arrayAccess, ctx) as J.ArrayAccess);
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new MarkVisitor());
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    @Box class A {}
+                    @(foo['bar']) class B {}
+                    const c = new Box<number>();
+                    const d = new foo['bar']<number>();
+                    let e: Box<string>;
+                `,
+                `
+                    @/*~~>*/Box class A {}
+                    @(/*~~>*/foo['bar']) class B {}
+                    const c = new /*~~>*/Box<number>();
+                    const d = new /*~~>*/foo['bar']<number>();
+                    let e: /*~~>*/Box<string>;
+                `
+            )
+        );
+    });
+});
+
+describe('JavaScript visitor dispatch', () => {
+    test('visitExpression and visitStatement see what the Java visitor shows them', async () => {
+        // given
+        const cu = await new JavaScriptParser({sourceFileCache}).parseOne({
+            text: 'for (const x of xs) { const y = <div>{x as T}</div>; }',
+            sourcePath: 'dispatch.tsx'
+        });
+        const expressions: string[] = [];
+        const statements: string[] = [];
+
+        // when
+        await new class extends JavaScriptVisitor<undefined> {
+            protected override async visitExpression(expression: Expression, p: undefined): Promise<J | undefined> {
+                expressions.push(expression.kind);
+                return expression;
+            }
+
+            protected override async visitStatement(statement: Statement, p: undefined): Promise<J | undefined> {
+                statements.push(statement.kind);
+                return statement;
+            }
+        }().visit(cu, undefined);
+
+        // then
+        expect(expressions).toEqual(expect.arrayContaining([JS.Kind.As, JS.Kind.JsxTag, JS.Kind.JsxEmbeddedExpression]));
+        expect(statements).toEqual(expect.arrayContaining([JS.Kind.ForOfLoop, J.Kind.Block]));
     });
 });

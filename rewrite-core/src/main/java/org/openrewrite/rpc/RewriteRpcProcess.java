@@ -150,19 +150,26 @@ public class RewriteRpcProcess extends Thread {
 
     /**
      * Caps what a peer may commit ({@code RLIMIT_DATA} on Linux, no effect elsewhere) so one that
-     * outgrows its budget dies alone rather than taking the host process with it. 0 is no cap.
+     * outgrows its budget dies alone rather than taking the host process with it, and makes a
+     * capped peer the OOM killer's first choice, for when peers under their caps still run the
+     * host's memory out between them. 0 is no cap.
      */
     public static void setMemoryLimit(long bytes) {
         memoryLimit = bytes;
     }
 
-    /** Best-effort: a hard limit already below the cap can't be raised unprivileged, so the tighter one stands. */
+    /**
+     * Best-effort: a hard limit already below the cap can't be raised unprivileged, so the tighter
+     * one stands. Raising {@code oom_score_adj} needs no privilege, and where {@code /proc} won't
+     * take it the peer just runs without.
+     */
     List<String> launchCommand() {
         if (memoryLimit <= 0 || !System.getProperty("os.name").startsWith("Linux")) {
             return Arrays.asList(command);
         }
         List<String> limited = new ArrayList<>(Arrays.asList("/bin/sh", "-c",
-                "ulimit -d " + memoryLimit / 1024 + "; exec \"$@\"", "sh"));
+                "{ echo 1000 > /proc/self/oom_score_adj; } 2>/dev/null; ulimit -d " + memoryLimit / 1024 + "; exec \"$@\"",
+                "sh"));
         limited.addAll(Arrays.asList(command));
         return limited;
     }

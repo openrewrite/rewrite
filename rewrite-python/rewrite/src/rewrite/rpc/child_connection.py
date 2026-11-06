@@ -6,7 +6,6 @@ as the Java<->Python link. stdio is point-to-point, so the facade owns the child
 to it directly here. A child's *outbound* callbacks toward Java (``GetObject`` etc.) are relayed
 by handling inbound requests inside ``request``'s read loop.
 """
-import json
 import os
 import re
 import subprocess
@@ -15,7 +14,7 @@ import traceback
 from importlib import metadata
 from pathlib import Path
 
-from rewrite.rpc import venv_manager
+from rewrite.rpc import json_codec, venv_manager
 
 _ENGINE_ROOT = str(Path(__file__).resolve().parents[2])
 _ENGINE_DIST = "openrewrite"
@@ -166,9 +165,10 @@ class ChildConnection:
             self._proc.kill()
 
     def _write(self, msg: dict) -> None:
-        data = json.dumps(msg).encode("utf-8")
+        data = json_codec.dumps(msg)
         header = ("Content-Length: %d\r\n\r\n" % len(data)).encode("ascii")
-        self._proc.stdin.write(header + data)
+        self._proc.stdin.write(header)
+        self._proc.stdin.write(data)
         self._proc.stdin.flush()
 
     def _read(self):
@@ -190,4 +190,4 @@ class ChildConnection:
             if not chunk:
                 return None
             body += chunk
-        return json.loads(body.decode("utf-8"))
+        return json_codec.loads(body)

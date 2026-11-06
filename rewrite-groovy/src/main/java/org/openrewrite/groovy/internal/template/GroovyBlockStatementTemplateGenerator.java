@@ -20,7 +20,9 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.Collection;
@@ -32,8 +34,12 @@ public class GroovyBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
-        if (j instanceof J.MethodInvocation) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
+        if (j instanceof Expression && insertsBesideStatement(location, mode)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
+        } else if (j instanceof J.MethodInvocation) {
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType != null && methodType.getReturnType() == JavaType.Primitive.Void) {
                 // Bare statements like `version = expr;` are not valid at class body level

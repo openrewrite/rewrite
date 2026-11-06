@@ -18,6 +18,7 @@ import {Cursor, Tree} from "../tree";
 import {Comment, isIdentifier, isJava, isLiteral, J, TextComment} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
+import {renderNodeType} from "./type-report";
 import * as fs from "fs";
 
 /**
@@ -38,6 +39,8 @@ export interface LstDebugOptions {
     includeMarkers?: boolean;
     /** Include node IDs in output. Default: false */
     includeIds?: boolean;
+    /** Include each node's rendered type, as the type report renders it. Default: false */
+    includeTypes?: boolean;
     /** Maximum depth to traverse (for print/recursive methods). Default: unlimited (-1) */
     maxDepth?: number;
     /** Properties to always exclude (in addition to defaults like 'type'). */
@@ -52,6 +55,7 @@ const DEFAULT_OPTIONS: Required<LstDebugOptions> = {
     includeCursorMessages: true,
     includeMarkers: false,
     includeIds: false,
+    includeTypes: false,
     maxDepth: -1,
     excludeProperties: [],
     output: 'console',
@@ -419,6 +423,10 @@ function escapeString(str: string): string {
 /**
  * Format a literal value for inline display.
  */
+function formatScalar(value: unknown): string {
+    return typeof value === 'bigint' ? `${value}n` : JSON.stringify(value);
+}
+
 function formatLiteralValue(lit: J.Literal): string {
     let value: string;
     if (lit.valueSource !== undefined) {
@@ -745,7 +753,7 @@ export class LstDebugPrinter {
 
         // Primitive or unknown type
         if (typeof node !== 'object') {
-            this.outputLines.push(`${this.indent(depth)}${JSON.stringify(node)}`);
+            this.outputLines.push(`${this.indent(depth)}${formatScalar(node)}`);
             return;
         }
 
@@ -774,6 +782,11 @@ export class LstDebugPrinter {
         // Add ID if requested
         if (this.options.includeIds && node.id) {
             header += ` (id=${node.id.substring(0, 8)}...)`;
+        }
+
+        const type = this.options.includeTypes ? renderNodeType(node) : undefined;
+        if (type !== undefined) {
+            header += ` : ${type}`;
         }
 
         this.outputLines.push(header);
@@ -842,7 +855,7 @@ export class LstDebugPrinter {
                 // Skip complex objects that aren't J nodes
                 this.outputLines.push(`${this.indent(depth)}${key}: <object>`);
             } else {
-                this.outputLines.push(`${this.indent(depth)}${key}: ${JSON.stringify(value)}`);
+                this.outputLines.push(`${this.indent(depth)}${key}: ${formatScalar(value)}`);
             }
         }
     }
@@ -925,7 +938,7 @@ export class LstDebugPrinter {
             if (typeof value === 'object' && value !== null) {
                 this.outputLines.push(`${this.indent(depth + 1)}${key}: <object>`);
             } else {
-                this.outputLines.push(`${this.indent(depth + 1)}${key}: ${JSON.stringify(value)}`);
+                this.outputLines.push(`${this.indent(depth + 1)}${key}: ${formatScalar(value)}`);
             }
         }
         this.outputLines.push(`${this.indent(depth)}}`);

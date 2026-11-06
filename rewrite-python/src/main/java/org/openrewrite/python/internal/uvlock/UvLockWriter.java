@@ -38,6 +38,9 @@ public final class UvLockWriter {
         blocks.add(headerBlock(lock));
         if (lock.getOptions() != null) {
             blocks.add(optionsBlock(lock.getOptions()));
+            if (lock.getOptions().getExcludeNewerPackage() != null) {
+                blocks.add(excludeNewerPackageBlock(lock.getOptions().getExcludeNewerPackage()));
+            }
         }
         if (lock.getManifest() != null) {
             blocks.add(manifestBlock(lock.getManifest()));
@@ -112,21 +115,66 @@ public final class UvLockWriter {
 
     private static String optionsBlock(UvLockOptions options) {
         StringBuilder b = new StringBuilder("[options]");
+        if (options.getResolutionMode() != null) {
+            b.append("\nresolution-mode = ").append(string(options.getResolutionMode()));
+        }
+        if (options.getPrereleaseMode() != null) {
+            b.append("\nprerelease-mode = ").append(string(options.getPrereleaseMode()));
+        }
+        if (options.getForkStrategy() != null) {
+            b.append("\nfork-strategy = ").append(string(options.getForkStrategy()));
+        }
         if (options.getExcludeNewer() != null) {
             b.append("\nexclude-newer = ").append(string(options.getExcludeNewer()));
+            if (UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(options.getExcludeNewer())) {
+                b.append(' ').append(UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT);
+            }
+        }
+        if (options.getExcludeNewerSpan() != null) {
+            b.append("\nexclude-newer-span = ").append(string(options.getExcludeNewerSpan()));
+        }
+        return b.toString();
+    }
+
+    private static String excludeNewerPackageBlock(Map<String, Object> entries) {
+        StringBuilder b = new StringBuilder("[options.exclude-newer-package]");
+        for (Map.Entry<String, Object> e : entries.entrySet()) {
+            b.append('\n').append(e.getKey()).append(" = ")
+                    .append(e.getValue() instanceof String ? string((String) e.getValue()) : e.getValue());
         }
         return b.toString();
     }
 
     private static String manifestBlock(UvLockManifest manifest) {
-        return "[manifest]\nmembers = " + multilineStringArray(manifest.getMembers());
+        StringBuilder b = new StringBuilder("[manifest]");
+        if (manifest.getMembers() != null) {
+            b.append("\nmembers = ").append(multilineStringArray(manifest.getMembers()));
+        }
+        if (manifest.getConstraints() != null) {
+            b.append("\nconstraints = ").append(requirementArray(manifest.getConstraints()));
+        }
+        if (manifest.getOverrides() != null) {
+            b.append("\noverrides = ").append(requirementArray(manifest.getOverrides()));
+        }
+        if (manifest.getBuildConstraints() != null) {
+            b.append("\nbuild-constraints = ").append(requirementArray(manifest.getBuildConstraints()));
+        }
+        return b.toString();
     }
 
     private static void addPackageBlocks(List<String> blocks, UvLockPackage pkg) {
         StringBuilder b = new StringBuilder("[[package]]");
         b.append("\nname = ").append(string(pkg.getName()));
-        b.append("\nversion = ").append(string(pkg.getVersion()));
+        if (pkg.getVersion() != null) {
+            b.append("\nversion = ").append(string(pkg.getVersion()));
+        }
         b.append("\nsource = ").append(source(pkg.getSource()));
+        if (pkg.getDefaultGroups() instanceof String) {
+            b.append("\ndefault-groups = ").append(string((String) pkg.getDefaultGroups()));
+        } else if (pkg.getDefaultGroups() != null) {
+            @SuppressWarnings("unchecked") List<String> groups = (List<String>) pkg.getDefaultGroups();
+            b.append("\ndefault-groups = ").append(inlineStringArray(groups));
+        }
         if (pkg.getResolutionMarkers() != null) {
             b.append("\nresolution-markers = ").append(multilineStringArray(pkg.getResolutionMarkers()));
         }
@@ -253,6 +301,9 @@ public final class UvLockWriter {
         }
         if (req.getIndex() != null) {
             b.append(", index = ").append(string(req.getIndex()));
+        }
+        if (req.getHashes() != null) {
+            b.append(", hashes = ").append(inlineStringArray(req.getHashes()));
         }
         return b.append(" }").toString();
     }

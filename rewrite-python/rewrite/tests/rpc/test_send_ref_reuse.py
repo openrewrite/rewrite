@@ -115,7 +115,8 @@ def test_a_failed_transfer_releases_the_refs_it_assigned(tmp_path, monkeypatch):
 
     monkeypatch.setattr(send_queue.RpcSendQueue, 'generate', fail_midway)
 
-    assert get_object(second_id) == [{'state': 'END_OF_OBJECT'}]
+    with pytest.raises(RuntimeError, match="transfer failed"):
+        get_object(second_id)
     assert server.local_refs.snapshot() == before_failure
 
 

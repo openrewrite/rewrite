@@ -146,6 +146,9 @@ def is_of_type(type1: JavaType | None, type2: JavaType | None) -> bool:
         return False
     if type1 is type2 and not isinstance(type1, JavaType.Unknown):
         return True
+    if isinstance(type1, JavaType.Union) and isinstance(type2, JavaType.Union):
+        return (all(any(is_of_type(a, b) for b in type2.bounds) for a in type1.bounds)
+                and all(any(is_of_type(a, b) for a in type1.bounds) for b in type2.bounds))
     # ``str`` is special: it can show up as either a primitive or a class.
     if is_string(type1) and is_string(type2):
         return True
@@ -249,10 +252,14 @@ def _is_assignable_to_fqn(to: str, from_: JavaType | None) -> bool:
         return _is_assignable_to_fqn(to, from_.type)
     elif isinstance(from_, JavaType.Method):
         return _is_assignable_to_fqn(to, from_.return_type)
-    elif isinstance(from_, (JavaType.Intersection, JavaType.Union)):
+    elif isinstance(from_, JavaType.Intersection):
         for bound in from_.bounds:
             if _is_assignable_to_fqn(to, bound):
                 return True
+    elif isinstance(from_, JavaType.Union):
+        # A union value may hold any of its members.
+        if all(_is_assignable_to_fqn(to, bound) for bound in from_.bounds):
+            return True
     # Everything is ultimately an ``object``.
     return to in _OBJECT_NAMES
 
@@ -274,6 +281,12 @@ def _is_assignable_to_type(to: JavaType | None, from_: JavaType | None) -> bool:
         return _is_assignable_to_type(to, from_.type)
     if isinstance(from_, JavaType.Method):
         return _is_assignable_to_type(to, from_.return_type)
+
+    # Splitting ``from_`` first lets each of its members find its own ``to`` member.
+    if isinstance(from_, JavaType.Union):
+        return all(_is_assignable_to_type(to, bound) for bound in from_.bounds)
+    if isinstance(to, JavaType.Union):
+        return any(_is_assignable_to_type(bound, from_) for bound in to.bounds)
 
     if isinstance(to, JavaType.Primitive):
         return _is_assignable_to_primitive(to, from_)

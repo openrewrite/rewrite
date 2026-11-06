@@ -53,7 +53,7 @@ M = TypeVar('M', bound=Marker)
 
 @lst_dataclass
 class Markers:
-    _id: UUID
+    _id: int | UUID
 
     @property
     def id(self) -> UUID:
@@ -94,6 +94,12 @@ class Markers:
         """
         return self.replace(markers=list_map(lambda m: remap_fn(m) if isinstance(m, cls) else m, self.markers))
 
+    def add(self, marker: Marker) -> Markers:
+        """Append ``marker``, or return this instance if an equal marker is already present."""
+        if marker in self.markers:
+            return self
+        return self.replace(markers=self.markers + [marker])
+
     EMPTY: ClassVar[Markers]
 
     def __eq__(self, other: object) -> bool:
@@ -107,7 +113,7 @@ class Markers:
     _LAST_EMPTY: ClassVar[Optional[Markers]] = None
 
     @classmethod
-    def build(cls, id: UUID, markers: List[Marker]) -> Markers:
+    def build(cls, id: int | UUID, markers: List[Marker]) -> Markers:
         """Marker-free nodes share one instance, and so one id, on the sending
         side; the last empty Markers stands in whenever that id comes round."""
         if markers:
@@ -126,13 +132,20 @@ Markers.EMPTY = Markers(random_id(), [])
 
 @lst_dataclass
 class SearchResult(Marker):
-    _id: UUID
+    _id: int | UUID
 
     _description: Optional[str]
 
     @property
     def description(self) -> Optional[str]:
         return self._description
+
+    # As in Java, equality ignores the id, so `Markers.add` keeps one SearchResult per description.
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, SearchResult) and self._description == other._description
+
+    def __hash__(self) -> int:
+        return hash(self._description)
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return comment_wrapper("" if self._description is None else f"({self._description})")
@@ -143,7 +156,8 @@ class SearchResult(Marker):
 
         Mirrors Java's ``org.openrewrite.marker.SearchResult.found(tree)``:
         returns a new tree (different identity from the input) carrying a
-        fresh :class:`SearchResult` marker. Returns ``None`` unchanged so
+        fresh :class:`SearchResult` marker, or ``tree`` itself when it already
+        carries one with this description. Returns ``None`` unchanged so
         callers can safely chain through nullable trees.
 
         Used by search recipes and search-as-precondition visitors to
@@ -152,11 +166,7 @@ class SearchResult(Marker):
         """
         if tree is None:
             return None
-        current = tree.markers
-        new_markers = Markers(
-            current.id, list(current.markers) + [SearchResult(random_id(), description)]
-        )
-        return tree.replace(_markers=new_markers)
+        return tree.replace(_markers=tree.markers.add(SearchResult(random_id(), description)))
 
 
 class Markup(Marker, ABC):
@@ -210,7 +220,7 @@ class Markup(Marker, ABC):
 @lst_dataclass
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -226,7 +236,7 @@ class MarkupWarn(Markup):
 @lst_dataclass
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -242,7 +252,7 @@ class MarkupError(Markup):
 @lst_dataclass
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -258,7 +268,7 @@ class MarkupInfo(Markup):
 @lst_dataclass
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -315,7 +325,7 @@ class RecipesThatMadeChanges(Marker):
     interpreting them, so a marker served to this peer returns to the host intact.
     """
 
-    _id: UUID
+    _id: int | UUID
 
     _recipes: Optional[List[List[RecipeThatMadeChanges]]]
 
@@ -326,7 +336,7 @@ class RecipesThatMadeChanges(Marker):
 
 @lst_dataclass
 class UnknownJavaMarker(Marker):
-    _id: UUID
+    _id: int | UUID
 
     _data: Dict[str, Any]
 
@@ -343,7 +353,7 @@ class ParseExceptionResult(Marker):
         return cls(random_id(), type(parser).__name__, exc_type.__name__,
                    ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
 
-    _id: UUID
+    _id: int | UUID
 
     _parser_type: str
 

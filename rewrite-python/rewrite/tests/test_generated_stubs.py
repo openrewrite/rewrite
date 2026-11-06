@@ -287,3 +287,28 @@ class Base(ABC):
     assert "    @abstractmethod\n    def visit(self, p: int) -> int: ...\n" in stub
 
     assert "_from_wire" not in stub
+
+
+def test_every_id_field_accepts_int_and_uuid():
+    declared = {line.strip() for source in SOURCES
+                for line in generate_stubs.generate_stub_content(source).splitlines()
+                if line.strip().startswith("_id:")}
+    assert declared == {"_id: int | UUID"}
+
+
+def test_node_constructors_accept_generated_and_existing_ids(tmp_path: Path):
+    recipe = tmp_path / "recipe.py"
+    recipe.write_text('''\
+from rewrite import Markers, random_id
+from rewrite.java import Space
+from rewrite.java.tree import Identifier
+
+fresh = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+Identifier(fresh.id, Space.EMPTY, Markers.build(random_id(), []), [], "y", None, None)
+''')
+    result = subprocess.run(
+        [sys.executable, "-m", "ty", "check", "--python", sys.prefix, "--output-format", "concise",
+         "--error", "invalid-argument-type", str(recipe)],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

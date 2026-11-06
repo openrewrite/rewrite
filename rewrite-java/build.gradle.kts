@@ -5,7 +5,7 @@ plugins {
     id("org.openrewrite.build.shadow")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 
@@ -50,7 +50,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
     implementation("org.apache.commons:commons-text:latest.release")
-    implementation("io.github.classgraph:classgraph:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
@@ -70,7 +69,7 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation("io.moderne:jsonrpc:latest.integration")
 
-    // For use in ClassGraphTypeMappingTest
+    // Types referenced only from test source text, so they need to be resolvable at test runtime
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
     testRuntimeOnly("jakarta.validation:jakarta.validation-api:3.1.1")

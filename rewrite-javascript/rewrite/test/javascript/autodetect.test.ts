@@ -64,6 +64,44 @@ describe('Autodetect', () => {
             expect(tabsAndIndents!.indentSize).toBe(2);
         });
 
+        test('a misindented line does not outvote the rest of the file', async () => {
+            const autodetect = await parseAndDetect(`
+                class Api {
+                  get() {
+                    return 1;
+                  }
+
+                  fail() {
+                     return 2;
+                  }
+
+                  put() {
+                    if (ready) {
+                      return 3;
+                    }
+                  }
+                }
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(2);
+        });
+
+        test('an unindented wrapper does not halve the detected width', async () => {
+            const autodetect = await parseAndDetect(`
+                (function () {
+                function f() {
+                    if (x) {
+                        y();
+                    }
+                }
+                })();
+                `);
+            const tabsAndIndents = autodetect.styles.find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle;
+
+            expect(tabsAndIndents.indentSize).toBe(4);
+        });
+
         test('detects tab indentation', async () => {
             const autodetect = await parseAndDetect(`
                 function test() {

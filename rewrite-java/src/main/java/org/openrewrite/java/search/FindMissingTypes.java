@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -59,10 +60,19 @@ public class FindMissingTypes extends Recipe {
         J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
+            Set<UUID> preexistingSearchResults = new JavaIsoVisitor<Set<UUID>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
+                    if (marker instanceof SearchResult) {
+                        ids.add(marker.getId());
+                    }
+                    return super.visitMarker(marker, ids);
+                }
+            }.reduce(j, new HashSet<>());
             new JavaIsoVisitor<List<MissingTypeResult>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
-                    if (marker instanceof SearchResult) {
+                    if (marker instanceof SearchResult && !preexistingSearchResults.contains(marker.getId())) {
                         String message = ((SearchResult) marker).getDescription();
                         String path = getCursor()
                                 .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)

@@ -20,12 +20,14 @@ import (
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // SpacesVisitor enforces gofmt's intra-line spacing rules:
 //
+//   - One space after `import`.
 //   - No space around unary operators (`!x`, `-y`).
 //   - One space after commas in argument/parameter lists
 //     (RightPadded.After fields don't get touched here — they precede
@@ -54,6 +56,60 @@ func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 	out := v.GoVisitor.Visit(t, p)
 	v.noteVisited(t)
 	return out
+}
+
+// VisitCompilationUnit writes one space after each `import` keyword, ahead of
+// the `(` of a grouped declaration or the spec of an ungrouped one.
+func (v *SpacesVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	if cu.Imports != nil {
+		markers := cu.Imports.Markers
+		group := java.FindMarker[golang.GroupedImport](markers)
+		if group != nil {
+			if before := ensureSingleSpace(group.Before); !java.SpaceEqual(before, group.Before) {
+				spaced := *group
+				spaced.Before = before
+				markers = withMarker(markers, spaced)
+			}
+		}
+		grouped := group != nil
+		elements := eachPadded(cu.Imports.Elements, func(rp java.RightPadded[*java.Import]) java.RightPadded[*java.Import] {
+			// Each declaration after the first starts at a spec that carries
+			// its `import` keyword on an ImportBlock marker.
+			block := java.FindMarker[golang.ImportBlock](rp.Element.Markers)
+			if block != nil {
+				grouped = block.Grouped
+			}
+			switch {
+			case block != nil && grouped:
+				if before := ensureSingleSpace(block.GroupedBefore); !java.SpaceEqual(before, block.GroupedBefore) {
+					spaced := *block
+					spaced.GroupedBefore = before
+					rp.Element = rp.Element.WithMarkers(withMarker(rp.Element.Markers, spaced))
+				}
+			case !grouped:
+				rp.Element = rp.Element.WithPrefix(ensureSingleSpace(rp.Element.Prefix))
+			}
+			return rp
+		})
+		if !java.MarkersEqual(markers, cu.Imports.Markers) || !java.SameSlice(elements, cu.Imports.Elements) {
+			imports := *cu.Imports
+			imports.Markers = markers
+			imports.Elements = elements
+			cu = cu.WithImports(&imports)
+		}
+	}
+	return v.GoVisitor.VisitCompilationUnit(cu, p)
+}
+
+// withMarker replaces the marker of m's entries that has marker's type.
+func withMarker[M java.Marker](m java.Markers, marker M) java.Markers {
+	entries := append([]java.Marker(nil), m.Entries()...)
+	for i, e := range entries {
+		if _, same := e.(M); same {
+			entries[i] = marker
+		}
+	}
+	return java.MakeMarkers(m.GetID(), entries)
 }
 
 func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {

@@ -185,7 +185,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
-                        if (fullyQualifiedName.startsWith("java.lang.")) {
+                        if ("java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
                             if (!isAnnotationTypeName() || conflictsWithSamePackageType(simpleName, fullyQualifiedName)) {
                                 return fieldAccess;
                             }

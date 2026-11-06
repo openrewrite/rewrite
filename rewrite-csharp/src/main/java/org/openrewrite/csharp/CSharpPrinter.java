@@ -90,6 +90,14 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             if (property.getPadding().getExpressionBody() != null || property.getPadding().getInitializer() != null) {
                 p.append(';');
             }
+        } else if (statement instanceof Cs.IndexerDeclaration) {
+            if (((Cs.IndexerDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
+        } else if (statement instanceof Cs.ConversionOperatorDeclaration) {
+            if (((Cs.ConversionOperatorDeclaration) statement).getPadding().getExpressionBody() != null) {
+                p.append(';');
+            }
         } else if (statement instanceof Cs.AnnotatedStatement) {
             printStatementTerminator(((Cs.AnnotatedStatement) statement).getStatement(), p);
         }
@@ -1339,8 +1347,8 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         List<JRightPadded<Statement>> init = control.getPadding().getInit();
         for (int i = 0; i < init.size(); i++) {
             visitForLoopControlStatement(init.get(i).getElement(), p);
+            visitSpace(init.get(i).getAfter(), p);
             if (i < init.size() - 1) {
-                visitSpace(init.get(i).getAfter(), p);
                 p.append(',');
             }
         }
@@ -2292,17 +2300,7 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
         for (int i = 0; i < variables.size(); i++) {
-            J.VariableDeclarations.NamedVariable variable = variables.get(i).getElement();
-            beforeSyntax(variable, p);
-            visit(variable.getName(), p);
-
-            JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
-            if (initializer != null) {
-                visitSpace(initializer.getBefore(), p);
-                p.append('=');
-                visit(initializer.getElement(), p);
-            }
-            afterSyntax(variable, p);
+            visit(variables.get(i).getElement(), p);
 
             if (i < variables.size() - 1) {
                 visitSpace(variables.get(i).getAfter(), p);
@@ -2312,6 +2310,22 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         afterSyntax(multiVariable, p);
         return multiVariable;
+    }
+
+    @Override
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+        beforeSyntax(variable, p);
+        visit(variable.getName(), p);
+
+        JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
+        if (initializer != null) {
+            visitSpace(initializer.getBefore(), p);
+            p.append('=');
+            visit(initializer.getElement(), p);
+        }
+
+        afterSyntax(variable, p);
+        return variable;
     }
 
     /**
@@ -3021,7 +3035,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (indexerDeclaration.getAccessors() != null) {
             visitBlock(indexerDeclaration.getAccessors(), p);
         }
@@ -3152,7 +3165,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             visitSpace(expressionBody.getBefore(), p);
             p.append("=>");
             visit(expressionBody.getElement(), p);
-            p.append(';');
         } else if (conversionOperatorDeclaration.getBody() != null) {
             visitBlock(conversionOperatorDeclaration.getBody(), p);
         }

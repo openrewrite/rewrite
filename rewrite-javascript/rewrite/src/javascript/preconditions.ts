@@ -68,6 +68,8 @@ export function isVendoredOrBundled(): RecipeRef {
  * ``methodPattern`` follows the OpenRewrite method-pattern syntax:
  * ``<receiver-type> <method-name>(<args>)`` — e.g.
  * ``"*..* tostring(..)"`` or ``"java.util.Collections emptyList()"``.
+ * For a pattern that does not fire, ``REWRITE_JAVASCRIPT_DUMP_TYPES=1`` prints the
+ * declaring type each call got during the test run.
  *
  * Delegates to {@code org.openrewrite.java.search.HasMethod}.
  */
@@ -75,7 +77,7 @@ export function usesMethod(methodPattern: string, matchOverrides: boolean = fals
     return new RecipeRef(
         "org.openrewrite.java.search.HasMethod",
         {methodPattern, matchOverrides},
-        new UsesMethod(methodPattern),
+        new UsesMethod(methodPattern, matchOverrides),
     );
 }
 
@@ -86,13 +88,14 @@ export function usesMethod(methodPattern: string, matchOverrides: boolean = fals
  * {@link UsesType} visitor for in-process evaluation; see
  * {@link hasSourcePath} for the introspection / lazy-evaluation pattern.
  *
- * Delegates to {@code org.openrewrite.java.search.HasType}.
+ * Delegates to {@code org.openrewrite.java.search.HasType}, which matches a type through any class
+ * or interface it extends and reads `checkAssignability` as `UsesType`'s `includeImplicit`.
  */
 export function usesType(fullyQualifiedTypeName: string, checkAssignability: boolean = false): RecipeRef {
     return new RecipeRef(
         "org.openrewrite.java.search.HasType",
         {fullyQualifiedTypeName, checkAssignability},
-        new UsesType(fullyQualifiedTypeName),
+        new UsesType(fullyQualifiedTypeName, {assignable: true, includeImplicit: checkAssignability}),
     );
 }
 
@@ -109,7 +112,7 @@ export function findMethods(methodPattern: string, matchOverrides: boolean = fal
     return new RecipeRef(
         "org.openrewrite.java.search.FindMethods",
         {methodPattern, matchOverrides},
-        new UsesMethod(methodPattern),
+        new UsesMethod(methodPattern, matchOverrides),
     );
 }
 

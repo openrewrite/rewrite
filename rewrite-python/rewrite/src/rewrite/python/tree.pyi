@@ -17,7 +17,7 @@ from rewrite.python.support_types import Py as Py, P as P
 
 @dataclass(frozen=True)
 class Async(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _statement: Statement
@@ -34,7 +34,7 @@ class Async(Py, Statement):
 
 @dataclass(frozen=True)
 class Shebang(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _text: str
@@ -51,7 +51,7 @@ class Shebang(Py, Statement):
 
 @dataclass(frozen=True)
 class Await(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
@@ -90,7 +90,7 @@ class Binary(Py, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Binary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _left: Expression
@@ -131,7 +131,7 @@ class ChainedAssignment(Py, Statement, TypedTree):
         @property
         def variables(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variables: List[JRightPadded[Expression]]
@@ -157,7 +157,7 @@ class ChainedAssignment(Py, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class ExceptionType(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: Optional[JavaType]
@@ -180,7 +180,7 @@ class ExceptionType(Py, TypeTree):
 
 @dataclass(frozen=True)
 class LiteralType(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _literal: Expression
@@ -200,7 +200,7 @@ class LiteralType(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class TypeHint(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type_tree: Expression
@@ -231,7 +231,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
         @property
         def statements(self) -> List[JRightPadded[Statement]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source_path: Path
@@ -273,7 +273,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
 
 @dataclass(frozen=True)
 class ExpressionStatement(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
     _expression: Expression
 
     def replace(self, **kwargs: Any) -> 'ExpressionStatement': ...
@@ -291,7 +291,7 @@ class ExpressionStatement(Py, Expression, Statement):
 
 @dataclass(frozen=True)
 class ExpressionTypeTree(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _reference: J
@@ -311,7 +311,7 @@ class ExpressionTypeTree(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class StatementExpression(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
     _statement: Statement
 
     def replace(self, **kwargs: Any) -> 'StatementExpression': ...
@@ -338,7 +338,7 @@ class MultiImport(Py, Statement):
         @property
         def names(self) -> JContainer[Import]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _from: Optional[JRightPadded[NameTree]]
@@ -373,7 +373,7 @@ class KeyValue(Py, Expression, TypedTree):
         @property
         def key(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _key: JRightPadded[Expression]
@@ -408,7 +408,7 @@ class DictLiteral(Py, Expression, TypedTree):
         @property
         def elements(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _elements: JContainer[Expression]
@@ -445,7 +445,7 @@ class CollectionLiteral(Py, Expression, TypedTree):
         @property
         def elements(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -491,7 +491,7 @@ class FormattedString(Py, Expression, TypedTree):
             @property
             def conversion(self) -> Optional[JRightPadded[FormattedString.Value.Conversion]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _expression: JRightPadded[Expression]
@@ -516,7 +516,7 @@ class FormattedString(Py, Expression, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> FormattedString.Value: ...
+        def with_id(self, id: int | UUID) -> FormattedString.Value: ...
         def with_prefix(self, prefix: Space) -> FormattedString.Value: ...
         def with_markers(self, markers: Markers) -> FormattedString.Value: ...
         def with_expression(self, expression: Expression) -> FormattedString.Value: ...
@@ -525,7 +525,7 @@ class FormattedString(Py, Expression, TypedTree):
         def with_format(self, format: Optional[Expression]) -> FormattedString.Value: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _delimiter: str
@@ -548,7 +548,7 @@ class FormattedString(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Pass(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
 
@@ -571,7 +571,7 @@ class TrailingElseWrapper(Py, Statement):
         @property
         def else_block(self) -> JLeftPadded[Block]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _statement: Statement
@@ -602,7 +602,7 @@ class ComprehensionExpression(Py, Expression):
 
     @dataclass(frozen=True)
     class Condition(Py):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _expression: Expression
@@ -615,7 +615,7 @@ class ComprehensionExpression(Py, Expression):
         @property
         def expression(self) -> Expression: ...
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Condition: ...
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Condition: ...
         def with_prefix(self, prefix: Space) -> ComprehensionExpression.Condition: ...
         def with_markers(self, markers: Markers) -> ComprehensionExpression.Condition: ...
         def with_expression(self, expression: Expression) -> ComprehensionExpression.Condition: ...
@@ -634,7 +634,7 @@ class ComprehensionExpression(Py, Expression):
             @property
             def iterated_list(self) -> JLeftPadded[Expression]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _async: Optional[JRightPadded[bool]]
@@ -659,7 +659,7 @@ class ComprehensionExpression(Py, Expression):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Clause: ...
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Clause: ...
         def with_prefix(self, prefix: Space) -> ComprehensionExpression.Clause: ...
         def with_markers(self, markers: Markers) -> ComprehensionExpression.Clause: ...
         def with_async(self, async_: Optional[bool]) -> ComprehensionExpression.Clause: ...
@@ -668,7 +668,7 @@ class ComprehensionExpression(Py, Expression):
         def with_conditions(self, conditions: Optional[List[ComprehensionExpression.Condition]]) -> ComprehensionExpression.Clause: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -708,7 +708,7 @@ class TypeAlias(Py, Statement, TypedTree):
         @property
         def value(self) -> JLeftPadded[J]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _name: Identifier
@@ -737,7 +737,7 @@ class TypeAlias(Py, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class YieldFrom(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
@@ -766,7 +766,7 @@ class UnionType(Py, Expression, TypeTree):
         @property
         def types(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _types: List[JRightPadded[Expression]]
@@ -802,7 +802,7 @@ class VariableScope(Py, Statement):
         @property
         def names(self) -> List[JRightPadded[Identifier]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -834,7 +834,7 @@ class Del(Py, Statement):
         @property
         def targets(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _targets: List[JRightPadded[Expression]]
@@ -858,7 +858,7 @@ class SpecialParameter(Py, TypeTree):
         KWARGS = ...
         ARGS = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -885,7 +885,7 @@ class Star(Py, Expression, TypeTree):
         LIST = ...
         DICT = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -917,7 +917,7 @@ class NamedArgument(Py, Expression):
         @property
         def value(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _name: Identifier
@@ -943,7 +943,7 @@ class NamedArgument(Py, Expression):
 
 @dataclass(frozen=True)
 class TypeHintedExpression(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
@@ -975,7 +975,7 @@ class ErrorFrom(Py, Expression):
         @property
         def from_(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _error: Expression
@@ -1039,7 +1039,7 @@ class MatchCase(Py, Expression):
             @property
             def children(self) -> JContainer[J]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _kind: Kind
@@ -1061,7 +1061,7 @@ class MatchCase(Py, Expression):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> MatchCase.Pattern: ...
+        def with_id(self, id: int | UUID) -> MatchCase.Pattern: ...
         def with_prefix(self, prefix: Space) -> MatchCase.Pattern: ...
         def with_markers(self, markers: Markers) -> MatchCase.Pattern: ...
         def with_kind(self, kind: Kind) -> MatchCase.Pattern: ...
@@ -1069,7 +1069,7 @@ class MatchCase(Py, Expression):
         def with_type(self, type: Optional[JavaType]) -> MatchCase.Pattern: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _pattern: Pattern
@@ -1108,7 +1108,7 @@ class Slice(Py, Expression, TypedTree):
         @property
         def step(self) -> Optional[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _start: Optional[JRightPadded[Expression]]

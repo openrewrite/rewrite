@@ -66,6 +66,18 @@ class JavaSourceSetTest {
           .containsExactly("net.bytebuddy.asm.Advice");
     }
 
+    @Test
+    void relativeDirectoryClasspath() throws Exception {
+        Files.createDirectories(tempDir.resolve("net/bytebuddy/asm"));
+        Files.write(tempDir.resolve("net/bytebuddy/asm/Advice.class"), new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+
+        List<JavaType.FullyQualified> types = JavaSourceSet.typesFromPath(Paths.get("").toAbsolutePath().relativize(tempDir), null);
+
+        assertThat(types)
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .containsExactly("net.bytebuddy.asm.Advice");
+    }
+
     private static void writeEntry(JarOutputStream jos, String name, byte[] content) throws java.io.IOException {
         JarEntry entry = new JarEntry(name);
         jos.putNextEntry(entry);

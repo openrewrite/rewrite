@@ -24,7 +24,10 @@ import {
     JavaScriptVisitor,
     JS,
     NodeResolutionResultKind,
+    NodeRuntimeKind,
+    PackageManager,
     prettierStyle,
+    sourceFileCache,
     StyleKind
 } from "../../src/javascript";
 import {Marker, marker, MarkersKind} from "../../src/markers";
@@ -90,6 +93,23 @@ const samples: { [kind: string]: () => Marker } = {
         version: "1.0.0",
         dependencies: {"is-odd": "^3.0.1"}
     }),
+    [NodeRuntimeKind]: () => ({
+        kind: NodeRuntimeKind,
+        id: randomId(),
+        nodeVersion: "v24.19.0",
+        os: "linux",
+        cpu: "x64",
+        libc: "musl",
+        packageManager: PackageManager.Pnpm,
+        packageManagerVersion: "10.18.3"
+    } as Marker),
+    [`${NodeRuntimeKind} that found no package manager`]: () => ({
+        kind: NodeRuntimeKind,
+        id: randomId(),
+        nodeVersion: "v24.19.0",
+        os: "darwin",
+        cpu: "arm64"
+    } as Marker),
     [StyleKind.Autodetect]: () => autodetect(randomId(), [IntelliJ.TypeScript.blankLines()]),
     [StyleKind.PrettierStyle]: () => prettierStyle(randomId(), {semi: false}, "3.0.0"),
     [`${StyleKind.PrettierStyle} without a version`]: () => prettierStyle(randomId(), {semi: false}),
@@ -103,11 +123,13 @@ const kinds: string[] = [
     ...Object.values(JS.Markers),
     ...Object.values(Yaml.Markers),
     NodeResolutionResultKind,
+    NodeRuntimeKind,
     StyleKind.Autodetect,
     StyleKind.PrettierStyle,
 ];
 
 describeJavaRpc("markers attached here reach Java and come back", () => {
+    const parser = new JavaScriptParser({sourceFileCache});
 
     test("every marker type has a sample", () => {
         expect(kinds.filter(kind => !samples[kind])).toEqual([]);
@@ -119,7 +141,7 @@ describeJavaRpc("markers attached here reach Java and come back", () => {
         const sample = samples[kind]();
         // sending tags what it sends, so what comes back is compared with a copy taken first
         const expected = structuredClone(sample);
-        const cu = (await new JavaScriptParser().parse({
+        const cu = (await parser.parse({
             text: "function f(b: boolean) {\n    const c = b || false;\n}",
             sourcePath: "markers.ts"
         }).next()).value as JS.CompilationUnit;

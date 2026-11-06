@@ -124,7 +124,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     prefix,
                     Markers.EMPTY,
                     source,
-                    unquoteSimpleKey(source)
+                    keyName(source)
             );
         });
     }
@@ -149,21 +149,17 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     }
 
     /**
-     * Strip surrounding quotes from a TOML key's source text. Per the TOML spec
-     * a quoted key (basic-string {@code "foo"} or literal-string {@code 'foo'})
-     * names the same key as the unquoted form when only ASCII-identifier
-     * characters are involved; the quotes are purely syntactic. For escape
-     * processing parity with {@link Toml.Literal} string values we currently
-     * only strip the outer quote characters and do not unescape interior
-     * sequences — escaped key names are exceedingly rare in practice.
+     * The name a simple key stands for. A basic-string key reads its escapes as a string value does, and a
+     * literal-string key reads none.
      */
-    private static String unquoteSimpleKey(String source) {
+    private static String keyName(String source) {
         if (source.length() < 2) {
             return source;
         }
         char first = source.charAt(0);
-        char last = source.charAt(source.length() - 1);
-        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+        if (first == '"' && source.endsWith("\"")) {
+            return TomlString.decodeBasic(source.substring(1, source.length() - 1), false);
+        } else if (first == '\'' && source.endsWith("'")) {
             return source.substring(1, source.length() - 1);
         }
         return source;
@@ -184,9 +180,15 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     public Toml visitString(TomlParser.StringContext ctx) {
         return convert(ctx, (c, prefix) -> {
             String string = c.getText();
-            String value = (string.startsWith("\"\"\"") || string.startsWith("'''"))
-                    ? string.substring(3, string.length() - 3)
-                    : string.substring(1, string.length() - 1);
+            boolean multiline = string.startsWith("\"\"\"") || string.startsWith("'''");
+            String value = multiline ? string.substring(3, string.length() - 3) : string.substring(1, string.length() - 1);
+            if (multiline && (value.startsWith("\n") || value.startsWith("\r\n"))) {
+                // a newline immediately after the opening delimiter is trimmed
+                value = value.substring(value.startsWith("\r\n") ? 2 : 1);
+            }
+            if (string.startsWith("\"")) {
+                value = TomlString.decodeBasic(value, multiline);
+            }
             return new Toml.Literal(
                     randomId(),
                     prefix,

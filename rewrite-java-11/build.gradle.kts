@@ -23,7 +23,6 @@ dependencies {
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
     implementation("io.micrometer:micrometer-core:latest.release")
-    implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
@@ -77,7 +76,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -115,6 +114,11 @@ normalization {
             ignoreCompletely()
         }
     }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
 }
 
 tasks.named("check") {

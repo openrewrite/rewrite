@@ -58,9 +58,9 @@ class ParseError(SourceFile):
                    input.source().read(),
                    erroneous)
 
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id: UUID) -> 'ParseError':
+    def with_id(self, id: int | UUID) -> 'ParseError':
         return replace_if_changed(self, _id=id)
 
     _markers: Markers

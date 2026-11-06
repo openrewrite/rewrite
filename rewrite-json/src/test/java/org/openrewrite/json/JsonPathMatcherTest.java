@@ -198,6 +198,130 @@ class JsonPathMatcherTest {
         );
     }
 
+    private final List<String> numbers = List.of(
+      //language=json5
+      """
+        {
+          "list": [
+            {"n": 1},
+            {"n": 2},
+            {"n": -1},
+            {"n": 1.0},
+            {"n": 1000},
+            {"n": 3000000000},
+            {"n": 12345678901234567890},
+            {"n": "1"}
+          ]
+        }
+        """
+    );
+
+    @Test
+    void numericEquality() {
+        assertMatched(
+          "$.list[?(@.n == 1)]",
+          numbers,
+          List.of("{\"n\": 1}", "{\"n\": 1.0}")
+        );
+        assertMatched(
+          "$.list[?(@.n == -1)]",
+          numbers,
+          List.of("{\"n\": -1}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 3000000000)]",
+          numbers,
+          List.of("{\"n\": 3000000000}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 12345678901234567890)]",
+          numbers,
+          List.of("{\"n\": 12345678901234567890}")
+        );
+        assertMatched(
+          "$.list[?(@.n == 1e3)]",
+          numbers,
+          List.of("{\"n\": 1000}")
+        );
+    }
+
+    @Test
+    void numericInequality() {
+        assertMatched(
+          "$.list[?(@.n != 1)]",
+          numbers,
+          List.of(
+            "{\"n\": 2}",
+            "{\"n\": -1}",
+            "{\"n\": 1000}",
+            "{\"n\": 3000000000}",
+            "{\"n\": 12345678901234567890}",
+            "{\"n\": \"1\"}"
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnScalarList() {
+        assertMatched(
+          "$.list[?(@ == 2)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [1, 2, 3]
+              }
+              """
+          ),
+          List.of("2")
+        );
+    }
+
+    @Test
+    void numericEqualityIsStrictAboutStrings() {
+        assertNotMatched(
+          "$[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": "1"
+              }
+              """
+          )
+        );
+        assertNotMatched(
+          "$[?(@.n == '1')]",
+          List.of(
+            //language=json5
+            """
+              {
+                "n": 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericEqualityOnNonFiniteNumbers() {
+        assertNotMatched(
+          "$.list[?(@.n == 1)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "list": [
+                  {"n": NaN},
+                  {"n": Infinity},
+                  {"n": -Infinity}
+                ]
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void multipleWildcards() {
         assertMatched(
@@ -656,6 +780,65 @@ class JsonPathMatcherTest {
           "$.list[?(@ == 'item 1')]",
           listOfScalars,
           List.of("\"item 1\"")
+        );
+    }
+
+    @Test
+    void quotedNamesAndFilterStringsMatchByTheTextTheEscapesStandFor() {
+        List<String> jest = List.of(
+          //language=json
+          """
+            {
+              "moduleNameMapper": {
+                "\\\\.(css|less)$": "identity-obj-proxy"
+              },
+              "testRegex": ["\\\\.test\\\\.js$"]
+            }
+            """
+        );
+        assertMatched(
+          "$.moduleNameMapper['\\\\.(css|less)$']",
+          jest,
+          List.of("\"\\\\.(css|less)$\": \"identity-obj-proxy\"")
+        );
+        assertMatched(
+          "$.testRegex[?(@ == '\\\\.test\\\\.js$')]",
+          jest,
+          List.of("\"testRegex\": [\"\\\\.test\\\\.js$\"]")
+        );
+    }
+
+    @Test
+    void quotedNamesAndFilterStringsMatchSurrogateEscapes() {
+        List<String> surrogates = List.of(
+          //language=json
+          """
+            {
+              "\\uD800": "unpaired",
+              "strings": ["a\\ud800b"],
+              "emoji": ["\\ud83d\\ude00"]
+            }
+            """
+        );
+        assertMatched(
+          "$['\\\\ud800']",
+          surrogates,
+          List.of("\"\\uD800\": \"unpaired\"")
+        );
+        assertMatched(
+          "$.strings[?(@ == 'a\\\\ud800b')]",
+          surrogates,
+          List.of("\"strings\": [\"a\\ud800b\"]")
+        );
+        assertMatched(
+          "$.strings[?(@ =~ '.*ud800.*')]",
+          surrogates,
+          List.of("\"a\\ud800b\"")
+        );
+        assertMatched(
+          "$.emoji[?(@ == '😀')]",
+          surrogates,
+          List.of("\"emoji\": [\"\\ud83d\\ude00\"]")
         );
     }
 

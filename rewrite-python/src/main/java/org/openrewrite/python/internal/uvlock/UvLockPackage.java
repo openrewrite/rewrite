@@ -34,8 +34,16 @@ import java.util.Map;
 public class UvLockPackage {
 
     String name;
+
+    /** Absent for a virtual, editable or directory project whose version is dynamic. */
+    @Nullable
     String version;
+
     UvLockSource source;
+
+    /** The project's {@code [tool.uv] default-groups} other than {@code ["dev"]}: {@code "all"} or the groups' names. */
+    @Nullable
+    Object defaultGroups;
 
     /**
      * Present only on fork-duplicated packages; emitted multiline even for one element.

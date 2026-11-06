@@ -150,7 +150,7 @@ public class XRange extends LatestRelease {
                 !(isX(m.group(2)) || isX(m.group(3)) || isX(m.group(4))))) {
             return Validated.invalid("xRange", pattern, "not a node x-range");
         }
-        UnionRange node = UnionRange.parse(pattern, false);
+        UnionRange node = UnionRange.parse(pattern);
         if (node == null) {
             return Validated.invalid("xRange", pattern, "not a valid node range");
         }
@@ -158,7 +158,7 @@ public class XRange extends LatestRelease {
     }
 
     // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
-    static String replaceXRange(String token, boolean incPre) {
+    static String replaceXRange(String token) {
         Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
         if (!m.matches()) {
             return token;
@@ -173,7 +173,7 @@ public class XRange extends LatestRelease {
         if ("=".equals(gtlt) && anyX) {
             gtlt = "";
         }
-        String pr = incPre ? "-0" : "";
+        String pr = "";
 
         if (xM) {
             return (">".equals(gtlt) || "<".equals(gtlt)) ? "<0.0.0-0" : "*";

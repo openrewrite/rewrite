@@ -16,6 +16,8 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.J;
@@ -579,6 +581,39 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               def pattern = ~/$$\\d+\\.\\d+/
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "'''a'''' | a'",
+      "'''a''''' | a''",
+      "\"\"\"a\"\"\"\" | a\"",
+      "\"\"\"a\"\"\"\"\" | a\"\"",
+      "''''''' | '",
+    })
+    void tripleQuotedStringEndingWithQuotes(String literal, String value) {
+        rewriteRun(
+          groovy("def s = " + literal + " + 'b'", spec -> spec.beforeRecipe(cu -> {
+              J.Binary concat = (J.Binary) requireNonNull(((J.VariableDeclarations) cu.getStatements().getFirst())
+                .getVariables().getFirst().getInitializer());
+              J.Literal left = (J.Literal) concat.getLeft();
+              assertThat(left.getValueSource()).isEqualTo(literal);
+              assertThat(left.getValue()).isEqualTo(value);
+          }))
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9489")
+    @Test
+    void tripleQuotedStringEndingWithQuoteInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def s = ('''a'''') + ('b')
               """
           )
         );

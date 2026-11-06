@@ -1,0 +1,223 @@
+{"header":"is-glob 4.0.3: every call its own tests (test.js) make, with its answer; generate/upstream-calls.js generate/upstream/is-glob.js <checkout> 4.0.3"}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["@.(?abc)"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["!*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["!foo"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["!foo.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["**/abc.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["abc/*.js"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["@.(?:abc)"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should be true if it is a glob pattern:","fn":"isGlob","args":["@.(?!abc)"],"out":true}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\!\\*.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\!foo"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\!foo.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\*(foo).js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\*.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["\\*\\*/abc.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should not match escaped globs","fn":"isGlob","args":["abc/\\*.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if the value is not a string:","fn":"isGlob","args":[],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if the value is not a string:","fn":"isGlob","args":[null],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if the value is not a string:","fn":"isGlob","args":[["**/*.js"]],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if the value is not a string:","fn":"isGlob","args":[["foo.js"]],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":[""],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["~/abc"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["~/abc"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["~/(abc)"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["+~(abc)"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["."],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["@.(abc)"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["aa"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["who?"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["why!?"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["where???"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["abc!/def/!ghi.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["abc.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["abc/def/!ghi.js"],"out":false}
+{"test":"test.js > isGlob > glob patterns > should be false if it is not a glob pattern:","fn":"isGlob","args":["abc/def/ghi.js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(?!foo).js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(?:foo).js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(?=foo).js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(a|b).js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(a|b|c).js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has a regex capture group:","fn":"isGlob","args":["abc/(foo bar)/*.js"],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has parens but is not a valid capture group","fn":"isGlob","args":["abc/(?foo).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has parens but is not a valid capture group","fn":"isGlob","args":["abc/(a b c).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has parens but is not a valid capture group","fn":"isGlob","args":["abc/(ab).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has parens but is not a valid capture group","fn":"isGlob","args":["abc/(abc).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if the path has parens but is not a valid capture group","fn":"isGlob","args":["abc/(foo bar).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the capture group is imbalanced:","fn":"isGlob","args":["abc/(?ab.js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the capture group is imbalanced:","fn":"isGlob","args":["abc/(ab.js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the capture group is imbalanced:","fn":"isGlob","args":["abc/(a|b.js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the capture group is imbalanced:","fn":"isGlob","args":["abc/(a|b|c.js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the group is escaped:","fn":"isGlob","args":["abc/\\(a|b).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the group is escaped:","fn":"isGlob","args":["abc/\\(a|b|c).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["$(abc)",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["&(abc)",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["? (abc)",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["?.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/(?ab.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/(ab.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/(a|b.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/(a|b|c.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/(foo).js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/?.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/[1-3.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/[^abc.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/[abc.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/foo?.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["abc/{abc.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be true if glob chars exist and `options.strict` is false","fn":"isGlob","args":["Who?.js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/\\(a|b).js",{"strict":false}],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/(a|b\\).js"],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/\\(a|b|c).js",{"strict":false}],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/\\(a|b|c.js",{"strict":false}],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/\\[abc].js",{"strict":false}],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/\\[abc.js",{"strict":false}],"out":false}
+{"test":"test.js > isGlob > regex capture groups > should be false if the first delim is escaped and options.strict is false:","fn":"isGlob","args":["abc/(a|b\\).js",{"strict":false}],"out":true}
+{"test":"test.js > isGlob > regex character classes > should be true if the path has a regex character class:","fn":"isGlob","args":["abc/[abc].js"],"out":true}
+{"test":"test.js > isGlob > regex character classes > should be true if the path has a regex character class:","fn":"isGlob","args":["abc/[^abc].js"],"out":true}
+{"test":"test.js > isGlob > regex character classes > should be true if the path has a regex character class:","fn":"isGlob","args":["abc/[1-3].js"],"out":true}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is not balanced:","fn":"isGlob","args":["abc/[abc.js"],"out":false}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is not balanced:","fn":"isGlob","args":["abc/[^abc.js"],"out":false}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is not balanced:","fn":"isGlob","args":["abc/[1-3.js"],"out":false}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is escaped:","fn":"isGlob","args":["abc/\\[abc].js"],"out":false}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is escaped:","fn":"isGlob","args":["abc/\\[^abc].js"],"out":false}
+{"test":"test.js > isGlob > regex character classes > should be false if the character class is escaped:","fn":"isGlob","args":["abc/\\[1-3].js"],"out":false}
+{"test":"test.js > isGlob > brace patterns > should be true if the path has brace characters:","fn":"isGlob","args":["abc/{a,b}.js"],"out":true}
+{"test":"test.js > isGlob > brace patterns > should be true if the path has brace characters:","fn":"isGlob","args":["abc/{a..z}.js"],"out":true}
+{"test":"test.js > isGlob > brace patterns > should be true if the path has brace characters:","fn":"isGlob","args":["abc/{a..z..2}.js"],"out":true}
+{"test":"test.js > isGlob > brace patterns > should be false if (basic) braces are not balanced:","fn":"isGlob","args":["abc/\\{a,b}.js"],"out":false}
+{"test":"test.js > isGlob > brace patterns > should be false if (basic) braces are not balanced:","fn":"isGlob","args":["abc/\\{a..z}.js"],"out":false}
+{"test":"test.js > isGlob > brace patterns > should be false if (basic) braces are not balanced:","fn":"isGlob","args":["abc/\\{a..z..2}.js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["$(abc)"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["&(abc)"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["Who?.js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["? (abc)"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["?.js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/?.js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["!&(abc)"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["!*.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["!foo"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["!foo.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["**/abc.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["*.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["*z(abc)"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["[1-10].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["[^abc].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["[a-j]*[^c]b/c"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["[abc].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["a/b/c/[a-z].js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/(aaa|bbb).js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/*.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/{a,b}.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/{a..z..2}.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be true if the path has regex characters:","fn":"isGlob","args":["abc/{a..z}.js"],"out":true}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\?.js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\[1-10\\].js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\[^abc\\].js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\[a-j\\]\\*\\[^c\\]b/c"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\[abc\\].js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["\\a/b/c/\\[a-z\\].js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["abc/\\(aaa|bbb).js"],"out":false}
+{"test":"test.js > isGlob > regex patterns > should be false if regex characters are escaped","fn":"isGlob","args":["abc/\\?.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/!(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/!(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/(ab)*.js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/*(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/*(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/+(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/+(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/?(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/?(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/@(a).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has an extglob:","fn":"isGlob","args":["abc/@(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\*.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\*\\*.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\@(a).js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\!(a).js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\+(a).js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\*(a).js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\?(a).js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\@(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\!(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\+(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\*(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\?(a|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\@(a\\|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\!(a\\|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\+(a\\|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\*(a\\|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if extglob characters are escaped:","fn":"isGlob","args":["abc/\\?(a\\|b).js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should not return true for non-extglob parens","fn":"isGlob","args":["C:/Program Files (x86)/"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has glob characters and is not a valid path:","fn":"isGlob","args":["abc/[*].js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be true if it has glob characters and is not a valid path:","fn":"isGlob","args":["abc/*.js"],"out":true}
+{"test":"test.js > isGlob > extglob patterns > should be false if it is a valid non-glob path:","fn":"isGlob","args":["abc/?.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if it is a valid non-glob path:","fn":"isGlob","args":["abc/!.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if it is a valid non-glob path:","fn":"isGlob","args":["abc/@.js"],"out":false}
+{"test":"test.js > isGlob > extglob patterns > should be false if it is a valid non-glob path:","fn":"isGlob","args":["abc/+.js"],"out":false}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["?(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["@(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["!(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["*(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["+(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["xyz/?(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["xyz/@(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["xyz/!(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["xyz/*(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["xyz/+(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["?(abc|xyz)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["@(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["!(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["*(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should return true when the string has an extglob:","fn":"isGlob","args":["+(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["\\?(abc)"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["\\@(abc)"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["\\!(abc)"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["\\*(abc)"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["\\+(abc)"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["xyz/\\?(abc)/xyz"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["xyz/\\@(abc)/xyz"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["xyz/\\!(abc)/xyz"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["xyz/\\*(abc)/xyz"],"out":false}
+{"test":"test.js > isGlob > isGlob > should not match escaped extglobs","fn":"isGlob","args":["xyz/\\+(abc)/xyz"],"out":false}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\?(abc|xyz)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\@(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\!(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\*(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\+(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\?(abc)/?(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\@(abc)/@(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\!(abc)/!(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\*(abc)/*(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\+(abc)/+(abc)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["xyz/\\?(abc)/xyz/def/?(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["xyz/\\@(abc)/xyz/def/@(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["xyz/\\!(abc)/xyz/def/!(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["xyz/\\*(abc)/xyz/def/*(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["xyz/\\+(abc)/xyz/def/+(abc)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\?(abc|xyz)/xyz/?(abc|xyz)/xyz"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\@(abc|xyz)/@(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\!(abc|xyz)/!(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\*(abc|xyz)/*(abc|xyz)"],"out":true}
+{"test":"test.js > isGlob > isGlob > should detect when an glob is in the same pattern as an escaped glob","fn":"isGlob","args":["\\+(abc|xyz)/+(abc|xyz)"],"out":true}
+{"test":"differences","fn":"isGlob","args":[""],"out":false}
+{"test":"differences","fn":"isGlob","args":["!"],"out":true}
+{"test":"differences","fn":"isGlob","args":["\\*"],"out":false}
+{"test":"differences","fn":"isGlob","args":["\\{a,b}"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a{b"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a(b"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a|b"],"out":false}
+{"test":"differences","fn":"isGlob","args":["[]"],"out":false}
+{"test":"differences","fn":"isGlob","args":["{}"],"out":false}
+{"test":"differences","fn":"isGlob","args":["()"],"out":false}
+{"test":"differences","fn":"isGlob","args":["\\!a"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a/(b|c)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["@(a"],"out":false}
+{"test":"differences","fn":"isGlob","args":["\\@(a)"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a[b\\]c]"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a.?"],"out":true}
+{"test":"differences","fn":"isGlob","args":["(?:a)"],"out":true}
+{"test":"differences","fn":"isGlob","args":["(?!a"],"out":false}
+{"test":"differences","fn":"isGlob","args":["a)"],"out":false}
+{"test":"differences","fn":"isGlob","args":["\\[a]!"],"out":true}

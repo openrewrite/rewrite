@@ -20,6 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -34,6 +36,7 @@ import org.openrewrite.toml.tree.Toml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -233,6 +236,36 @@ class ParseProjectIntegTest {
         assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"uv.lock", "poetry.lock", "pdm.lock"})
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPyprojectLockFile(String lockFileName) throws Exception {
+        Path projectDir = tempDir.resolve("with_" + lockFileName.replace('.', '_'));
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+        Files.writeString(projectDir.resolve(lockFileName), """
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        assertThat(sources)
+                .filteredOn(sf -> sf.getSourcePath().getFileName().toString().equals(lockFileName))
+                .singleElement()
+                .isInstanceOf(Toml.Document.class);
+    }
+
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void includesRequirementsTxt() throws Exception {
@@ -330,6 +363,59 @@ class ParseProjectIntegTest {
                 .doesNotContain("requirements.txt");
     }
 
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void provisionedEnvBacksBothTypesAndMarkers() throws Exception {
+        Path projectDir = tempDir.resolve("provisioned");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 100
+                """);
+        Files.writeString(projectDir.resolve("requirements.txt"), "sortedcontainers==2.4.0\n");
+        Files.writeString(projectDir.resolve("requirements-dev.txt"), "six\n");
+        // A package the parser's own interpreter lacks, so that only the provisioned env resolves it
+        Files.writeString(projectDir.resolve("ranked.py"), """
+                from sortedcontainers import SortedList
+
+                class Ranked(SortedList):
+                    pass
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        List<JavaType.FullyQualified> supertypes = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                if (classDecl.getType() != null && classDecl.getType().getSupertype() != null) {
+                    supertypes.add(classDecl.getType().getSupertype());
+                }
+                return classDecl;
+            }
+        }.visit(sources.stream().filter(s -> s.getSourcePath().endsWith("ranked.py")).findFirst().orElseThrow(), 0);
+        assertThat(supertypes).extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                .containsExactly("sortedcontainers.sortedlist.SortedList");
+
+        // Both files resolve against the one env, while each names only its own dependencies
+        PythonResolutionResult base = marker(sources, "requirements.txt");
+        PythonResolutionResult dev = marker(sources, "requirements-dev.txt");
+        assertThat(base.getDependencies()).extracting(PythonResolutionResult.Dependency::getName).containsExactly("sortedcontainers");
+        assertThat(dev.getDependencies()).extracting(PythonResolutionResult.Dependency::getName).containsExactly("six");
+        assertThat(dev.getResolvedDependency("sortedcontainers")).isNotNull()
+                .extracting(PythonResolutionResult.ResolvedDependency::getVersion).isEqualTo("2.4.0");
+    }
+
+    private static PythonResolutionResult marker(List<SourceFile> sources, String fileName) {
+        return sources.stream()
+                .filter(s -> s.getSourcePath().getFileName().toString().equals(fileName))
+                .findFirst()
+                .flatMap(s -> s.getMarkers().findFirst(PythonResolutionResult.class))
+                .orElseThrow(() -> new AssertionError("No PythonResolutionResult on " + fileName));
+    }
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)

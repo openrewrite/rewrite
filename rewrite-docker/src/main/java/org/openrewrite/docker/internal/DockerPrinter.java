@@ -17,6 +17,7 @@ package org.openrewrite.docker.internal;
 
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.docker.DockerVisitor;
+import org.openrewrite.docker.tree.CommaPrefix;
 import org.openrewrite.docker.tree.Comment;
 import org.openrewrite.docker.tree.Docker;
 import org.openrewrite.docker.tree.Space;
@@ -236,6 +237,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
                 visit(arg, p);
                 // Print comma after this element if not last
                 if (i < volume.getValues().size() - 1) {
+                    printCommaPrefix(arg.getMarkers(), p);
                     p.append(",");
                 }
             }
@@ -263,6 +265,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
             visit(arg, p);
             // Print comma after this element if not last
             if (i < shell.getArguments().size() - 1) {
+                printCommaPrefix(arg.getMarkers(), p);
                 p.append(",");
             }
         }
@@ -360,6 +363,7 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
             visit(argument, p);
             // Print comma after this element if not last
             if (i < arguments.size() - 1) {
+                printCommaPrefix(argument.getMarkers(), p);
                 p.append(",");
             }
         }
@@ -469,6 +473,16 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new org.openrewrite.Cursor(getCursor(), marker), DOCKERFILE_MARKER_WRAPPER));
+        }
+    }
+
+    /**
+     * Print the whitespace that preceded the comma following a JSON array element, if any.
+     */
+    private void printCommaPrefix(org.openrewrite.marker.Markers markers, PrintOutputCapture<P> p) {
+        CommaPrefix commaPrefix = markers.findFirst(CommaPrefix.class).orElse(null);
+        if (commaPrefix != null) {
+            visitSpace(commaPrefix.getPrefix(), p);
         }
     }
 

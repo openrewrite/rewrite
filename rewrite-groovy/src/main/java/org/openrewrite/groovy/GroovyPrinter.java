@@ -27,6 +27,7 @@ import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.CompactConstructor;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -395,7 +396,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
                     .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
             boolean parenthesized = lambda.getParameters().isParenthesized();
-            if (!ls.isJavaStyle()) {
+            boolean omitBraces = lambda.getMarkers().findFirst(OmitBraces.class).isPresent();
+            if (!ls.isJavaStyle() && !omitBraces) {
                 p.append('{');
             }
             visitMarkers(lambda.getParameters().getMarkers(), p);
@@ -418,7 +420,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            if (!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle() && !omitBraces) {
                 p.append('}');
             }
             afterSyntax(lambda, p);
@@ -568,8 +570,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
                 return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
-                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(return_.getMarkers(), p);
+                beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
                 visit(return_.getExpression(), p);
                 afterSyntax(return_, p);
                 return return_;

@@ -305,6 +305,15 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
+        public List<J> getSideEffects() {
+            List<J> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(indexed.getSideEffects());
+            sideEffects.addAll(dimension.getIndex().getSideEffects());
+            return sideEffects;
+        }
+
+        @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
@@ -714,9 +723,13 @@ public interface J extends Tree {
         @Transient
         @Override
         public List<J> getSideEffects() {
+            List<J> rightSideEffects = right.getSideEffects();
+            if ((getOperator() == Type.And || getOperator() == Type.Or) && !rightSideEffects.isEmpty()) {
+                return singletonList(this);
+            }
             List<J> sideEffects = new ArrayList<>(2);
             sideEffects.addAll(left.getSideEffects());
-            sideEffects.addAll(right.getSideEffects());
+            sideEffects.addAll(rightSideEffects);
             return sideEffects;
         }
 
@@ -4291,7 +4304,9 @@ public interface J extends Tree {
                 if (name.getType() instanceof JavaType.Method && name.getType() != this.methodType) {
                     newType = (JavaType.Method) name.getType();
                 } else {
-                    newType = this.methodType.getName().equals(name.getSimpleName()) ? this.methodType : this.methodType.withName(name.getSimpleName());
+                    // A constructor type is named <constructor> whatever the call spells, like `super` or `this`
+                    newType = this.methodType.isConstructor() || this.methodType.getName().equals(name.getSimpleName()) ?
+                            this.methodType : this.methodType.withName(name.getSimpleName());
                 }
             }
             return new MethodInvocation(id, prefix, markers, select, typeParameters, name.withType(newType), arguments, newType);
@@ -5563,6 +5578,15 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTernary(this, p);
+        }
+
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            if (getTruePart().getSideEffects().isEmpty() && getFalsePart().getSideEffects().isEmpty()) {
+                return condition.getSideEffects();
+            }
+            return singletonList(this);
         }
 
         public Padding getPadding() {

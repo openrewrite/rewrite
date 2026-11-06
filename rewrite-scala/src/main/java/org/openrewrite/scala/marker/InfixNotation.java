@@ -28,6 +28,9 @@ import java.util.UUID;
  * 
  * This marker indicates that the method call should be printed
  * without the dot and parentheses, using space-separated infix style.
+ * <p>
+ * Also marks a J.DeconstructionPattern for an infix extractor pattern such as
+ * "h :: t", printed as its two operands around the extractor name.
  */
 @Value
 @With

@@ -36,6 +36,7 @@ public class RpcReceiveQueue {
     private final @Nullable String sourceFileType;
     private final @Nullable PrintStream log;
     private final List<Integer> receivedRefs = new ArrayList<>();
+    private final Map<String, Class<?>> classes = new HashMap<>();
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
                            @Nullable String sourceFileType, @Nullable PrintStream log) {
@@ -245,13 +246,17 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        try {
-            Class<?> clazz = Class.forName(type);
-            //noinspection unchecked
-            return (T) objenesis.newInstance(clazz);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+        Class<?> clazz = classes.get(type);
+        if (clazz == null) {
+            try {
+                clazz = Class.forName(type);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            classes.put(type, clazz);
         }
+        //noinspection unchecked
+        return (T) objenesis.newInstance(clazz);
     }
 
     /**

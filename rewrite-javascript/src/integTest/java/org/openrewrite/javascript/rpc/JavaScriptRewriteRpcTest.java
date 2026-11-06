@@ -35,16 +35,25 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.JsonParser;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.ByteArrayInputStream;
@@ -65,6 +74,7 @@ import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("JSUnusedLocalSymbols")
 class JavaScriptRewriteRpcTest implements RewriteTest {
@@ -123,6 +133,35 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
               }
               """,
             spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @Test
+    void runXmlRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.xml.change-attribute",
+              Map.of("key", "controllerName", "value", "my.app.controller.Home"))),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <%@ page contentType="text/html" %>
+              <mvc:View controllerName="my.app.controller.Main" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                  <!-- page -->
+                  <Page title='&amp;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+              </mvc:View>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <%@ page contentType="text/html" %>
+              <mvc:View controllerName="my.app.controller.Home" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                  <!-- page -->
+                  <Page title='&amp;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+              </mvc:View>
+              """,
+            spec -> spec.path("webapp/view/Main.view.xml")
           )
         );
     }
@@ -412,11 +451,167 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of())),
           text("file1", "file1 (count: 2)"),
           text("file2", "file2 (count: 2)")
+        );
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesJavaScript() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.generate-file",
+            Map.of("sourcePath", "eslint.config.mjs", "text", "export default [\n  {rules: {}},\n];\n"))),
+          javascript(
+            null,
+            """
+              export default [
+                {rules: {}},
+              ];
+              """,
+            spec -> spec.path("eslint.config.mjs")
+              .afterRecipe(cu -> assertThat(cu).isInstanceOf(JS.CompilationUnit.class))
+          )
+        );
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesJson() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.generate-file",
+            Map.of("sourcePath", ".vscode/extensions.json", "text", "{\n  \"recommendations\": [\"dbaeumer.vscode-eslint\"]\n}\n"))),
+          json(
+            null,
+            """
+              {
+                "recommendations": ["dbaeumer.vscode-eslint"]
+              }
+              """,
+            spec -> spec.path(".vscode/extensions.json")
+              .afterRecipe(doc -> assertThat(doc).isInstanceOf(Json.Document.class))
+          )
+        );
+    }
+
+    @Test
+    void runRecipeThatDeletes() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.json.delete-file",
+              Map.of("sourcePath", "tslint.json")))
+            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
+              .anySatisfy(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
+                  assertThat(row.getAfterSourcePath()).isEmpty();
+              })),
+          json(
+            """
+              {"rules": {"no-console": true}}
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          json(
+            """
+              {"name": "my-project"}
+              """,
+            spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @Test
+    void runBatchedRecipesThatDelete() throws IOException {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipes(
+              client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
+              client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
+            )
+            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
+              .anySatisfy(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
+                  assertThat(row.getAfterSourcePath()).isEmpty();
+              })),
+          json(
+            """
+              {"rules": {"no-console": true}}
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          json(
+            """
+              {"name": "my-project", "version": "0.0.1"}
+              """,
+            """
+              {"name": "my-project", "version": "1.0.0"}
+              """,
+            spec -> spec.path("package.json")
+          )
+        );
+        assertThat(Files.readString(tempDir.resolve("rpc.log"))).contains("BatchVisit");
+    }
+
+    @Test
+    void treeDeletedInBatchVisitIsNotServedAfterwards() {
+        // given
+        installRecipes();
+        RpcRecipe delete = (RpcRecipe) client().prepareRecipe("org.openrewrite.example.json.delete-file",
+          Map.of("sourcePath", "tslint.json"));
+        Json.Document tslint = JsonParser.builder().build()
+          .parse("{\"rules\": {}}")
+          .map(sf -> (Json.Document) sf.withSourcePath(Path.of("tslint.json")))
+          .findFirst()
+          .orElseThrow();
+
+        // when
+        BatchVisitResponse response = client().batchVisit(tslint, new InMemoryExecutionContext(), null,
+          List.of(new BatchVisit.BatchVisitItem(delete.getEditVisitor(), null)));
+
+        // then
+        assertThat(response.getResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.isDeleted()).isTrue());
+        assertThat((Object) client().getObject(tslint.getId().toString(), Json.Document.class.getName())).isNull();
+    }
+
+    @Test
+    void runScanningRecipeThatGeneratesFromScannedFileAndDeletesIt() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe("org.openrewrite.example.javascript.migrate-tslint", Map.of())),
+          json(
+            """
+              {
+                "rules": {
+                  "no-console": true,
+                  "no-debugger": true
+                }
+              }
+              """,
+            null,
+            spec -> spec.path("tslint.json")
+          ),
+          javascript(
+            null,
+            """
+              export default [
+                {
+                  rules: {
+                    "no-console": "error",
+                    "no-debugger": "error",
+                  },
+                },
+              ];
+              """,
+            spec -> spec.path("eslint.config.mjs")
+              .afterRecipe(cu -> assertThat(cu).isInstanceOf(JS.CompilationUnit.class))
+          )
         );
     }
 
@@ -498,6 +693,49 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectFailureReadsFileUnderRelativeTo(@TempDir Path repo) throws Exception {
+        Path project = Files.createDirectories(repo.resolve("app"));
+        Files.writeString(project.resolve("package.json"), """
+          {"name": "app", "version": "1.0.0"}
+          """);
+        Files.writeString(project.resolve("index.js"), "const x = 1;");
+        String workspace = """
+          packages:
+            - 'packages/*'
+          """;
+        Files.writeString(project.resolve("pnpm-workspace.yaml"), workspace);
+
+        // Refusing a file once it has arrived takes the same path as failing to receive it.
+        Path failing = Path.of("app", "pnpm-workspace.yaml");
+        ExecutionContext ctx = ParsingExecutionContextView.view(new InMemoryExecutionContext())
+          .setParsingListener(new ParsingEventListener() {
+              @Override
+              public void startedParsing(Parser.Input input) {
+                  if (input.getPath().equals(failing)) {
+                      throw new IllegalStateException("Cannot take " + input.getPath());
+                  }
+              }
+          });
+
+        // Source paths are relative to the repository, a directory above the project being parsed.
+        List<SourceFile> sourceFiles = client()
+          .parseProject(project, null, repo, ctx)
+          .toList();
+
+        assertThat(sourceFiles)
+          .extracting(SourceFile::getSourcePath)
+          .containsExactlyInAnyOrder(Path.of("app", "package.json"), Path.of("app", "index.js"), failing);
+        assertThat(sourceFiles)
+          .filteredOn(sf -> sf.getSourcePath().equals(failing))
+          .singleElement()
+          .isInstanceOfSatisfying(ParseError.class, parseError ->
+            assertThat(parseError.getText()).isEqualTo(workspace));
+        assertThat(sourceFiles)
+          .filteredOn(sf -> !sf.getSourcePath().equals(failing))
+          .noneMatch(sf -> sf instanceof ParseError);
     }
 
     @Test

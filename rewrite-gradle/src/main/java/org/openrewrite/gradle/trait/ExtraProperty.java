@@ -23,6 +23,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.marker.By;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.trait.Trait;
 
@@ -230,7 +231,40 @@ public class ExtraProperty implements Trait<J> {
                 J.MethodInvocation method = (J.MethodInvocation) node;
                 return setSyntax(method, cursor) == null ? null : stringLiteral(method.getArguments().get(0));
             }
+            if (node instanceof J.VariableDeclarations) {
+                // Kotlin's val foo by extra("bar"), as opposed to val foo: String by extra reading it
+                J.VariableDeclarations declarations = (J.VariableDeclarations) node;
+                return declarations.getMarkers().findFirst(By.class).isPresent() && declarations.getVariables().size() == 1 &&
+                       isExtraDelegate(declarations.getVariables().get(0).getInitializer()) ?
+                        declarations.getVariables().get(0).getSimpleName() : null;
+            }
             return null;
+        }
+
+        /**
+         * Whether the invocation configures extra properties in a closure or lambda: {@code ext { }}, or Kotlin's
+         * {@code extra.apply { }} and {@code with(extra) { }}.
+         */
+        public static boolean isExtBlock(J.MethodInvocation method) {
+            switch (method.getSimpleName()) {
+                case "ext":
+                    return true;
+                case "apply":
+                    return isExt(method.getSelect());
+                case "with":
+                    return method.getArguments().size() == 2 && isExt(method.getArguments().get(0));
+                default:
+                    return false;
+            }
+        }
+
+        private static boolean isExtraDelegate(@Nullable Expression initializer) {
+            if (!(initializer instanceof J.MethodInvocation)) {
+                return false;
+            }
+            J.MethodInvocation delegate = (J.MethodInvocation) initializer;
+            return "extra".equals(delegate.getSimpleName()) && delegate.getArguments().size() == 1 &&
+                   !(delegate.getArguments().get(0) instanceof J.Empty);
         }
 
         private static @Nullable PropertySyntax assignmentSyntax(Expression variable, Cursor cursor) {
@@ -279,7 +313,8 @@ public class ExtraProperty implements Trait<J> {
             if (isExt(method.getSelect())) {
                 return PropertySyntax.EXT_SET_METHOD;
             }
-            return withinBlock(cursor, "ext") ? PropertySyntax.EXT_BLOCK_SET_METHOD : null;
+            return cursor.getPathAsStream().anyMatch(v -> v instanceof J.MethodInvocation && isExtBlock((J.MethodInvocation) v)) ?
+                    PropertySyntax.EXT_BLOCK_SET_METHOD : null;
         }
 
         private static boolean isExt(@Nullable Expression expression) {

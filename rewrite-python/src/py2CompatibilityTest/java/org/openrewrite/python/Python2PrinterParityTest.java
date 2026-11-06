@@ -69,6 +69,11 @@ class Python2PrinterParityTest {
       "print 1\ntry:\n    f()\nexcept E, e:\n    g(e)\n",
       "print 1\ntry:\n    f()\nexcept (A, B) , e:\n    g(e)\n",
       "\"\"\"doc\"\"\"\nprint 1\nx\n(a)\na[0]\n",
+      "print 1\ndef f():\n    if x:\n        a\n    # c\n    elif y:\n        b\n",
+      "print 1\nfor a, b in xs:\n    x = [k for k, v in a[i, j]]\n",
+      "print sum(i for i in xs)\n",
+      "print 1\nx = lambda (a, (b, c)), d=1: a\ndef f(a, (b, c)=t, *e):\n    pass\n",
+      "print 1\ndef f(a, ):  # c\n    pass;  # d\n# e\n",
       """
         import os
         from os.path import join, dirname

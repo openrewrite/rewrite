@@ -15,7 +15,7 @@
  */
 
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {javascript, typescript} from "../../../src/javascript";
 import {AsyncCallbackInSyncArrayMethod} from "../../../src/javascript/recipes/async-callback-in-sync-array-method";
 
 describe('AsyncCallbackInSyncArrayMethod', () => {
@@ -120,6 +120,62 @@ describe('AsyncCallbackInSyncArrayMethod', () => {
                     expect(actual).toContain('/*~~(Async callback passed to .forEach()');
                     return actual;
                 }
+            )
+        );
+    });
+
+    test('flags only array receivers', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new AsyncCallbackInSyncArrayMethod();
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    class TaskQueue {
+                        async some(predicate: (t: number) => Promise<boolean>): Promise<boolean> {
+                            return false;
+                        }
+                    }
+                    const queue = new TaskQueue();
+                    const hit = queue.some(async task => task === 1);
+                    const anyOdd = [1, 2, 3].some(async n => n % 2 === 1);
+                    const ids: readonly number[] = [1, 2];
+                    const anyEven = ids.some(async n => n % 2 === 0);
+                `,
+                `
+                    class TaskQueue {
+                        async some(predicate: (t: number) => Promise<boolean>): Promise<boolean> {
+                            return false;
+                        }
+                    }
+                    const queue = new TaskQueue();
+                    const hit = queue.some(async task => task === 1);
+                    const anyOdd = /*~~(Async callback passed to .some())~~>*/[1, 2, 3].some(async n => n % 2 === 1);
+                    const ids: readonly number[] = [1, 2];
+                    const anyEven = /*~~(Async callback passed to .some())~~>*/ids.some(async n => n % 2 === 0);
+                `
+            )
+        );
+    });
+
+    test('flags a receiver without type attribution', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new AsyncCallbackInSyncArrayMethod();
+
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `
+                    function anyValid(list) {
+                        return list.some(async item => await validate(item));
+                    }
+                `,
+                `
+                    function anyValid(list) {
+                        return /*~~(Async callback passed to .some())~~>*/list.some(async item => await validate(item));
+                    }
+                `
             )
         );
     });

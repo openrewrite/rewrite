@@ -15,6 +15,7 @@
  */
 
 import {mapAsync} from "../src";
+import {updateIfChanged} from "../src/util";
 
 describe("mapAsync", () => {
     test("sequential execution", async () => {
@@ -35,5 +36,18 @@ describe("mapAsync", () => {
 
         // test
         expect(global).toEqual("fourthreesix");
+    });
+});
+
+describe("updateIfChanged", () => {
+    test("merges whose key lists concatenate alike still take each key from its own side", () => {
+        // given
+        updateIfChanged<any>({a: 1}, {b: 2, c: 3});
+
+        // when
+        const merged = updateIfChanged<any>({a: 1, b: 9}, {c: 4});
+
+        // then
+        expect(merged).toEqual({a: 1, b: 9, c: 4});
     });
 });

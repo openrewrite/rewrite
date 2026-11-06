@@ -16,8 +16,8 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -43,9 +43,50 @@ class ExecutionContextTest implements RewriteTest {
                   return text;
               }
           }).withCausesAnotherCycle(true))
-            .typeValidationOptions(TypeValidation.all().immutableExecutionContext(false)),
+            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);
+    }
+
+    @Test
+    void computeMessageIfAbsentFunctionMayWriteToContext() {
+        var ctx = new InMemoryExecutionContext();
+
+        String computed = ctx.computeMessageIfAbsent("computed", k -> {
+            ctx.computeMessageIfAbsent("nested", k2 -> "nested");
+            // More messages than a default ConcurrentHashMap holds before it resizes
+            for (int i = 0; i < 16; i++) {
+                ctx.putMessage("written" + i, i);
+            }
+            return "computed";
+        });
+
+        assertThat(computed).isEqualTo("computed");
+        assertThat(ctx.getMessages())
+          .containsEntry("computed", "computed")
+          .containsEntry("nested", "nested")
+          .containsEntry("written15", 15);
+    }
+
+    @Test
+    void computeMessageIfAbsentReturnsValueStoredWhileFunctionRan() {
+        var ctx = new InMemoryExecutionContext();
+
+        // The function's own write stands in for another thread winning the race on the key
+        String computed = ctx.computeMessageIfAbsent("key", k -> {
+            ctx.putMessage("key", "stored first");
+            return "computed";
+        });
+
+        assertThat(computed).isEqualTo("stored first");
+        assertThat(ctx.<String>getMessage("key")).isEqualTo("stored first");
+    }
+
+    @Test
+    void computeMessageIfAbsentReturnsNullResultWithoutStoringIt() {
+        var ctx = new InMemoryExecutionContext();
+        assertThat(ctx.<String>computeMessageIfAbsent("absent", k -> null)).isNull();
+        assertThat(ctx.getMessages()).doesNotContainKey("absent");
     }
 }

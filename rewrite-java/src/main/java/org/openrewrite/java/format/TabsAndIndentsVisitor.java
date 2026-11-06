@@ -286,7 +286,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (!Space.firstPrefix(control.getInit()).getLastWhitespace().contains("\n") && evaluate(() -> wrappingStyle.getForStatement().getAlignWhenMultiline(), false)) {
                             sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
                             positionService = sourceFile.service(SourcePositionService.class);
-                            ColSpan colSpan = positionService.columnsOf(getCursor(), control.getInit().get(0));
+                            // JavaPrinter prints a loop's control directly, so replace the containing loop,
+                            // not just a Control cursor whose parent may still hold the old initializer.
+                            Cursor loopCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
+                            J.ForLoop currentLoop = ((J.ForLoop) loopCursor.getValue()).withControl(control);
+                            ColSpan colSpan = positionService.columnsOf(loopCursor.withValue(currentLoop), control.getInit().get(0));
                             getCursor().putMessage("lastIndent", colSpan.getStartColumn() - colSpan.getIndent() - 1 + indent);
                             getCursor().putMessage("indentType", IndentType.ALIGN);
                         }
@@ -562,7 +566,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             builder.append(line);
                         }
                     }
-                    literal = literal.withValueSource(builder.toString()).withValue(content);
+                    // every line moves by the same amount, which leaves the text block's value as it was
+                    literal = literal.withValueSource(builder.toString());
                 }
             }
         }

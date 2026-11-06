@@ -27,6 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,7 +40,7 @@ import java.util.Map;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion, Collection<ResolvedDependency>>> {
+public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion, Collection<ManageDependencies.Manageable>>> {
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
     @Option(displayName = "Group",
@@ -81,17 +82,17 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     String description = "Make existing dependencies managed by moving their version to be specified in the dependencyManagement section of the POM.";
 
     @Override
-    public Map<GroupArtifactVersion, Collection<ResolvedDependency>> getInitialValue(ExecutionContext ctx) {
+    public Map<GroupArtifactVersion, Collection<Manageable>> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifactVersion, Collection<Manageable>> rootGavToDependencies) {
         return Preconditions.check(Boolean.TRUE.equals(addToRootPom), new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document doc = super.visitDocument(document, ctx);
-                Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                Collection<Manageable> manageableDependencies = Manageable.of(findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*"));
                 ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
                 rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
                 return doc;
@@ -100,25 +101,25 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifactVersion, Collection<Manageable>> rootGavToDependencies) {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml maven = super.visitDocument(document, ctx);
 
-                Collection<ResolvedDependency> manageableDependencies;
+                Collection<Manageable> manageableDependencies;
                 if (Boolean.TRUE.equals(addToRootPom)) {
                     ResolvedPom pom = getResolutionResult().getPom();
                     GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
                     manageableDependencies = rootGavToDependencies.get(gav);
                 } else {
-                    manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                    manageableDependencies = Manageable.of(findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*"));
                 }
 
                 if (manageableDependencies != null) {
-                    Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
+                    Map<GroupArtifact, Manageable> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
 
-                    for (ResolvedDependency rmd : manageableDependencies) {
+                    for (Manageable rmd : manageableDependencies) {
                         String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
                                 rmd.getClassifier());
                         if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
@@ -128,10 +129,10 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                         }
                     }
 
-                    for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
+                    for (Manageable rmd : maxVersionByGroupArtifact.values()) {
                         doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
                                 rmd.getArtifactId(), rmd.getVersion(), null,
-                                null, rmd.getRequested().getClassifier(), null));
+                                null, rmd.getRequestedClassifier(), null));
                         if (!Boolean.TRUE.equals(skipModelUpdate)) {
                             maybeUpdateModel();
                         }
@@ -142,6 +143,34 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                 return maven;
             }
         };
+    }
+
+    /**
+     * What managing a resolved dependency reads of it, without its own dependencies.
+     */
+    @Value
+    public static class Manageable {
+        String groupId;
+        String artifactId;
+        String version;
+        String type;
+
+        @Nullable
+        String classifier;
+
+        @Nullable
+        String requestedClassifier;
+
+        int depth;
+
+        static List<Manageable> of(Collection<ResolvedDependency> dependencies) {
+            List<Manageable> manageable = new ArrayList<>(dependencies.size());
+            for (ResolvedDependency d : dependencies) {
+                manageable.add(new Manageable(d.getGroupId(), d.getArtifactId(), d.getVersion(), d.getType(),
+                        d.getClassifier(), d.getRequested().getClassifier(), d.getDepth()));
+            }
+            return manageable;
+        }
     }
 
     private MavenResolutionResult findRootPom(MavenResolutionResult pom) {

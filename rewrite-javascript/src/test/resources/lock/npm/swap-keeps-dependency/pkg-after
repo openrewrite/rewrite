@@ -1,7 +1,0 @@
-{
-  "name": "swap-keeps-dependency",
-  "version": "1.0.0",
-  "dependencies": {
-    "debug": "4.4.3"
-  }
-}

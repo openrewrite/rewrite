@@ -256,7 +256,9 @@ describe('variable declaration mapping', () => {
     test('decorators of a variable statement', () =>
         spec.rewriteRun({
             //language=typescript
-            ...typescript('@a /*1*/ export /*2*/ @b /*3*/ const c = 1;\n@d let e = 1, f = 2;'),
+            ...typescript(`
+                @a /*1*/ export /*2*/ @b /*3*/ const c = 1;
+                @d let e = 1, f = 2;`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const names = (annotations: J.Annotation[]) => annotations.map(a => (a.annotationType as J.Identifier).simpleName);
                 const single = cu.statements[0].element as J.VariableDeclarations;

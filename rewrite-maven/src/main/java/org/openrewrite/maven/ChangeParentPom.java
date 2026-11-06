@@ -32,6 +32,7 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -124,6 +125,8 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     String description = "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
+                "Only what the project uses is retained: a managed version is copied in only for a dependency that this pom or one of its modules declares without a version, " +
+                "and a property only when the pom references it. " +
                 "Removes redundant dependency versions already managed by the new parent.";
 
     @Deprecated
@@ -174,19 +177,22 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     public static class Accumulator {
         /**
-         * The re-resolved marker for each pom whose {@code <parent>} is being changed, keyed by that pom's
-         * resolved GAV. Only the poms actually being changed are retained here (not every pom in the run, as
-         * a prior implementation did); descendants are re-parented onto these in the edit phase without being
-         * stored, and one re-resolved marker is shared by all of a changed pom's descendants.
+         * The new parent of each pom whose {@code <parent>} is being changed, keyed by that pom's resolved GAV.
          */
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> updatedByPom = new ConcurrentHashMap<>();
+        final Map<ResolvedGroupArtifactVersion, Parent> newParentByPom = new ConcurrentHashMap<>();
 
         /**
-         * The same markers as {@link #updatedByPom}, but also declaring the dependency management that the
-         * edit phase restores in the changed pom. Descendants resolve against this view; filled on demand in
-         * the edit phase, as it depends on the new parent's own model.
+         * Each changed pom resolved against its new parent, which descendants are re-parented onto in the edit
+         * phase. Held softly and resolved again once collected, as a pom's model is too heavy to pin for the cycle.
          */
-        final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> restoredByPom = new ConcurrentHashMap<>();
+        final Map<ResolvedGroupArtifactVersion, SoftReference<ResolvedPom>> updatedByPom = new ConcurrentHashMap<>();
+
+        /**
+         * The same poms as {@link #updatedByPom}, but also declaring the dependency management that the edit
+         * phase restores in the changed pom. Descendants resolve against this view; filled on demand in the edit
+         * phase, as it depends on the new parent's own model.
+         */
+        final Map<ResolvedGroupArtifactVersion, SoftReference<ResolvedPom>> restoredByPom = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -262,21 +268,17 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                 return document;
                             }
 
-                            // Re-resolve this changed pom against its new parent and record the marker keyed
-                            // by GAV. Only the poms actually being changed are retained (not every pom in the
-                            // run); descendants are re-parented onto these in the edit phase. Keying by GAV
-                            // lets multiple changed poms - e.g. one root per repository in a multi-repo run -
-                            // each propagate independently, and one marker is shared by all its descendants.
+                            // Re-resolve this changed pom against its new parent and record it keyed by GAV.
+                            // Only the poms actually being changed are recorded (not every pom in the run);
+                            // descendants are re-parented onto these in the edit phase. Keying by GAV lets
+                            // multiple changed poms - e.g. one root per repository in a multi-repo run - each
+                            // propagate independently.
                             Parent updatedParentRef = new Parent(
                                     new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()),
                                     targetRelativePath);
-                            Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
-                            ResolvedPom updatedResolvedPom = mrr.getPom()
-                                    .withRequested(updatedPom)
-                                    .resolve(ctx, new MavenPomDownloader(
-                                            mrr.getProjectPoms(), ctx, MavenExecutionContextView.view(ctx).effectiveSettings(mrr),
-                                            mrr.getActiveProfiles()));
-                            acc.updatedByPom.put(mrr.getPom().getGav(), mrr.withPom(updatedResolvedPom));
+                            ResolvedPom updatedResolvedPom = resolveAgainst(mrr, updatedParentRef, ctx);
+                            acc.newParentByPom.put(mrr.getPom().getGav(), updatedParentRef);
+                            acc.updatedByPom.put(mrr.getPom().getGav(), new SoftReference<>(updatedResolvedPom));
                         }
                     } catch (MavenDownloadingException e) {
                         // The edit-phase visitor re-attempts the download for the changed pom and surfaces
@@ -319,7 +321,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                 // this pom onto the changed ancestor's re-resolved marker and let UpdateMavenModel re-resolve
                 // this pom's own model against it.
                 MavenResolutionResult mrr = d.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
-                if (mrr != null && !acc.updatedByPom.containsKey(mrr.getPom().getGav())) {
+                if (mrr != null && !acc.newParentByPom.containsKey(mrr.getPom().getGav())) {
                     MavenResolutionResult reparented = reparentOntoChangedAncestor(mrr, acc, ctx);
                     if (reparented != null) {
                         d = pinVersionsDroppedByChangedAncestor(d, mrr, reparented, ctx);
@@ -500,7 +502,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     /**
      * If {@code mrr} descends from a pom whose {@code <parent>} is being changed (an entry in
-     * {@code updatedByPom}), return {@code mrr} re-parented onto that changed ancestor's re-resolved marker,
+     * {@code newParentByPom}), return {@code mrr} re-parented onto that changed ancestor's re-resolved marker,
      * so this pom's view of its parent - including the parent's re-resolved dependency management - reflects
      * the new parent. {@link UpdateMavenModel} then re-resolves this pom's own model against it.
      * {@code UpdateMavenModel} re-resolves a pom and its modules but never its parent, so the ancestor must be
@@ -512,16 +514,47 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
         if (parent == null) {
             return null;
         }
-        MavenResolutionResult updatedParent = acc.updatedByPom.get(parent.getPom().getGav());
-        if (updatedParent == null) {
+        ResolvedPom updatedParentPom = updatedPom(parent, acc, ctx);
+        MavenResolutionResult updatedParent;
+        if (updatedParentPom == null) {
             updatedParent = reparentOntoChangedAncestor(parent, acc, ctx);
             if (updatedParent == null) {
                 return null;
             }
         } else {
-            updatedParent = withRestoredManagement(parent, updatedParent, acc, ctx);
+            updatedParent = withRestoredManagement(parent, parent.withPom(updatedParentPom), acc, ctx);
         }
         return mrr.withParent(updatedParent);
+    }
+
+    /**
+     * The pom resolved against its new parent, or null when its parent isn't being changed or can't be resolved.
+     */
+    private static @Nullable ResolvedPom updatedPom(MavenResolutionResult mrr, Accumulator acc, ExecutionContext ctx) {
+        ResolvedGroupArtifactVersion gav = mrr.getPom().getGav();
+        Parent newParent = acc.newParentByPom.get(gav);
+        if (newParent == null) {
+            return null;
+        }
+        SoftReference<ResolvedPom> cached = acc.updatedByPom.get(gav);
+        ResolvedPom updated = cached == null ? null : cached.get();
+        if (updated == null) {
+            try {
+                updated = resolveAgainst(mrr, newParent, ctx);
+            } catch (MavenDownloadingException e) {
+                return null;
+            }
+            acc.updatedByPom.put(gav, new SoftReference<>(updated));
+        }
+        return updated;
+    }
+
+    private static ResolvedPom resolveAgainst(MavenResolutionResult mrr, Parent newParent,
+                                              ExecutionContext ctx) throws MavenDownloadingException {
+        return mrr.getPom()
+                .withRequested(mrr.getPom().getRequested().withParent(newParent))
+                .resolve(ctx, new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                        MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles()));
     }
 
     /**
@@ -532,12 +565,13 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
     private static MavenResolutionResult withRestoredManagement(MavenResolutionResult original, MavenResolutionResult withNewParent,
                                                                 Accumulator acc, ExecutionContext ctx) {
         ResolvedGroupArtifactVersion gav = withNewParent.getPom().getGav();
-        MavenResolutionResult restored = acc.restoredByPom.get(gav);
+        SoftReference<ResolvedPom> cached = acc.restoredByPom.get(gav);
+        ResolvedPom restored = cached == null ? null : cached.get();
         if (restored == null) {
-            restored = restoreManagement(original, withNewParent, ctx);
-            acc.restoredByPom.put(gav, restored);
+            restored = restoreManagement(original, withNewParent, ctx).getPom();
+            acc.restoredByPom.put(gav, new SoftReference<>(restored));
         }
-        return restored;
+        return withNewParent.withPom(restored);
     }
 
     private static MavenResolutionResult restoreManagement(MavenResolutionResult original, MavenResolutionResult withNewParent, ExecutionContext ctx) {

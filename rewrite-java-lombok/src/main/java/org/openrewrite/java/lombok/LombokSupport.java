@@ -32,7 +32,26 @@ import static java.util.Collections.*;
 
 public class LombokSupport {
 
+    private static @Nullable ClassLoader cachedParserClassLoader;
+    private static @Nullable ClassLoader cachedShadowClassLoader;
+
     public static @Nullable Processor createLombokProcessor(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        ClassLoader lombokShadowLoader = shadowClassLoader(parserClassLoader);
+        if (lombokShadowLoader == null) {
+            return null;
+        }
+        return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+    }
+
+    /**
+     * Like Lombok's own launcher, keep one {@code ShadowClassLoader} rather than loading, verifying and
+     * JIT-compiling all of Lombok's classes again for every parser.
+     */
+    private static synchronized @Nullable ClassLoader shadowClassLoader(ClassLoader parserClassLoader) throws ReflectiveOperationException {
+        if (parserClassLoader == cachedParserClassLoader) {
+            return cachedShadowClassLoader;
+        }
+
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", parserClassLoader)) {
@@ -96,7 +115,9 @@ public class LombokSupport {
                     emptyList(),
                     singletonList("lombok.patcher.Symbols")
             );
-            return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+            cachedParserClassLoader = parserClassLoader;
+            cachedShadowClassLoader = lombokShadowLoader;
+            return lombokShadowLoader;
         } finally {
             if (oldValue != null) {
                 System.setProperty("shadow.override.lombok", oldValue);

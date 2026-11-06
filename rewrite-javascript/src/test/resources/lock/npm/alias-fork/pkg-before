@@ -1,7 +1,0 @@
-{
-  "name": "alias-fork-fixture",
-  "version": "1.0.0",
-  "dependencies": {
-    "emoji-regex": "^10.3.0"
-  }
-}

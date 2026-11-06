@@ -23,6 +23,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 
+@CheckReturnValue
 public final class Assertions {
     private Assertions() {
     }

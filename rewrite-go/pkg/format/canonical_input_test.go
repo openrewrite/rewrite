@@ -69,7 +69,7 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 		return nil
 	})
 
-	var checked, changed int
+	var checked, changed, rebuilt int
 	var examples []string
 	kinds := map[string]int{}
 	kindExamples := map[string]string{}
@@ -101,18 +101,22 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 		}
 		checked++
 
-		var got string
+		var out java.Tree
 		switch pass {
 		case "all":
 			v := NewAutoFormatVisitor(nil)
-			out := v.Visit(cu, nil)
-			got = printer.Print(visitor.DrainAfterVisits(v, out.(java.Tree), nil))
+			out = visitor.DrainAfterVisits(v, v.Visit(cu, nil), nil)
 		case "mvs":
-			got = printer.Print(NewMinimumViableSpacingVisitor(nil).Visit(cu, nil))
+			out = NewMinimumViableSpacingVisitor(nil).Visit(cu, nil)
 		default:
-			got = printer.Print(NewDocCommentVisitor(nil).Visit(cu, nil))
+			out = NewDocCommentVisitor(nil).Visit(cu, nil)
 		}
+		got := printer.Print(out)
 		if got == src {
+			// A pass that leaves the layout as it was returns the tree it was given.
+			if out != java.Tree(cu) {
+				rebuilt++
+			}
 			continue
 		}
 		changed++
@@ -141,7 +145,7 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 			}
 		}
 	}
-	t.Logf("gofmtCleanFilesChecked=%d changed=%d", checked, changed)
+	t.Logf("gofmtCleanFilesChecked=%d changed=%d rebuilt=%d", checked, changed, rebuilt)
 	keys := make([]string, 0, len(kinds))
 	for k := range kinds {
 		keys = append(keys, k)
@@ -159,5 +163,8 @@ func canonicalInputUnchanged(t *testing.T, pass string) {
 	}
 	if changed > ceiling {
 		t.Errorf("rewrote %d already-canonical files, ceiling is %d", changed, ceiling)
+	}
+	if rebuilt > 0 {
+		t.Errorf("returned a new tree for %d already-canonical files it left as they were", rebuilt)
 	}
 }

@@ -20,11 +20,13 @@ namespace OpenRewrite.CSharp.Rpc;
 /// <summary>
 /// What a recipe bundle's publish output says about itself, read from the staging project's
 /// <c>Recipes.deps.json</c>: the NuGet package the staging project referenced, the version that
-/// resolved to, and the runtime assemblies that package contributed itself (as opposed to its
-/// transitive dependencies). Because all of this lives in the publish directory, a host can hand
-/// the directory back to a later server instance and have it loaded without a registry.
+/// resolved to, the runtime assemblies that package contributed itself (as opposed to its
+/// transitive dependencies), and the content hash of every package it was published from.
+/// Because all of this lives in the publish directory, a host can hand the directory back to a
+/// later server instance and have it loaded without a registry.
 /// </summary>
-internal sealed record PublishedBundle(string PackageName, string Version, HashSet<string> OwnAssemblyNames)
+internal sealed record PublishedBundle(string PackageName, string Version, HashSet<string> OwnAssemblyNames,
+    HashSet<string> PackageHashes)
 {
     public static PublishedBundle Read(string publishDir)
     {
@@ -65,6 +67,13 @@ internal sealed record PublishedBundle(string PackageName, string Version, HashS
                 ownAssemblyNames.Add(Path.GetFileNameWithoutExtension(assembly.Name));
             }
         }
-        return new PublishedBundle(packageName, version, ownAssemblyNames);
+        return new PublishedBundle(packageName, version, ownAssemblyNames, PackageHashesIn(depsJson.GetProperty("libraries")));
     }
+
+    internal static HashSet<string> PackageHashesIn(JsonElement libraries) =>
+        libraries.EnumerateObject()
+            .Where(library => library.Value.GetProperty("type").GetString() == "package")
+            // deps.json prefixes each hash with "sha512-", and project.assets.json doesn't.
+            .Select(library => library.Value.GetProperty("sha512").GetString()!.Replace("sha512-", ""))
+            .ToHashSet();
 }

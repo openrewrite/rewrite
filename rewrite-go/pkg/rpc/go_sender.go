@@ -117,7 +117,7 @@ func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// EOF space
-	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).EOF },
+	q.GetAndSend(cu, func(v any) any { return spaceRef(v.(*golang.CompilationUnit).EOF) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	return cu
 }
@@ -198,7 +198,7 @@ func (s *GoSender) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Element },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Dots },
+	q.GetAndSend(vr, func(v any) any { return spaceRef(v.(*golang.Variadic).Dots) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Postfix }, nil)
 	q.GetAndSend(vr, func(v any) any { return AsRef(v.(*golang.Variadic).Type) },
@@ -248,7 +248,7 @@ func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Indexed },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).OpenBracket },
+	q.GetAndSend(sl, func(v any) any { return spaceRef(v.(*golang.Slice).OpenBracket) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Low },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -256,14 +256,14 @@ func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Max },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).CloseBracket },
+	q.GetAndSend(sl, func(v any) any { return spaceRef(v.(*golang.Slice).CloseBracket) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	return sl
 }
 
 func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).OpenBracket },
+	q.GetAndSend(mt, func(v any) any { return spaceRef(v.(*golang.MapType).OpenBracket) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Key },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -531,7 +531,7 @@ func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Comm },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Colon },
+	q.GetAndSend(cc, func(v any) any { return spaceRef(v.(*golang.CommClause).Colon) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSendList(cc,
 		func(v any) []any {

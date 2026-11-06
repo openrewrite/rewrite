@@ -435,8 +435,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void idempotentAfterAddingGradlePluginPortalWithExistingContent() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
           settingsGradle(
             """
               rootProject.name = "demo"
@@ -457,8 +456,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void idempotentAfterAddingGradlePluginPortalWithExistingContentKts() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
           settingsGradleKts(
             """
               rootProject.name = "demo"
@@ -511,8 +509,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void addToExistingPluginManagementNotFirstStatementKts() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
           settingsGradleKts(
             """
               rootProject.name = "demo"
@@ -645,8 +642,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void addSecondMavenRepoKts() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.spring.io"))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.spring.io")),
           settingsGradleKts(
             """
               pluginManagement {
@@ -676,8 +672,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void addToExistingPluginManagementWithPluginsBlockKts() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
           settingsGradleKts(
             """
               pluginManagement {

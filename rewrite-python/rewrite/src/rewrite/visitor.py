@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TypeVar, Optional, Dict, List, Any, cast, Type, ClassVar, Generic, Generator
 
 from .execution import RecipeRunException
+from .heavyweight import Heavyweight
 from .markers import Marker, Markers
 from .tree import SourceFile, Tree
 from .utils import list_map
@@ -17,7 +18,7 @@ P = TypeVar('P')
 
 
 @dataclass(frozen=True)
-class Cursor:
+class Cursor(Heavyweight):
     parent: Optional[Cursor]
     value: object
     messages: Optional[Dict[str, object]] = None
@@ -25,7 +26,7 @@ class Cursor:
     ROOT_VALUE: ClassVar[str] = "root"
 
     def get_message(self, key: str, default_value: O) -> O:
-        return default_value if self.messages is None else cast(O, self.messages.get(key))
+        return default_value if self.messages is None else cast(O, self.messages.get(key, default_value))
 
     def put_message(self, key: str, value: object) -> None:
         messages = self.messages
@@ -98,7 +99,7 @@ class Cursor:
         return self.parent
 
 
-class TreeVisitor(ABC, Generic[T, P]):
+class TreeVisitor(Heavyweight, ABC, Generic[T, P]):
     _visit_count: int = 0
     _cursor: Cursor = Cursor(None, "root")
     _after_visit: Optional[List[TreeVisitor[Any, P]]] = None

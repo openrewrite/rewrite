@@ -41,7 +41,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void addsNpmOverrideForTransitive(@TempDir Path tempDir) {
         rewriteRun(
-                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("lodash", "^4.17.21", null)),
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("ms", "^2.1.3", null)),
                 npm(tempDir,
                         packageJson(
                                 "{\n" +
@@ -56,7 +56,21 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                                 "    \"express\": \"^4.18.0\"\n" +
                                 "  },\n" +
                                 "  \"overrides\": {\n" +
-                                "    \"lodash\": \"^4.17.21\"\n" +
+                                "    \"ms\": \"^2.1.3\"\n" +
+                                "  }\n" +
+                                "}\n")));
+    }
+
+    @Test
+    void addsNoOverrideForAPackageNotInTheTree(@TempDir Path tempDir) {
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("lodash", "^4.17.21", null)),
+                npm(tempDir,
+                        packageJson(
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"dependencies\": {\n" +
+                                "    \"express\": \"^4.18.0\"\n" +
                                 "  }\n" +
                                 "}\n")));
     }

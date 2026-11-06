@@ -34,7 +34,7 @@ final class NodeComparand {
                     "(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")" +
                     ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)$");
 
-    enum Op {
+    private enum Op {
         LT("<"), LTE("<="), GT(">"), GTE(">="), EQ("=");
 
         private final String symbol;
@@ -43,8 +43,6 @@ final class NodeComparand {
             this.symbol = symbol;
         }
     }
-
-    static final NodeComparand GTE_ZERO = new NodeComparand(Op.GTE, ParsedVersion.parse("0.0.0"));
 
     private final Op op;
 
@@ -97,10 +95,6 @@ final class NodeComparand {
 
     boolean isAny() {
         return version == null;
-    }
-
-    Op getOp() {
-        return op;
     }
 
     ParsedVersion getVersion() {

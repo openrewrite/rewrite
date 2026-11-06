@@ -111,7 +111,7 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
                             Cursor methodCursor = getCursor();
                             methodCalls.insertRow(ctx, new MethodCalls.Row(
                                     methodCursor.firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                                    methodCall.printTrimmed(methodCursor),
+                                    methodCall.printTrimmed(methodCursor.getParentOrThrow()),
                                     requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName(),
                                     methodCall.getMethodType().getName(),
                                     methodCall.getMethodType().getParameterTypes().stream().map(Object::toString)

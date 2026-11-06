@@ -17,6 +17,7 @@ package org.openrewrite.golang.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangVisitor;
@@ -55,7 +56,8 @@ public class AutoFormatVisitor<P> extends GolangVisitor<P> {
         if (tree == null) {
             return (J) defaultValue(null, p);
         }
-        return doFormat(tree, p, new Cursor(getCursor(), tree));
+        FormattingListener.beforeFormat(tree, stopAfter, getCursor());
+        return doFormat(tree, p, getCursor());
     }
 
     private J doFormat(Tree tree, P p, Cursor cursor) {

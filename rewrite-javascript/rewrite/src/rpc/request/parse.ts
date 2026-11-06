@@ -20,6 +20,7 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {withMetrics} from "./metrics";
 import * as path from "path";
+import {XmlParser} from "../../xml/parser";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
@@ -39,6 +40,8 @@ export class Parse {
         const fileName = path.basename(filePath);
         if (fileName === 'package.json') {
             return "packageJson";
+        } else if (XmlParser.accept(filePath)) {
+            return "xml";
         }
         return "javascript";
     }

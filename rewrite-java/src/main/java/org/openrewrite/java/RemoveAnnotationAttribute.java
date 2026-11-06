@@ -20,9 +20,13 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -90,10 +94,17 @@ public class RemoveAnnotationAttribute extends Recipe {
 
                     return arg;
                 }));
-                if (a != withoutAttribute &&
-                        withoutAttribute.getArguments() != null &&
-                        withoutAttribute.getArguments().size() == 1) {
-                    doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
+                if (a != withoutAttribute) {
+                    List<Expression> kept = withoutAttribute.getArguments() == null ?
+                            emptyList() : withoutAttribute.getArguments();
+                    for (Expression arg : a.getArguments()) {
+                        if (!kept.contains(arg)) {
+                            RemoveImport.namesReferencedBy(arg).forEach(this::maybeRemoveImport);
+                        }
+                    }
+                    if (kept.size() == 1) {
+                        doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
+                    }
                 }
                 return withoutAttribute;
             }

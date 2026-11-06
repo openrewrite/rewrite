@@ -94,9 +94,9 @@ public class DataTable<Row> {
      * <p>
      * When a {@link #withInstanceName(Supplier) lazy supplier} has been set,
      * it is evaluated on first access (after recipe options are populated).
-     * Otherwise, defaults to {@link #getDisplayName()}.
+     * Otherwise, defaults to {@link #displayName}.
      * <p>
-     * When no {@link #getGroup() group} is set, this name is used by the store
+     * When no {@link #group} is set, this name is used by the store
      * to identify the data table bucket. Also exposed in the GraphQL API.
      */
     public String getInstanceName() {

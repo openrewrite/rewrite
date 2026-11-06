@@ -44,7 +44,7 @@ def _replace_delegating(wrapper: T, wrapped_field: str, delegated: Tuple[str, ..
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Async(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -74,7 +74,7 @@ class Async(Py, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Shebang(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -104,7 +104,7 @@ class Shebang(Py, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Await(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -141,7 +141,7 @@ class Await(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Binary(Py, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -235,7 +235,7 @@ class Binary(Py, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ChainedAssignment(Py, Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -305,7 +305,7 @@ class ChainedAssignment(Py, Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ExceptionType(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -349,7 +349,7 @@ class ExceptionType(Py, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class LiteralType(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -386,7 +386,7 @@ class LiteralType(Py, Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeHint(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -423,7 +423,7 @@ class TypeHint(Py, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class CompilationUnit(Py, JavaSourceFile, SourceFile):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -539,7 +539,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ExpressionStatement(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     @property
@@ -570,7 +570,7 @@ class ExpressionStatement(Py, Expression, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ExpressionTypeTree(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -607,7 +607,7 @@ class ExpressionTypeTree(Py, Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class StatementExpression(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     @property
@@ -637,7 +637,7 @@ class StatementExpression(Py, Expression, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MultiImport(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -711,7 +711,7 @@ class MultiImport(Py, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class KeyValue(Py, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -781,7 +781,7 @@ class KeyValue(Py, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class DictLiteral(Py, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -849,7 +849,7 @@ class CollectionLiteral(Py, Expression, TypedTree):
         SET = 1
         TUPLE = 2
 
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -919,7 +919,7 @@ class CollectionLiteral(Py, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class FormattedString(Py, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -965,9 +965,9 @@ class FormattedString(Py, Expression, TypedTree):
             REPR = 1
             ASCII = 2
 
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> FormattedString.Value:
+        def with_id(self, id: int | UUID) -> FormattedString.Value:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1070,7 +1070,7 @@ class FormattedString(Py, Expression, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Pass(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1093,7 +1093,7 @@ class Pass(Py, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TrailingElseWrapper(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1162,7 +1162,7 @@ class ComprehensionExpression(Py, Expression):
         DICT = 2
         GENERATOR = 3
 
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1217,9 +1217,9 @@ class ComprehensionExpression(Py, Expression):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Condition(Py):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Condition:
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Condition:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1255,9 +1255,9 @@ class ComprehensionExpression(Py, Expression):
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
     @lst_dataclass
     class Clause(Py):
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Clause:
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Clause:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -1353,7 +1353,7 @@ class ComprehensionExpression(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeAlias(Py, Statement, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1434,7 +1434,7 @@ class TypeAlias(Py, Statement, TypedTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class YieldFrom(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1471,7 +1471,7 @@ class YieldFrom(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class UnionType(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1538,7 +1538,7 @@ class VariableScope(Py, Statement):
         GLOBAL = 0
         NONLOCAL = 1
 
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1601,7 +1601,7 @@ class VariableScope(Py, Statement):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Del(Py, Statement):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1661,7 +1661,7 @@ class SpecialParameter(Py, TypeTree):
         KWARGS = 0
         ARGS = 1
 
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1709,7 +1709,7 @@ class Star(Py, Expression, TypeTree):
         LIST = 0
         DICT = 1
 
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1753,7 +1753,7 @@ class Star(Py, Expression, TypeTree):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class NamedArgument(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1823,7 +1823,7 @@ class NamedArgument(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class TypeHintedExpression(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1867,7 +1867,7 @@ class TypeHintedExpression(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class ErrorFrom(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -1937,7 +1937,7 @@ class ErrorFrom(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class MatchCase(Py, Expression):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space
@@ -2022,9 +2022,9 @@ class MatchCase(Py, Expression):
             VALUE = 14
             WILDCARD = 15
 
-        _id: UUID
+        _id: int | UUID
 
-        def with_id(self, id: UUID) -> MatchCase.Pattern:
+        def with_id(self, id: int | UUID) -> MatchCase.Pattern:
             return replace_if_changed(self, _id=id)
 
         _prefix: Space
@@ -2107,7 +2107,7 @@ class MatchCase(Py, Expression):
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
 @lst_dataclass
 class Slice(Py, Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
 
 
     _prefix: Space

@@ -30,8 +30,8 @@ public class DeimplementInterface<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         maybeRemoveImport(fullyQualifiedInterfaceName);
-        return super.visitClassDeclaration(classDecl, p).withImplements(ListUtils.map(classDecl.getImplements(), impl ->
-                TypeUtils.isOfClassType(impl.getType(), fullyQualifiedInterfaceName) ? null : impl));
+        return super.visitClassDeclaration(classDecl, p).withImplements(ListUtils.filter(classDecl.getImplements(), impl ->
+                !TypeUtils.isOfClassType(impl.getType(), fullyQualifiedInterfaceName)));
     }
 
     @Override

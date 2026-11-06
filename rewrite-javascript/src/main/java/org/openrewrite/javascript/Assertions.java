@@ -30,6 +30,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
+import javax.annotation.CheckReturnValue;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +43,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 @SuppressWarnings({"unused", "DataFlowIssue"})
+@CheckReturnValue
 public class Assertions {
 
     private Assertions() {
