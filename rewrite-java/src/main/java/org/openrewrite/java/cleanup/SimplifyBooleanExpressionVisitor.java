@@ -385,6 +385,16 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
+        Object parent = getCursor().getParentTreeCursor().getValue();
+        // A method invocation can be a statement, but a boolean literal cannot. Visit the children
+        // first so that expressions in the select and arguments can still be simplified.
+        if (parent instanceof J.Block || parent instanceof J.If || parent instanceof J.If.Else ||
+            parent instanceof Loop || parent instanceof J.Label ||
+            parent instanceof J.ForLoop.Control &&
+            !method.isScope(((J.ForLoop.Control) parent).getCondition()) ||
+            parent instanceof J.Case && ((J.Case) parent).getStatements().stream().anyMatch(method::isScope)) {
+            return asMethod;
+        }
         Expression select = asMethod.getSelect();
         if (IS_EMPTY.matches(asMethod) &&
             select instanceof J.Literal &&
