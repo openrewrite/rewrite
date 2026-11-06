@@ -50,6 +50,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
     @ParameterizedTest
+    @ValueSource(strings = {"token", "base64", "username"})
+    void bunCannotForwardHostCredentialsWhenTheirOriginalAuthPathIsUnknown(String credential) {
+        AtomicInteger sent = new AtomicInteger();
+        NodeRegistry registry = new NodeRegistry("@proxy-control", "https://registry.invalid/private/",
+                "token".equals(credential) ? "synthetic-secret" : null,
+                "username".equals(credential) ? "synthetic-user" : null, null,
+                "base64".equals(credential) ? "c3ludGhldGljOnNlY3JldA==" : null, false, null, true, false);
+        NodeRegistries registries = new NodeRegistries(registry, Map.of("@proxy-control", registry), null, null, null);
+        BunRegistryManifests source = new BunRegistryManifests(registries, new NpmRegistryClient(r -> {
+            sent.incrementAndGet();
+            throw new IllegalStateException("synthetic sender boundary");
+        }));
+        assertThatThrownBy(() -> source.packument(registry.getUrl(), "@proxy-control/synthetic", false))
+                .isInstanceOf(CannotKnow.class).hasMessageContaining("credential path").hasMessageNotContaining("synthetic-secret");
+        assertThat(sent).hasValue(0);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"--proxy", "--https-proxy", "--network-timeout",
             "--install.proxy", "--install.https-proxy", "--install.network-timeout"})
     void commandStyleYarnRequestOptionsCannotDisappearBeforeTheLiveAdapter(String option) {
