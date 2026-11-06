@@ -174,12 +174,15 @@ public class JsonPathMatcher {
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
             if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
+                boolean wildcard = ctx.dotOperator().wildcard() != null;
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
                     JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
-                        if (result != null) {
+                        if (wildcard && result instanceof List) {
+                            results.addAll((List<Object>) result);
+                        } else if (result != null) {
                             results.add(result);
                         }
                     }
