@@ -436,6 +436,16 @@ public class UpdateJavaCompatibility extends Recipe {
         return version.substring(version.indexOf(".") + 1);
     }
 
+    private static boolean isJavaVersionConstant(J.FieldAccess fieldAccess) {
+        if ("majorVersion".equals(fieldAccess.getSimpleName()) && fieldAccess.getTarget() instanceof J.FieldAccess) {
+            return isJavaVersionConstant((J.FieldAccess) fieldAccess.getTarget());
+        }
+        Expression target = fieldAccess.getTarget();
+        String targetName = target instanceof J.Identifier ? ((J.Identifier) target).getSimpleName() :
+                target instanceof J.FieldAccess ? ((J.FieldAccess) target).getSimpleName() : null;
+        return "JavaVersion".equals(targetName) && fieldAccess.getSimpleName().startsWith("VERSION_");
+    }
+
     private Expression changeJavaVersion(Expression expression, @Nullable DeclarationStyle style) {
         String newJavaVersion = version <= 8 ? "1." + version : String.valueOf(version);
         String newJavaVersionEnum = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
@@ -466,6 +476,11 @@ public class UpdateJavaCompatibility extends Recipe {
             }
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+            if (!isJavaVersionConstant(fieldAccess)) {
+                // Versions.java, rootProject.ext.javaVersion and the like are the build's own properties, whose value
+                // is set elsewhere and which have no VERSION_N member to rename them to.
+                return expression;
+            }
             if (style == DeclarationStyle.String) {
                 expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
             } else if (style == DeclarationStyle.Enum) {
