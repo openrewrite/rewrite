@@ -895,6 +895,70 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticStarImportNextToImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      new A1().foo();
+                      stat();
+                  }
+              }
+              """,
+            """
+              import a.A2;
+
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      new A2().foo();
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticStarImportNextToUnusedImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """,
+            """
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void staticImports2() {
         rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
           java(

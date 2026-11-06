@@ -280,6 +280,22 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             } else if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) tree;
                 if (targetType instanceof JavaType.FullyQualified) {
+                    // The members a static star import of the original type brings in are now those of the target type,
+                    // so it is changed here already. Otherwise removing an import of the original type below would also
+                    // remove the static star import, as none of the members of the original type are used anymore.
+                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> {
+                        if (!i.isStatic() || !"*".equals(i.getQualid().getSimpleName()) ||
+                                !TypeUtils.fullyQualifiedNamesAreEqual(i.getTypeName(), originalType.getFullyQualifiedName())) {
+                            return i;
+                        }
+                        Cursor cursor = getCursor();
+                        setCursor(new Cursor(cursor, i));
+                        try {
+                            return visitAndCast(i, ctx, super::visitImport);
+                        } finally {
+                            setCursor(cursor);
+                        }
+                    }));
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic()) {
                             continue;
