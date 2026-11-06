@@ -247,20 +247,13 @@ with the name its binding carries after the move, whether or not the cursor reac
 
 ### Which name a rebind binds
 
-`to.alias` settles it when given. The move is refused where that name is taken, or where the binding
-shares its name with a module-scope value (below).
+`to.alias` settles it when given, or refuses the move where that name is taken.
 Otherwise a binding the source named itself — an aliased specifier,
 or a default, namespace or AMD binding, whose name never came from a member — keeps that name; an
 unaliased named specifier follows its member to the new name, since that is what the source would
 have written had it imported the member all along — but only where the file spells that name nowhere
 else, since a rename onto a name already in use would capture its references or be captured by them.
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
-The binding also keeps its name where a module-scope value has it too, as it can when the import binds
-only a type (`import type {X}; const X = 1`): renaming would also rename the value's reads, and
-`export {X}` exports both. A pinned alias other than that name refuses the move. A function declared
-in a block, and a `declare global` variable, count as module-scope here though in an ES module they
-are not. Scope can't yet tell their reads from the import's, so the binding keeps an alias it may not
-need.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
 moved binding is a value too. Outside the imports and `export {…}` clauses the file may spell it only
@@ -365,13 +358,12 @@ The four above that still apply, plus these:
 - `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
 - `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
-  rebind binds", or would rename a binding that shares its name with a module-scope value
+  rebind binds"
 - the file binds its modules with `require`, `from` is an ES import, and the move would need a new
   import, because that import binds something else too or the two differ in default/namespace/named shape
 
-One call moves one binding. Where a second binding of the same member has a name of its own, in
-another statement or beside it in one (`import {a, a as b}`), it is left as it stands: the name read
-from the first would bind twice if it were applied to both.
+One call moves one binding. Where a second statement binds the same member under a name of its own,
+it is left as it stands: the name read from the first would bind twice if it were applied to both.
 
 ## RPC Sender/Receiver
 

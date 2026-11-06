@@ -1205,7 +1205,6 @@ describe("maybeBind and type-only imports", () => {
     });
 
     test("a type-only request beside a type-only default import gets an import of its own", async () => {
-        // TypeScript rejects `import type R, {ReactElement}` (TS1363)
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = bindOnce({module: "react", member: "ReactElement", typeOnly: true}, bound);
@@ -1905,7 +1904,6 @@ describe("maybeRebind", () => {
     });
 
     test("a value import of a type keeps its name beside a destructured value of that name", async () => {
-        // Without `isolatedModules`, TypeScript lets an import that binds only a type share its name with a value
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
         //language=typescript

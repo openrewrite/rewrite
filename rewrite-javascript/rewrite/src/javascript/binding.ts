@@ -388,10 +388,10 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
 }
 
 /**
- * The name the moved binding takes, or undefined where a pinned alias can't be used as given:
- * it is taken, and renaming it would leave the caller's references unbound, or the binding shares
- * its name with a module-scope value, which another name would split it from.
- * The rule is CLAUDE.md: Which name a rebind binds.
+ * The name the moved binding takes, or undefined where a pinned alias cannot be bound verbatim,
+ * since deconflicting it would leave the references the caller emits unbound, or would split the
+ * binding from a value of the same name (`sharesNameWithValue`). The rule is
+ * CLAUDE.md: Which name a rebind binds.
  */
 function rebindingName(
     visitor: JavaScriptVisitor<any>,
@@ -416,13 +416,8 @@ function rebindingName(
 }
 
 /**
- * Whether a module-scope value has the import's name, as it can when the import binds only a type:
- * `import type {X} from "m"; const X = 1`. Renaming would also rename the value's reads, and
- * `export {X}` exports both, so the binding keeps its name.
- *
- * Scope also counts a function declared in a block and a `declare global` variable here, though
- * neither is module-scope in an ES module. The alias that keeps is sometimes unneeded, but safe:
- * scope can't yet tell their reads from the import's, so a rename would move those too.
+ * Whether a module-scope value shares the import's name, so the move keeps it as an alias:
+ * `import type {Old} from "m"; const Old = 1` becomes `import type {New as Old} from "m2"; const Old = 1`.
  */
 function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBinding): boolean {
     return !existing.viaRequire && valuesDeclaredAtTopLevel(cu).has(existing.localName);
