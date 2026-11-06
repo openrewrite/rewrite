@@ -1085,7 +1085,7 @@ public interface JavaType {
             List<JavaType> bounds = getBounds(), thatBounds = that.getBounds();
             return name.equals(that.name) && variance == that.variance &&
                    (variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty() ||
-                    !bounds.isEmpty() && bounds.equals(thatBounds));
+                    !bounds.isEmpty() && TypeUtils.isOfType(this, that));
         }
 
         @Override

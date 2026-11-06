@@ -1323,7 +1323,8 @@ public class TypeUtils {
         }
 
         public boolean isComparing(JavaType to, JavaType from) {
-            return Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
+            // Track active graph nodes without recursively comparing their potentially cyclic bounds.
+            return this.to == to && this.from == from ||
                     parent != null && parent.isComparing(to, from);
         }
 
