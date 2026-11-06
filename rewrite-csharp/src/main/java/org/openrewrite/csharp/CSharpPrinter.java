@@ -1339,8 +1339,8 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         List<JRightPadded<Statement>> init = control.getPadding().getInit();
         for (int i = 0; i < init.size(); i++) {
             visitForLoopControlStatement(init.get(i).getElement(), p);
+            visitSpace(init.get(i).getAfter(), p);
             if (i < init.size() - 1) {
-                visitSpace(init.get(i).getAfter(), p);
                 p.append(',');
             }
         }

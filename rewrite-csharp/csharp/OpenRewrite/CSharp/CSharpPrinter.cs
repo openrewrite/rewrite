@@ -1751,9 +1751,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             {
                 Visit(paddedInit.Element, p);
             }
+            VisitSpace(paddedInit.After, p);
             if (i < fl.LoopControl.Init.Count - 1)
             {
-                VisitSpace(paddedInit.After, p);
                 p.Append(',');
             }
         }
