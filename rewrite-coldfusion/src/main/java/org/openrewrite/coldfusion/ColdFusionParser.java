@@ -38,6 +38,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -124,7 +125,7 @@ public class ColdFusionParser implements Parser {
         for (Input input : all) {
             Path path = input.getRelativePath(relativeTo);
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
-                index.add(path, parse(path, is.readFully(), input.getFileAttributes(), is.getCharset(), is.isCharsetBomMarked()));
+                index.add(path, parse(path, text(path, is), input.getFileAttributes(), is.getCharset(), is.isCharsetBomMarked()));
             } catch (Throwable ignored) {
                 // a file that does not parse declares nothing, and its error is reported when it is parsed again
             }
@@ -135,7 +136,7 @@ public class ColdFusionParser implements Parser {
             parsingListener.startedParsing(input);
             Path path = input.getRelativePath(relativeTo);
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
-                String source = is.readFully();
+                String source = text(path, is);
                 Cf.CompilationUnit cu = TypeAttribution.attribute(
                         parse(path, source, input.getFileAttributes(), is.getCharset(), is.isCharsetBomMarked()), index);
                 if (inference != null) {
@@ -170,7 +171,7 @@ public class ColdFusionParser implements Parser {
                 Path path = input.getRelativePath(relativeTo);
                 Cf.CompilationUnit cu;
                 try (EncodingDetectingInputStream is = input.getSource(ctx)) {
-                    cu = TypeAttribution.attribute(parse(path, is.readFully(), input.getFileAttributes(), is.getCharset(),
+                    cu = TypeAttribution.attribute(parse(path, text(path, is), input.getFileAttributes(), is.getCharset(),
                             is.isCharsetBomMarked()), index);
                 } catch (Throwable ignored) {
                     // reported when the file is parsed again to be returned
@@ -255,7 +256,7 @@ public class ColdFusionParser implements Parser {
                 Path logical = Paths.get(logicalPath.isEmpty() ? relative : logicalPath + "/" + relative);
                 try (InputStream in = Files.newInputStream(file);
                      EncodingDetectingInputStream is = new EncodingDetectingInputStream(in)) {
-                    index.add(logical, parse(logical, is.readFully(), null, is.getCharset(), is.isCharsetBomMarked()));
+                    index.add(logical, parse(logical, text(logical, is), null, is.getCharset(), is.isCharsetBomMarked()));
                 } catch (Throwable ignored) {
                     // a component that does not parse declares nothing
                 }
@@ -263,6 +264,26 @@ public class ColdFusionParser implements Parser {
         }
         index.link();
         return index;
+    }
+
+    /**
+     * A file's text: its bytes after any byte order mark, decoded in the charset detected for them. Bytes that do not
+     * decode to text that encodes back to them are no CFML, as a zip archive or a template cfencode encrypted is not.
+     * Parsing one fails rather than printing other bytes back.
+     */
+    static String text(Path path, EncodingDetectingInputStream is) throws IOException {
+        ByteArrayOutputStream read = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        for (int n; (n = is.read(buffer, 0, buffer.length)) != -1; ) {
+            read.write(buffer, 0, n);
+        }
+        byte[] bytes = read.toByteArray();
+        Charset charset = is.getCharset();
+        String text = new String(bytes, charset);
+        if (!Arrays.equals(text.getBytes(charset), bytes)) {
+            throw new ColdFusionParsingException("not text in " + charset.name(), path.toString());
+        }
+        return text;
     }
 
     static Cf.CompilationUnit parse(Path path, String source, @Nullable FileAttributes fileAttributes,

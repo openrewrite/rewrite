@@ -1225,7 +1225,17 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         if (ctx.expression() != null) {
             expression = expression(ctx.expression());
         }
-        attributes = statementAttributes(ctx.statementAttribute());
+        attributes = new ArrayList<>(ctx.statementAttribute().size());
+        AttributeComma comma = null;
+        for (ParseTree child : ctx.children) {
+            if (child instanceof TerminalNode && ((TerminalNode) child).getSymbol().getType() == COMMA) {
+                comma = new AttributeComma(randomId(), sourceBefore(((TerminalNode) child).getSymbol()));
+            } else if (child instanceof StatementAttributeContext) {
+                Cf.TagAttribute attribute = statementAttribute((StatementAttributeContext) child);
+                attributes.add(comma == null ? attribute : attribute.withMarkers(attribute.getMarkers().add(comma)));
+                comma = null;
+            }
+        }
         J.Block body = ctx.bodyBlock() == null ? null : block(ctx.bodyBlock());
         return new Cf.ScriptTag(randomId(), prefix, Markers.EMPTY, identifier(Space.EMPTY, name.getText()), attributes,
                 expression, body);
@@ -1234,12 +1244,20 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     private JRightPadded<Statement> functionDeclaration(FunctionDeclarationContext ctx) {
         Space prefix = prefix(ctx.getStart());
         List<J.Modifier> modifiers = new ArrayList<>();
-        for (FunctionModifierContext modifier : ctx.functionModifier()) {
-            Token token = modifier.getStart();
-            Space modifierPrefix = sourceBefore(token);
-            modifiers.add(modifier(modifierPrefix, token.getText(), modifierType(token.getType())));
+        TypeTree returnType = null;
+        int returnTypePosition = 0;
+        for (ParseTree child : ctx.children) {
+            if (child instanceof FunctionModifierContext) {
+                Token token = ((FunctionModifierContext) child).getStart();
+                Space modifierPrefix = sourceBefore(token);
+                modifiers.add(modifier(modifierPrefix, token.getText(), modifierType(token.getType())));
+            } else if (child instanceof ReturnTypeContext) {
+                returnType = returnType((ReturnTypeContext) child);
+                returnTypePosition = modifiers.size();
+            } else if (child instanceof TerminalNode) {
+                break;
+            }
         }
-        TypeTree returnType = ctx.returnType() == null ? null : returnType(ctx.returnType());
         Token function = ctx.FUNCTION().getSymbol();
         FunctionKeyword keyword = new FunctionKeyword(randomId(), sourceBefore(function), function.getText());
         Token nameToken = ctx.anyWord().getStart();
@@ -1253,6 +1271,9 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         DeclarationAttributes attributes = declarationAttributes(headerAttributes(ctx.headerAttribute()),
                 LanguageAttributes.FUNCTION, "returntype", true, returnType != null);
         attributes.markers.add(0, keyword);
+        if (returnType != null && returnTypePosition < modifiers.size()) {
+            attributes.markers.add(new ReturnTypePosition(randomId(), returnTypePosition));
+        }
         J.Block body = ctx.block() == null ? null : block(ctx.block());
         J.MethodDeclaration method = new J.MethodDeclaration(randomId(), prefix, Markers.build(attributes.markers),
                 attributes.annotations, modifiers, null, returnType != null ? returnType : attributes.type,
@@ -1361,26 +1382,30 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     private List<Cf.TagAttribute> statementAttributes(List<StatementAttributeContext> contexts) {
         List<Cf.TagAttribute> attributes = new ArrayList<>(contexts.size());
         for (StatementAttributeContext ctx : contexts) {
-            Space prefix = prefix(ctx.getStart());
-            int start = start(ctx.getStart());
-            Token last = ctx.getStart();
-            for (ParseTree child : ctx.children) {
-                Token token = child instanceof TerminalNode ? ((TerminalNode) child).getSymbol() : ((ParserRuleContext) child).getStop();
-                if (token.getType() == ASSIGN) {
-                    break;
-                }
-                last = token;
-            }
-            skip(last);
-            J.Identifier name = identifier(Space.EMPTY, source.substring(start, cursor));
-            JLeftPadded<Expression> value = null;
-            if (ctx.ASSIGN() != null) {
-                Space beforeEquals = sourceBefore(ctx.ASSIGN().getSymbol());
-                value = new JLeftPadded<>(beforeEquals, expression(ctx.ternaryExpression()), Markers.EMPTY);
-            }
-            attributes.add(new Cf.TagAttribute(randomId(), prefix, Markers.EMPTY, name, value));
+            attributes.add(statementAttribute(ctx));
         }
         return attributes;
+    }
+
+    private Cf.TagAttribute statementAttribute(StatementAttributeContext ctx) {
+        Space prefix = prefix(ctx.getStart());
+        int start = start(ctx.getStart());
+        Token last = ctx.getStart();
+        for (ParseTree child : ctx.children) {
+            Token token = child instanceof TerminalNode ? ((TerminalNode) child).getSymbol() : ((ParserRuleContext) child).getStop();
+            if (token.getType() == ASSIGN) {
+                break;
+            }
+            last = token;
+        }
+        skip(last);
+        J.Identifier name = identifier(Space.EMPTY, source.substring(start, cursor));
+        JLeftPadded<Expression> value = null;
+        if (ctx.ASSIGN() != null) {
+            Space beforeEquals = sourceBefore(ctx.ASSIGN().getSymbol());
+            value = new JLeftPadded<>(beforeEquals, expression(ctx.ternaryExpression()), Markers.EMPTY);
+        }
+        return new Cf.TagAttribute(randomId(), prefix, Markers.EMPTY, name, value);
     }
 
     private Cf.TagAttribute namedAttribute(NamedAttributeContext ctx) {

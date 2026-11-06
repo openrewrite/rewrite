@@ -30,12 +30,16 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+
+import static java.util.Collections.singletonList;
 
 /**
  * The packages ForgeBox, CommandBox's registry, serves. Each version downloads once into a cache and unpacks there,
@@ -43,6 +47,7 @@ import java.util.zip.ZipInputStream;
  */
 public final class ForgeBoxPackages {
     public static final String FORGEBOX = "https://www.forgebox.io/api/v1";
+    private static final String GITHUB = "https://github.com/";
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
@@ -116,9 +121,51 @@ public final class ForgeBoxPackages {
             if ("forgeboxStorage".equals(url)) {
                 url = data(registry + "/storage/" + encode(slug) + "/" + encode(number)).asText();
             }
-            unpack(url, directory);
+            String repository = gitHubRepository(url);
+            if (repository != null) {
+                unpackGitHub(repository, directory);
+            } else if (!unpack(url, directory, false)) {
+                throw new IllegalStateException("Downloading " + url + " answered 404");
+            }
         }
         return new Installed(slug, number, installPath(slug, entry.path("typeSlug").asText(""), directory), directory);
+    }
+
+    /**
+     * The GitHub repository a download names as CommandBox writes one, {@code owner/repo} with a {@code #ref} or not,
+     * or null. CommandBox takes a download with no colon and two names around a slash as one, or one written
+     * {@code github:owner/repo}.
+     */
+    private static @Nullable String gitHubRepository(String download) {
+        String repository = download.regionMatches(true, 0, "github:", 0, 7) ? download.substring(7) : download;
+        if (repository.indexOf(':') >= 0 || repository.startsWith("@")) {
+            return null;
+        }
+        StringBuilder names = new StringBuilder();
+        int count = 0;
+        for (String name : repository.trim().split("/")) {
+            if (!name.isEmpty()) {
+                names.append(count++ == 0 ? "" : "/").append(name);
+            }
+        }
+        return count == 2 ? names.toString() : null;
+    }
+
+    /**
+     * Unpacks a GitHub repository at its ref, as CommandBox installs one: it clones the repository and checks out the
+     * ref, or {@code master}, else {@code main}, when there is none. GitHub's archive of a ref holds the same files,
+     * in one directory named for the repository and the ref.
+     */
+    private void unpackGitHub(String repository, Path directory) {
+        int hash = repository.indexOf('#');
+        String path = hash < 0 ? repository : repository.substring(0, hash);
+        List<String> refs = hash < 0 ? Arrays.asList("master", "main") : singletonList(repository.substring(hash + 1));
+        for (String ref : refs) {
+            if (unpack(GITHUB + path + "/archive/" + ref + ".zip", directory, true)) {
+                return;
+            }
+        }
+        throw new IllegalStateException("GitHub has no archive of " + path + " at " + String.join(" or ", refs));
     }
 
     /**
@@ -217,18 +264,30 @@ public final class ForgeBoxPackages {
 
     /**
      * Unpacks a package's zip beside its directory and moves it into place, so a directory in the cache is complete or
-     * absent, and another process unpacking the same version at the same time loses the race harmlessly.
+     * absent, and another process unpacking the same version at the same time loses the race harmlessly. A zip that
+     * holds the package in one directory has that directory left out. Returns false when there is no zip at the URL.
      */
-    private void unpack(String url, Path directory) {
+    private boolean unpack(String url, Path directory, boolean inOneDirectory) {
         Path unpacking = directory.resolveSibling(directory.getFileName() + ".unpacking-" + System.nanoTime());
         try (HttpSender.Response response = http.get(url).withConnectTimeout(TIMEOUT).withReadTimeout(TIMEOUT).send()) {
+            if (response.getCode() == 404) {
+                return false;
+            }
             if (!response.isSuccessful()) {
                 throw new IllegalStateException("Downloading " + url + " answered " + response.getCode());
             }
             Files.createDirectories(unpacking);
             try (InputStream body = response.getBody(); ZipInputStream zip = new ZipInputStream(body)) {
                 for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-                    Path target = unpacking.resolve(entry.getName()).normalize();
+                    String name = entry.getName();
+                    if (inOneDirectory) {
+                        int slash = name.indexOf('/');
+                        if (slash < 0 || slash == name.length() - 1) {
+                            continue;
+                        }
+                        name = name.substring(slash + 1);
+                    }
+                    Path target = unpacking.resolve(name).normalize();
                     if (!target.startsWith(unpacking)) {
                         continue;
                     }
@@ -245,6 +304,7 @@ public final class ForgeBoxPackages {
             } catch (FileAlreadyExistsException | DirectoryNotEmptyException raced) {
                 // another process unpacked the same version first
             }
+            return true;
         } catch (IOException e) {
             throw new UncheckedIOException("Unpacking " + url + " into " + directory, e);
         } finally {
