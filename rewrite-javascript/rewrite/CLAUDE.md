@@ -277,10 +277,30 @@ A caller that renames references itself defeats this: the name it writes in is t
 wants, so the collision check sees it as taken and the binding keeps an alias instead. Drop such a
 pass rather than run it alongside.
 
+### The member's other spellings
+
+A named member is spelled through its module as well as through a binding of it, and those spellings
+move with it: `NS.Old` where `NS` is a module object the file binds at module scope (`import * as NS`,
+`import NS = require`, `const NS = require`, `const NS = await import`), wherever it is read, as a type,
+a value, a call, a `new` or a JSX tag; `import("m").Old`, with `typeof` too; and `export {Old} from "m"`,
+which keeps the name it publishes as `export {New as Old}`, while `export {Old as X}` becomes `export {New as X}`. They move when the binding does, and also where
+nothing binds `from`, which still answers `undefined` since no binding moved. A move refused for the
+binding renames none of them, so the file is never left half-moved.
+
+A module object keeps naming `from`'s module, so `NS.Old` moves only within one module. An `import()`
+type and a re-export spell their module and move it too. A re-export that re-exports something else as
+well leaves that behind: the moved specifier joins a re-export of `to` of the same kind (`export type`
+or not) where the file has one, as a moved import joins an import of `to`, and otherwise takes a
+statement of its own right after the one it left. A statement it empties goes.
+
+A default import is left alone: `D.Old` reads a property of the default export, which is the member
+only where the default is the module object, as `export =` typings make it.
+
 ### What a rebind's attribution follows
 
 Moving an ES import renames every type in the file that names what moved, following each type's
-signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+signature but not a class's members. So does a move that only renames a member's spellings through
+its module, since nothing binds `from`, once it renames one. An AMD dependency swap rewrites no attribution. Names follow
 the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
 function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
 declared beside a moved member keeps the old name.
@@ -351,7 +371,7 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 The four above that still apply, plus these:
 
-- nothing binds `from`
+- nothing binds `from` (its spellings through the module still move; see "The member's other spellings")
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out
