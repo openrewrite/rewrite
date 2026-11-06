@@ -74,6 +74,7 @@ import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings("JSUnusedLocalSymbols")
 class JavaScriptRewriteRpcTest implements RewriteTest {
@@ -132,6 +133,35 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
               }
               """,
             spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @Test
+    void runXmlRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.xml.change-attribute",
+              Map.of("key", "controllerName", "value", "my.app.controller.Home"))),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <%@ page contentType="text/html" %>
+              <mvc:View controllerName="my.app.controller.Main" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                  <!-- page -->
+                  <Page title='&amp;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+              </mvc:View>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <%@ page contentType="text/html" %>
+              <mvc:View controllerName="my.app.controller.Home" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                  <!-- page -->
+                  <Page title='&amp;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+              </mvc:View>
+              """,
+            spec -> spec.path("webapp/view/Main.view.xml")
           )
         );
     }
