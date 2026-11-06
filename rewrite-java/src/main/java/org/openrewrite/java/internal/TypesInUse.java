@@ -84,7 +84,8 @@ public class TypesInUse {
      *       inner-class segment). {@link #hasTypeInPackage} and {@link #hasTypeInPackageOrSubpackage}
      *       check these.</li>
      *   <li>{@code alias*} — the canonical form of an inner-class FQN ({@code $} replaced with
-     *       {@code .}) ends here. Lets {@link #hasType} match either form against
+     *       {@code .}), or of a .NET generic FQN without its arity ({@code List`1} as {@code List}),
+     *       ends here. Lets {@link #hasType} match either form against
      *       {@link TypeUtils#fullyQualifiedNamesAreEqual} semantics without confusing package-shape
      *       queries.</li>
      * </ul>
@@ -380,7 +381,8 @@ public class TypesInUse {
      * twice when it contains {@code $}: once raw (so {@code com.foo.Outer$Inner} is the three
      * segments {@code [com, foo, Outer$Inner]}, with the inner-class boundary preserved for
      * package-shape queries) and once as a canonical alias ({@code [com, foo, Outer, Inner]}, so
-     * exact-FQN lookups by either form land on the same terminating node).
+     * exact-FQN lookups by either form land on the same terminating node). A .NET generic FQN also
+     * gets an alias without its arities.
      * <p>
      * Each node tracks four visibility bits — leaf vs alias, each with explicit vs implicit —
      * plus a descendant-explicit/-implicit rollup that propagates only on the raw insertion path,
@@ -400,8 +402,8 @@ public class TypesInUse {
         private final Node root = new Node();
 
         /**
-         * Insert {@code fqn} as a real leaf at its raw path. If it contains {@code $}, additionally
-         * insert the canonicalized path as an alias leaf so {@link #hasFqn} answers either form.
+         * Insert {@code fqn} as a real leaf at its raw path. If it contains {@code $} or an arity,
+         * additionally insert the canonicalized path as an alias leaf so {@link #hasFqn} answers either form.
          */
         void insert(String fqn, boolean explicit) {
             if (fqn.isEmpty()) {
@@ -411,6 +413,24 @@ public class TypesInUse {
             if (fqn.indexOf('$') >= 0) {
                 insertPath(fqn.replace('$', '.'), explicit, true);
             }
+            if (fqn.indexOf('`') >= 0) {
+                insertPath(withoutArity(fqn.replace('$', '.')), explicit, true);
+            }
+        }
+
+        private static String withoutArity(String fqn) {
+            StringBuilder name = new StringBuilder(fqn.length());
+            for (int i = 0; i < fqn.length(); i++) {
+                char c = fqn.charAt(i);
+                if (c == '`') {
+                    while (i + 1 < fqn.length() && Character.isDigit(fqn.charAt(i + 1))) {
+                        i++;
+                    }
+                } else {
+                    name.append(c);
+                }
+            }
+            return name.toString();
         }
 
         private void insertPath(String path, boolean explicit, boolean alias) {

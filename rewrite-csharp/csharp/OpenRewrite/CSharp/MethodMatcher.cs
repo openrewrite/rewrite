@@ -43,6 +43,7 @@ namespace OpenRewrite.CSharp;
 public class MethodMatcher
 {
     private readonly Regex _declaringTypePattern;
+    private readonly bool _declaringTypeNamesArity;
     private readonly Regex _methodNamePattern;
     private readonly ArgumentMatcher[] _argMatchers;
     private readonly bool _matchOverrides;
@@ -54,6 +55,7 @@ public class MethodMatcher
         var (declaringType, methodName, args) = ParsePattern(methodPattern);
 
         _declaringTypePattern = GlobToRegex(declaringType);
+        _declaringTypeNamesArity = declaringType.Contains('`');
         _methodNamePattern = GlobToRegex(methodName);
 
         if (args == "..")
@@ -141,7 +143,7 @@ public class MethodMatcher
         if (fqn == null)
             return true;
 
-        if (_declaringTypePattern.IsMatch(fqn))
+        if (MatchesDeclaringTypePattern(fqn))
             return true;
 
         // Check supertypes if matchOverrides is enabled
@@ -155,12 +157,15 @@ public class MethodMatcher
         return false;
     }
 
+    private bool MatchesDeclaringTypePattern(string fqn) =>
+        _declaringTypePattern.IsMatch(_declaringTypeNamesArity ? fqn : TypeUtils.WithoutArity(fqn));
+
     private bool MatchesTypeHierarchy(JavaType.Class cls, HashSet<string> seen)
     {
         if (!seen.Add(cls.FullyQualifiedName))
             return false;
 
-        if (_declaringTypePattern.IsMatch(cls.FullyQualifiedName))
+        if (MatchesDeclaringTypePattern(cls.FullyQualifiedName))
             return true;
 
         var super = TypeUtils.AsClass(cls.Supertype);
@@ -308,10 +313,12 @@ public class MethodMatcher
     {
         private readonly Regex _pattern;
         private readonly Regex? _fqnPattern;
+        private readonly bool _namesArity;
 
         public TypeArgMatcher(Regex pattern, string originalGlob)
         {
             _pattern = pattern;
+            _namesArity = originalGlob.Contains('`');
             // If the pattern is a C# keyword, also match the fully-qualified name
             if (KeywordToFqn.TryGetValue(originalGlob, out var fqn))
                 _fqnPattern = GlobToRegex(fqn);
@@ -322,6 +329,7 @@ public class MethodMatcher
             var fqn = TypeUtils.GetFullyQualifiedName(paramType);
             if (fqn != null)
             {
+                if (!_namesArity) fqn = TypeUtils.WithoutArity(fqn);
                 if (_pattern.IsMatch(fqn)) return true;
                 if (_fqnPattern != null && _fqnPattern.IsMatch(fqn)) return true;
 

@@ -30,6 +30,7 @@ public class AttributeMatcher
 {
     private readonly string _simpleName;
     private readonly string? _fullyQualifiedName;
+    private readonly bool _namesArity;
 
     /// <summary>
     /// Create an <see cref="AttributeMatcher"/> from an attribute name pattern.
@@ -38,6 +39,7 @@ public class AttributeMatcher
     /// </summary>
     public AttributeMatcher(string pattern)
     {
+        _namesArity = pattern.Contains('`');
         // If the pattern contains a dot, treat it as fully qualified
         var lastDot = pattern.LastIndexOf('.');
         if (lastDot >= 0)
@@ -62,7 +64,8 @@ public class AttributeMatcher
         var type = TypeUtils.AsClass(annotation.Type);
         if (type != null)
         {
-            var fqn = NormalizeAttributeName(type.FullyQualifiedName);
+            var fqn = NormalizeAttributeName(
+                _namesArity ? type.FullyQualifiedName : TypeUtils.WithoutArity(type.FullyQualifiedName));
             if (_fullyQualifiedName != null)
                 return string.Equals(fqn, _fullyQualifiedName, StringComparison.Ordinal);
 
@@ -109,21 +112,24 @@ public class AttributeMatcher
     }
 
     /// <summary>
-    /// Strip the conventional <c>Attribute</c> suffix from a C# attribute name.
+    /// Strip the conventional <c>Attribute</c> suffix from a C# attribute name, keeping the arity
+    /// that follows it in a generic attribute's name (<c>N.GenAttribute`1</c> becomes <c>N.Gen`1</c>).
     /// </summary>
     internal static string NormalizeAttributeName(string name)
     {
         const string suffix = "Attribute";
-        if (!name.EndsWith(suffix, StringComparison.Ordinal))
+        var tick = name.LastIndexOf('`');
+        var end = tick > name.LastIndexOfAny(['.', '$']) ? tick : name.Length;
+        if (!name.AsSpan(0, end).EndsWith(suffix, StringComparison.Ordinal))
             return name;
 
         // For FQNs, only strip the suffix from the last segment
-        var lastDot = name.LastIndexOf('.');
-        var segment = lastDot >= 0 ? name[(lastDot + 1)..] : name;
+        var lastDot = name.LastIndexOf('.', end - 1);
+        var segmentLength = end - (lastDot + 1);
 
         // Don't strip if the segment IS "Attribute" (nothing would remain)
-        return segment.Length > suffix.Length
-            ? name[..^suffix.Length]
+        return segmentLength > suffix.Length
+            ? name[..(end - suffix.Length)] + name[end..]
             : name;
     }
 }

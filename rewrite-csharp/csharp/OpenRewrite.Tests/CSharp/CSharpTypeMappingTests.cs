@@ -82,6 +82,111 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task GenericTypesAreNamedWithTheirArity()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            namespace N
+            {
+                class ResultBase { }
+                class ResultBase<TResult> : ResultBase { }
+                class Outer<T> { public class Inner { } }
+                class Test
+                {
+                    void M()
+                    {
+                        ResultBase<int> generic = null;
+                        Outer<int>.Inner nested = null;
+                    }
+                }
+            }
+            """);
+
+        var generic = Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Parameterized>(
+            FindVariableDeclaration(cu, "generic")!.TypeExpression?.Type).Type);
+        Assert.Equal("N.ResultBase`1", generic.FullyQualifiedName);
+        Assert.Equal("N.ResultBase", Assert.IsType<JavaType.Class>(generic.Supertype).FullyQualifiedName);
+
+        Assert.Equal("N.Outer`1$Inner",
+            TypeUtils.GetFullyQualifiedName(FindVariableDeclaration(cu, "nested")!.TypeExpression?.Type));
+    }
+
+    [Fact]
+    public async Task NamesMatchGenericTypesWithOrWithoutArity()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            namespace N
+            {
+                class GenAttribute<T> : System.Attribute { }
+                [Gen<int>]
+                class Test
+                {
+                    void M()
+                    {
+                        List<int> list = new List<int>();
+                        list.Add(1);
+                    }
+                }
+            }
+            """);
+
+        Assert.True(TypeUtils.IsOfClassType(
+            FindVariableDeclaration(cu, "list")!.TypeExpression?.Type, "System.Collections.Generic.List"));
+        Assert.True(new MethodMatcher("System.Collections.Generic.List Add(..)")
+            .Matches(FindFirst<MethodInvocation>(cu)!));
+        Assert.True(new AttributeMatcher("N.Gen").Matches(FindFirst<Annotation>(cu)!));
+        Assert.NotSame(cu, new OpenRewrite.Java.Search.UsesType("System.Collections.Generic.List")
+            .Visit(cu, new OpenRewrite.Core.ExecutionContext()));
+
+        Assert.True(new AttributeMatcher("N.Gen`1").Matches(FindFirst<Annotation>(cu)!));
+    }
+
+    [Fact]
+    public async Task ArityKeepsGenericAndNonGenericTypesApart()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            namespace N
+            {
+                class Box { }
+                class Box<T> { }
+                class Test
+                {
+                    void M()
+                    {
+                        Box plain = null;
+                        Box<int> generic = null;
+                        List<Box> plains = null;
+                        List<Box<int>> generics = null;
+                    }
+                }
+            }
+            """);
+        JavaType? TypeOf(string name) => FindVariableDeclaration(cu, name)!.TypeExpression?.Type;
+
+        Assert.False(TypeUtils.IsOfClassType(TypeOf("plain"), "N.Box`1"));
+        Assert.False(TypeUtils.IsAssignableTo(TypeOf("generic"), TypeOf("plain")));
+        Assert.False(TypeUtils.IsAssignableTo(TypeOf("generics"), TypeOf("plains")));
+    }
+
+    private static T? FindFirst<T>(CompilationUnit cu) where T : class, J
+    {
+        var finder = new FirstFinder<T>();
+        finder.Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
+        finder.Visit(cu, 0);
+        return finder.Found;
+    }
+
+    private class FirstFinder<T> : CSharpVisitor<int> where T : class, J
+    {
+        public T? Found { get; private set; }
+
+        public override J? Visit(OpenRewrite.Core.Tree? tree, int p)
+        {
+            if (Found == null && tree is T t) Found = t;
+            return base.Visit(tree, p);
+        }
+    }
+
+    [Fact]
     public async Task GenericClassField_HasParameterizedTypeWithGenericTypeVariables()
     {
         // A class with type parameters and a field whose type references them.
@@ -287,7 +392,7 @@ public class CSharpTypeMappingTests : RewriteTest
         var declType = varDecl!.TypeExpression?.Type;
         Assert.NotNull(declType);
         var paramType = Assert.IsType<JavaType.Parameterized>(declType);
-        Assert.Equal("System.Nullable", TypeUtils.GetFullyQualifiedName(paramType.Type));
+        Assert.Equal("System.Nullable`1", TypeUtils.GetFullyQualifiedName(paramType.Type));
         Assert.NotNull(paramType.TypeParameters);
         Assert.Single(paramType.TypeParameters!);
         Assert.IsType<JavaType.Primitive>(paramType.TypeParameters[0]);
@@ -384,7 +489,7 @@ public class CSharpTypeMappingTests : RewriteTest
 
         var declType = varDecl!.TypeExpression?.Type;
         var paramType = Assert.IsType<JavaType.Parameterized>(declType);
-        Assert.Equal("System.Nullable", TypeUtils.GetFullyQualifiedName(paramType.Type));
+        Assert.Equal("System.Nullable`1", TypeUtils.GetFullyQualifiedName(paramType.Type));
         Assert.NotNull(paramType.TypeParameters);
         var innerType = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
         Assert.Equal("Bar", innerType.FullyQualifiedName);
@@ -494,7 +599,7 @@ public class CSharpTypeMappingTests : RewriteTest
             or "add_Changed" or "remove_Changed");
 
         var items = Assert.Single(holderType.Methods!, m => m.Name == "Items");
-        Assert.Equal("System.Collections.Generic.List",
+        Assert.Equal("System.Collections.Generic.List`1",
             Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Parameterized>(items.ReturnType).Type)
                 .FullyQualifiedName);
 

@@ -40,7 +40,31 @@ class ExactTypeNameMatcher implements TypeNameMatcher {
 
     @Override
     public boolean matches(String typeName) {
-        return TypeUtils.fullyQualifiedNamesAreEqual(pattern, typeName);
+        return TypeUtils.fullyQualifiedNamesAreEqual(pattern, typeName) || matchesAnyArity(pattern, typeName);
+    }
+
+    /**
+     * A .NET generic type's name ends in its arity ({@code System.Collections.Generic.List`1}).
+     * A pattern written without any arity matches every arity.
+     */
+    private static boolean matchesAnyArity(String pattern, String typeName) {
+        return typeName.length() > pattern.length() && typeName.indexOf('`') >= 0 &&
+               TypeUtils.fullyQualifiedNamesAreEqual(pattern, withoutArity(typeName));
+    }
+
+    private static String withoutArity(String typeName) {
+        StringBuilder name = new StringBuilder(typeName.length());
+        for (int i = 0; i < typeName.length(); i++) {
+            char c = typeName.charAt(i);
+            if (c == '`') {
+                while (i + 1 < typeName.length() && Character.isDigit(typeName.charAt(i + 1))) {
+                    i++;
+                }
+            } else {
+                name.append(c);
+            }
+        }
+        return name.toString();
     }
 
     @Override

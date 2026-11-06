@@ -50,7 +50,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         _fullyQualifiedTypeName = fullyQualifiedTypeName;
         var lastDot = fullyQualifiedTypeName.LastIndexOf('.');
         _namespace = lastDot > 0 ? fullyQualifiedTypeName[..lastDot] : null;
-        _typeName = lastDot > 0 ? fullyQualifiedTypeName[(lastDot + 1)..] : fullyQualifiedTypeName;
+        _typeName = TypeUtils.WithoutArity(lastDot > 0 ? fullyQualifiedTypeName[(lastDot + 1)..] : fullyQualifiedTypeName);
         _onlyIfReferenced = onlyIfReferenced;
     }
 
@@ -354,7 +354,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             if (string.Equals(identifier.SimpleName, simpleName, StringComparison.Ordinal)
                 && !(Cursor.ParentTree.Value is FieldAccess parent && ReferenceEquals(parent.Name.Element, identifier))
                 && (TypeUtils.GetFullyQualifiedName(identifier.Type) is not { Length: > 0 } resolved
-                    || string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal)))
+                    || TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName)))
             {
                 Found = true;
             }
@@ -462,7 +462,7 @@ public static class AddUsing
             if (!Shadowed
                 && string.Equals(name, simpleName, StringComparison.Ordinal)
                 && TypeUtils.GetFullyQualifiedName(type) is { Length: > 0 } resolved
-                && !string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal))
+                && !TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName))
             {
                 Shadowed = true;
             }

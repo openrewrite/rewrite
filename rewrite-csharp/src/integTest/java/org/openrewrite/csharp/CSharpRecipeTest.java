@@ -350,6 +350,56 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
+    void findGenericTypesByNameWithoutArity() {
+        String project = """
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net9.0</TargetFramework>
+            </PropertyGroup>
+          </Project>
+          """;
+        String source = """
+          using System.Collections.Generic;
+          class Foo {
+              void Test(List<int> list) {
+                  list.Add(1);
+              }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("System.Collections.Generic.List", null)),
+          csproj(project),
+          csharp(
+            source,
+            """
+              using System.Collections.Generic;
+              class Foo {
+                  void Test(/*~~>*/List<int> list) {
+                      list.Add(1);
+                  }
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("System.Collections.Generic.List Add(..)", null)),
+          csproj(project),
+          csharp(
+            source,
+            """
+              using System.Collections.Generic;
+              class Foo {
+                  void Test(List<int> list) {
+                      /*~~>*/list.Add(1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void deleteMethodArgument() {
         rewriteRun(
           spec -> spec

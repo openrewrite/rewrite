@@ -69,6 +69,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<CSharpRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
     /**
+     * The revision of what {@link #dependencyTypes} returns. It changes whenever types enumerated by an
+     * earlier revision no longer fit the types the parser maps, so a cache of them should key on it.
+     * From revision 2, a generic type's name ends in its arity ({@code System.Collections.Generic.List`1}).
+     */
+    public static final int DEPENDENCY_TYPES_REVISION = 2;
+
+    /**
      * The command used to start the RPC process. Useful for logging and diagnostics.
      */
     private final String command;
