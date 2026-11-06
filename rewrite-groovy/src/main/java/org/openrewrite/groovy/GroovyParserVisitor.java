@@ -2511,14 +2511,16 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitIfElse(IfStatement ifElse) {
-            Space fmt = sourceBefore("if");
-            J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
-                    JRightPadded.build((Expression) doVisit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
-            JRightPadded<Statement> then = maybeSemicolon(doVisit(ifElse.getIfBlock()));
-            J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
-                    new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
-                            maybeSemicolon(doVisit(ifElse.getElseBlock())));
-            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_));
+            queue.add(labeled(ifElse, () -> {
+                Space fmt = sourceBefore("if");
+                J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                        JRightPadded.build((Expression) doVisit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
+                JRightPadded<Statement> then = maybeSemicolon(doVisit(ifElse.getIfBlock()));
+                J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+                        new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
+                                maybeSemicolon(doVisit(ifElse.getElseBlock())));
+                return new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_);
+            }));
         }
 
         @Override
