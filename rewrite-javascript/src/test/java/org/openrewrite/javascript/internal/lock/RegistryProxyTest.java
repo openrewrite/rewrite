@@ -57,7 +57,7 @@ class RegistryProxyTest {
         String npm = host.userNpmrcWithNetwork(HostInputs.GLOBAL_AND_USER);
         String pnpm = host.userPnpmrc(HostInputs.USER, false);
         assertThat(npm).contains("noproxy=", "npm.test").doesNotContain("pnpm.test", "http-proxy=", "HOST_SECRET", "3456");
-        assertThat(pnpm).contains("no-proxy=", "pnpm.test", "http-proxy=", "2345").doesNotContain("npm.test", "HOST_SECRET", "3456");
+        assertThat(pnpm).contains("no-proxy=", "pnpm.test", "http-proxy=", "2345").doesNotContain("noproxy=", "HOST_SECRET", "3456");
     }
 
     @ParameterizedTest
