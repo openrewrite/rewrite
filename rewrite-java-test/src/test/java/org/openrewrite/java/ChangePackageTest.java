@@ -2437,6 +2437,10 @@ class ChangePackageTest implements RewriteTest {
                   void test(String somepkg) {
                       int len = somepkg.length();
                   }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
+                  }
               }
               """,
             """
@@ -2453,6 +2457,10 @@ class ChangePackageTest implements RewriteTest {
 
                   void test(String somepkg) {
                       int len = somepkg.length();
+                  }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
                   }
               }
               """
