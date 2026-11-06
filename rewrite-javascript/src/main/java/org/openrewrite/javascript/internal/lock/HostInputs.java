@@ -188,7 +188,7 @@ public class HostInputs {
             npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
             npmrcCredentials(npmrc, scoped.getValue(), keys);
         }
-        NodeRegistries others = projectCredentials();
+        NodeRegistries others = projectCredentials(scopes);
         for (NodeRegistry other : others.all()) {
             npmrcCredentials(npmrc, other, keys);
         }
@@ -212,7 +212,7 @@ public class HostInputs {
             yarnrcEntry(entries, registry, keys);
         }
         List<NodeRegistry> others = new ArrayList<>(user.getByScope().values());
-        others.addAll(projectCredentials().all());
+        others.addAll(projectCredentials(GLOBAL_AND_USER).all());
         for (NodeRegistry other : others) {
             if (hasCredentials(other) && !keys.contains(yarnrcKey(other))) {
                 yarnrcEntry(entries, other, keys);
@@ -278,9 +278,12 @@ public class HostInputs {
 
     // the host's credentials for every registry the npmrc files name, the project's registry lines only, since the
     // package manager reads that file's own credentials and always-auth where it reads it
-    private NodeRegistries projectCredentials() {
+    private NodeRegistries projectCredentials(Set<NpmrcScope> scopes) {
         List<Npmrc> files = new ArrayList<>();
         for (Npmrc file : npmrc) {
+            if (file.getScope() != NpmrcScope.Project && !scopes.contains(file.getScope())) {
+                continue;
+            }
             files.add(file.getScope() == NpmrcScope.Project ? registriesOnly(file) : withoutGlobalAlwaysAuth(file));
         }
         return RegistryDiscovery.discover(registries, credentials, files, system);

@@ -290,6 +290,18 @@ class NpmRegistryClientTest {
                 });
     }
 
+    @Test
+    void anAuthenticatedResponseCannotSatisfyAnAnonymousRequest() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(200, "{\"versions\":{}}");
+        sender.enqueueStatus(401);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        client.getPackumentText(registry().withAuthToken("synthetic-user"), "private-package", false);
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "private-package", false))
+          .isInstanceOfSatisfying(NodeRegistryException.class, e -> assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED));
+        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
+    }
+
     static final class StubHttpSender implements HttpSender {
         final List<Request> requests = new ArrayList<>();
         final Deque<Supplier<Response>> responses = new ArrayDeque<>();
