@@ -3431,6 +3431,45 @@ describe("maybeRebind and import attributes", () => {
         ));
     });
 
+    test("the target's name is taken where its import carries other attributes", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {New} from "m2" with {type: "json"};
+            import {Old} from "m";
+
+            Old(New);`,
+            `
+            import {New} from "m2" with {type: "json"};
+            import {New as Old} from "m2";
+
+            Old(New);`
+        ));
+        expect(bound.name).toBe("Old");
+    });
+
+    test("the target's name is free where its import carries the same attributes", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {New} from "m2" with {type: "json"};
+            import {Old} from "m" with {type: "json"};
+
+            Old(New);`,
+            `
+            import {New} from "m2" with {type: "json"};
+
+            New(New);`
+        ));
+        expect(bound.name).toBe("New");
+    });
+
     test("members of one import moved to one module end up in one import with its attributes", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
