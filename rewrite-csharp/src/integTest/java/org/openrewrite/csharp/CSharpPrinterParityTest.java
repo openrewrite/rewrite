@@ -744,6 +744,7 @@ class CSharpPrinterParityTest {
               for (;;) { break; }
               for (x = 0, x++; ; ) break;
               for ( ; x < 3 ; x++ ) continue;
+              for (x = 0 , x++ ; x < 3; ) { }
 
               foreach (var item in xs) { }
               foreach (int item in xs)

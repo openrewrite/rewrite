@@ -4028,6 +4028,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var empty = new Empty(Tree.RandomId(), firstSemiPrefix, Markers.Empty);
             init.Add(new JRightPadded<Statement>(empty, Space.Empty, Markers.Empty));
         }
+        else
+        {
+            init[^1] = init[^1].WithAfter(firstSemiPrefix);
+        }
 
         // Parse condition
         Expression? condExpr = null;
