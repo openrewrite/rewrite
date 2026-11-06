@@ -185,7 +185,8 @@ public class DotNetBuildContext
     /// their relative path structure. LST documents are printed at this point.
     /// Entries excluded or superseded by LSTs are not validated or written. All remaining
     /// paths are validated before any directories or files are created. Paths must be
-    /// portable relative paths, without backslashes, drive prefixes or parent segments.
+    /// relative paths without drive prefixes or parent segments. Native Windows separators
+    /// are accepted on Windows; backslashes on other hosts are rejected conservatively.
     /// This provides lexical containment, not symlink or filesystem race protection.
     /// </summary>
     /// <param name="rootDir">The directory to write files into.</param>
@@ -233,14 +234,14 @@ public class DotNetBuildContext
         }
     }
 
-    private static string ResolveDestination(string root, string relativePath)
+    internal static string ResolveDestination(string root, string relativePath)
     {
         // Check Windows syntax on every host as well as the host's own rooted syntax.
         if (string.IsNullOrWhiteSpace(relativePath) || relativePath.Contains('\0') ||
-            relativePath.Contains('\\') || relativePath.Contains(':') ||
-            relativePath.StartsWith('/') || Path.IsPathRooted(relativePath) ||
-            relativePath.Split('/').Contains(".."))
-            throw new ArgumentException("Captured build file path must be a portable relative path without parent segments.", nameof(relativePath));
+            (!OperatingSystem.IsWindows() && relativePath.Contains('\\')) || relativePath.Contains(':') ||
+            relativePath.Replace('\\', '/').StartsWith('/') || Path.IsPathRooted(relativePath) ||
+            relativePath.Replace('\\', '/').Split('/').Contains(".."))
+            throw new ArgumentException("Captured build file path must be a supported relative path without parent segments.", nameof(relativePath));
 
         var destination = Path.GetFullPath(Path.Combine(root, relativePath));
         var prefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;

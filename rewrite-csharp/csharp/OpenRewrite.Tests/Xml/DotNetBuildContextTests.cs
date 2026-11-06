@@ -53,18 +53,39 @@ public class DotNetBuildContextTests : IDisposable
     [InlineData("C:/outside.props")]
     [InlineData("C:outside.props")]
     [InlineData(@"\\server\share\outside.props")]
-    [InlineData(@"nested\file.props")]
+    [InlineData(@"nested\..\outside.props")]
     [InlineData("nested/../outside.props")]
     [InlineData("")]
     [InlineData("bad\0.props")]
-    public void RejectsInvalidSnapshot(string path)
+    public void RejectsInvalidDestinationWithoutFilesystemWrites(string path)
     {
-        var context = new DotNetBuildContext();
-        context.Capture("safe.props", "safe");
-        context.Capture(path, "unsafe");
         var root = Path.Combine(temp, "root");
-        Assert.Throws<ArgumentException>(() => context.MaterializeAll(root));
+        Assert.Throws<ArgumentException>(() => DotNetBuildContext.ResolveDestination(root, path));
         Assert.False(Directory.Exists(root));
+    }
+
+
+    [Theory]
+    [InlineData("disk")]
+    [InlineData("document")]
+    [InlineData("scan")]
+    public void MaterializesNativeNestedCapturePaths(string capture)
+    {
+        const string content = "<Project><!-- native path --></Project>";
+        var path = Path.Combine("nested space", "Build.props");
+        var context = new DotNetBuildContext();
+        if (capture == "disk") context.Capture(path, content);
+        else if (capture == "document") context.CaptureIfBuildFile(new XmlParser().Parse(content, path));
+        else
+        {
+            var source = Path.Combine(temp, "source");
+            Directory.CreateDirectory(Path.Combine(source, "nested space"));
+            File.WriteAllText(Path.Combine(source, path), content);
+            context.CaptureFromDisk(source);
+        }
+        var root = Path.Combine(temp, "root");
+        context.MaterializeAll(root);
+        Assert.Equal(content, File.ReadAllText(Path.Combine(root, path)));
     }
 
     [Fact]
