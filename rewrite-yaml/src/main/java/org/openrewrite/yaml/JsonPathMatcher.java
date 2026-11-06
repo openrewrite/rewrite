@@ -262,8 +262,8 @@ public class JsonPathMatcher {
             // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
+            boolean wildcard = ctx.dotOperator().wildcard() != null;
             if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
-                boolean wildcard = ctx.dotOperator().wildcard() != null;
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
                     JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, false);
@@ -278,6 +278,10 @@ public class JsonPathMatcher {
                 }
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
+            } else if (wildcard) {
+                List<Object> descendants = new ArrayList<>();
+                collectDescendants(scope, descendants);
+                return getResultFromList(descendants);
             } else {
                 JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, scope, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
@@ -489,6 +493,19 @@ public class JsonPathMatcher {
                 return children(((Yaml.Sequence.Entry) node).getBlock());
             }
             return Collections.emptyList();
+        }
+
+        private static void collectDescendants(@Nullable Object node, List<Object> descendants) {
+            if (node instanceof List) {
+                for (Object o : (List<?>) node) {
+                    collectDescendants(o, descendants);
+                }
+                return;
+            }
+            for (Object child : children(node)) {
+                descendants.add(child);
+                collectDescendants(child, descendants);
+            }
         }
 
         @Override

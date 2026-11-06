@@ -346,6 +346,41 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void scopedRecursiveWildcardSelectsEveryDescendant() {
+        assertMatched(
+          "$.a..*",
+          List.of(
+            """
+              a:
+                b: 1
+                c:
+                  d: 2
+                l:
+                  - x: y
+                  - z
+              other: 3
+              """
+          ),
+          List.of(
+            "b: 1",
+            "d: 2",
+            """
+              c:
+                d: 2
+              """,
+            "x: y",
+            "x: y",
+            "z",
+            """
+              l:
+                - x: y
+                - z
+              """
+          )
+        );
+    }
+
+    @Test
     void indexAfterWildcardIndexesTheWildcardResults() {
         assertMatched(
           "$.root.*[0]",
