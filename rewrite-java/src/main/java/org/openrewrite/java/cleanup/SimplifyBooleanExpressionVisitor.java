@@ -404,8 +404,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             Expression arg = asMethod.getArguments().get(0);
             if (arg instanceof J.Literal && select instanceof J.Literal) {
                 return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
-            } else if (SemanticallyEqual.areEqual(select, arg)) {
-                return booleanLiteral(method, true);
             }
         }
         return j;

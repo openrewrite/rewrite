@@ -120,6 +120,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         ));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"next().equals(next())"})
+    void preserveStringSelfEqualsEvaluation(String expression) {
+        rewriteRun(groovy(
+          """
+            class A {
+                String value;
+                String next() { return value; }
+                boolean f(String value, A holder, String[] values, int index) {
+                    return %s;
+                }
+            }
+            """.formatted(expression)
+        ));
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
