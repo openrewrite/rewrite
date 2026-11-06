@@ -16,7 +16,18 @@
 import {emptyMarkers} from "../markers";
 import {randomId} from "../uuid";
 import {Cursor} from "../tree";
-import {detectIndent, emptySpace, getMemberKeyName, isArray, isLiteral, isMember, isObject, Json, rightPadded, space} from "./tree";
+import {
+    detectIndent,
+    emptySpace,
+    getMemberKeyName,
+    isArray,
+    isLiteral,
+    isMember,
+    isObject,
+    Json,
+    rightPadded,
+    space
+} from "./tree";
 
 /**
  * Pure, immutable helpers for reading and editing JSON objects while keeping a document's formatting.
@@ -102,7 +113,6 @@ export function toPlain(json: Json): unknown {
             try {
                 return JSON.parse(json.source);
             } catch {
-                // a JSON5 literal, such as a hexadecimal number
             }
         }
         return json.value;
@@ -127,15 +137,16 @@ export function toPlain(json: Json): unknown {
 }
 
 /**
- * The member keys from the document root down to the cursor. Array elements on the way contribute no step.
+ * The member keys from the document root down to the cursor, or `undefined` if a key on the way can't be read.
+ * Array elements on the way contribute no step.
  */
-export function pathOf(cursor: Cursor): string[] {
+export function pathOf(cursor: Cursor): string[] | undefined {
     const path: string[] = [];
     for (const value of cursor.asArray()) {
         if (value?.kind === Json.Kind.Member) {
             const key = getMemberKeyName(value as Json.Member);
             if (key === undefined) {
-                return [];
+                return undefined;
             }
             path.unshift(key);
         }
@@ -149,7 +160,7 @@ export function pathOf(cursor: Cursor): string[] {
  * The value is placed after the colon with the spacing already there: the replaced value's, or a sibling's.
  * A new member copies its indentation from the sibling it is placed next to; in an object without members,
  * it is laid out by {@link SetMemberOptions.indent} and {@link SetMemberOptions.depth}.
- * To change only the formatting or markers of a value, use {@link updateMember}.
+ * To change only the formatting or markers of a value, use {@link updateMember}, which keeps the prefix it is given.
  */
 export function setMember(obj: Json.Object, key: string, value: Json.Value, options: SetMemberOptions = {}): Json.Object {
     const index = indexOfMember(obj, key);
@@ -197,7 +208,8 @@ export function setMember(obj: Json.Object, key: string, value: Json.Value, opti
 }
 
 /**
- * Replaces the value of an existing member with what `fn` makes of it, after the same space as the old value.
+ * Replaces the value of an existing member with what `fn` makes of it. A value that `fn` derives from the old one
+ * keeps the prefix `fn` gives it; a new value without a prefix is placed after the same space as the old value.
  */
 export function updateMember(obj: Json.Object, key: string, fn: (old: Json.Value) => Json.Value): Json.Object {
     const index = indexOfMember(obj, key);
@@ -206,7 +218,11 @@ export function updateMember(obj: Json.Object, key: string, fn: (old: Json.Value
     }
     const existing = obj.members[index].element as Json.Member;
     const value = fn(existing.value);
-    return value === existing.value ? obj : withElementAt(obj, index, {...existing, value: withPrefix(value, existing.value.prefix)});
+    if (value === existing.value) {
+        return obj;
+    }
+    const placed = value.id !== existing.value.id && isEmptySpace(value.prefix) ? withPrefix(value, existing.value.prefix) : value;
+    return withElementAt(obj, index, {...existing, value: placed});
 }
 
 /**
@@ -219,19 +235,23 @@ export function removeMember(obj: Json.Object, key: string): Json.Object {
         return obj;
     }
     const removed = obj.members[index];
+    const removedMember = removed.element as Json.Member;
+    const kept = commentsEndingPreviousLine(removedMember.prefix);
+    const keep = (to: Json.Space) => withLeadingComments(removedMember.prefix.whitespace, kept, to);
     const elements = obj.members.filter((_, i) => i !== index);
     const present = elements.filter(m => m.element.kind !== Json.Kind.Empty);
 
     if (present.length === 0) {
         const closing = elements.length > 0 ? elements[elements.length - 1].after : removed.after;
-        return {...obj, members: [rightPadded<Json>(emptyElement(), closing)]};
+        return {...obj, members: [rightPadded<Json>(emptyElement(), keep(closing))]};
     }
-    if (index === 0 && isMember(elements[0].element)) {
-        const next = elements[0].element;
-        elements[0] = {...elements[0], element: withLeadingWhitespace(next, leadingWhitespace(removed.element as Json.Member))};
-    }
-    if (index === elements.length) {
-        elements[index - 1] = {...elements[index - 1], after: removed.after};
+    if (index < elements.length) {
+        const next = elements[index].element;
+        const element = kept.length > 0 ? {...next, prefix: keep(next.prefix)} :
+            index === 0 && isMember(next) ? withLeadingWhitespace(next, leadingWhitespace(removedMember)) : next;
+        elements[index] = {...elements[index], element};
+    } else {
+        elements[index - 1] = {...elements[index - 1], after: keep(removed.after)};
     }
     return {...obj, members: elements};
 }
@@ -362,6 +382,10 @@ function withElementAt(obj: Json.Object, index: number, element: Json.Member): J
     return {...obj, members: elements};
 }
 
+function isEmptySpace(s: Json.Space): boolean {
+    return s.whitespace === "" && s.comments.length === 0;
+}
+
 function withPrefix<T extends Json>(json: T, prefix: Json.Space): T {
     return json.prefix === prefix ? json : {...json, prefix};
 }
@@ -381,12 +405,41 @@ function newMember(key: string, value: Json.Value, prefix: Json.Space, keyAfter:
     };
 }
 
+/**
+ * Whether two values hold the same data: literals that decode to the same value, arrays with the same elements
+ * in the same order, and objects with the same members in any order.
+ */
 function sameData(a: Json.Value, b: Json.Value): boolean {
     if (a === b) {
         return true;
     }
-    const plain = toPlain(a);
-    return plain !== undefined && JSON.stringify(plain) === JSON.stringify(toPlain(b));
+    if (isLiteral(a) && isLiteral(b)) {
+        const plain = toPlain(a);
+        return plain === toPlain(b) && (typeof plain !== "number" || sameInteger(a.source, b.source));
+    }
+    if (isArray(a) && isArray(b)) {
+        const as = a.values.map(v => v.element).filter(v => v.kind !== Json.Kind.Empty);
+        const bs = b.values.map(v => v.element).filter(v => v.kind !== Json.Kind.Empty);
+        return as.length === bs.length && as.every((v, i) => sameData(v, bs[i]));
+    }
+    if (isObject(a) && isObject(b)) {
+        const as = members(a);
+        const bs = members(b);
+        return as.length === bs.length && as.every(m => {
+            const key = getMemberKeyName(m);
+            const other = key === undefined ? undefined : member(b, key);
+            return other !== undefined && sameData(m.value, other.value);
+        });
+    }
+    return false;
+}
+
+/**
+ * Integers beyond double precision decode to the same number, so their sources are compared exactly.
+ */
+function sameInteger(a: string, b: string): boolean {
+    const integer = /^-?\d+$/;
+    return !integer.test(a) || !integer.test(b) || BigInt(a) === BigInt(b);
 }
 
 /**
@@ -422,6 +475,30 @@ function splitTrailingComment(after: Json.Space, following: string): { trailing?
     return {
         trailing: {kind: Json.Kind.Space, whitespace: after.whitespace, comments: [{...comment, suffix: following}]},
         closing: rest.length === 0 ? space(comment.suffix) : {kind: Json.Kind.Space, whitespace: comment.suffix, comments: rest}
+    };
+}
+
+/**
+ * The comments at the start of a member's prefix that end the line before it, such as one after the previous
+ * member's comma. They describe what comes before the member, so they stay when it is removed.
+ */
+function commentsEndingPreviousLine(prefix: Json.Space): Json.Comment[] {
+    if (prefix.whitespace.includes("\n")) {
+        return [];
+    }
+    const end = prefix.comments.findIndex(c => c.suffix.includes("\n"));
+    return end < 0 ? [] : prefix.comments.slice(0, end + 1);
+}
+
+function withLeadingComments(whitespace: string, comments: Json.Comment[], to: Json.Space): Json.Space {
+    if (comments.length === 0) {
+        return to;
+    }
+    const last = comments.length - 1;
+    return {
+        kind: Json.Kind.Space,
+        whitespace,
+        comments: [...comments.slice(0, last), {...comments[last], suffix: to.whitespace}, ...to.comments]
     };
 }
 

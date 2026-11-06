@@ -32,6 +32,7 @@ import {
     removeMember,
     setAt,
     setMember,
+    space,
     toPlain,
     updateAt,
     updateMember,
@@ -339,6 +340,21 @@ describe("setMember", () => {
         expect(objectEdit).toBe(obj);
     });
 
+    test("leaves an object that holds the same members in another order", async () => {
+        // given
+        const obj = root(await parse(`{"cfg": {"a": 1, "b": 2}}`));
+
+        // when
+        const edited = setMember(obj, "cfg", fromPlain({b: 2, a: 1}, "  "));
+
+        // then
+        expect(edited).toBe(obj);
+    });
+
+    test("replaces an integer that differs only beyond double precision", async () => {
+        expect(await editRoot(`{"v": 9007199254740993}`, obj => setMember(obj, "v", literal(9007199254740992)))).toBe(`{"v": 9007199254740992}`);
+    });
+
     test("keeps a trailing comma", async () => {
         expect(await editRoot(`{
   "a": 1,
@@ -454,6 +470,59 @@ describe("removeMember", () => {
 
         // then
         expect(removeMember(obj, "d")).toBe(obj);
+    });
+
+    test("keeps a comment on the line of the member before a removed last one", async () => {
+        expect(await editRoot(`{
+  "a": 1, // about a
+  // about b
+  "b": 2
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1 // about a
+}`);
+    });
+
+    test("keeps a comment on the line of the member before a removed middle one", async () => {
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "b": 2,
+  "c": 3
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1, // about a
+  "c": 3
+}`);
+    });
+
+    test("keeps a comment on the line of the opening brace", async () => {
+        expect(await editRoot(`{ // config
+  "a": 1,
+  "b": 2
+}`, obj => removeMember(obj, "a"))).toBe(`{ // config
+  "b": 2
+}`);
+        expect(await editRoot(`{ // config
+  "a": 1
+}`, obj => removeMember(obj, "a"))).toBe(`{ // config
+}`);
+    });
+
+    test("keeps a comment on the line of the member before one removed before a trailing comma", async () => {
+        expect(await editRoot(`{
+  "a": 1, // about a
+  "b": 2,
+}`, obj => removeMember(obj, "b"))).toBe(`{
+  "a": 1, // about a
+}`);
+    });
+});
+
+describe("updateMember", () => {
+    test("keeps the prefix that fn gives the value", async () => {
+        expect(await editRoot(`{"a": 1}`, obj => updateMember(obj, "a", v => ({...v, prefix: space("   ")})))).toBe(`{"a":   1}`);
+    });
+
+    test("places a new value after the old value's prefix", async () => {
+        expect(await editRoot(`{"a":  1}`, obj => updateMember(obj, "a", () => literal(2)))).toBe(`{"a":  2}`);
     });
 });
 
@@ -601,7 +670,7 @@ class AddPrivate extends Recipe {
         return new class extends JsonVisitor<ExecutionContext> {
             protected override async visitObject(obj: Json.Object, ctx: ExecutionContext): Promise<Json | undefined> {
                 const visited = await super.visitObject(obj, ctx) as Json.Object;
-                if (pathOf(this.cursor).length !== 0) {
+                if (pathOf(this.cursor)?.length !== 0) {
                     return visited;
                 }
                 return removeMember(setMember(visited, "private", literal(true)), "jest");
@@ -631,7 +700,7 @@ describe("in a recipe", () => {
 
     test("pathOf gives the member keys down to the cursor", async () => {
         // given
-        const paths: string[][] = [];
+        const paths: (string[] | undefined)[] = [];
         const visitor = new class extends JsonVisitor<ExecutionContext> {
             protected override async visitLiteral(lit: Json.Literal, ctx: ExecutionContext): Promise<Json | undefined> {
                 if (lit.value === "x") {
@@ -646,5 +715,28 @@ describe("in a recipe", () => {
 
         // then
         expect(paths).toEqual([["a", "b"], ["a", "c"]]);
+    });
+
+    test("pathOf is undefined below a key it can't read", async () => {
+        // given
+        const doc = await parse(`{"a": {"b": "x"}}`);
+        const a = member(root(doc), "a")!;
+        const unreadable = {...a, key: {...a.key, element: {...a.key.element, kind: Json.Kind.Empty}}} as unknown as Json.Member;
+        const edited = {...doc, value: {...root(doc), members: [{...root(doc).members[0], element: unreadable}]}} as Json.Document;
+        const paths: (string[] | undefined)[] = [];
+        const visitor = new class extends JsonVisitor<ExecutionContext> {
+            protected override async visitLiteral(lit: Json.Literal, ctx: ExecutionContext): Promise<Json | undefined> {
+                if (lit.value === "x") {
+                    paths.push(pathOf(this.cursor));
+                }
+                return lit;
+            }
+        };
+
+        // when
+        await visitor.visit(edited, new ExecutionContext());
+
+        // then
+        expect(paths).toEqual([undefined]);
     });
 });
