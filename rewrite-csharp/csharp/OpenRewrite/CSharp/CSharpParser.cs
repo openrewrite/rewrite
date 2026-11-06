@@ -332,7 +332,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -505,7 +505,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -579,7 +579,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -9635,16 +9635,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var after = _pendingSemicolonSpace;
         _pendingSemicolonSpace = Space.Empty;
         return new JRightPadded<Statement>(s, after, Markers.Empty);
-    }
-
-    /// <summary>
-    /// Wraps an ExternAlias in JRightPadded, consuming any pending semicolon space into After.
-    /// </summary>
-    private JRightPadded<ExternAlias> PadExternAlias(ExternAlias ea)
-    {
-        var after = _pendingSemicolonSpace;
-        _pendingSemicolonSpace = Space.Empty;
-        return new JRightPadded<ExternAlias>(ea, after, Markers.Empty);
     }
 
     /// <summary>

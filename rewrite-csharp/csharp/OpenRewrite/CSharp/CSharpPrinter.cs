@@ -109,9 +109,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
-            // AnnotatedStatement: delegate to inner statement
+            // AnnotatedStatement and Label: delegate to inner statement
             case AnnotatedStatement ann:
                 PrintStatementTerminator(ann.Statement, p);
+                break;
+            case Label label:
+                PrintStatementTerminator(label.Statement, p);
                 break;
 
             // FieldAccess used as statement (like event accessor declarations)
@@ -1716,7 +1719,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(label.LabelName.After, p);
         p.Append(':');
         Visit(label.Statement, p);
-        PrintStatementTerminator(label.Statement, p);
+        // PrintStatementTerminator prints the statement's ';' after the space that pads the label
         AfterSyntax(label, p);
         return label;
     }

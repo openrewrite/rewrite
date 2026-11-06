@@ -100,6 +100,8 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
             }
         } else if (statement instanceof Cs.AnnotatedStatement) {
             printStatementTerminator(((Cs.AnnotatedStatement) statement).getStatement(), p);
+        } else if (statement instanceof J.Label) {
+            printStatementTerminator(((J.Label) statement).getStatement(), p);
         }
     }
 
@@ -1321,7 +1323,6 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
         beforeSyntax(label, p);
         visitRightPadded(label.getPadding().getLabel(), ":", p);
         visit(label.getStatement(), p);
-        printStatementTerminator(label.getStatement(), p);
         afterSyntax(label, p);
         return label;
     }
