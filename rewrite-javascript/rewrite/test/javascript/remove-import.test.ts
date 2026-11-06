@@ -48,6 +48,29 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('should keep the attributes of an import it removes a member from', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "b"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import D, {a, b} from 'm' with {type: 'json'};
+                        import {b as c} from 'n' assert {type: 'json'};
+
+                        D(a, c);
+                    `,
+                    `
+                        import D, {a} from 'm' with {type: 'json'};
+                        import {b as c} from 'n' assert {type: 'json'};
+
+                        D(a, c);
+                    `
+                )
+            );
+        });
+
         test('should remove named import with string literal module export name', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("./styles.module.css", "link-a"));

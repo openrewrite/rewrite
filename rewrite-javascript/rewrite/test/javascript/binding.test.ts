@@ -3304,6 +3304,158 @@ describe("maybeRebind adds no alias the file doesn't need", () => {
     });
 });
 
+describe("maybeRebind and import attributes", () => {
+    test("a binding joins no import of the target whose attributes differ, and keeps its own", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import type {Old} from "m" with {"resolution-mode": "require"};
+                import type {Other} from "m2" with {"resolution-mode": "import"};
+
+                let a: Old;
+                let b: Other;`,
+                `
+                import type {New} from "m2" with {"resolution-mode": "require"};
+                import type {Other} from "m2" with {"resolution-mode": "import"};
+
+                let a: New;
+                let b: Other;`
+            ),
+            //language=typescript
+            typescript(
+                `
+                import {Old} from "m" with {type: "json"};
+                import {Other} from "m2";
+
+                Old;
+                Other;`,
+                `
+                import {New} from "m2" with {type: "json"};
+                import {Other} from "m2";
+
+                New;
+                Other;`
+            ),
+            //language=typescript
+            typescript(
+                `
+                import {Old} from "m";
+                import {Other} from "m2" with {type: "json"};
+
+                Old;
+                Other;`,
+                `
+                import {New} from "m2";
+                import {Other} from "m2" with {type: "json"};
+
+                New;
+                Other;`
+            )
+        );
+    });
+
+    test("the legacy assert and with spell different attributes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Old} from "m" assert {type: "json"};
+            import {Other} from "m2" with {type: "json"};
+
+            Old;
+            Other;`,
+            `
+            import {New} from "m2" assert {type: "json"};
+            import {Other} from "m2" with {type: "json"};
+
+            New;
+            Other;`
+        ));
+    });
+
+    test("the same attributes, spelled differently, still join", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Old} from "m" with {"type": 'json', extra: "x"};
+            import {Other} from "m2" with { extra: 'x', type: "json" };
+
+            Old;
+            Other;`,
+            `
+            import {New, Other} from "m2" with { extra: 'x', type: "json" };
+
+            New;
+            Other;`
+        ));
+    });
+
+    test("a binding leaving a statement that binds other names takes its attributes along", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Old, Kept} from "m" with {type: "json"};
+
+            Old;
+            Kept;`,
+            `
+            import {Kept} from "m" with {type: "json"};
+            import {New} from "m2" with {type: "json"};
+
+            New;
+            Kept;`
+        ));
+    });
+
+    test("a binding that changes shape keeps its attributes in the statement that replaces its own", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {}, {module: "m"});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import Old from "m" with {type: "json"};
+
+            Old;`,
+            `
+            import {New as Old} from "m2" with {type: "json"};
+
+            Old;`
+        ));
+    });
+
+    test("members of one import moved to one module end up in one import with its attributes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "A"}, to: {module: "m2", member: "A"}});
+                maybeRebind(this, {from: {module: "m", member: "B"}, to: {module: "m2", member: "B"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {A, B} from "m" with {type: "json"};
+
+            A;
+            B;`,
+            `
+            import {A, B} from "m2" with {type: "json"};
+
+            A;
+            B;`
+        ));
+    });
+});
+
 function dropModule(module: string, member?: string) {
     return new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {

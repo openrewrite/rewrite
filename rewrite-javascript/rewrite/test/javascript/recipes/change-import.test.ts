@@ -231,6 +231,35 @@ describe("change-import", () => {
             }, { unsafeCleanup: true });
         });
 
+        test("joins no import of the target module that carries other attributes", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "old-pkg",
+                oldMember: "Config",
+                newModule: "new-pkg"
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import type { Config } from 'old-pkg' with { 'resolution-mode': 'require' };
+                    import type { Options } from 'new-pkg';
+
+                    let c: Config;
+                    let o: Options;
+                    `,
+                    `
+                    import type { Config } from 'new-pkg' with { 'resolution-mode': 'require' };
+                    import type { Options } from 'new-pkg';
+
+                    let c: Config;
+                    let o: Options;
+                    `
+                )
+            );
+        });
+
         test("preserves aliased import", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({

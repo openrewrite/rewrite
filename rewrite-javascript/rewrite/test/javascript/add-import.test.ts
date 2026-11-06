@@ -1040,6 +1040,81 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should not merge into an import whose attributes the request does not carry', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    `,
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {b} from 'm';
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                    import D from 'm' with {type: 'json'};
+                    `,
+                    `
+                    import D from 'm' with {type: 'json'};
+                    import {b} from 'm';
+                    `
+                )
+            );
+        });
+
+        test('should merge into the import of the module that carries no attributes', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {c} from 'm';
+                    `,
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {b, c} from 'm';
+                    `
+                )
+            );
+        });
+
+        test('should not move a type into another resolution mode by merging it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'pkg', member: 'B', typeOnly: true, onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import type {A} from 'pkg' with {'resolution-mode': 'require'};
+                    `,
+                    `
+                    import type {A} from 'pkg' with {'resolution-mode': 'require'};
+                    import type {B} from 'pkg';
+                    `
+                )
+            );
+        });
+
+        test('should reuse a binding the file already has, whatever attributes load it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'a', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(`import {a} from 'm' with {type: 'json'};\n`)
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {
