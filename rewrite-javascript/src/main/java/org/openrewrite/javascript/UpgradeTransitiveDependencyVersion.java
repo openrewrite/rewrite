@@ -76,14 +76,16 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 "package manager reads it, and regenerates the lock file natively, without executing the package " +
                 "manager: npm's `overrides`, Bun's `overrides` or `resolutions`, Yarn's `resolutions`, and for " +
                 "pnpm `pnpm-workspace.yaml` or `pnpm.overrides` by the pnpm release the project names. An override " +
-                "the package manager cannot read is not written, and the reason is recorded. Not safe to use as a " +
+                "the package manager cannot read is not written, and the reason is recorded. None is written for a " +
+                "package the lock does not resolve. Not safe to use as a " +
                 "precondition: consults the package registry over the network and publishes per-project state " +
                 "shared with other dependency recipes.";
     }
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined, packageName));
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined, packageName),
+                packageName);
     }
 
     @Override
@@ -115,10 +117,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         try {
             pm = decision.getPackageManager();
         } catch (Rejected e) {
-            decision.decline(String.valueOf(e.getMessage()));
+            decision.decline(ctx, String.valueOf(e.getMessage()));
             return;
         }
-        if (pm == null) {
+        if (pm == null || !decision.resolves()) {
             return;
         }
         Path path = decision.getPath();
@@ -127,13 +129,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         try {
             root = workspaceRoot(acc.scan, path, pm, rules);
         } catch (Rejected e) {
-            decision.decline(String.valueOf(e.getMessage()));
+            decision.decline(ctx, String.valueOf(e.getMessage()));
             return;
         }
         if (!root.equals(path)) {
             if (!acc.holds(root)) {
-                decision.decline("the override belongs in the workspace root's " + root +
-                                 ", which is not a package.json the recipe edits");
+                decision.decline(ctx, "the override belongs in the workspace root's " + root +
+                                      ", which is not a package.json the recipe edits");
             }
             return;
         }
@@ -145,7 +147,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             if (catalogs != null && catalogs.getPath().equals(workspaceManifest)) {
                 workspace = catalogs.print();
             } else if (acc.scan.paths.contains(workspaceManifest)) {
-                decision.cannotKnow(CannotKnow.unread(settingsFile));
+                decision.cannotKnow(ctx, CannotKnow.unread(settingsFile));
                 return;
             }
         }
@@ -155,7 +157,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         decision.describe(override.toString());
         String declined = override.declined();
         if (declined != null) {
-            decision.decline(declined);
+            decision.decline(ctx, declined);
             return;
         }
         boolean inWorkspace = override.getPlace() == OverridePlace.WORKSPACE_MANIFEST;
@@ -172,11 +174,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         }
         String outranked = override.outranked();
         if (outranked != null) {
-            decision.decline(outranked);
+            decision.decline(ctx, outranked);
         }
         if (inWorkspace) {
-            decision.editFileBeside(requireNonNull(settingsFile), c -> c instanceof NodeCatalogs.Pnpm ?
-                    override.from(manifest, c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
+            decision.editFileBeside(ctx, requireNonNull(settingsFile), c -> c instanceof NodeCatalogs.Pnpm ?
+                    override.from(c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
         } else {
             decision.editManifest(override::apply);
         }

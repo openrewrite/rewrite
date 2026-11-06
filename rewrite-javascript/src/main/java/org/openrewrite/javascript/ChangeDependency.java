@@ -123,7 +123,7 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
                 } catch (Rejected e) {
                     String why = oldPackageName + " was not renamed: " + e.getMessage();
                     decision.warn(why);
-                    decision.decline(why);
+                    decision.decline(ctx, why);
                     continue;
                 }
                 String catalog = catalogs == null ? null : catalogs.catalogOf(value);
@@ -137,7 +137,7 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
                 if (catalogs != null && catalogs.declined() != null) {
                     String why = oldPackageName + " was not renamed: " + catalogs.declined();
                     decision.warn(why);
-                    decision.decline(why);
+                    decision.decline(ctx, why);
                 } else if (catalogs != null && catalogs.isFlowStyle()) {
                     decline(decision, ctx, declared.getKey(), value, spec,
                             "its catalogs are written in flow style, which is not edited in place");

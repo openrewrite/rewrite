@@ -4,17 +4,13 @@ plugins {
     id("me.champeau.jmh") version "0.7.3"
 }
 
-val recipeModule by configurations.creating {
-    isTransitive = true
-}
-
 dependencies {
     jmh("com.google.code.findbugs:jsr305:latest.release")
     jmh("org.projectlombok:lombok:latest.release")
 
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java"))
-    jmh(project(":rewrite-java-21"))
+    jmh(project(":rewrite-java-25"))
     jmh(project(":rewrite-javascript"))
     jmh(project(":rewrite-maven"))
     jmh("org.antlr:antlr4-runtime:4.13.2")
@@ -27,23 +23,6 @@ dependencies {
     // Nebula doesn't like having jmhAnnotationProcessor without jmh so we just add it twice.
     jmh("org.openjdk.jmh:jmh-generator-annprocess:latest.release")
     jmhAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:latest.release")
-
-    // Large recipe module for benchmarking recipe loading at scale
-    recipeModule("org.openrewrite.recipe:rewrite-spring:latest.release")
-}
-
-// Write resolved recipeModule classpath to a file so JMH benchmarks can read it at runtime
-val writeRecipeModuleClasspath by tasks.registering {
-    val outputFile = layout.buildDirectory.file("recipeModuleClasspath.txt")
-    outputs.file(outputFile)
-    doLast {
-        val paths = recipeModule.resolve().joinToString("\n") { it.absolutePath }
-        outputFile.get().asFile.writeText(paths)
-    }
-}
-
-tasks.named("jmh") {
-    dependsOn(writeRecipeModuleClasspath)
 }
 
 jmh {

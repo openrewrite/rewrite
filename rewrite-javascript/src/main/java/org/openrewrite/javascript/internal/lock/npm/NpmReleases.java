@@ -40,7 +40,7 @@ public final class NpmReleases {
      * gives what that release wrote ({@code REWRITE_LOCK_EVERY_RELEASE} replays every release of a range, not only
      * its first and last). It widens as the releases around the ported one are ported and replayed.
      */
-    public static final String PROVEN = "7.0.4 - 12.2.0";
+    public static final String PROVEN = "7.0.4 - 12.2.1";
 
     private static final List<NpmRelease> ALL = load();
 

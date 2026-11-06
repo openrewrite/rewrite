@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor} from '../..';
-import {J, NameTree} from '../../java';
+import {J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
@@ -130,14 +129,7 @@ export function generateCacheKey(
     ].join('::');
 }
 
-abstract class IdVisitor extends JavaScriptVisitor<any> {
-    // `JavaVisitor.visitTypeName` is a no-op stub, which leaves annotation names unreachable
-    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: any): Promise<N> {
-        return (await this.visit(nameTree, p)) as N;
-    }
-}
-
-class RandomizeIdVisitor extends IdVisitor {
+class RandomizeIdVisitor extends JavaScriptVisitor<any> {
     readonly minted = new Set<string>();
 
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
@@ -147,7 +139,7 @@ class RandomizeIdVisitor extends IdVisitor {
     }
 }
 
-class CollectIdVisitor extends IdVisitor {
+class CollectIdVisitor extends JavaScriptVisitor<any> {
     readonly ids = new Set<string>();
 
     protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
@@ -156,7 +148,7 @@ class CollectIdVisitor extends IdVisitor {
     }
 }
 
-class RetainIdVisitor extends IdVisitor {
+class RetainIdVisitor extends JavaScriptVisitor<any> {
     private readonly seen = new Set<string>();
 
     constructor(private readonly retainable: ReadonlySet<string>) {

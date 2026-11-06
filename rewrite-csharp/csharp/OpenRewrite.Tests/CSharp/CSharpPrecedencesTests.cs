@@ -151,10 +151,37 @@ public class CSharpPrecedencesTests
     [Fact]
     public void NeedsParentheses_SameAssociativeOp_NoParens()
     {
-        // a + b inside +, on the left  =>  no parens (associative)
+        // a + b inside +, on the left  =>  no parens (left-associative)
         var child = MakeBinary(Binary.OperatorType.Addition, MakeId("a"), MakeId("b"));
         var parent = MakeBinary(Binary.OperatorType.Addition, child, MakeId("c"));
         Assert.False(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: false));
+    }
+
+    [Theory]
+    [InlineData(Binary.OperatorType.Addition)]
+    [InlineData(Binary.OperatorType.Multiplication)]
+    [InlineData(Binary.OperatorType.BitAnd)]
+    [InlineData(Binary.OperatorType.BitOr)]
+    [InlineData(Binary.OperatorType.BitXor)]
+    [InlineData(Binary.OperatorType.And)]
+    [InlineData(Binary.OperatorType.Or)]
+    [InlineData(Binary.OperatorType.LeftShift)]
+    [InlineData(Binary.OperatorType.Equal)]
+    public void NeedsParentheses_SameOpOnRight_NeedsParens(Binary.OperatorType op)
+    {
+        // b + c on the right of +  =>  needs parens (a + b + c parses as (a + b) + c)
+        var child = MakeBinary(op, MakeId("b"), MakeId("c"));
+        var parent = MakeBinary(op, MakeId("a"), child);
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: true));
+    }
+
+    [Fact]
+    public void NeedsParentheses_PatternOrOnRight_NeedsParens()
+    {
+        // B or C on the right of or  =>  needs parens (A or B or C parses as (A or B) or C)
+        var child = MakeCsBinary(CsBinary.OperatorType.Or, MakeId("B"), MakeId("C"));
+        var parent = MakeCsBinary(CsBinary.OperatorType.Or, MakeId("A"), child);
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: true));
     }
 
     [Fact]
@@ -195,6 +222,25 @@ public class CSharpPrecedencesTests
     }
 
     [Fact]
+    public void NeedsParentheses_NullCoalescingOnLeft_NeedsParens()
+    {
+        // a ?? b on the left of ??  =>  needs parens (a ?? b ?? c parses as a ?? (b ?? c))
+        var child = MakeNullCoalescing(MakeId("a"), MakeId("b"));
+        var parent = MakeNullCoalescing(child, MakeId("c"));
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: false));
+    }
+
+    [Fact]
+    public void NeedsParentheses_CsBinaryNullCoalescingOnLeft_NeedsParens()
+    {
+        var child = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("a"), MakeId("b"));
+        var parent = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, child, MakeId("c"));
+        Assert.True(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: false));
+        Assert.False(CSharpPrecedences.NeedsParentheses(child,
+            MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("x"), child), isRightOperand: true));
+    }
+
+    [Fact]
     public void NeedsParentheses_DifferentOpsAtSameLevel_NeedsParens()
     {
         // == inside !=  =>  needs parens (same precedence, different op)
@@ -229,24 +275,4 @@ public class CSharpPrecedencesTests
         Assert.Same(parens, result);
     }
 
-    // =============================================================
-    // IsAssociative
-    // =============================================================
-
-    [Theory]
-    [InlineData(Binary.OperatorType.Addition, true)]
-    [InlineData(Binary.OperatorType.Multiplication, true)]
-    [InlineData(Binary.OperatorType.BitAnd, true)]
-    [InlineData(Binary.OperatorType.BitOr, true)]
-    [InlineData(Binary.OperatorType.BitXor, true)]
-    [InlineData(Binary.OperatorType.And, true)]
-    [InlineData(Binary.OperatorType.Or, true)]
-    [InlineData(Binary.OperatorType.Subtraction, false)]
-    [InlineData(Binary.OperatorType.Division, false)]
-    [InlineData(Binary.OperatorType.Modulo, false)]
-    public void IsAssociative_Binary(Binary.OperatorType op, bool expected)
-    {
-        var expr = MakeBinary(op, MakeId("a"), MakeId("b"));
-        Assert.Equal(expected, CSharpPrecedences.IsAssociative(expr));
-    }
 }

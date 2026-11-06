@@ -84,8 +84,7 @@ public final class UnimportedReferences {
 
     private static List<String> find(J.CompilationUnit cu, Imports imports, @Nullable Set<UUID> only) {
         String packageName = cu.getPackageDeclaration() == null ? "" : cu.getPackageDeclaration().getPackageName();
-        Set<String> declared = new HashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        Set<String> declared = new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> d) {
                 d.add(classDecl.getSimpleName());
@@ -99,10 +98,9 @@ public final class UnimportedReferences {
                 }
                 return super.visitTypeParameter(typeParam, d);
             }
-        }.visit(cu, declared);
+        }.reduce(cu, new HashSet<>());
 
-        Set<String> found = new LinkedHashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        Set<String> found = new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Import visitImport(J.Import anImport, Set<String> f) {
                 return anImport;
@@ -195,7 +193,7 @@ public final class UnimportedReferences {
                        name(declaringType).startsWith(TEMPLATE_PACKAGE + ".") ||
                        inLexicalScope(declaringType, cursor) || imports.declaresStatic(declaringType, member);
             }
-        }.visit(cu, found);
+        }.reduce(cu, new LinkedHashSet<>());
         return new ArrayList<>(found);
     }
 

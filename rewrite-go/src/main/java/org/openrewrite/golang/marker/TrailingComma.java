@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
 @With
 public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
@@ -37,8 +40,8 @@ public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
     @Override
     public void rpcSend(TrailingComma after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, TrailingComma::getBefore, space -> new JavaSender().visitSpace(space, q));
-        q.getAndSend(after, TrailingComma::getAfter, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
+        q.getAndSend(after, x -> spaceRef(x.getAfter()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

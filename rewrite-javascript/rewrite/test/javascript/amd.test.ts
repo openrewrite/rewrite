@@ -3,13 +3,14 @@ import {Cursor} from "../../src/tree";
 import {
     amdBlockOf, bodyOf, deconflict, dependencyNames, derivedBindingName, elementsOf, enclosingAmdBlock,
     identifierOf, javascript, JavaScriptParser, JavaScriptVisitor, JS, lastSegment, namesDeclaredWithin,
-    namesUsed, parameterNames, parametersOf, present, references, withDependency, withoutDependencyAt,
-    withUnboundDependency
+    namesUsed, parameterNames, parametersOf, present, references, sourceFileCache, withDependency,
+    withoutDependencyAt, withUnboundDependency
 } from "../../src/javascript";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 async function firstCall(source: string): Promise<J.MethodInvocation> {
-    const parser = new JavaScriptParser();
     const gen = parser.parse({text: source, sourcePath: "a.js"});
     const parsed = (await gen.next()).value as JS.CompilationUnit;
     const statement = parsed.statements[0].element;
@@ -80,15 +81,30 @@ describe("withDependency", () => {
     test("a one-per-line block keeps one per line", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`,
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`
+            `
+            sap.ui.define([
+                "a/B"
+            ], function (
+                B
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], function (
+                B,
+                D
+            ) {});`
         ));
     });
 
     test("an existing trailing comma moves to the entry that ends up last", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B",], function (B,) {});`,
             `sap.ui.define(["a/B", "c/D",], function (B, D,) {});`
@@ -98,6 +114,7 @@ describe("withDependency", () => {
     test("an appended parameter takes its separator from a destructured one", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B", "a/C"], function (B, {c}) {});`,
             `sap.ui.define(["a/B", "a/C", "c/D"], function (B, {c}, D) {});`
@@ -107,18 +124,34 @@ describe("withDependency", () => {
     test("an appended entry copies the whitespace before its neighbour, never a comment", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(
             javascript(
                 `sap.ui.define(["a/B", /* the C */ "a/C"], function (B, C) {});`,
                 `sap.ui.define(["a/B", /* the C */ "a/C", "c/D"], function (B, C, D) {});`
             ),
+            //language=javascript
             javascript(
-                `sap.ui.define([/* a\n b */ "a/B"], function (B) {});`,
-                `sap.ui.define([/* a\n b */ "a/B", "c/D"], function (B, D) {});`
+                `
+                sap.ui.define([/* a
+                 b */ "a/B"], function (B) {});`,
+                `
+                sap.ui.define([/* a
+                 b */ "a/B", "c/D"], function (B, D) {});`
             ),
+            //language=javascript
             javascript(
-                `sap.ui.define([\n    // the B\n    "a/B"\n], function (B) {});`,
-                `sap.ui.define([\n    // the B\n    "a/B",\n    "c/D"\n], function (B, D) {});`
+                `
+                sap.ui.define([
+                    // the B
+                    "a/B"
+                ], function (B) {});`,
+                `
+                sap.ui.define([
+                    // the B
+                    "a/B",
+                    "c/D"
+                ], function (B, D) {});`
             )
         );
     });
@@ -126,6 +159,7 @@ describe("withDependency", () => {
     test("a block with no dependency array gains one before the factory", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(function () {});`,
             `sap.ui.define(["c/D"], function (D) {});`
@@ -135,15 +169,30 @@ describe("withDependency", () => {
     test("an arrow factory keeps one per line same as a function factory", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B"\n], (\n    B\n) => {});`,
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], (\n    B,\n    D\n) => {});`
+            `
+            sap.ui.define([
+                "a/B"
+            ], (
+                B
+            ) => {});`,
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], (
+                B,
+                D
+            ) => {});`
         ));
     });
 
     test("an arrow factory's trailing comma moves to the entry that ends up last", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B",], (B,) => {});`,
             `sap.ui.define(["a/B", "c/D",], (B, D,) => {});`
@@ -153,6 +202,7 @@ describe("withDependency", () => {
     test("an unparenthesized single-parameter arrow gains parens as it grows past one", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], B => {});`,
             `sap.ui.define(["a/B", "c/D"], (B, D) => {});`
@@ -162,6 +212,7 @@ describe("withDependency", () => {
     test("a comment before a bare arrow stays with the parameter it followed as parens go on", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B"], B /*x*/ => {});`,
             `sap.ui.define(["a/B", "c/D"], (B /*x*/ , D) => {});`
@@ -183,9 +234,23 @@ describe("withDependency", () => {
     test("a trailing comment stays on the entry it followed instead of relabeling the appended one", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        spec.cycles = 1;
+        //language=javascript
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B" // note\n], function (\n    B\n) {});`,
-            `sap.ui.define([\n    "a/B" // note\n,\n    "c/D"], function (\n    B,\n    D\n) {});`
+            `
+            sap.ui.define([
+                "a/B" // note
+            ], function (
+                B
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B" // note
+            ,
+                "c/D"], function (
+                B,
+                D
+            ) {});`
         ));
     });
 });
@@ -200,9 +265,22 @@ describe("withoutDependencyAt", () => {
                     withoutDependencyAt(m, block, 1);
             }
         });
+        //language=javascript
         await spec.rewriteRun(javascript(
-            `sap.ui.define([\n    "a/B",\n    "c/D"\n], function (\n    B,\n    D\n) {});`,
-            `sap.ui.define([\n    "a/B"\n], function (\n    B\n) {});`
+            `
+            sap.ui.define([
+                "a/B",
+                "c/D"
+            ], function (
+                B,
+                D
+            ) {});`,
+            `
+            sap.ui.define([
+                "a/B"
+            ], function (
+                B
+            ) {});`
         ));
     });
 
@@ -215,6 +293,7 @@ describe("withoutDependencyAt", () => {
                     withoutDependencyAt(m, block, 0);
             }
         });
+        spec.cycles = 1;
         await spec.rewriteRun(javascript(
             `sap.ui.define(["a/B", "c/D"], function (B, D) {});`,
             `sap.ui.define(["c/D"], function (D) {});`
@@ -239,7 +318,7 @@ describe("withoutDependencyAt", () => {
     test("an out-of-range index leaves the block unchanged instead of throwing", async () => {
         const call = await firstCall(`define(["a/B", "c/D"], function (B, D) {});`);
         const block = amdBlockOf(call)!;
-        expect(dependencyNames(amdBlockOf(withoutDependencyAt(call, block, 2))!)).toEqual(["a/B", "c/D"]);
+        expect(withoutDependencyAt(call, block, 2)).toBe(call);
     });
 
     function removeFirstDependency() {
@@ -273,6 +352,7 @@ describe("withoutDependencyAt", () => {
     test("removing the first entry moves no comment onto the survivor and drops none of its own", async () => {
         const relabeled = new RecipeSpec();
         relabeled.recipe = fromVisitor(removeFirstDependency());
+        relabeled.cycles = 1;
         await relabeled.rewriteRun(javascript(
             `sap.ui.define([/* keep me */ "a/B", "c/D"], function (B, D) {});`,
             `sap.ui.define(["c/D"], function (D) {});`
@@ -280,6 +360,7 @@ describe("withoutDependencyAt", () => {
 
         const dropped = new RecipeSpec();
         dropped.recipe = fromVisitor(removeFirstDependency());
+        dropped.cycles = 1;
         await dropped.rewriteRun(javascript(
             `sap.ui.define(["a/B", /* about D */ "c/D"], function (B, D) {});`,
             `sap.ui.define([/* about D */ "c/D"], function (D) {});`
@@ -301,6 +382,7 @@ describe("withUnboundDependency", () => {
     test("the appended dependency takes no parameter, whether or not the block already leaves one unbound", async () => {
         const bound = new RecipeSpec();
         bound.recipe = fromVisitor(addUnbound("c/D"));
+        bound.cycles = 1;
         await bound.rewriteRun(javascript(
             `sap.ui.define(["a/B"], function (B) {});`,
             `sap.ui.define(["a/B", "c/D"], function (B) {});`
@@ -308,6 +390,7 @@ describe("withUnboundDependency", () => {
 
         const alreadyUnbound = new RecipeSpec();
         alreadyUnbound.recipe = fromVisitor(addUnbound("e/F"));
+        alreadyUnbound.cycles = 1;
         await alreadyUnbound.rewriteRun(javascript(
             `sap.ui.define(["a/B", "c/D"], function (B) {});`,
             `sap.ui.define(["a/B", "c/D", "e/F"], function (B) {});`

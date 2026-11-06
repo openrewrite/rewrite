@@ -40,6 +40,17 @@ func emptyAsNil(s string) any {
 	return s
 }
 
+// spaceRef sends a comment-free Space with at most 50 bytes of whitespace as a ref to its interned
+// instance, so each repeat is a ref-only message. Other values go as they are, since a ref stays in
+// both peers' tables for the whole connection.
+func spaceRef(v any) any {
+	s, ok := v.(java.Space)
+	if !ok || len(s.Comments()) > 0 || len(s.Whitespace()) > 50 {
+		return v
+	}
+	return AsRef(s)
+}
+
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
 func sendSpace(s java.Space, q *SendQueue) {
 	q.GetAndSendList(s,
@@ -201,16 +212,16 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.GroupedImport).Before) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ImportBlock:
 		// ImportBlock.rpcSend sends: id, closePrevious, before Space, grouped, groupedBefore Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).ClosePrevious }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.ImportBlock).Before) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Grouped }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.ImportBlock).GroupedBefore) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ShortVarDecl:
 		q.GetAndSend(m, func(x any) any { return x.(golang.ShortVarDecl).Ident.String() }, nil)
@@ -235,14 +246,14 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 	case golang.TrailingComma:
 		// TrailingComma.rpcSend sends: id (UUID string), before Space, after Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.TrailingComma).Before) },
 			func(v any) { sendSpace(v.(java.Space), q) })
-		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.TrailingComma).After) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.ChanDirMarker:
 		// ChanDirMarker.rpcSend sends: id (UUID string), before Space
 		q.GetAndSend(m, func(x any) any { return x.(golang.ChanDirMarker).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(golang.ChanDirMarker).Before },
+		q.GetAndSend(m, func(x any) any { return spaceRef(x.(golang.ChanDirMarker).Before) },
 			func(v any) { sendSpace(v.(java.Space), q) })
 	case golang.PartialTypeAttribution:
 		// PartialTypeAttribution.rpcSend sends: id (UUID string), reason (string)

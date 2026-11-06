@@ -18,9 +18,11 @@ package org.openrewrite.java.service;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.RemoveImport;
+import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.J;
 
@@ -37,6 +39,10 @@ public class ImportService {
 
     public <P> JavaVisitor<P> removeImportVisitor(String fullyQualifiedName) {
         return new RemoveImport<>(fullyQualifiedName);
+    }
+
+    public TreeVisitor<?, ExecutionContext> removeUnusedImportsVisitor() {
+        return new RemoveUnusedImports().getVisitor();
     }
 
     /**

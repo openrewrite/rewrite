@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeShapeValidationService;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -29,8 +30,11 @@ import org.openrewrite.java.tree.Javadoc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 public class JavaTreeShapeValidationService implements TreeShapeValidationService {
     private static final Pattern PARSER_VERSION = Pattern.compile("\\.Java(\\d+)Parser\\b");
@@ -88,6 +92,35 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
+    public Parser.Builder untypedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // the copy's types are incomplete, so they stay out of a type factory the test's builder holds
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .classpath(emptyList())
+                .dependsOn(emptyList())
+                .typeAttribution(false)
+                .typeFactory(null);
+    }
+
+    @Override
+    public @Nullable String syntaxError(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, AtomicReference<@Nullable String>>() {
+            @Override
+            public Tree preVisit(Tree t, AtomicReference<@Nullable String> text) {
+                if (text.get() != null) {
+                    stopAfterPreVisit();
+                } else if (t instanceof J.Erroneous) {
+                    text.set(((J.Erroneous) t).getText());
+                    stopAfterPreVisit();
+                }
+                return t;
+            }
+        }.reduce(sourceFile, new AtomicReference<>()).get();
+    }
+
+    @Override
     public boolean equivalent(Tree tree, Tree parsed) {
         // a type annotation can sit on a declaration, on its type or on a part of the type, and recipes place it
         // where the parser doesn't
@@ -96,8 +129,7 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     private static boolean hasAnnotations(Tree tree) {
-        AtomicBoolean found = new AtomicBoolean();
-        new TreeVisitor<Tree, AtomicBoolean>() {
+        return new TreeVisitor<Tree, AtomicBoolean>() {
             @Override
             public Tree preVisit(Tree t, AtomicBoolean f) {
                 if (t instanceof J.Annotation || t instanceof J.AnnotatedType) {
@@ -106,16 +138,14 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, found);
-        return found.get();
+        }.reduce(tree, new AtomicBoolean()).get();
     }
 
     /**
      * The kinds of node in a tree in the order they are visited, without annotations and what holds them.
      */
     private static List<Class<?>> kindsWithoutAnnotations(Tree tree) {
-        List<Class<?>> kinds = new ArrayList<>();
-        new TreeVisitor<Tree, List<Class<?>>>() {
+        return new TreeVisitor<Tree, List<Class<?>>>() {
             @Override
             public Tree preVisit(Tree t, List<Class<?>> k) {
                 if (t instanceof J.Annotation || t instanceof J.Empty || t instanceof Javadoc) {
@@ -125,7 +155,6 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, kinds);
-        return kinds;
+        }.reduce(tree, new ArrayList<>());
     }
 }

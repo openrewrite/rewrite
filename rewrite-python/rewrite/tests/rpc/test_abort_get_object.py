@@ -23,16 +23,18 @@ the receiver says so.
 
 import ast
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from rewrite import InMemoryExecutionContext, Markers, random_id
+from rewrite.markers import Marker
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.printer import PythonPrinter
 from rewrite.rpc import receive_queue, server
 from rewrite.rpc.reference import ReferenceMap
 from rewrite.rpc.send_queue import RpcSendQueue
+from rewrite.utils import lst_dataclass
 
 _CU_TYPE = 'org.openrewrite.python.tree.Py$CompilationUnit'
 
@@ -73,6 +75,25 @@ def test_an_aborted_transfer_is_sent_whole_again(transfers):
     assert len(server.local_refs) == 0
     # not as no change to a tree the host dropped, nor citing refs it never recorded
     assert server.handle_get_object(request) == sent
+
+
+def test_a_get_object_that_fails_to_serialize_fails_the_request(transfers):
+    @lst_dataclass
+    class _CodeclessMarker(Marker):
+        _id: int | UUID
+
+    sent = _parse("x = 0\n")
+    cu = _parse("x = 1\n").replace(id=sent.id)
+    cu = cu.replace(markers=cu.markers.add(_CodeclessMarker(random_id())))
+    tree_id = str(cu.id)
+    server.local_objects[tree_id] = cu
+    server.remote_objects[tree_id] = sent
+
+    with pytest.raises(TypeError, match=r"No RPC codec is registered for the marker .*\._CodeclessMarker"):
+        server.handle_get_object({'id': tree_id, 'sourceFileType': _CU_TYPE})
+
+    assert tree_id not in server.remote_objects
+    assert len(server.local_refs) == 0
 
 
 def test_aborting_what_is_not_the_latest_transfer_drops_every_ref(transfers):

@@ -16,23 +16,28 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 
 class JavaSenderTest {
     private final String sourceFileType = J.CompilationUnit.class.getName();
+    private final List<RpcObjectData> sent = new ArrayList<>();
     private final Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
-    private final RpcSendQueue sq = new RpcSendQueue(1, batch -> batches.addLast(new ArrayList<>(batch)),
-            new IdentityHashMap<>(), sourceFileType, false);
+    private final RpcSendQueue sq = new RpcSendQueue(1, batch -> {
+        sent.addAll(batch);
+        // ids arrive as strings, as they do over the wire
+        batches.addLast(batch.stream().map(d -> d.getValue() instanceof UUID ?
+                new RpcObjectData(d.getState(), d.getValueType(), d.getValue().toString(), d.getRef(), false) : d).toList());
+    }, new IdentityHashMap<>(), sourceFileType, false);
     private final RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, sourceFileType, null);
 
     @Test
@@ -57,5 +62,34 @@ class JavaSenderTest {
         JRightPadded<Space> received = rq.receive(before, right -> new JavaReceiver().visitRightPadded(right, rq));
 
         assertThat(received.getElement().getWhitespace()).isEqualTo(" ");
+    }
+
+    @Test
+    void shortCommentFreeSpaceIsSentOnceAsRefAndOthersByValue() {
+        J.MethodInvocation invocation = new J.MethodInvocation(randomId(), Space.EMPTY, Markers.EMPTY, null, null,
+                identifier(Space.EMPTY, "f"),
+                JContainer.build(Space.EMPTY, List.of(
+                        JRightPadded.build(identifier(Space.format(" "), "a")),
+                        JRightPadded.build(identifier(Space.format(" "), "b")),
+                        JRightPadded.build(identifier(Space.format(" /* c */ "), "c")),
+                        JRightPadded.build(identifier(Space.format(" ".repeat(51)), "d"))
+                ), Markers.EMPTY), null);
+
+        sq.send(invocation, null, null);
+        sq.flush();
+        J.MethodInvocation received = rq.receive(null);
+
+        assertThat(sent.stream().filter(d -> Space.class.getName().equals(d.getValueType()) && d.getRef() == null))
+                .as("the commented and the long Space go by value").hasSize(2);
+        assertThat(sent.stream().filter(d -> Space.class.getName().equals(d.getValueType()) && d.getRef() != null))
+                .as("each shared Space, EMPTY and \" \", is defined once").hasSize(2);
+        List<Expression> args = received.getArguments();
+        assertThat(args.get(0).getPrefix()).isSameAs(args.get(1).getPrefix());
+        assertThat(args.get(2).getPrefix().getComments()).singleElement()
+                .extracting(c -> ((TextComment) c).getText()).isEqualTo(" c ");
+    }
+
+    private static J.Identifier identifier(Space prefix, String name) {
+        return new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), name, null, null);
     }
 }

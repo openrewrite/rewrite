@@ -36,7 +36,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     }
 
     /**
-     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
     @Deprecated
     public boolean getValidateCursorAcyclic() {
@@ -44,7 +44,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     }
 
     /**
-     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     * @deprecated A cursor whose parent points to the same element fails an assertion in tests, so this has no effect.
      */
     @Deprecated
     @SuppressWarnings("UnusedReturnValue")

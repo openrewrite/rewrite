@@ -24,6 +24,7 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -168,6 +169,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitImportClause(JS.ImportClause importClause, RpcReceiveQueue q) {
         return importClause
                 .withTypeOnly(q.receive(importClause.isTypeOnly()))
+                .withDeferred(q.receive(importClause.isDeferred()))
                 .getPadding().withName(q.receive(importClause.getPadding().getName(), el -> visitRightPadded(el, q)))
                 .withNamedBindings(q.receive(importClause.getNamedBindings(), expr -> (Expression) visitNonNull(expr, q)));
     }
@@ -633,6 +635,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public J visitLiteral(J.Literal literal, RpcReceiveQueue q) {
+            J.Literal l = (J.Literal) super.visitLiteral(literal, q);
+            if (l.getType() == JavaType.Primitive.Long && l.getValue() instanceof String) {
+                return l.withValue(new BigInteger((String) l.getValue()));
+            }
+            return l;
         }
     }
 }

@@ -28,6 +28,7 @@ export type {
     RewriteRule,
     TryOnOptions,
     RewriteConfig,
+    DebugSetting,
     DebugOptions,
     DebugLogEntry,
     MatchExplanation,

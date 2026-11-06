@@ -16,6 +16,8 @@
 //file:noinspection UnstableApiUsage
 
 
+import com.gradle.develocity.agent.gradle.DevelocityConfiguration
+import com.gradle.develocity.agent.gradle.scan.BuildScanConfiguration
 import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
 import com.gradle.scan.plugin.BuildScanExtension
 import org.gradle.api.initialization.Settings
@@ -29,8 +31,15 @@ interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
     void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=BuildScanExtension) Closure cl);
 }
 
+interface DevelocitySpec extends DevelocityConfiguration {
+    void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, value=BuildScanConfiguration) Closure cl);
+}
+
+// Develocity types may only appear inside @DelegatesTo here: the plugin is not on the runtime classpath,
+// so referencing one in a method signature fails reflective loading and strips this class's Settings supertype
 abstract class RewriteSettings extends groovy.lang.Script implements Settings {
     abstract void pluginManagement(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginManagementSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
     abstract void gradleEnterprise(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=GradleEnterpriseSpec) Closure cl)
+    abstract void develocity(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, value=DevelocitySpec) Closure cl)
 }

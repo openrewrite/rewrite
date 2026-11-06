@@ -43,6 +43,8 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -154,8 +156,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Data
     public static class GradleWrapperState {
+        /**
+         * Whether the root of the repository is a Gradle build, and so the place a missing wrapper belongs.
+         */
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+
+        /**
+         * The directories that hold a `gradle/wrapper/gradle-wrapper.properties`, which are the only ones
+         * whose `gradlew`, `gradlew.bat` and wrapper jar are part of a wrapper.
+         */
+        Set<Path> wrapperDirectories = new HashSet<>();
 
         @Nullable
         BuildTool currentMarker;
@@ -198,6 +209,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         } else if (!PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                             return false;
                         }
+                        acc.wrapperDirectories.add(wrapperDirectory(sourceFile.getSourcePath(), 3));
 
                         acc.currentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
                                 .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
@@ -269,7 +281,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                        if (new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                        // a Gradle build in a subdirectory, such as a test fixture or an included build with
+                        // its own wrapper, does not make the root a place a wrapper belongs
+                        if (sourceFile.getSourcePath().getParent() == null &&
+                            new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
                             acc.gradleProject = true;
                         }
 
@@ -335,6 +350,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as properties"))
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
             gradleWrapperFiles.add(gradleWrapperProperties);
+            acc.wrapperDirectories.add(wrapperDirectory(WRAPPER_PROPERTIES_LOCATION, 3));
         }
 
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
@@ -382,12 +398,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                 SourceFile sourceFile = (SourceFile) tree;
                 if (acc.updatedMarker != null) {
-                    Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
+                    // a file stamped with another build tool, such as a wrapper beside a nested Gradle build, is
+                    // still updated, but keeps its own marker
+                    Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
+                            .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle);
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
-                        if (currentMarker.getType() != BuildTool.Type.Gradle) {
-                            return sourceFile;
-                        }
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
                         if (compare < 0) {
@@ -399,7 +415,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 }
 
                 GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
                     if (!gradlewText.equals(gradlew.getText())) {
@@ -407,7 +424,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                     return gradlew;
                 }
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewBatText = batchScript(gradleWrapper, ctx);
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
                     if (!gradlewBatText.equals(gradlewBat.getText())) {
@@ -418,7 +436,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if (sourceFile instanceof Properties.File && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                     return new WrapperPropertiesVisitor(gradleWrapper, distributionChecksum(gradleWrapper)).visitNonNull(sourceFile, ctx);
                 }
-                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
+                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 3))) {
                     return gradleWrapper.wrapperJar(sourceFile);
                 }
                 if (sourceFile instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
@@ -430,6 +449,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
+    }
+
+    /**
+     * The directory a wrapper file belongs to, the one that holds `gradlew` and `gradle/wrapper`.
+     *
+     * @param depth how many path elements the wrapper file is below that directory
+     */
+    private static Path wrapperDirectory(Path sourcePath, int depth) {
+        Path directory = sourcePath;
+        for (int i = 0; i < depth && directory != null; i++) {
+            directory = directory.getParent();
+        }
+        return directory == null ? Paths.get("") : directory;
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {
@@ -593,12 +625,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                 p = ((Properties.File) p).withContent(contentList);
             } else if (!checksumKey.isEmpty() && checksum == null) {
-                List<Properties.Content> contentList = ListUtils.map(((Properties.File) p).getContent(), c -> {
-                    if (c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())) {
-                        return null;
-                    }
-                    return c;
-                });
+                List<Properties.Content> contentList = ListUtils.filter(((Properties.File) p).getContent(), c ->
+                  !(c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())));
                 p = ((Properties.File) p).withContent(contentList);
             }
             return p;

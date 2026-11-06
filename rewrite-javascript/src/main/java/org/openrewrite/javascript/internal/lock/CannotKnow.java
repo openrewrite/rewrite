@@ -23,7 +23,7 @@ import java.util.Set;
 
 /**
  * Raised where the package manager reads something the engine is not given: a tarball's contents, a manifest that is
- * not in the registry, the filesystem, network timing, the host. {@link #getSubject()} names it.
+ * not in the registry, the filesystem, network timing, the host. {@link #subject} names it.
  */
 @Getter
 public final class CannotKnow extends RuntimeException {

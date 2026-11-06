@@ -554,6 +554,10 @@ public class RewriteRpc {
         if (preconditions.isEmpty()) {
             return null;
         }
+        if (preconditions.size() == 1) {
+            // Unwrapped, so that RpcRecipe#editPreconditionReadsContent recognises a lone language gate
+            return buildPreconditionVisitor(preconditions.get(0));
+        }
 
         List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
         for (PrepareRecipeResponse.Precondition p : preconditions) {
@@ -828,7 +832,12 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
-        return await(request(method, body, responseType), responseType);
+        try {
+            return await(request(method, body, responseType), responseType);
+        } catch (RuntimeException e) {
+            IncompatibleRecipeBundleException refusal = IncompatibleRecipeBundleException.from(e);
+            throw refusal != null ? refusal : e;
+        }
     }
 
     /**

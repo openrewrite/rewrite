@@ -24,14 +24,18 @@ import {
     Pattern,
     pattern,
     rewrite,
+    sourceFileCache,
+    Template,
     template,
     typescript
 } from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
+const parser = new JavaScriptParser({sourceFileCache});
+
 /** The first node of `kind` in `text`, with the cursor that reached it. */
 async function findFirst(text: string, kind: string): Promise<[J, Cursor]> {
-    const cu: SourceFile = await new JavaScriptParser().parseOne({text, sourcePath: "match.ts"});
+    const cu: SourceFile = await parser.parseOne({text, sourcePath: "match.ts"});
     let found: [J, Cursor] | undefined;
     const visitor = new class extends JavaScriptVisitor<ExecutionContext> {
         protected override async postVisit(node: J, ctx: ExecutionContext): Promise<J | undefined> {
@@ -139,6 +143,7 @@ describe('rewriting through a captured condition', () => {
                 return await negate.tryOn(this.cursor, iff) || super.visitIf(iff, p);
             }
         });
+        spec.cycles = 1;
 
         return spec.rewriteRun(
             //language=typescript
@@ -151,5 +156,42 @@ describe('rewriting through a captured condition', () => {
 }`
             )
         );
+    });
+});
+
+describe('a visitExpression that rewrites what a pattern matches', () => {
+    const spec = new RecipeSpec();
+
+    /** A recipe whose visitExpression applies `after` wherever `before` matches. */
+    function rewriteExpressions(before: Pattern, after: Template): void {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                const ret = await super.visitExpression(expression, p) as Expression;
+                return await before.match(ret, this.cursor) ? await after.apply(ret, this.cursor) : ret;
+            }
+        });
+    }
+
+    // visitExpression gets the parentheses before what they hold, so the match has to wait for the expression inside
+    test.each([
+        ['if (a.b) {}', 'if (c) {}'],
+        ['while (a.b) {}', 'while (c) {}'],
+        ['do {} while (a.b);', 'do {} while (c);'],
+        ['switch (a.b) {}', 'switch (c) {}'],
+        ['const x = (a.b);', 'const x = (c);']
+    ])('keeps the parentheses of %s', (before, after) => {
+        rewriteExpressions(pattern`a.b`, template`c`);
+        return spec.rewriteRun(typescript(before, after));
+    });
+
+    test('applies a template that holds its match once in a condition', () => {
+        rewriteExpressions(pattern`f()`, template`!f()`);
+        spec.cycles = 1;
+        return spec.rewriteRun(typescript('if (f()) {}', 'if (!f()) {}'));
+    });
+
+    test('matches parentheses that the pattern has too', () => {
+        rewriteExpressions(pattern`(a.b)`, template`c`);
+        return spec.rewriteRun(typescript('const x = (a.b);', 'const x = c;'));
     });
 });

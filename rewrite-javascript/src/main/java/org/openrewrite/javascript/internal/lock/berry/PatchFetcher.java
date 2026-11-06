@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
+import java.util.List;
+
 /**
  * Port of @yarnpkg/plugin-patch sources/PatchFetcher.ts (Yarn 4.10.3).
  */
@@ -30,9 +32,48 @@ final class PatchFetcher implements Fetcher {
 
     @Override
     public @Nullable String fetch(Locator locator, FetchOptions opts) {
+        Project project = opts.getProject();
         return Cache.fetchPackageFromCache(locator, () -> {
-            throw new CannotKnow("the checksum of " + StructUtils.stringifyLocator(locator) + " (Yarn applies the " +
-                                 "patch to the source's archive)");
-        }, opts.getProject());
+            ZipArchive archive = archive(locator, opts);
+            return () -> Cache.getCacheKey(project.configuration) + "/" + HashUtils.sha512Hex(
+                    archive.toByteArray(project.configuration.get("compressionLevel")));
+        }, project);
+    }
+
+    private static ZipArchive archive(Locator locator, FetchOptions opts) {
+        PatchUtils.Spec<Locator> spec = PatchUtils.parseLocator(locator);
+        Locator source = spec.getSourceItem();
+        ZipArchive archive;
+        if (PatchUtils.isPatchLocator(source)) {
+            archive = archive(source, opts).stableCopy();
+        } else if (new NpmSemverFetcher().supports(source, opts)) {
+            archive = TgzUtils.convertToZip(NpmSemverFetcher.fetchFromNetwork(source, opts),
+                    StructUtils.getIdentVendorPath(locator), 1).stableCopy();
+        } else if (new NpmHttpFetcher().supports(source, opts)) {
+            StructUtils.Range range = StructUtils.parseRange(source.reference);
+            String url = (String) range.getParams().get("__archiveUrl");
+            byte[] tgz = NpmHttpUtils.get(url, source, range.getSelector(), opts.getProject(), opts.getRegistry());
+            archive = TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(locator), 1).stableCopy();
+        } else {
+            throw new CannotKnow("the source archive of patched " + StructUtils.stringifyLocator(source));
+        }
+        List<@Nullable String> patches = PatchUtils.loadPatchFiles(spec.getParentLocator(),
+                spec.getPatchPaths(), opts.getProject());
+        String prefix = StructUtils.getIdentVendorPath(locator) + "/";
+        for (int n = 0; n < patches.size(); n++) {
+            String text = patches.get(n);
+            if (text == null) continue;
+            ZipArchive attempt = archive.copy();
+            try {
+                PatchApply.apply(PatchParse.parsePatchFile(text), attempt, prefix, spec.getSourceVersion());
+                archive = attempt;
+            } catch (PatchApply.UnmatchedHunk e) {
+                if (!spec.getPatchPaths().get(n).startsWith("optional!")) {
+                    throw new ReportError(66, StructUtils.stringifyLocator(locator) + ": " + e.getMessage());
+                }
+                // Yarn discards the entire optional patch, including effects preceding the failed hunk.
+            }
+        }
+        return archive;
     }
 }

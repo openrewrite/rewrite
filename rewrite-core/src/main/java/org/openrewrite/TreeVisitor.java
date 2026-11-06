@@ -47,7 +47,7 @@ import static java.util.Objects.requireNonNull;
  * @param <T> The type of tree.
  * @param <P> An input object that is passed to every visit method.
  */
-public abstract class TreeVisitor<T extends @Nullable Tree, P> {
+public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyweight {
     private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
     private static final int DEADLINE_CHECK_MASK = 255;
 

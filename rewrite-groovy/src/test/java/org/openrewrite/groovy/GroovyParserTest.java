@@ -15,16 +15,25 @@
  */
 package org.openrewrite.groovy;
 
+import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Tree;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
@@ -517,4 +526,44 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void cloneDoesNotShareStylesWithOriginal() throws Exception {
+        // given
+        GroovyParser.Builder original = GroovyParser.builder();
+        NamedStyles styles = new NamedStyles(Tree.randomId(), "test", "test", "test", emptySet(), emptyList());
+
+        // when
+        GroovyParser.Builder clone = original.clone().styles(singletonList(styles));
+
+        // then
+        assertThat(styles(clone)).containsExactly(styles);
+        assertThat(styles(original)).isEmpty();
+    }
+
+    @Test
+    void cloneDoesNotShareCompilerCustomizersWithOriginal() {
+        // given
+        GroovyParser.Builder original = GroovyParser.builder();
+        AtomicInteger invocations = new AtomicInteger();
+
+        // when
+        GroovyParser.Builder clone = original.clone().compilerCustomizers(config -> invocations.incrementAndGet());
+
+        // then
+        parse(original);
+        assertThat(invocations).hasValue(0);
+        parse(clone);
+        assertThat(invocations).hasPositiveValue();
+    }
+
+    private static void parse(GroovyParser.Builder builder) {
+        builder.build().parse(new InMemoryExecutionContext(), "def a = 1").findFirst().orElseThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<NamedStyles> styles(GroovyParser.Builder builder) throws ReflectiveOperationException {
+        Field styles = GroovyParser.Builder.class.getDeclaredField("styles");
+        styles.setAccessible(true);
+        return (List<NamedStyles>) styles.get(builder);
+    }
 }

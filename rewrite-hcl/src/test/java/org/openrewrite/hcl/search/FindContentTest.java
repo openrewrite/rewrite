@@ -40,4 +40,33 @@ class FindContentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findAttributeOfResourceSelectedByFilter() {
+        rewriteRun(
+          spec -> spec.recipe(new FindContent("$.resource.aws_db_instance[?(@.engine == 'mysql')].engine_version")),
+          hcl(
+            """
+              resource "aws_db_instance" "a" {
+                engine         = "mysql"
+                engine_version = "5.7"
+              }
+              resource "aws_db_instance" "b" {
+                engine         = "postgres"
+                engine_version = "13"
+              }
+              """,
+            """
+              resource "aws_db_instance" "a" {
+                engine         = "mysql"
+                /*~~>*/engine_version = "5.7"
+              }
+              resource "aws_db_instance" "b" {
+                engine         = "postgres"
+                engine_version = "13"
+              }
+              """
+          )
+        );
+    }
 }

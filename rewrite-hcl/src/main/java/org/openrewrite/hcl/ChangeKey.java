@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.format.AttributeSpaceVisitor;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Expression;
@@ -43,7 +44,7 @@ public class ChangeKey extends Recipe {
 
     @Option(displayName = "Old key path",
             description = "A JSONPath expression locating the attribute to rename.",
-            example = "$.resource.name")
+            example = "$.resource.aws_db_instance.name")
     String oldKeyPath;
 
     @Option(displayName = "New key",
@@ -182,14 +183,6 @@ public class ChangeKey extends Recipe {
     }
 
     private Hcl.Literal quotedLiteral(Space prefix) {
-        String source = newKey
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
-                .replace("${", "$${")
-                .replace("%{", "%%{");
-        return new Hcl.Literal(Tree.randomId(), prefix, Markers.EMPTY, source, source);
+        return new Hcl.Literal(Tree.randomId(), prefix, Markers.EMPTY, newKey, HclString.quoted(newKey));
     }
 }

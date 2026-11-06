@@ -59,4 +59,30 @@ class RefinedTypeTreeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void semicolonSeparatedStructuralTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f(r: { def a: Int; def b: Int }) = r.a
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementsInStructuralType() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f(r: { ; def a: Int;; def b: Int; }) = r.a
+                }
+                """
+            )
+        );
+    }
 }

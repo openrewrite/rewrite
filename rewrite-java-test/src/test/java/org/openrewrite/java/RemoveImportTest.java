@@ -17,13 +17,16 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -65,6 +68,52 @@ class RemoveImportTest implements RewriteTest {
               import java.util.List;
               class A {
                  List<Integer> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportOfTypeTheSourceNeverNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """,
+            """
+              import java.util.Collections;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveImportOfTypeOnlyJavadocNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.List;
+              class A {
+                 /** Returns a {@link List}. */
+                 Object list() {
+                    return null;
+                 }
               }
               """
           )
@@ -117,6 +166,81 @@ class RemoveImportTest implements RewriteTest {
 
               class A {
                  Collection<Integer> c;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportOnlyIntoTypesTheSourceNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.nio.charset.CodingErrorAction")),
+          java(
+            """
+              import java.nio.charset.*;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """,
+            """
+              import java.nio.charset.CharsetDecoder;
+              import java.nio.charset.StandardCharsets;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportIntoOuterTypeOfQualifiedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Import visitImport(J.Import import_, ExecutionContext ctx) {
+                  maybeRemoveImport("java.util.List");
+                  return import_;
+              }
+
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  // only the nested type is attributed
+                  return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
+              }
+          })).afterTypeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
               }
               """
           )

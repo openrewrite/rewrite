@@ -22,6 +22,12 @@ import org.jspecify.annotations.Nullable;
  */
 public interface RegistryMetadata {
 
+    /** A fetcher using the config of the store controller that makes the request. */
+    default RegistryMetadata withOptions(PnpmOptions options) {
+        return this;
+    }
+
+
     /**
      * {@code GET <registry><name>}: the abbreviated document, or the full one when {@code fullMetadata}; null when the
      * registry answers 404.

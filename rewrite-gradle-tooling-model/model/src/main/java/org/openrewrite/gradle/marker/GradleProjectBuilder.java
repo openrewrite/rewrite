@@ -87,7 +87,15 @@ public final class GradleProjectBuilder {
                         new ArrayList<>(pluginRepositories),
                         GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
                 ),
-                springDependencyManagementPlugin(project));
+                springDependencyManagementPlugin(project),
+                buildFilePath(project));
+    }
+
+    /**
+     * Relative rather than absolute so the build machine's layout does not leak into the LST.
+     */
+    private static String buildFilePath(Project project) {
+        return project.getProjectDir().toPath().relativize(project.getBuildFile().toPath()).toString();
     }
 
     // Reflective because OpenRewrite depends on neither plugin, and null when anything is unavailable so that
@@ -172,7 +180,6 @@ public final class GradleProjectBuilder {
                 .collect(toList());
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
         if (!(repo instanceof AuthenticationSupportedInternal)) {
             return builder;
@@ -181,8 +188,12 @@ public final class GradleProjectBuilder {
         Credentials credentials = getCredentials((AuthenticationSupportedInternal) repo);
         if (credentials instanceof PasswordCredentials) {
             PasswordCredentials passwordCredentials = (PasswordCredentials) credentials;
-            Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
-            Optional.ofNullable(passwordCredentials.getPassword()).ifPresent(builder::password);
+            if (passwordCredentials.getUsername() != null) {
+                builder = builder.username(passwordCredentials.getUsername());
+            }
+            if (passwordCredentials.getPassword() != null) {
+                builder = builder.password(passwordCredentials.getPassword());
+            }
         }
         return builder;
     }

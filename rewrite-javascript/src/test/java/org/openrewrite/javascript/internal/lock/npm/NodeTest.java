@@ -918,6 +918,21 @@ class NodeTest {
     }
 
     @Test
+    void explainsAMissingNameOrVersionAsUndefined() {
+        Node root = node(opts().path("/p").pkg(obj("dependencies", obj("x", "^9"))));
+        // as a node that failed to load: ERESOLVE reports it as "Found: x@undefined"
+        Node x = node(opts().parent(root).pkg(obj("name", "x")));
+        assertThat(Js.string(x.explain().get("version"))).isEqualTo("undefined");
+
+        // a project without a name or version: ERESOLVE reports "While resolving: undefined@undefined"
+        Node virtual = node(opts().path("/virtual-root").sourceReference(root).pkg(obj()));
+        Node y = node(opts().parent(virtual).pkg(obj("name", "y", "version", "1.0.0")));
+        Map<?, ?> whileInstalling = (Map<?, ?>) y.explain().get("whileInstalling");
+        assertThat(Js.string(whileInstalling.get("name")) + "@" + Js.string(whileInstalling.get("version")))
+          .isEqualTo("undefined@undefined");
+    }
+
+    @Test
     void explainYourself() {
         Node n = node(opts().path("/some/path").pkg(obj("dependencies", obj("x", "1", "y", "2"))));
         assertThat(n.explain()).isEqualTo(obj("location", "/some/path"));

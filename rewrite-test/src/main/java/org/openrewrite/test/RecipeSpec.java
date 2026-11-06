@@ -216,6 +216,9 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * The cycles to run, by default one more than {@link #expectedCyclesThatMakeChanges(int)} and at least two.
+     */
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
         return this;
@@ -307,10 +310,6 @@ public class RecipeSpec {
     public RecipeSpec expectedCyclesThatMakeChanges(int expectedCyclesThatMakeChanges) {
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
         return this;
-    }
-
-    int getCycles() {
-        return cycles == null ? 2 : cycles;
     }
 
     int getExpectedCyclesThatMakeChanges(int cycles) {

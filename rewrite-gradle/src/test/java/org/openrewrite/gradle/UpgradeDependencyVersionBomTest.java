@@ -481,6 +481,62 @@ class UpgradeDependencyVersionBomTest implements RewriteTest {
     }
 
     @Test
+    void upgradesSharingABomPropertyDeclareItOnceAtTheHigherVersion() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeDependencyVersion("org.apache.kafka", "kafka-clients", "2.8.1", null),
+            new UpgradeDependencyVersion("org.apache.kafka", "kafka-streams", "2.8.0", null)
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.apache.kafka:kafka-clients'
+                  implementation 'org.apache.kafka:kafka-streams'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['kafka.version'] = '2.8.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.apache.kafka:kafka-clients'
+                  implementation 'org.apache.kafka:kafka-streams'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updatesBomPropertyOverrideInGradleProperties() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.33", null)),

@@ -16,6 +16,7 @@
 package org.openrewrite.test;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ImportValidationService;
@@ -25,34 +26,40 @@ import java.util.*;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * Finds recipes that write code naming types and static members their files don't import, and templates that name
- * them without declaring them, which resolve only on files that already import them.
+ * Checks that the files a recipe changes import what their code names and nothing else.
  */
 final class ImportedNames {
     private final @Nullable ImportValidationService service;
+    private final boolean importReferencedTypes;
+    private final boolean removeUnusedImports;
     private List<String> undeclared = emptyList();
 
-    private ImportedNames(@Nullable ImportValidationService service) {
+    private ImportedNames(@Nullable ImportValidationService service, boolean importReferencedTypes,
+                          boolean removeUnusedImports) {
         this.service = service;
+        this.importReferencedTypes = importReferencedTypes;
+        this.removeUnusedImports = removeUnusedImports;
     }
 
-    static ImportedNames of(boolean enabled, List<SourceFile> sources) {
-        if (enabled) {
+    static ImportedNames of(RecipeQualityValidation quality, Recipe recipe, List<SourceFile> sources) {
+        boolean removeUnusedImports = quality.removeUnusedImports() && !Probes.isAdHoc(recipe);
+        if (quality.importReferencedTypes() || removeUnusedImports) {
             for (SourceFile source : sources) {
                 ImportValidationService service = service(source);
                 if (service != null) {
-                    return new ImportedNames(service);
+                    return new ImportedNames(service, quality.importReferencedTypes(), removeUnusedImports);
                 }
             }
         }
-        return new ImportedNames(null);
+        return new ImportedNames(null, false, false);
     }
 
     RecipeRun record(Supplier<RecipeRun> run) {
-        if (service == null) {
+        if (service == null || !importReferencedTypes) {
             return run.get();
         }
         try (ImportValidationService.Recording recording = service.recordUndeclared()) {
@@ -62,11 +69,12 @@ final class ImportedNames {
         }
     }
 
-    void assertImported(Collection<Result> results) {
+    void assertImports(Collection<Result> results) {
         if (service == null) {
             return;
         }
         StringBuilder unimported = new StringBuilder();
+        StringBuilder unused = new StringBuilder();
         for (Result result : results) {
             SourceFile after = result.getAfter();
             ImportValidationService afterService = after == null || after == result.getBefore() ? null :
@@ -74,16 +82,18 @@ final class ImportedNames {
             if (afterService == null) {
                 continue;
             }
-            List<String> names = new ArrayList<>(afterService.unimported(after));
-            if (result.getBefore() != null) {
-                names.removeAll(afterService.unimported(result.getBefore()));
+            if (importReferencedTypes) {
+                List<String> names = new ArrayList<>(afterService.unimported(after));
+                if (result.getBefore() != null) {
+                    names.removeAll(afterService.unimported(result.getBefore()));
+                }
+                append(unimported, result, names);
             }
-            if (!names.isEmpty()) {
-                unimported.append("  ").append(after.getSourcePath()).append(NameMatching.changedBy(result))
-                        .append(": ").append(String.join(", ", names)).append('\n');
+            if (removeUnusedImports) {
+                append(unused, result, afterService.newlyUnusedImports(result.getBefore(), after));
             }
         }
-        List<String> failures = new ArrayList<>(2);
+        List<String> failures = new ArrayList<>(3);
         if (unimported.length() > 0) {
             failures.add("Import the types and static members the code the recipe writes names, with " +
                          "maybeAddImport(\"java.util.List\") for a type or maybeAddImport(\"java.util.Collections\", " +
@@ -105,9 +115,30 @@ final class ImportedNames {
                          "The file needs the import too, so also call maybeAddImport.");
         }
         if (!failures.isEmpty()) {
-            fail(String.join("\n\n", failures) + "\nIf the recipe names them this way on purpose, add " +
-                 "spec.recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false)" +
-                 ".build()).");
+            failures.set(failures.size() - 1, failures.get(failures.size() - 1) + "\nIf the recipe names them " +
+                         "this way on purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
+                         ".importReferencedTypes(false).build()).");
+        }
+        if (unused.length() > 0) {
+            failures.add("Remove the imports the recipe leaves unused, with maybeRemoveImport(\"java.util.List\") " +
+                         "once it has removed the code that used a type, and add imports with maybeAddImport, " +
+                         "which imports only what the file names. The recipe left these sources importing what " +
+                         "nothing in them uses:\n" + unused +
+                         "If the code still names it, the recipe wrote that code without its type, and a later " +
+                         "RemoveUnusedImports would delete an import the code needs. If the recipe keeps them on " +
+                         "purpose, add spec.recipeQualityValidation(RecipeQualityValidation.builder()" +
+                         ".removeUnusedImports(false).build()).");
+        }
+        if (!failures.isEmpty()) {
+            fail(String.join("\n\n", failures));
+        }
+    }
+
+    private static void append(StringBuilder sources, Result result, List<String> names) {
+        if (!names.isEmpty()) {
+            sources.append("  ").append(requireNonNull(result.getAfter()).getSourcePath())
+                    .append(NameMatching.changedBy(result)).append(": ").append(String.join(", ", names))
+                    .append('\n');
         }
     }
 

@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
+import org.openrewrite.hcl.internal.HclString;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.marker.AlreadyReplaced;
 
@@ -86,7 +87,8 @@ public class FindAndReplaceLiteral extends Recipe {
                 if (literal.getValue() == null) {
                     return literal;
                 }
-                Matcher matcher = pattern.matcher(literal.getValue().toString());
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                Matcher matcher = pattern.matcher(written(literal, parent));
                 if (!matcher.find()) {
                     return literal;
                 }
@@ -94,9 +96,28 @@ public class FindAndReplaceLiteral extends Recipe {
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
-                String newLiteral = matcher.replaceAll(replacement);
-                return literal.withValue(newLiteral).withValueSource(newLiteral)
+                return withWritten(literal, matcher.replaceAll(replacement), parent)
                         .withMarkers(literal.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+            }
+
+            // a string is matched as written, without the quotes a block label's source holds
+            private String written(Hcl.Literal literal, Object parent) {
+                if (!(literal.getValue() instanceof String)) {
+                    return literal.getValue().toString();
+                }
+                String source = literal.getValueSource();
+                return parent instanceof Hcl.Block ? source.substring(1, source.length() - 1) : source;
+            }
+
+            private Hcl.Literal withWritten(Hcl.Literal literal, String text, Object parent) {
+                if (!(literal.getValue() instanceof String)) {
+                    return literal.withValue(text).withValueSource(text);
+                } else if (parent instanceof Hcl.Block) {
+                    return literal.withValue(HclString.decodeQuoted(text)).withValueSource('"' + text + '"');
+                } else if (parent instanceof Hcl.HeredocTemplate) {
+                    return literal.withValue(HclString.decodeHeredoc(text)).withValueSource(text);
+                }
+                return literal.withValue(HclString.decodeQuoted(text)).withValueSource(text);
             }
         };
     }

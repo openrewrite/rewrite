@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.trait.GradlePlugin;
@@ -47,6 +48,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -102,8 +104,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     public static class DependencyVersionState {
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
         Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
-        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
-        AtomicReference<@Nullable GradleSettings> gradleSettings = new AtomicReference<>();
+
+        /**
+         * The root project's repositories if it was scanned, otherwise the first one's, which a catalog resolves
+         * against when no settings script was scanned.
+         */
+        AtomicReference<@Nullable ProjectRepositories> projectRepositories = new AtomicReference<>();
+        AtomicReference<@Nullable ProjectRepositories> settingsRepositories = new AtomicReference<>();
     }
 
     @Override
@@ -128,11 +135,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
-                    if (gradleProject != null && (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath()))) {
-                        acc.gradleProject.set(gradleProject);
+                    if (gradleProject != null && (acc.projectRepositories.get() == null || ":".equals(gradleProject.getPath()))) {
+                        acc.projectRepositories.set(ProjectRepositories.of(gradleProject));
                     }
                     if (gradleSettings != null) {
-                        acc.gradleSettings.set(gradleSettings);
+                        acc.settingsRepositories.set(ProjectRepositories.of(gradleSettings));
                     }
                     localVariableValues.clear();
                 }
@@ -213,9 +220,15 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
-                upgradeVersionCatalog(catalog,
-                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), acc.gradleSettings.get()), ctx));
+        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+            // A selector given settings resolves from the settings' repositories alone
+            ProjectRepositories settingsRepositories = acc.settingsRepositories.get();
+            ProjectRepositories repositories = settingsRepositories != null ? settingsRepositories :
+                    acc.projectRepositories.get();
+            return upgradeVersionCatalog(catalog, repositories == null ?
+                    new DependencyVersionSelector(metadataFailures, null, null) :
+                    repositories.selector(metadataFailures), ctx);
+        });
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -274,11 +287,13 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                         .collect(toSet());
                                 try {
                                     MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories())
+                                            .resolve(emptyList(), mpd, gradleProject.getMavenRepositories(), ctx).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                                             .filter(requested::contains)
                                             .collect(toList());
-                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories())
+                                            .resolve(emptyList(), mpd, gradleProject.getMavenRepositories(), ctx).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
                                             .filter(gav -> requested.stream().anyMatch(r -> r.equals(gav.asGroupArtifact())))
                                             .collect(toList());

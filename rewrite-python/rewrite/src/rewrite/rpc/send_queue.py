@@ -47,6 +47,44 @@ _MAX_WIRE_INT_BITS = 3300
 
 T = TypeVar('T')
 
+_UNRESOLVED: Any = object()
+_PER_INSTANCE: Any = object()
+# The valueType sent for each class's instances, as _get_value_type resolves it.
+_VALUE_TYPES: Dict[type, Any] = {}
+
+
+def _builtin_value_type(obj_type: type) -> Any:
+    """The valueType of a class's instances where the codec registry has no say, else _UNRESOLVED."""
+    if obj_type in (str, int, float, bool, type(None)):
+        return None
+    if issubclass(obj_type, dict):
+        return _PER_INSTANCE
+    if issubclass(obj_type, (list, UUID, Path)):
+        return None
+
+    if issubclass(obj_type, JavaType.Primitive):
+        return 'org.openrewrite.java.tree.JavaType$Primitive'
+    if issubclass(obj_type, JavaType.Method):
+        return 'org.openrewrite.java.tree.JavaType$Method'
+    if issubclass(obj_type, JavaType.Parameterized):
+        return 'org.openrewrite.java.tree.JavaType$Parameterized'
+    # ShallowClass extends Class, so it is checked first, or it would be sent as a Class.
+    if issubclass(obj_type, JavaType.ShallowClass):
+        return 'org.openrewrite.java.tree.JavaType$ShallowClass'
+    if issubclass(obj_type, JavaType.Class):
+        return 'org.openrewrite.java.tree.JavaType$Class'
+    if issubclass(obj_type, JavaType.GenericTypeVariable):
+        return 'org.openrewrite.java.tree.JavaType$GenericTypeVariable'
+    if issubclass(obj_type, JavaType.Union):
+        return 'org.openrewrite.java.tree.JavaType$MultiCatch'
+    if issubclass(obj_type, JavaType.Intersection):
+        return 'org.openrewrite.java.tree.JavaType$Intersection'
+
+    # Other enums are serialized by name
+    if issubclass(obj_type, Enum):
+        return None
+    return _UNRESOLVED
+
 
 class RpcSendQueue:
     """Queue for generating RpcObjectData array from Python LST using visitor pattern."""
@@ -304,56 +342,24 @@ class RpcSendQueue:
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""
-        if obj is None:
-            return None
-
         obj_type = type(obj)
-
-        # Primitives and built-ins don't need type info
-        if obj_type in (str, int, float, bool, type(None)):
-            return None
-        if isinstance(obj, dict):
+        value_type = _VALUE_TYPES.get(obj_type, _UNRESOLVED)
+        if value_type is _UNRESOLVED:
+            value_type = _builtin_value_type(obj_type)
+            if value_type is _UNRESOLVED:
+                if _java_type_name_of is None:
+                    _bind_registry_lookups()
+                value_type = _java_type_name_of(obj_type)
+                if value_type is None:
+                    # not cached, as a codec may yet be registered for the class
+                    return None
+            _VALUE_TYPES[obj_type] = value_type
+        if value_type is _PER_INSTANCE:
             # An opaque value the remote side has a codec for but Python does not is received as
             # {'kind': <valueType>, **fields} (see RpcReceiveQueue._do_change). Re-emit its original
             # valueType so it round-trips unchanged; an ordinary dict (no 'kind') stays untyped.
             return obj.get('kind')
-        if isinstance(obj, list):
-            return None
-        if isinstance(obj, UUID):
-            return None
-        if isinstance(obj, Path):
-            return None
-
-        # JavaType.Primitive is a special Enum that needs its Java type name
-        # Check for JavaType.Primitive before the general Enum check
-        if isinstance(obj, JavaType.Primitive):
-            return 'org.openrewrite.java.tree.JavaType$Primitive'
-        if isinstance(obj, JavaType.Method):
-            return 'org.openrewrite.java.tree.JavaType$Method'
-        if isinstance(obj, JavaType.Parameterized):
-            return 'org.openrewrite.java.tree.JavaType$Parameterized'
-        # ShallowClass extends Class, so check it first — otherwise isinstance(obj, Class)
-        # would return the Class type name and strip the ShallowClass marker.
-        if isinstance(obj, JavaType.ShallowClass):
-            return 'org.openrewrite.java.tree.JavaType$ShallowClass'
-        if isinstance(obj, JavaType.Class):
-            return 'org.openrewrite.java.tree.JavaType$Class'
-        if isinstance(obj, JavaType.GenericTypeVariable):
-            return 'org.openrewrite.java.tree.JavaType$GenericTypeVariable'
-        if isinstance(obj, JavaType.Union):
-            return 'org.openrewrite.java.tree.JavaType$MultiCatch'
-        if isinstance(obj, JavaType.Intersection):
-            return 'org.openrewrite.java.tree.JavaType$Intersection'
-
-        # Other enums don't need type info (they're serialized by name)
-        if isinstance(obj, Enum):
-            return None
-
-        # Look up Java type name from codec registry. Bound here rather than at the top: every
-        # primitive, dict, list, UUID and Path returns above without ever needing it.
-        if _java_type_name_of is None:
-            _bind_registry_lookups()
-        return _java_type_name_of(obj_type)
+        return value_type
 
     def _get_primitive_value(self, obj: Any) -> Any:
         """Get the primitive value representation for serialization."""

@@ -732,7 +732,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     /**
      * Resolves a {@code pkg.Name} reference to the class symbol its package lists, which needs no class file
      * read, and types the tree with it so the type mapping can serve it from the factory. Every other shape,
-     * and a class not accessible from here, is left to attribution.
+     * and a class not accessible from here, is left to attribution. So is a package whose listing fails, as with an
+     * unreadable classpath jar.
      */
     private boolean resolveWithoutCompleting(JCTree tree) {
         if (!(tree instanceof JCTree.JCFieldAccess) || symbol == null) {
@@ -743,8 +744,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         if (packageName == null) {
             return false;
         }
-        Symbol.PackageSymbol pkg = classReader.enterPackage(packageName);
-        pkg.complete();
+        Symbol.PackageSymbol pkg;
+        try {
+            pkg = classReader.enterPackage(packageName);
+            pkg.complete();
+        } catch (Symbol.CompletionFailure ignored) {
+            return false;
+        }
         if (!pkg.exists()) {
             return false;
         }

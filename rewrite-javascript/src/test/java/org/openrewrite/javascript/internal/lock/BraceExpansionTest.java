@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * brace-expansion 1.1.11's, 5.0.6's and 5.0.9's own tests and the inputs where their sources differ, and
+ * brace-expansion 1.1.11's, 5.0.6's, 5.0.9's and 5.0.12's own tests and the inputs where their sources differ, and
  * balanced-match 1.0.0's and 4.0.4's own tests ({@code upstream/brace-expansion-*}, {@code upstream/balanced-match-*}).
  */
 class BraceExpansionTest {
@@ -46,7 +46,8 @@ class BraceExpansionTest {
     private static final String[][] RELEASES = {
             {"V1_1_11", "brace-expansion-1.1.11.jsonl", "balanced-match-1.0.0.jsonl"},
             {"V5_0_6", "brace-expansion-5.0.6.jsonl.gz", "balanced-match-4.0.4.jsonl"},
-            {"V5_0_9", "brace-expansion-5.0.9.jsonl.gz", "balanced-match-4.0.4.jsonl"}};
+            {"V5_0_9", "brace-expansion-5.0.9.jsonl.gz", "balanced-match-4.0.4.jsonl"},
+            {"V5_0_12", "brace-expansion-5.0.12.jsonl.gz", "balanced-match-4.0.4.jsonl"}};
 
     static Stream<Arguments> calls() {
         List<Arguments> out = new ArrayList<>();
@@ -65,7 +66,7 @@ class BraceExpansionTest {
     private static @Nullable String notPorted(Call call) {
         if ("expand".equals(call.getFn())) {
             return call.has(1) && !(call.arg(1) instanceof Map && ((Map<?, ?>) call.arg(1)).isEmpty()) ?
-                    "expand with a max or a maxLength: minimatch 10.2.5 passes none" : null;
+                    "expand with options: minimatch 10.2.5 passes none" : null;
         }
         return "{".equals(call.arg(0)) && "}".equals(call.arg(1)) ? null :
                 call.getFn() + " of other delimiters: brace-expansion asks for { and } only";
@@ -141,9 +142,10 @@ class BraceExpansionTest {
         }
         Map<String, Integer> expected = new LinkedHashMap<>();
         expected.put("balanced-match-1.0.0 balanced of other delimiters: brace-expansion asks for { and } only", 7);
-        expected.put("brace-expansion-5.0.6 expand with a max or a maxLength: minimatch 10.2.5 passes none", 2);
+        expected.put("brace-expansion-5.0.6 expand with options: minimatch 10.2.5 passes none", 2);
         expected.put("balanced-match-4.0.4 balanced of other delimiters: brace-expansion asks for { and } only", 9);
-        expected.put("brace-expansion-5.0.9 expand with a max or a maxLength: minimatch 10.2.5 passes none", 8);
+        expected.put("brace-expansion-5.0.9 expand with options: minimatch 10.2.5 passes none", 8);
+        expected.put("brace-expansion-5.0.12 expand with options: minimatch 10.2.5 passes none", 32);
         assertThat(notPorted).isEqualTo(expected);
     }
 

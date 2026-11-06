@@ -5,7 +5,7 @@ plugins {
     id("org.openrewrite.build.shadow")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 

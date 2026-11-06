@@ -54,8 +54,7 @@ public class XmlTreeShapeValidationService implements TreeShapeValidationService
 
     @Override
     public List<String> invalid(SourceFile sourceFile) {
-        List<String> invalid = new ArrayList<>();
-        new XmlIsoVisitor<List<String>>() {
+        return new XmlIsoVisitor<List<String>>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, List<String> found) {
                 Set<String> keys = new HashSet<>();
@@ -67,7 +66,6 @@ public class XmlTreeShapeValidationService implements TreeShapeValidationService
                 }
                 return super.visitTag(tag, found);
             }
-        }.visit(sourceFile, invalid);
-        return invalid;
+        }.reduce(sourceFile, new ArrayList<>());
     }
 }

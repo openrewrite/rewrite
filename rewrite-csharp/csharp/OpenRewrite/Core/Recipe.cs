@@ -142,7 +142,9 @@ public interface IScanningRecipe
 /// <summary>
 /// A recipe that first scans source files to accumulate data, then transforms them.
 /// </summary>
-/// <typeparam name="TAccumulator">The type of the accumulator for scanning data.</typeparam>
+/// <typeparam name="TAccumulator">The type of the accumulator for scanning data. It stays in memory until the cycle
+/// ends, so it should hold values such as coordinates, paths and ids, not trees or other <see cref="IHeavyweight"/>
+/// objects.</typeparam>
 public abstract class ScanningRecipe<TAccumulator> : Recipe, IScanningRecipe
 {
     public abstract TAccumulator GetInitialValue(ExecutionContext ctx);

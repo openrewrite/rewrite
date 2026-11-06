@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the OpenRewrite Typ
 
 ## Module Overview
 
-TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON and YAML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
+TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON, YAML and XML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
 
 Self-contained Node.js project, separate from the Java monorepo build system.
 
@@ -40,7 +40,7 @@ npm run typecheck
 npm run testhelper -- test/javascript/recipes/order-imports.test.ts
 ```
 
-Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
+Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `start`.
 
 ### Java RPC Integration Tests
 
@@ -52,6 +52,10 @@ Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.m
 ```
 
 This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
+
+Name such a test `test/rpc/java-*.test.ts`, or add it to `javaTests` in `vitest.config.mts`. That puts it in the `java` vitest project, which Gradle runs as `npmTestJava` and reruns when the Java side changes. Gradle runs the `typescript` project as `npmTestTypeScript`, without the Java classpath.
+
+`./gradlew :rewrite-javascript:npmTest` runs `npmTypecheck`, `npmTestTypeScript` and `npmTestJava` but does no work itself, so `npmTest --rerun` reruns nothing. To force a rerun, pass `--rerun` to `npmTestTypeScript` or `npmTestJava`.
 
 ## Directory Structure
 
@@ -86,6 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
@@ -104,7 +109,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser/, format/, cleanup/   # Category tests
 │   │   └── search/, templating/, migrate/
 │   ├── java/                            # Java model tests
-│   ├── json/, yaml/                     # JSON/YAML tests
+│   ├── json/, yaml/, xml/               # JSON/YAML/XML tests
 │   └── rpc/                             # RPC integration tests
 ├── tsconfig.json
 ├── vitest.config.mts
@@ -199,14 +204,23 @@ describe('OrderImports', () => {
 
     test('sorts imports', () =>
         spec.rewriteRun(
+            //language=typescript
             typescript(
-                `import {z} from 'zebra';\nimport {a} from 'alpha';`,
-                `import {a} from 'alpha';\nimport {z} from 'zebra';`
+                `
+                import {z} from 'zebra';
+                import {a} from 'alpha';
+                `,
+                `
+                import {a} from 'alpha';
+                import {z} from 'zebra';
+                `
             )
         )
     );
 });
 ```
+
+Prefer writing test sources over real lines rather than with `\n`.
 
 ### Sharing a `RecipeSpec` across tests
 
@@ -315,7 +329,8 @@ reads `exports` or `module.exports` anywhere, inside a function too. There `mayb
 `require`, since an `import` would make the file an ES module. A function whose own parameters are
 `require`, `exports` or `module`, as an AMD factory's are, does not count.
 
-A new `require` goes among the file's leading requires, the run after a shebang and `'use strict'`
+A new `require` goes among the file's leading requires, the run after a shebang and any directives
+(`'use strict'`, `'use client'`, `/// <reference … />`, ...)
 that every other top-level statement follows, so nothing at top level reads the binding before it
 is initialised. A member joins a `const` destructuring `require` of its module there that has no
 rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets

@@ -24,8 +24,12 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.java.format.NormalizeTabsOrSpaces;
 import org.openrewrite.java.search.FindCompileErrors;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
@@ -39,6 +43,9 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.java.Assertions.java;
@@ -549,6 +556,56 @@ class JavaParserTest implements RewriteTest {
               }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void cloneDoesNotShareStylesWithOriginal() {
+        // given
+        JavaParser.Builder<? extends JavaParser, ?> original = JavaParser.fromJavaVersion();
+        NamedStyles styles = new NamedStyles(Tree.randomId(), "test", "test", "test", emptySet(), emptyList());
+
+        // when
+        JavaParser.Builder<? extends JavaParser, ?> clone = original.clone().styles(singletonList(styles));
+
+        // then
+        assertThat(parse(clone, "class A {}").getMarkers().findFirst(NamedStyles.class)).contains(styles);
+        assertThat(parse(original, "class B {}").getMarkers().findFirst(NamedStyles.class)).isEmpty();
+    }
+
+    private static SourceFile parse(JavaParser.Builder<? extends JavaParser, ?> builder, @Language("java") String source) {
+        return builder.build().parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow();
+    }
+
+    @Test
+    void tabsStyleOfOneCloneDoesNotReformatSourcesOfAnother() {
+        JavaParser.Builder<? extends JavaParser, ?> base = JavaParser.fromJavaVersion();
+        NamedStyles tabs = new NamedStyles(Tree.randomId(), "tabs", "tabs", null, emptySet(),
+          singletonList(IntelliJ.tabsAndIndents().withUseTabCharacter(true)));
+        rewriteRun(
+          spec -> spec.recipe(new NormalizeTabsOrSpaces()).parser(base.clone().styles(singletonList(tabs))),
+          java(
+            """
+              class A {
+                  int a;
+              }
+              """,
+            """
+              class A {
+              	int a;
+              }
+              """
+          )
+        );
+        rewriteRun(
+          spec -> spec.recipe(new NormalizeTabsOrSpaces()).parser(base.clone()),
+          java(
+            """
+              class B {
+                  int b;
+              }
+              """
           )
         );
     }

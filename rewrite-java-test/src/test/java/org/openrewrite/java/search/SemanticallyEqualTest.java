@@ -50,6 +50,15 @@ class SemanticallyEqualTest {
     }
 
     @Test
+    void nullIsOnlyEqualToNull() {
+        J.CompilationUnit cu = javaParser.parse("class A {}").findFirst().map(J.CompilationUnit.class::cast).orElseThrow();
+
+        assertFalse(SemanticallyEqual.areEqual(null, cu));
+        assertFalse(SemanticallyEqual.areEqual(cu, null));
+        assertTrue(SemanticallyEqual.areEqual(null, null));
+    }
+
+    @Test
     void classModifierLists() {
         assertEqual(
           """

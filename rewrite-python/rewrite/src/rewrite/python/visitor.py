@@ -224,6 +224,7 @@ class PythonVisitor(JavaVisitor[P]):
                 comp.clauses
             )
         )
+        comp = comp.replace(suffix=self.visit_space(comp.suffix, p))
         if self._visits_types:
             comp = comp.replace(_type=self.visit_type(comp.type, p))
         return comp

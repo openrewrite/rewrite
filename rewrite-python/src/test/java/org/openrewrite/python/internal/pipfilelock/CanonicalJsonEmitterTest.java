@@ -28,7 +28,7 @@ import static org.openrewrite.python.internal.pipfilelock.Fixtures.resource;
 
 /**
  * All expected values in this class were recorded from Python 3.14 via
- * {@code src/test/resources/pipfilelock/oracle.py compact}, i.e.
+ * {@code record/pipenv-oracle.py compact}, i.e.
  * {@code json.dumps(obj, sort_keys=True, separators=(",", ":"))}.
  */
 class CanonicalJsonEmitterTest {

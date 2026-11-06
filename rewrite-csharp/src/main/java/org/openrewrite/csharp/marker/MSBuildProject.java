@@ -22,6 +22,7 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -48,7 +49,7 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @Builder
 @AllArgsConstructor
-public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildProject> {
+public class MSBuildProject implements Marker, Heavyweight, Serializable, RpcCodec<MSBuildProject> {
 
     @With
     @Builder.Default
@@ -138,7 +139,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     @With
     @Builder
     @AllArgsConstructor
-    public static class TargetFramework implements Serializable, RpcCodec<TargetFramework> {
+    public static class TargetFramework implements Heavyweight, Serializable, RpcCodec<TargetFramework> {
         String targetFramework;
 
         @Builder.Default
@@ -230,7 +231,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     @With
     @Builder
     @AllArgsConstructor
-    public static class ResolvedPackage implements Serializable, RpcCodec<ResolvedPackage> {
+    public static class ResolvedPackage implements Heavyweight, Serializable, RpcCodec<ResolvedPackage> {
         String name;
 
         String resolvedVersion;
@@ -433,7 +434,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
 
         /**
          * NuGet packages this project depends on directly. Instances are shared with the
-         * owning {@link TargetFramework#getResolvedPackages()}.
+         * owning {@link TargetFramework#resolvedPackages}.
          */
         @Builder.Default
         List<ResolvedPackage> resolvedPackages = emptyList();

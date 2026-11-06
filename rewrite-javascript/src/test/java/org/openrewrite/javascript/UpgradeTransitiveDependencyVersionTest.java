@@ -43,6 +43,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.AddKeyValue;
@@ -661,13 +662,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void npmRejectingTheOverrideKeepsTheEditAndWarns() {
+    void npmRejectingTheOverrideLeavesTheManifestAndWarns() {
         Scenario s = new Scenario("npm/override-recipe-conflicts-direct");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", null)
             .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
               .satisfies(row -> assertThat(row.getDetail()).contains("EOVERRIDE"))),
-          s.root(PackageManager.Npm, s.file("pkg"), true),
+          s.root(PackageManager.Npm, s.file("pkg-before"), true),
           packageLock(s.file("before"), null, spec -> spec.noTrim().after(actual -> {
               assertThat(actual).contains("EOVERRIDE").endsWith(requireNonNull(s.file("before")));
               return actual;
@@ -746,6 +747,43 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void pnpmNamesAnOverrideScopedToAParentThatStillApplies() {
         golden("pnpm/override-recipe-parent-selector-present", PackageManager.Pnpm, "7.0.0", null,
           "pnpm applies is-odd>is-number before a global override of is-number");
+    }
+
+    @Test
+    void npmPackageNotInTheResolvedTreeGetsNoOverride() {
+        Scenario s = new Scenario("npm/override-recipe-global");
+        String before = requireNonNull(s.file("pkg-before"));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("left-pad", "1.3.0", null))
+            .executionContext(s.ctx())
+            .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyEditsDeclined.class)).isEmpty()),
+          packageJson(before, null, resolved(nodeResolutionResult(PackageManager.Npm, dependencies(before)),
+            "is-odd@3.0.1", "is-number@6.0.0"), spec -> spec.noTrim()),
+          s.lock(PackageManager.Npm, null)
+        );
+    }
+
+    @Test
+    void npmPackageInTheResolvedTreeIsOverridden() {
+        Scenario s = new Scenario("npm/override-recipe-global");
+        String before = requireNonNull(s.file("pkg-before"));
+        rewriteRun(
+          spec -> s.spec(spec, "^7.0.0", null),
+          packageJson(before, s.file("pkg"), resolved(nodeResolutionResult(PackageManager.Npm,
+            dependencies(before)), "is-odd@3.0.1", "is-number@6.0.0"), spec -> spec.noTrim()
+            .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning)),
+          s.lock(PackageManager.Npm, s.file("after"))
+        );
+    }
+
+    private static NodeResolutionResult resolved(NodeResolutionResult marker, String... packages) {
+        List<ResolvedDependency> resolved = new ArrayList<>();
+        for (String pkg : packages) {
+            int at = pkg.lastIndexOf('@');
+            resolved.add(new ResolvedDependency(pkg.substring(0, at), pkg.substring(at + 1), null, null, null, null,
+              null, null));
+        }
+        return marker.withResolvedDependencies(resolved);
     }
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path) {
@@ -911,14 +949,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         return orders;
     }
 
-    // the edit is kept and the lock warned: pnpm 11.2.2 hands the install to the release the project names
+    // the edit is declined and the lock warned: pnpm 11.2.2 hands the install to the release the project names
     private void otherPnpmRelease(String scenario, @Nullable String path, String release) {
         Scenario s = new Scenario(scenario);
         s.release = release;
         List<SourceSpecs> sources = new ArrayList<>();
-        sources.add(s.root(PackageManager.Pnpm, s.file("pkg"), true));
-        if (s.file("workspace") != null) {
-            sources.add(s.workspace());
+        sources.add(s.root(PackageManager.Pnpm, s.file("pkg-before"), true));
+        if (s.file("workspace-before") != null) {
+            sources.add(yaml(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml").noTrim()));
         }
         sources.add(pnpmLock(s.file("before"), null, spec -> spec.noTrim().afterRecipe(lock ->
           assertThat(lock.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(warn ->
@@ -1028,7 +1066,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             String before = requireNonNull(file("pkg-before"));
             List<String> members = file("tree-before/" + MEMBER) == null ? null : singletonList(MEMBER);
             NodeResolutionResult marker = nodeResolutionResult(pm, members, dependencies(before));
-            if (warned && !before.equals(after)) {
+            if (warned) {
                 return packageJson(before, null, marker, spec -> spec.noTrim().after(actual -> {
                     assertThat(actual).contains("lock regeneration failed").endsWith(requireNonNull(after));
                     return actual;

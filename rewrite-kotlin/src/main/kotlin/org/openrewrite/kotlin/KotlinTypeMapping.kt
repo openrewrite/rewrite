@@ -461,7 +461,7 @@ class KotlinTypeMapping(
                             if (interfaces == null) {
                                 interfaces = ArrayList()
                             }
-                            interfaces!!.add(remapKotlinBuiltin(superType))
+                            interfaces.add(remapKotlinBuiltin(superType))
                         }
 
                         FullyQualified.Kind.Class -> if ("java.lang.Object" != signature) {
@@ -483,7 +483,7 @@ class KotlinTypeMapping(
                             if (interfaces == null) {
                                 interfaces = ArrayList()
                             }
-                            interfaces!!.add(candidate)
+                            interfaces.add(candidate)
                         }
 
                         else -> {}
@@ -1122,7 +1122,7 @@ class KotlinTypeMapping(
         // For a Parameterized (e.g. kotlin.Enum<Foo>) remap the underlying raw type but
         // keep the parameterization so we don't lose type argument information.
         if (fq is Parameterized) {
-            val inner = fq.type ?: return fq
+            val inner = fq.type
             val remappedInner = remapKotlinBuiltin(inner)
             if (remappedInner === inner) {
                 return fq
@@ -1227,7 +1227,7 @@ class KotlinTypeMapping(
             erasedParameterName(type.type)
         }
 
-        is GenericTypeVariable -> type.bounds?.firstOrNull()
+        is GenericTypeVariable -> type.bounds.firstOrNull()
             ?.let { erasedParameterName(it) } ?: "java.lang.Object"
 
         is FullyQualified -> {
@@ -1444,7 +1444,7 @@ class KotlinTypeMapping(
                         if (interfaces == null) {
                             interfaces = ArrayList()
                         }
-                        interfaces!!.add(type(classifierSupertype) as FullyQualified)
+                        interfaces.add(type(classifierSupertype) as FullyQualified)
                     } else if ("java.lang.Object" != fqn) {
                         supertype = type(classifierSupertype) as FullyQualified
                     }
@@ -1470,7 +1470,7 @@ class KotlinTypeMapping(
                 for (method: JavaMethod in type.methods) {
                     val mt = methodDeclarationType(method, c)
                     if (mt != null) {
-                        methods!!.add(mt)
+                        methods.add(mt)
                     }
                 }
             }
@@ -1483,7 +1483,7 @@ class KotlinTypeMapping(
                         if (method.access.toLong() and ((1 shl 12).toLong() or (1L shl 31) or (1L shl 37) or (1 shl 29).toLong()) == 0L) {
                             val ms = javaConstructorType(method, c)
                             if (ms != null) {
-                                methods!!.add(ms)
+                                methods.add(ms)
                             }
                         }
                     }
@@ -1493,14 +1493,14 @@ class KotlinTypeMapping(
                 if (methods == null) {
                     methods = ArrayList()
                 }
-                methods!!.add(enumValuesMethod(c))
-                methods!!.add(enumValueOfMethod(c))
+                methods.add(enumValuesMethod(c))
+                methods.add(enumValueOfMethod(c))
             }
             var typeParameters: MutableList<JavaType>? = null
             if (type.typeParameters.isNotEmpty()) {
                 typeParameters = ArrayList(type.typeParameters.size)
                 for (typeArgument: JavaTypeParameter in type.typeParameters) {
-                    typeParameters!!.add(type(typeArgument))
+                    typeParameters.add(type(typeArgument))
                 }
             }
             c.unsafeSet(typeParameters,
@@ -1590,7 +1590,7 @@ class KotlinTypeMapping(
         if (resolvedDeclaringType is Parameterized) {
             resolvedDeclaringType = resolvedDeclaringType.type
         }
-        val finalDeclaringType: FullyQualified = resolvedDeclaringType!!
+        val finalDeclaringType: FullyQualified = resolvedDeclaringType
         val paramNamesArr: kotlin.Array<String>? = if (constructor.valueParameters.isNotEmpty()) {
             kotlin.Array(constructor.valueParameters.size) { i -> "arg$i" }
         } else null
@@ -1662,7 +1662,7 @@ class KotlinTypeMapping(
             } else {
                 bounds = ArrayList(type.upperBounds.size)
                 for (bound: org.jetbrains.kotlin.load.java.structure.JavaType in type.upperBounds) {
-                    (bounds as ArrayList<JavaType>).add(type(bound))
+                    bounds.add(type(bound))
                 }
             }
             gtv.unsafeSet(name,
@@ -1774,7 +1774,7 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     private fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
         (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
-                symbol.callableId?.isLocal == false &&
+                !symbol.isLocal &&
                 symbol.dispatchReceiverType == null &&
                 symbol.containingClassLookupTag() == null &&
                 symbol.fir.isScriptTopLevelDeclaration != true
@@ -1850,7 +1850,6 @@ class KotlinTypeMapping(
                     ConstantValueKind.Short, ConstantValueKind.UnsignedShort -> Primitive.Short
                     ConstantValueKind.String -> Primitive.String
                     ConstantValueKind.Error -> Primitive.None
-                    else -> throw UnsupportedOperationException("Unexpected constant value kind: ${type.kind}")
                 }
             }
 

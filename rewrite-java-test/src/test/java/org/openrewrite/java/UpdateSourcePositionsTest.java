@@ -88,6 +88,26 @@ class UpdateSourcePositionsTest {
     }
 
     @Test
+    void enumConstantInitializer() {
+        String source = """
+          enum E {
+              A(1);
+
+              E(int n) {
+              }
+          }
+          """;
+        List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(source).collect(toList());
+        Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
+        J.EnumValueSet enums = (J.EnumValueSet) ((J.CompilationUnit) result.getAfter()).getClasses().getFirst().getBody().getStatements().getFirst();
+        J.NewClass initializer = enums.getEnums().getFirst().getInitializer();
+        assertThat(initializer.getMarkers().findFirst(Range.class)).hasValueSatisfying(range -> {
+            assertThat(range.getStart().getOffset()).isEqualTo(source.indexOf("(1)"));
+            assertThat(range.length()).isEqualTo("(1)".length());
+        });
+    }
+
+    @Test
     void updateSourcePositions() {
         List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(
           """

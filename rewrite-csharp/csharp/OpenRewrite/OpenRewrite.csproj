@@ -56,6 +56,8 @@
     <PackageReference Include="StreamJsonRpc" Version="2.25.29" />
     <!-- Overrides the 2.5.302 that StreamJsonRpc pulls in, for CVE-2026-92707. -->
     <PackageReference Include="MessagePack" Version="2.5.307" />
+    <!-- Overrides the 1.2.4 that StreamJsonRpc pulls in, for GHSA-grf3-jgmf-2g5j. -->
+    <PackageReference Include="Nerdbank.MessagePack" Version="1.3.88" />
     <!-- xunit (assertion/fixture API only) is consumed by the public Test/ helpers (RewriteTest, RpcFixture, ...). -->
     <!-- The runner packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) live in the sibling OpenRewrite.Tests project. -->
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="none" />

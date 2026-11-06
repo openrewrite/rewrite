@@ -31,10 +31,13 @@ from rewrite.utils import assign_fields, replace_if_changed
 
 T = TypeVar('T')
 
-# Hot-path lookup: every received envelope hits this. `Enum.__call__` does a
-# metaclass-driven O(n) value scan in stdlib `enum`; a plain dict is ~5-10×
-# faster, and at ~70M calls per medium-set sequential run that matters.
+# `Enum.__call__` scans the members for a value, where a dict lookup does not.
 _STATE_BY_VALUE: Dict[str, RpcObjectState] = {s.value: s for s in RpcObjectState}
+
+# A str-valued enum member equals its value, so these match a state decoded off the wire and an
+# RpcObjectState put on an in-process queue alike.
+_NO_CHANGE, _DELETE, _ADD, _CHANGE = 'NO_CHANGE', 'DELETE', 'ADD', 'CHANGE'
+_UNSET: Any = object()
 
 
 class _FrozenList(list):
@@ -56,11 +59,9 @@ _EMPTY_LIST: List[Any] = _FrozenList()
 
 
 class RpcObjectData:
-    """Data structure for RPC object messages.
+    """An RPC object message as ``RpcReceiveQueue.take`` returns it.
 
-    Slotted rather than tuple-backed: about 20% cheaper to construct on 3.12, and ~70M of these
-    are created per medium-set sequential run. Read by attribute only — the send side builds
-    plain dicts, so one of these never reaches json.dumps.
+    ``receive`` and ``receive_list`` read the decoded message dict directly.
     """
 
     __slots__ = ('state', 'value_type', 'value', 'ref', 'trace')
@@ -116,23 +117,27 @@ class RpcReceiveQueue:
         self._fresh: Set[int] = set()
         # Refs this queue recorded, for roll_back_refs.
         self._received_refs: List[int] = []
+        # Registry lookups, resolved once per class or valueType for the life of this queue.
+        self._codecs: Dict[type, Any] = {}
+        self._factories: Dict[str, Any] = {}
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
+        return self._parse_message(self._take_raw())
+
+    def _take_raw(self) -> Dict[str, Any]:
+        """The next message as decoded off the wire, which ``receive`` and ``receive_list`` read in place."""
         if not self._batch:
             self._batch = deque(self._pull())
 
         if not self._batch:
             raise RuntimeError("RPC receive queue is empty and pull returned no data")
 
-        raw = self._batch.popleft()
-        return self._parse_message(raw)
+        return self._batch.popleft()
 
     def _parse_message(self, raw: Dict[str, Any]) -> RpcObjectData:
         """Parse a raw message dict into RpcObjectData."""
         state_raw = raw.get('state', 'NO_CHANGE')
-        # type(x) is str sidesteps the ABC dispatch path that isinstance() takes
-        # — saves a hot per-call ~200 ns × ~70M calls.
         state = _STATE_BY_VALUE[state_raw] if type(state_raw) is str else state_raw
 
         return RpcObjectData(
@@ -180,18 +185,20 @@ class RpcReceiveQueue:
         Returns:
             The deserialized object, or None if deleted
         """
-        message = self.take()
-        ref: Optional[int] = None
+        message = self._take_raw()
+        state = message.get('state', _NO_CHANGE)
 
-        if message.state == RpcObjectState.NO_CHANGE:
+        if state == _NO_CHANGE:
             return before
 
-        elif message.state == RpcObjectState.DELETE:
+        elif state == _DELETE:
             return None
 
-        elif message.state == RpcObjectState.ADD:
-            ref = message.ref
-            if ref is not None and message.value_type is None and message.value is None:
+        elif state == _ADD:
+            ref = message.get('ref')
+            value_type = message.get('valueType')
+            value = message.get('value')
+            if ref is not None and value_type is None and value is None:
                 # Pure reference to existing object
                 if ref in self._refs:
                     return self._refs[ref]
@@ -199,11 +206,11 @@ class RpcReceiveQueue:
                     raise RuntimeError(f"Received reference to unknown object: {ref}")
             else:
                 # New object or forward declaration with ref
-                if message.value_type is None:
-                    before = message.value
+                if value_type is None:
+                    before = value
                     fresh = False
                 else:
-                    before = self._new_obj(message.value_type)
+                    before = self._new_obj(value_type)
                     fresh = True
 
                 if ref is not None:
@@ -213,18 +220,19 @@ class RpcReceiveQueue:
 
             # Fall through to CHANGE for field-by-field deserialization
             if not fresh:
-                return self._do_change(before, on_change, message, ref)
+                return self._do_change(before, on_change, state, value_type, value, ref)
             self._fresh.add(id(before))
             try:
-                return self._do_change(before, on_change, message, ref)
+                return self._do_change(before, on_change, state, value_type, value, ref)
             finally:
                 self._fresh.discard(id(before))
 
-        elif message.state == RpcObjectState.CHANGE:
-            return self._do_change(before, on_change, message, message.ref)
+        elif state == _CHANGE:
+            return self._do_change(before, on_change, state, message.get('valueType'),
+                                   message.get('value'), message.get('ref'))
 
         else:
-            raise RuntimeError(f"Unknown state type: {message.state}")
+            raise RuntimeError(f"Unknown state type: {state}")
 
     def roll_back_refs(self) -> None:
         """Drop the refs received through this queue, for when what it was receiving did not
@@ -247,7 +255,9 @@ class RpcReceiveQueue:
         self,
         before: Optional[T],
         on_change: Optional[Callable[[Optional[T]], T]],
-        message: RpcObjectData,
+        state: str,
+        value_type: Optional[str],
+        value: Any,
         ref: Optional[int]
     ) -> Optional[T]:
         """Handle CHANGE state for an object."""
@@ -259,17 +269,17 @@ class RpcReceiveQueue:
             codec = self._get_codec(before)
             if codec is not None:
                 after = codec(before, self)
-            elif message.value is not None:
-                reader = _value_readers.get(message.value_type) if message.value_type else None
+            elif value is not None:
+                reader = _value_readers.get(value_type) if value_type else None
                 if reader is not None:
-                    after = reader(message.value)
-                elif message.value_type:
-                    after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
+                    after = reader(value)
+                elif value_type:
+                    after = {'kind': value_type, **value} if isinstance(value, dict) else value
                 else:
-                    after = message.value
-            elif message.state == RpcObjectState.ADD and message.value_type:
+                    after = value
+            elif state == _ADD and value_type:
                 raise RuntimeError(
-                    f"No RPC codec registered on the Python side for '{message.value_type}'. "
+                    f"No RPC codec registered on the Python side for '{value_type}'. "
                     "The remote side has a codec and sent property messages that will not be consumed, "
                     "causing RPC queue desynchronization."
                 )
@@ -318,24 +328,24 @@ class RpcReceiveQueue:
         Returns:
             The deserialized list, or None if deleted
         """
-        message = self.take()
+        state = self._take_raw().get('state', _NO_CHANGE)
 
-        if message.state == RpcObjectState.NO_CHANGE:
+        if state == _NO_CHANGE:
             return before
 
-        elif message.state == RpcObjectState.DELETE:
+        elif state == _DELETE:
             return None
 
-        elif message.state == RpcObjectState.ADD:
+        elif state == _ADD:
             before = []
             # Fall through to CHANGE
 
-        elif message.state != RpcObjectState.CHANGE:
-            raise RuntimeError(f"{message.state} is not supported for lists")
+        elif state != _CHANGE:
+            raise RuntimeError(f"{state} is not supported for lists")
 
         # Next message should be CHANGE with positions array
-        positions_msg = self.take()
-        positions = positions_msg.value
+        positions_msg = self._take_raw()
+        positions = positions_msg.get('value')
 
         if not isinstance(positions, list):
             raise RuntimeError(f"Expected positions array but got: {positions_msg}")
@@ -382,7 +392,9 @@ class RpcReceiveQueue:
 
         All types should be registered via codec registration at module load time.
         """
-        factory = _get_codec_factory(value_type, self._source_file_type)
+        factory = self._factories.get(value_type, _UNSET)
+        if factory is _UNSET:
+            factory = self._factories[value_type] = _get_codec_factory(value_type, self._source_file_type)
         if factory is not None:
             return factory()
 
@@ -399,8 +411,11 @@ class RpcReceiveQueue:
             return None
 
         # Look up by Python class name - no isinstance checks needed
-        obj_type = type(obj).__qualname__
-        return _get_receive_codec(obj_type, self._source_file_type)
+        obj_type = type(obj)
+        codec = self._codecs.get(obj_type, _UNSET)
+        if codec is _UNSET:
+            codec = self._codecs[obj_type] = _get_receive_codec(obj_type.__qualname__, self._source_file_type)
+        return codec
 
 
 # Codec registry

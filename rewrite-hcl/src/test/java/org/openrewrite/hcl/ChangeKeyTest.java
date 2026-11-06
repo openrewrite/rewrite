@@ -17,11 +17,46 @@ package org.openrewrite.hcl;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class ChangeKeyTest implements RewriteTest {
+
+    @Test
+    void quotedNewKeyIsEscapedInSourceAndDecodedInValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$..Role", "say \"hi\" \\ ${x}")),
+          hcl(
+            """
+              tags = {
+                Role = "elb"
+              }
+              """,
+            """
+              tags = {
+                "say \\"hi\\" \\\\ $${x}" = "elb"
+              }
+              """,
+            spec -> spec.afterRecipe(config -> {
+                List<Object> values = new ArrayList<>();
+                new HclIsoVisitor<List<Object>>() {
+                    @Override
+                    public Hcl.Literal visitLiteral(Hcl.Literal literal, List<Object> found) {
+                        found.add(literal.getValue());
+                        return literal;
+                    }
+                }.visit(config, values);
+                assertThat(values).containsExactly("say \"hi\" \\ ${x}", "elb");
+            })
+          )
+        );
+    }
 
     @DocumentExample
     @Test
@@ -39,6 +74,37 @@ class ChangeKeyTest implements RewriteTest {
               resource "aws_db_instance" "default" {
                 engine  = "mysql"
                 db_name = "mydb"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameAttributeInBlockSelectedByLabels() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$.resource.aws_db_instance.default.name", "db_name")),
+          hcl(
+            """
+              resource "aws_db_instance" "default" {
+                name = "mydb"
+              }
+              resource "aws_db_instance" "other" {
+                name = "otherdb"
+              }
+              resource "aws_rds_cluster" "default" {
+                name = "cluster"
+              }
+              """,
+            """
+              resource "aws_db_instance" "default" {
+                db_name = "mydb"
+              }
+              resource "aws_db_instance" "other" {
+                name = "otherdb"
+              }
+              resource "aws_rds_cluster" "default" {
+                name = "cluster"
               }
               """
           )

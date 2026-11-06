@@ -38,9 +38,11 @@ import org.openrewrite.marker.Markers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -58,15 +60,14 @@ public final class PackageJsonOverrides {
     private final String packageName;
     private final String newVersion;
     private final @Nullable List<DependencyPathSegment> path;
-    private final Json.Document root;
+    private final Root root;
     private final WorkspaceSettings workspace;
     private final @Nullable PnpmRelease release;
     private final OverridePlace place;
-    private @Nullable String rootText;
     private @Nullable String declined;
     private boolean declinedKnown;
 
-    private PackageJsonOverrides(ManifestRules rules, Json.Document root, WorkspaceSettings workspace,
+    private PackageJsonOverrides(ManifestRules rules, Root root, WorkspaceSettings workspace,
                                  String packageName, String newVersion, @Nullable List<DependencyPathSegment> path) {
         this.rules = rules;
         this.root = root;
@@ -74,16 +75,8 @@ public final class PackageJsonOverrides {
         this.newVersion = newVersion;
         this.path = path;
         this.workspace = workspace;
-        this.release = PnpmRelease.of(rules, rootText(), workspace.settings());
-        this.place = rules.overridePlace(rootText(), workspace.settings(), release == null ? -1 : release.getMajor());
-    }
-
-    // the root as printed, once
-    private String rootText() {
-        if (rootText == null) {
-            rootText = PackageJsonHelper.printed(root);
-        }
-        return rootText;
+        this.release = PnpmRelease.of(rules, root.text, workspace.settings());
+        this.place = rules.overridePlace(root.text, workspace.settings(), release == null ? -1 : release.getMajor());
     }
 
     /**
@@ -94,8 +87,8 @@ public final class PackageJsonOverrides {
                                           String packageName, String newVersion,
                                           @Nullable List<DependencyPathSegment> path) {
         ManifestRules rules = LockFileRegeneration.manifestRules(pm).installedAs(installingVersion(pm, root));
-        return new PackageJsonOverrides(rules, root, new WorkspaceSettings(rules, workspaceManifest), packageName,
-                newVersion, path);
+        return new PackageJsonOverrides(rules, new Root(root), new WorkspaceSettings(rules, workspaceManifest),
+                packageName, newVersion, path);
     }
 
     // the release of pm the root's NodeRuntime marker records, the one that built the LST and installs; null for none
@@ -109,11 +102,21 @@ public final class PackageJsonOverrides {
      * decided from them. A pnpm-workspace.yaml of the same text is not read again.
      */
     public PackageJsonOverrides from(Json.Document root, @Nullable String workspaceManifest) {
+        Root revision = new Root(root);
         boolean sameWorkspace = workspace.isText(workspaceManifest);
-        if (root == this.root && sameWorkspace) {
+        if (revision.text.equals(this.root.text) && sameWorkspace) {
             return this;
         }
-        return new PackageJsonOverrides(rules, root, sameWorkspace ? workspace :
+        return new PackageJsonOverrides(rules, revision, sameWorkspace ? workspace :
+                new WorkspaceSettings(rules, workspaceManifest), packageName, newVersion, path);
+    }
+
+    /**
+     * This override decided again for another revision of the pnpm-workspace.yaml beside its root; this one when it
+     * was decided from that.
+     */
+    public PackageJsonOverrides from(@Nullable String workspaceManifest) {
+        return workspace.isText(workspaceManifest) ? this : new PackageJsonOverrides(rules, root,
                 new WorkspaceSettings(rules, workspaceManifest), packageName, newVersion, path);
     }
 
@@ -232,15 +235,11 @@ public final class PackageJsonOverrides {
         }
         String field = place == OverridePlace.OVERRIDES ? "overrides" :
                 place == OverridePlace.RESOLUTIONS ? "resolutions" : place == OverridePlace.PNPM_FIELD ? "pnpm" : null;
-        Json value = field == null ? null : member(root, field);
-        if (value != null && !(value instanceof Json.JsonObject)) {
+        if (field != null && root.notObjects.contains(field)) {
             return "the root's " + field + " is not an object";
         }
-        if (place == OverridePlace.PNPM_FIELD && value != null) {
-            Json overrides = member((Json.JsonObject) value, "overrides");
-            if (overrides != null && !(overrides instanceof Json.JsonObject)) {
-                return "the root's pnpm.overrides is not an object";
-            }
+        if (place == OverridePlace.PNPM_FIELD && root.notObjects.contains("pnpm.overrides")) {
+            return "the root's pnpm.overrides is not an object";
         }
         return null;
     }
@@ -336,7 +335,7 @@ public final class PackageJsonOverrides {
     private Map<String, @Nullable Object> parsedResolutions() {
         Object parsed;
         try {
-            parsed = EcmaScript.jsonParse(rootText());
+            parsed = EcmaScript.jsonParse(root.text);
         } catch (RuntimeException e) {
             return emptyMap();
         }
@@ -355,10 +354,9 @@ public final class PackageJsonOverrides {
             }
             return keys;
         }
-        Json pnpm = member(root, "pnpm");
-        for (Json map : Arrays.asList(member(root, "resolutions"), place == OverridePlace.PNPM_FIELD &&
-                pnpm instanceof Json.JsonObject ? member((Json.JsonObject) pnpm, "overrides") : null)) {
-            keys.addAll(keys(map));
+        keys.addAll(root.resolutions);
+        if (place == OverridePlace.PNPM_FIELD) {
+            keys.addAll(root.pnpmOverrides);
         }
         return keys;
     }
@@ -541,6 +539,34 @@ public final class PackageJsonOverrides {
 
     private static Json.Literal makeStringLiteral(String value) {
         return new Json.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "\"" + value + "\"", value);
+    }
+
+    /**
+     * What an override reads of a revision of the root's package.json: its text, the fields an override goes in that
+     * hold no object, and the keys of its resolutions and pnpm.overrides.
+     */
+    private static final class Root {
+        private final String text;
+        private final Set<String> notObjects = new HashSet<>();
+        private final List<String> resolutions;
+        private final List<String> pnpmOverrides;
+
+        Root(Json.Document root) {
+            this.text = PackageJsonHelper.printed(root);
+            for (String field : Arrays.asList("overrides", "resolutions", "pnpm")) {
+                Json value = member(root, field);
+                if (value != null && !(value instanceof Json.JsonObject)) {
+                    notObjects.add(field);
+                }
+            }
+            Json pnpm = member(root, "pnpm");
+            Json overrides = pnpm instanceof Json.JsonObject ? member((Json.JsonObject) pnpm, "overrides") : null;
+            if (overrides != null && !(overrides instanceof Json.JsonObject)) {
+                notObjects.add("pnpm.overrides");
+            }
+            this.resolutions = keys(member(root, "resolutions"));
+            this.pnpmOverrides = keys(overrides);
+        }
     }
 
     /**

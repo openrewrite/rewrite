@@ -21,6 +21,7 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
@@ -36,6 +37,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -434,6 +436,99 @@ class XmlParserTest implements RewriteTest {
         assertThat(parsed.printAll()).isEqualTo(source);
         assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
           .contains("Malformed attribute");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "<root><a></b></root> | Mismatched closing tag </b>",
+      "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table> | Mismatched closing tag </label>",
+      "<Root></root> | Mismatched closing tag </root>",
+      "<root><a> | Unclosed element <a>",
+      "<root><a></a> | Unclosed element <root>",
+    })
+    void unbalancedTagsAreNotSilentlyAccepted(String source, String expectedMessage) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains(expectedMessage);
+    }
+
+    @Test
+    void mismatchedClosingTagNamesBothPositions() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<table>\n  <tr><td><label>\n    <details><summary>Request</summary>\n  </label></td></tr>\n</table>")
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Mismatched closing tag </label> at line 4, column 3 for <details> opened at line 3, column 5");
+    }
+
+    @Test
+    void malformedAttributeIsReportedOverTheUnbalancedTagsItCauses() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("head.html"), """
+            <head>
+            <link rel="icon" href="favicon.png">
+            <link rel="alternate" title="{{ partial "docs/title" . }}">
+            </head>
+            """)), null, new InMemoryExecutionContext(t -> {
+          }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute in head.html at line 3");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "misnested.html | <div><b><i>x</b></i></div>",
+      "conditional.jsp | <div><% if (x) { %><a href=\"/x\"><% } else { %><span><% } %>text<% if (x) { %></a><% } else { %></span><% } %></div>",
+    })
+    void htmlToleratesMismatchedClosingTagsThatStillBalance(String path, String source) {
+        rewriteRun(
+          xml(source, spec -> spec.path(path))
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "<jsp:root><Div></div></jsp:root> | Mismatched closing tag </div>",
+      "<jsp:root><b><i>x</b></i></jsp:root> | Mismatched closing tag </b>",
+      "<jsp:root><br></jsp:root> | Mismatched closing tag </jsp:root>",
+    })
+    void jspxIsParsedAsStrictXml(String source, String expectedMessage) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("page.jspx"), source)), null,
+            new InMemoryExecutionContext(t -> {
+            }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains(expectedMessage);
+    }
+
+    @Test
+    void htmlReportsTheMismatchBehindAnUnclosedElement() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("rest.html"),
+            "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>")),
+            null, new InMemoryExecutionContext(t -> {
+          }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Mismatched closing tag </label>");
+    }
+
+    @Test
+    void htmlClosingTagsMatchIgnoringCase() {
+        rewriteRun(
+          xml(
+            "<TABLE><TR><TD>cell</td></tr></table>",
+            spec -> spec.path("legacy.jsp")
+          )
+        );
     }
 
     @Test
@@ -891,6 +986,25 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void jspxDocument() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <jsp:root xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" version="2.0">
+                <jsp:directive.page contentType="text/html; charset=UTF-8"/>
+                <c:forEach var="item" items="${items}">
+                  <p>${item.name}</p>
+                </c:forEach>
+                <jsp:text><![CDATA[<br>]]></jsp:text>
+              </jsp:root>
+              """,
+            spec -> spec.path("WEB-INF/views/items.jspx")
+          )
+        );
+    }
+
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
     @ValueSource(strings = {
@@ -899,6 +1013,8 @@ class XmlParserTest implements RewriteTest {
       "proj.csproj",
       "proj.Csproj",
       "/foo/bar/baz.jsp",
+      "/foo/bar/baz.jspx",
+      "WEB-INF/tags/greeting.tagx",
       "ejbModule/META-INF/Map.mapxmi",
       "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
       "ejbModule/META-INF/Schema/SAMPLE.dbxmi",

@@ -15,12 +15,14 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 
 import java.util.List;
 
 /**
- * Lets the test framework check that a recipe imports the types and static members the code it writes names.
+ * Lets the test framework check that a recipe imports the types and static members the code it writes names, and
+ * no more.
  */
 public interface ImportValidationService {
 
@@ -29,6 +31,12 @@ public interface ImportValidationService {
      * "`List` (java.util.List)".
      */
     List<String> unimported(SourceFile sourceFile);
+
+    /**
+     * @return The imports of {@code after} that nothing in it uses, and that {@code before} either used or didn't
+     * have, such as "import java.util.List". When {@code before} has missing types, none of its imports are returned.
+     */
+    List<String> newlyUnusedImports(@Nullable SourceFile before, SourceFile after);
 
     /**
      * Records, until closed, the types and static members that templates applied on this thread name without

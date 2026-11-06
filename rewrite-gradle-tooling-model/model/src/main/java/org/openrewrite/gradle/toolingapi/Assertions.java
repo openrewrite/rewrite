@@ -31,6 +31,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 import org.opentest4j.TestAbortedException;
 
+import javax.annotation.CheckReturnValue;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
+@CheckReturnValue
 public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(URI distributionUrl) {
@@ -129,7 +131,8 @@ public class Assertions {
                                  ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                                  "zipStoreBase=GRADLE_USER_HOME\n" +
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        // No gradle-wrapper.jar: the tooling API reads only the properties, and the jar would have to be
+                        // extracted from a download of most of the distribution
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
                         Files.copy(gradleWrapper.gradlew().getInputStream(), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
@@ -200,7 +203,7 @@ public class Assertions {
                         // Construct a synthetic marker to apply to freestanding Gradle scripts to aid recipes in resolving dependencies
                         GradleProject freestandingScriptMarker = new GradleProject(
                                 randomId(), "", "", "", "", emptyList(), new ArrayList<>(allRepositories),
-                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null);
+                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null, null);
                         for (int i = 0; i < sourceFiles.size(); i++) {
                             SourceFile sourceFile = sourceFiles.get(i);
                             if ((sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) &&

@@ -278,6 +278,7 @@ describe('template formatting', () => {
                 return await rule.tryOn(this.cursor, identifier) || identifier;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=javascript
             javascript('const c = foo;', 'const c = wrap(foo);'));

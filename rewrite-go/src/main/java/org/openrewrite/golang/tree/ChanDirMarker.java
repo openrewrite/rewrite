@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
 @With
 public class ChanDirMarker implements Marker, RpcCodec<ChanDirMarker> {
@@ -36,7 +39,7 @@ public class ChanDirMarker implements Marker, RpcCodec<ChanDirMarker> {
     @Override
     public void rpcSend(ChanDirMarker after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, ChanDirMarker::getBefore, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

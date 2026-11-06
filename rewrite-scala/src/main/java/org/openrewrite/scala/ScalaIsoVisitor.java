@@ -118,6 +118,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
+    }
+
+    @Override
     public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
         return (J.Try.Catch) super.visitCatch(_catch, p);
     }

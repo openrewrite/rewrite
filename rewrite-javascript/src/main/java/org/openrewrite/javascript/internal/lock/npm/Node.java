@@ -548,7 +548,7 @@ public class Node {
         }
 
         why.put("name", isProjectRoot() || isTop() ? getPackageName() : name);
-        why.put("version", pkg.get("version"));
+        why.put("version", Js.get(pkg, "version"));
         if (!errors.isEmpty() || !truthy(getPackageName()) || !truthy(pkg.get("version"))) {
             why.put("errors", !errors.isEmpty() ? errors :
                     Collections.singletonList(new IllegalStateException("invalid package: lacks name and/or version")));
@@ -557,8 +557,8 @@ public class Node {
 
         if (getRoot().sourceReference != null) {
             Map<String, Object> whileInstalling = new LinkedHashMap<>();
-            whileInstalling.put("name", getRoot().getPackage().get("name"));
-            whileInstalling.put("version", getRoot().getPackage().get("version"));
+            whileInstalling.put("name", Js.get(getRoot().getPackage(), "name"));
+            whileInstalling.put("version", Js.get(getRoot().getPackage(), "version"));
             whileInstalling.put("path", getRoot().sourceReference.getPath());
             why.put("whileInstalling", whileInstalling);
         }

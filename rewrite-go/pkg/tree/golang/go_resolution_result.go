@@ -76,6 +76,8 @@ type GoResolutionResult struct {
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
 
+func (GoResolutionResult) IsHeavyweight() {}
+
 func (m GoResolutionResult) FindRequire(modulePath string) *GoRequire {
 	for i := range m.Requires {
 		if m.Requires[i].ModulePath == modulePath {

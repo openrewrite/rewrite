@@ -126,6 +126,85 @@ public final class PnpmRelease {
                              "from " + major + "." + minor + "." + patch + " install it otherwise than those before");
     }
 
+    /**
+     * pnpm 11 moved non-network settings from npm-conf's .npmrc files to pnpm-workspace.yaml.
+     */
+    boolean readsSettingsFromNpmrc() {
+        return !atLeast(11, 0, 0);
+    }
+
+    /**
+     * pnpm 11 removed package.json's pnpm settings and Yarn resolutions. pnpm 10's
+     * config/config src/getOptionsFromRootManifest.ts reads them before the workspace's settings.
+     */
+    boolean readsSettingsFromRootManifest() {
+        return !atLeast(11, 0, 0);
+    }
+
+    /**
+     * General settings in pnpm-workspace.yaml are read from 10.5.0; before, only packages and catalogs.
+     */
+    boolean readsSettingsFromWorkspaceManifest() {
+        return atLeast(10, 5, 0);
+    }
+
+    /**
+     * pnpm 11 defaults minimumReleaseAge to one day; pnpm 10 leaves it unset (the resolver uses zero).
+     */
+    boolean defaultsToOneDayReleaseAge() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#9950).
+     */
+    boolean fetchesFullMetadataForOptionalDependencies() {
+        return atLeast(10, 28, 2);
+    }
+
+    /**
+     * package-requester seeds the preferred version from currentPkg from 10.12.1.
+     */
+    boolean prefersTheCurrentPackageVersion() {
+        return atLeast(10, 12, 1);
+    }
+
+    /**
+     * resolveRootDependencies passes the workspace root's providers to hoistPeers from 10.15.0.
+     */
+    boolean hoistsPeersFromTheWorkspaceRoot() {
+        return atLeast(10, 15, 0);
+    }
+
+    /**
+     * hoistPeers reads a weighted preferred selector's type and omits a null maximum from 10.33.0.
+     */
+    boolean readsWeightedRequiredPeerSelectors() {
+        return atLeast(10, 33, 0);
+    }
+
+    /**
+     * pnpm 11 weights versions from the existing lock above direct dependency selectors. pnpm 10 keeps each
+     * locked version as the bare selector type, without increasing an existing selector's weight.
+     */
+    boolean weightsLockedPreferredVersions() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * Dot-prefixed workspace manifest misspellings are detected from 10.29.0.
+     */
+    boolean detectsDotPrefixedWorkspaceManifests() {
+        return atLeast(10, 29, 0);
+    }
+
+    /**
+     * pnpm 10 bundles @yarnpkg/extensions 2.0.3; pnpm 11's compatibility database is 2.0.6.
+     */
+    boolean usesCompatibilityDatabase206() {
+        return atLeast(11, 0, 0);
+    }
+
     // @pnpm/lockfile.utils src/toLockfileResolution.ts and pkgSnapshotToResolution.ts, @pnpm/lockfile.fs
     // src/lockfileFormatConverters.ts
 
@@ -143,7 +222,7 @@ public final class PnpmRelease {
      * give is kept in the lock, from 11.0.8 (pnpm/pnpm#11276); before, the resolution is the integrity alone.
      */
     boolean keepsATarballUrlTheRegistryCannotGive() {
-        return atLeast(11, 0, 8);
+        return !atLeast(11, 0, 0) || atLeast(11, 0, 8);
     }
 
     /**
@@ -349,10 +428,10 @@ public final class PnpmRelease {
      * An .npmrc's unscoped credentials ({@code _authToken}, {@code _auth}, {@code username}, {@code _password},
      * {@code tokenHelper}, {@code cert}, {@code key}) are pinned to the registry that .npmrc names, else npm's, and
      * checked with that registry's own, from 11.4.0; before, the merged unscoped ones are checked as the default
-     * registry's.
+     * registry's. The proven pnpm 10 pin 10.34.9 also rescopes each source; 10.0.0 and 10.11.0 do not.
      */
     boolean rescopesUnscopedCredentials() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 4, 0);
     }
 
     /**
@@ -449,10 +528,11 @@ public final class PnpmRelease {
      * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
      * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
      * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
-     * each is expanded as any other.
+     * each is expanded as any other. Among the proven pnpm 10 pins, 10.34.9 also applies this filter;
+     * 10.0.0 and 10.11.0 do not (config/config's dropUntrustedEnvExpansions).
      */
     boolean ignoresTheEnvironmentInRepositoryRequestDestinations() {
-        return atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 5, 3);
     }
 
     /**
@@ -969,6 +1049,13 @@ public final class PnpmRelease {
      */
     boolean movesAStalePinUpToADirectVersion() {
         return atLeast(11, 8, 0);
+    }
+
+    /**
+     * The install command passes supportedArchitectures.libc to getFetchFullMetadata from 10.14.0.
+     */
+    boolean fetchesFullMetadataForConfiguredLibc() {
+        return atLeast(10, 14, 0);
     }
 
     /**

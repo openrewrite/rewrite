@@ -38,6 +38,7 @@ public final class PnpmRelease {
     // each range's first and last release recorded with the same writes, and the pnpm 11 releases the engine
     // reproduces, whose writes are the port's
     private static final List<String> RECORDED = Arrays.asList("9.5.0 - 9.15.9", "10.32.1 - 10.34.6",
+            "10.34.9",
             pnpm11Proven());
 
     private static String pnpm11Proven() {

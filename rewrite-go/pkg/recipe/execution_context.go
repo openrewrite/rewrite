@@ -32,6 +32,8 @@ func NewExecutionContext() *ExecutionContext {
 	}
 }
 
+func (*ExecutionContext) IsHeavyweight() {}
+
 func (ctx *ExecutionContext) PutMessage(key string, value any) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()

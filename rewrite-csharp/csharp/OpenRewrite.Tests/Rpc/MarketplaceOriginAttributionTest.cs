@@ -79,7 +79,7 @@ public class MarketplaceOriginAttributionTest : IDisposable
     }
 
     [Fact]
-    public void GetMarketplace_AttributesEachRecipeToItsOwnPackage()
+    public async Task GetMarketplace_AttributesEachRecipeToItsOwnPackage()
     {
         var marketplace = new RecipeMarketplace();
         var server = new RewriteRpcServer(marketplace);
@@ -87,18 +87,16 @@ public class MarketplaceOriginAttributionTest : IDisposable
         // Install via the object form so the server sees a packageName for each.
         // Serialize to JsonElement so the server's JsonValueKind.Object branch is reached
         // (in-process anonymous objects don't deserialize to JsonElement automatically).
-        server.InstallRecipes(new InstallRecipesRequest
-            {
-                Recipes = JsonSerializer.SerializeToElement(new { packageName = _alphaDll, version = (string?)null })
-            })
-            .GetAwaiter().GetResult();
-        server.InstallRecipes(new InstallRecipesRequest
-            {
-                Recipes = JsonSerializer.SerializeToElement(new { packageName = _betaDll, version = (string?)null })
-            })
-            .GetAwaiter().GetResult();
+        await server.InstallRecipes(new InstallRecipesRequest
+        {
+            Recipes = JsonSerializer.SerializeToElement(new { packageName = _alphaDll, version = (string?)null })
+        });
+        await server.InstallRecipes(new InstallRecipesRequest
+        {
+            Recipes = JsonSerializer.SerializeToElement(new { packageName = _betaDll, version = (string?)null })
+        });
 
-        var rows = server.GetMarketplace().GetAwaiter().GetResult();
+        var rows = await server.GetMarketplace();
 
         var alpha = rows.Single(r => r.Descriptor.Name == "AlphaPlugin.AlphaRecipe");
         var beta = rows.Single(r => r.Descriptor.Name == "BetaPlugin.BetaRecipe");

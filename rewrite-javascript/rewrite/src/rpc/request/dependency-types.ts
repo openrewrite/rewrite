@@ -68,13 +68,13 @@ export class DependencyTypes {
                         const sender = new JavaSender();
                         // FQNs this dependency defines, sent before the types so the caller can tell
                         // defined types from references up front, then the types themselves.
-                        await q.sendList(types.map(t => Type.FullyQualified.getFullyQualifiedName(t)), undefined, s => s);
-                        await q.sendList(
+                        q.sendList(types.map(t => Type.FullyQualified.getFullyQualifiedName(t)), undefined, s => s);
+                        q.sendList(
                             types.map(t => asRef(t)),
                             undefined,
                             t => Type.signature(t),
-                            async t => {
-                                await sender.visitType(t, q);
+                            t => {
+                                sender.visitType(t, q);
                             }
                         );
                         pending.set(key, q.finish());

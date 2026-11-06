@@ -57,6 +57,8 @@ def test_not_type_attribution():
 class NegateAssertCondition(PythonVisitor[ExecutionContext]):
     def visit_assert(self, assert_: Assert, p: ExecutionContext) -> Assert:
         condition = assert_.condition
+        if isinstance(condition, Unary):
+            return assert_
         return assert_.replace(condition=Unary(
             uuid4(),
             condition.prefix,

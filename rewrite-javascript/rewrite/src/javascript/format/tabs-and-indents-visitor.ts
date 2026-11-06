@@ -408,6 +408,10 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
             return literal;
         }
         return produce(literal, draft => {
+            // JSX text is its own value, as the parser makes it
+            if (draft.value === draft.valueSource) {
+                draft.value = normalizedValueSource;
+            }
             draft.valueSource = normalizedValueSource;
         });
     }

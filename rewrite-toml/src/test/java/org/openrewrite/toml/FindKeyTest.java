@@ -46,6 +46,25 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
+    void quotedSegmentMatchesTheKeyItsEscapesStandFor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("hosts.\"a\\\"b\\\\*\"")),
+          toml(
+            """
+              [hosts]
+              "a\\"b\\\\\\nc" = 1
+              other = 2
+              """,
+            """
+              [hosts]
+              ~~>"a\\"b\\\\\\nc" = 1
+              other = 2
+              """
+          )
+        );
+    }
+
+    @Test
     void findKeyInInlineTable() {
         rewriteRun(
           spec -> spec.recipe(new FindKey(

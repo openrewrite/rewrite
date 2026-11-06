@@ -90,7 +90,7 @@ public class Java11Parser implements JavaParser {
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, resolvedTypeFactory());
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
 
                 return new Java11Parser(delegate);
             } catch (Exception e) {

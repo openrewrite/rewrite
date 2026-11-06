@@ -174,7 +174,8 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                     } else if (sf instanceof Json.Document && "package.json".equals(name) &&
                                sf.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
                         acc.scan.projects.computeIfAbsent(sf.getSourcePath(), k ->
-                                new NodeDependencyScan.ProjectState()).capturedPackageJson = sf;
+                                new NodeDependencyScan.ProjectState()).capturedPackageJson =
+                                NodeDependencyScan.Manifest.of(sf);
                     }
                     return tree;
                 }
@@ -214,9 +215,9 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
             if (acc.result == null) {
                 Path manifest = Paths.get("package.json");
                 NodeDependencyScan.ProjectState ps = acc.scan.projects.get(manifest);
-                acc.result = PackageJsonHelper.editAndRegenerate(ps.capturedPackageJson, Function.identity(),
-                        Collections.singletonMap(Paths.get(path), content), ps.capturedLockContent,
-                        NodeDependencyScan.projectFiles(acc.scan, p -> null, manifest), ctx);
+                acc.result = PackageJsonHelper.editAndRegenerate(requireNonNull(ps.capturedPackageJson).document(),
+                        Function.identity(), Collections.singletonMap(Paths.get(path), content),
+                        ps.capturedLockContent, NodeDependencyScan.projectFiles(acc.scan, p -> null, manifest), ctx);
             }
             return acc.result;
         }

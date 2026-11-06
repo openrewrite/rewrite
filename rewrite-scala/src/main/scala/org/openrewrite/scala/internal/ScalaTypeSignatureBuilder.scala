@@ -16,6 +16,7 @@
 package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.core.Contexts.*
+import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Names
 import dotty.tools.dotc.core.Symbols
 import dotty.tools.dotc.core.Types.*
@@ -45,6 +46,8 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           typeRefSignature(tr)
         case tmr: TermRef =>
           termRefSignature(tmr)
+        case at: AppliedType if at.isRepeatedParam =>
+          signature(at.translateFromRepeated(toArray = false))
         case at: AppliedType =>
           parameterizedSignature(at)
         case tp: TypeParamRef =>
@@ -58,7 +61,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
         case at: AndType =>
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
-          signature(ot.tp1) + " | " + signature(ot.tp2)
+          unionMembers(ot).map(_._1).mkString(" | ")
         case NoType =>
           "{undefined}"
         case _ =>
@@ -96,8 +99,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     if (!sym.exists) return tr.show
     if (sym.isTypeParam) return typeVariableSignature(sym.name.toString, tr.underlying)
 
-    val fqn = sym.fullName.toString
-    mapScalaFqnToJava(fqn)
+    mapScalaFqnToJava(binaryName(sym))
   }
 
   private def termRefSignature(tmr: TermRef): String = {
@@ -159,7 +161,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** The signature of the method with the given parameter and result types, as instantiated at a call. */
   def methodSignature(sym: Symbols.Symbol, info: Type): String = {
-    val owner = sym.owner.fullName.toString
+    val owner = methodOwnerFqn(sym.owner)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val returnType = info.finalResultType match {
       case NoType => "void"
@@ -173,7 +175,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     val paramTypes = new StringJoiner(",", "[", "]")
     info.stripPoly match {
       case mt: MethodType =>
-        mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
+        mt.paramInfos.foreach(pt => paramTypes.add(signature(parameterType(sym, pt))))
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)
@@ -181,9 +183,49 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     sb.toString()
   }
 
+  /** The type of a parameter of the method as the JVM sees it: a repeated parameter is an array of a Java method, a `Seq` otherwise. */
+  def parameterType(method: Symbols.Symbol, pt: Type): Type =
+    if (!pt.isRepeatedParam) pt
+    else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
+    else pt.translateFromRepeated(toArray = false)
+
+  // Sorted so that `A | B` and `B | A` share one cache key.
+  def unionMembers(ot: OrType): List[(String, Type)] =
+    unionAlternatives(ot).map(t => signature(t) -> t).distinctBy(_._1).sortBy(_._1)
+
+  private def unionAlternatives(tpe: Type): List[Type] = tpe.dealias match {
+    case ot: OrType => unionAlternatives(ot.tp1) ++ unionAlternatives(ot.tp2)
+    case nothing if nothing.isExactlyNothing => Nil
+    case other => List(other)
+  }
+
+  /**
+   * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
+   * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
+   */
+  def classFqn(sym: Symbols.Symbol): String = methodOwnerFqn(sym) match {
+    case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
+    case other => other
+  }
+
+  /** The owner of a method in its signature: its class by binary name, with Java statics under the Java class. */
+  def methodOwnerFqn(owner: Symbols.Symbol): String = {
+    val fqn = binaryName(owner)
+    if (owner.is(Flags.JavaDefined) && owner.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
+  }
+
   def variableSignature(sym: Symbols.Symbol): String = {
-    val owner = sym.owner.fullName.toString
-    owner + "{name=" + sym.name.toString + "}"
+    val name = "{name=" + sym.name.toString
+    if (sym.owner.isClass) return binaryName(sym.owner) + name + "}"
+    val owner = if (sym.owner.is(Flags.Method)) methodSignature(sym.owner) else sym.owner.fullName.toString
+    owner + name + (if (sym.span.exists) ",pos=" + sym.span.start else "") + "}"
+  }
+
+  /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
+  private def binaryName(sym: Symbols.Symbol): String = {
+    val pkg = sym.enclosingPackageClass
+    if (pkg.isEffectiveRoot) sym.flatName.toString
+    else pkg.fullName.toString + "." + sym.flatName
   }
 
   def variableSignature(name: String): String = {
@@ -205,6 +247,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case "scala.Unit" => "void"
     case "scala.Any" => "java.lang.Object"
     case "scala.AnyRef" => "java.lang.Object"
+    case "scala.Matchable" => "java.lang.Object"
     case "scala.Nothing" => "scala.Nothing"
     case "scala.Null" => "null"
     case other => other

@@ -10,6 +10,7 @@ pluginManagement {
             content {
                 includeGroupAndSubgroups("org.openrewrite")
                 includeGroupAndSubgroups("io.moderne")
+                includeVersionByRegex(".*", ".*", ".*-backpatch-.*")
             }
         }
         gradlePluginPortal()
@@ -27,6 +28,7 @@ val allProjects = listOf(
     "rewrite-android",
     "rewrite-benchmarks",
     "rewrite-bom",
+    "rewrite-coldfusion",
     "rewrite-core",
     "rewrite-csharp",
     "rewrite-docker",
@@ -85,40 +87,4 @@ if (System.getProperty("idea.active") == null &&
         "rewrite-java-21",
         "rewrite-java-25"
     )
-}
-
-// ---------------------------------------------------------------
-// ------ Gradle Develocity Configuration ------------------------
-// ---------------------------------------------------------------
-
-plugins {
-    id("com.gradle.develocity") version "latest.release"
-    id("com.gradle.common-custom-user-data-gradle-plugin") version "latest.release"
-}
-
-develocity {
-    val isCiServer = System.getenv("CI")?.equals("true") ?: false
-    server = "https://community.develocity.cloud"
-    projectId = "openrewrite"
-    val accessKey = System.getenv("GRADLE_ENTERPRISE_ACCESS_KEY")
-    val authenticated = !accessKey.isNullOrBlank()
-    buildCache {
-        remote(develocity.buildCache) {
-            isEnabled = true
-            isPush = isCiServer && authenticated
-        }
-    }
-
-    buildScan {
-        capture {
-            fileFingerprints = true
-        }
-        publishing {
-            onlyIf {
-                authenticated
-            }
-        }
-
-        uploadInBackground = !isCiServer
-    }
 }

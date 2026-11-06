@@ -19,6 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StreamUtils;
 import org.openrewrite.ipc.http.HttpSender;
 
+import java.util.Map;
+import java.util.List;
+import java.util.HashMap;
+import java.util.ArrayList;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -60,6 +64,106 @@ public class SdistMetadataReader {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * The requirements setuptools recorded in the sdist's {@code *.egg-info/requires.txt}, as PEP 508 strings. An
+     * egg-info directory without that file records none. Null when the sdist has no egg-info or cannot be read.
+     */
+    public static @Nullable List<String> eggInfoRequirements(HttpSender http, String sdistUrl) {
+        String path = sdistUrl.toLowerCase(Locale.ROOT).replaceFirst("[?#].*$", "");
+        boolean zip = path.endsWith(".zip");
+        if (!zip && !path.endsWith(".tar.gz") && !path.endsWith(".tgz")) {
+            return null;
+        }
+        Map<String, byte[]> entries = new HashMap<>();
+        try (HttpSender.Response response = http.send(http.get(sdistUrl).build())) {
+            if (!response.isSuccessful()) {
+                return null;
+            }
+            if (zip) {
+                try (ZipInputStream in = new ZipInputStream(response.getBody())) {
+                    ZipEntry entry;
+                    while ((entry = in.getNextEntry()) != null) {
+                        collectEggInfo(entry.getName(), entry.isDirectory(), in, entries);
+                    }
+                }
+            } else {
+                try (InputStream in = new GZIPInputStream(response.getBody())) {
+                    byte[] header = new byte[512];
+                    while (readFully(in, header) && !isZeroBlock(header)) {
+                        long size = parseOctal(header, 124, 12);
+                        if (size < 0) {
+                            break;
+                        }
+                        byte type = header[156];
+                        String name = tarName(header);
+                        long padded = (size + 511) / 512 * 512;
+                        if ((type == '0' || type == 0) && name.endsWith(".egg-info/requires.txt")) {
+                            byte[] data = new byte[(int) size];
+                            if (!readFully(in, data)) {
+                                break;
+                            }
+                            collectEggInfo(name, false, new java.io.ByteArrayInputStream(data), entries);
+                            skipFully(in, padded - size);
+                        } else {
+                            collectEggInfo(name, type == '5', null, entries);
+                            skipFully(in, padded);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        if (!entries.containsKey("egg-info")) {
+            return null;
+        }
+        byte[] requires = entries.get("requires.txt");
+        return requires == null ? new ArrayList<>() : parseRequiresTxt(new String(requires, StandardCharsets.UTF_8));
+    }
+
+    // an egg-info directory directly under the sdist's top-level directory belongs to the sdist itself
+    private static void collectEggInfo(String name, boolean directory, @Nullable InputStream data,
+                                       Map<String, byte[]> entries) throws IOException {
+        String[] parts = (name.startsWith("./") ? name.substring(2) : name).split("/");
+        if (parts.length < 2 || !parts[1].endsWith(".egg-info")) {
+            return;
+        }
+        entries.put("egg-info", new byte[0]);
+        if (!directory && parts.length == 3 && "requires.txt".equals(parts[2]) && data != null) {
+            entries.put("requires.txt", StreamUtils.readAllBytes(data));
+        }
+    }
+
+    /** {@code requires.txt} sections {@code [extra]}, {@code [:marker]} and {@code [extra:marker]} become markers. */
+    static List<String> parseRequiresTxt(String text) {
+        List<String> requirements = new ArrayList<>();
+        String extra = null;
+        String marker = null;
+        for (String raw : text.split("\r?\n")) {
+            String line = raw.trim();
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            if (line.startsWith("[") && line.endsWith("]")) {
+                String section = line.substring(1, line.length() - 1);
+                int colon = section.indexOf(':');
+                extra = colon >= 0 ? section.substring(0, colon).trim() : section.trim();
+                marker = colon >= 0 ? section.substring(colon + 1).trim() : null;
+                extra = extra.isEmpty() ? null : extra;
+                continue;
+            }
+            List<String> conditions = new ArrayList<>();
+            if (marker != null && !marker.isEmpty()) {
+                conditions.add("(" + marker + ")");
+            }
+            if (extra != null) {
+                conditions.add("extra == '" + extra + "'");
+            }
+            requirements.add(conditions.isEmpty() ? line : line + "; " + String.join(" and ", conditions));
+        }
+        return requirements;
     }
 
     private static byte @Nullable [] pkgInfoFromZip(InputStream body) throws IOException {
