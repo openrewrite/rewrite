@@ -51,8 +51,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft()) && SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -65,8 +65,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft()) && SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -579,10 +579,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
      * e.g. {@code x && true}, {@code x && false}, {@code x || true}, or {@code x || false}.
      * <p>
      * In Java, {@code &&} and {@code ||} are boolean-only, so these always simplify to {@code x} or the
-     * literal. In languages like JavaScript/TypeScript and Groovy, {@code &&}/{@code ||} return one of
+     * literal. In JavaScript/TypeScript, {@code &&}/{@code ||} return one of
      * their operands unchanged based on truthiness, so {@code x || false} yields {@code false} when
      * {@code x} is falsy (e.g. {@code undefined}) rather than the original value. Simplifying then
-     * changes semantics unless {@code x} is boolean-typed.
+     * changes semantics unless {@code x} is boolean-typed. Groovy also coerces non-boolean operands,
+     * so replacing a boolean result with an operand can change its type and value.
      *
      * @param nonLiteralOperand the operand that is not the boolean literal
      * @return true if the short-circuit expression can be safely simplified
