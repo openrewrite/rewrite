@@ -172,14 +172,66 @@ public class HostInputs {
      * credentials of every registry the npmrc files name under always-auth, as the host sends them with each request.
      */
     public String userNpmrc(Set<NpmrcScope> scopes) {
+        return userNpmrc(scopes, NetworkConfig.NONE);
+    }
+
+    /** npm's network settings alongside its existing host registry configuration. */
+    public String userNpmrcWithNetwork(Set<NpmrcScope> scopes) {
+        return userNpmrc(scopes, NetworkConfig.NPM);
+    }
+
+    /** pnpm's network keys, in the trusted user/global file rather than the project's expansion context. */
+    public String userPnpmrc(Set<NpmrcScope> scopes, boolean legacy) {
+        return userNpmrc(scopes, legacy ? NetworkConfig.PNPM_10 : NetworkConfig.PNPM_11);
+    }
+
+    private enum NetworkConfig { NONE, NPM, PNPM_10, PNPM_11 }
+
+    private String userNpmrc(Set<NpmrcScope> scopes, NetworkConfig network) {
         NodeRegistries user = discover(scopes, true);
         StringBuilder npmrc = new StringBuilder();
         String alwaysAuth = globalAlwaysAuth(scopes);
         if (alwaysAuth != null) {
             npmrc.append(ALWAYS_AUTH).append('=').append(alwaysAuth).append('\n');
         }
-        Set<String> keys = new LinkedHashSet<>();
+        // Keep the manager's spelling and source: npm's noproxy and pnpm's no-proxy are not aliases in pnpm 11.
+        // A trusted file's unresolved network placeholder is explicitly declined by the transport, never expanded
+        // through a project's settings or silently discarded.
+        if (network != NetworkConfig.NONE && registries.isEmpty()) {
+            List<String> networkKeys = new ArrayList<>(Arrays.asList("proxy", "https-proxy", "ca", "ca[]", "cert", "key", "local-address"));
+            if (network != NetworkConfig.PNPM_11) {
+                networkKeys.add("noproxy");
+                networkKeys.add("noproxy[]");
+            }
+            if (network != NetworkConfig.NPM) {
+                networkKeys.add("http-proxy");
+                networkKeys.add("no-proxy");
+            }
+            for (NpmrcScope scope : Arrays.asList(NpmrcScope.Global, NpmrcScope.User)) {
+                for (Npmrc file : this.npmrc) {
+                    if (!scopes.contains(scope) || file.getScope() != scope) {
+                        continue;
+                    }
+                    for (Map.Entry<String, String> entry : file.getProperties().entrySet()) {
+                        if (networkKeys.contains(entry.getKey())) {
+                            npmrc.append(entry.getKey()).append('=').append(EcmaScript.quote(entry.getValue())).append('\n');
+                        }
+                    }
+                }
+            }
+        }
         NodeRegistry registry = user.getDefaultRegistry();
+        if (network != NetworkConfig.NONE && registries.isEmpty()) {
+            // Keep the existing trusted expansion and injected-sender contract for these TLS settings, including
+            // requests to a registry named later by the manager's workspace config.
+            if (registry.getCafile() != null) {
+                npmrc.append("cafile=").append(EcmaScript.quote(registry.getCafile())).append('\n');
+            }
+            if (!registry.isStrictSsl()) {
+                npmrc.append("strict-ssl=false\n");
+            }
+        }
+        Set<String> keys = new LinkedHashSet<>();
         if (namesDefault(scopes)) {
             npmrc.append("registry=").append(registry.getUrl()).append('\n');
         }

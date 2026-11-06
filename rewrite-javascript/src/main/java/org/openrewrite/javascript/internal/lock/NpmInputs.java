@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
 import org.openrewrite.javascript.internal.lock.npm.NpmReleases;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.Arrays;
@@ -78,7 +79,7 @@ final class NpmInputs implements Port {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
         NpmLockRegenerator regeneration = new NpmLockRegenerator(inputs,
-                new NpmRegistryPackuments(host.transport(), client));
+                new NpmRegistryPackuments(host.transport(), client, RegistryTransport.environment(host.getSystem())));
         return reconcileNpmPeerDependencies ? regeneration.regenerateForUpdate() : regeneration.regenerate();
     }
 
@@ -95,7 +96,7 @@ final class NpmInputs implements Port {
                 .lock(dir.getLock())
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
-                .userNpmrc(host.userNpmrc(HostInputs.GLOBAL_AND_USER))
+                .userNpmrc(host.userNpmrcWithNetwork(HostInputs.GLOBAL_AND_USER))
                 .paths(dir.getPaths())
                 .directory(dir.getPaths() == null ? null : dir.getPath())
                 .host(host.getHost())

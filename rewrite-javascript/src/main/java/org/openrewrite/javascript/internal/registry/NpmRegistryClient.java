@@ -38,13 +38,27 @@ public class NpmRegistryClient {
     private static final String FULL_ACCEPT = "application/json";
 
     private final HttpSender httpSender;
+    private final RegistryTransport transport;
     // Never let a response obtained with one credential bypass another project's registry authorization.
     // Registry values are memory-only keys; credentials are not embedded in printable URL/cache-key strings.
     private final Map<NodeRegistry, Map<String, byte[]>> tarballCache = new ConcurrentHashMap<>();
     private final Map<NodeRegistry, Map<String, String>> documentCache = new ConcurrentHashMap<>();
 
     public NpmRegistryClient(HttpSender httpSender) {
+        this(httpSender, RegistryTransport.DEFAULT);
+    }
+
+    private NpmRegistryClient(HttpSender httpSender, RegistryTransport transport) {
         this.httpSender = httpSender;
+        this.transport = transport;
+    }
+
+    /**
+     * A transport-bound client with its own credential and response caches. No response fetched on another route
+     * can satisfy a request on this route, including one whose configuration must be refused.
+     */
+    public NpmRegistryClient withTransport(RegistryTransport transport) {
+        return new NpmRegistryClient(httpSender, transport);
     }
 
     /**
@@ -113,37 +127,47 @@ public class NpmRegistryClient {
 
     private byte[] send(NodeRegistry registry, String name, @Nullable String version, String url,
                         String accept, boolean packument) {
+        guard(registry);
+        HttpSender sender = transport.sender(httpSender, url);
         HttpSender.Request request;
         try {
-            HttpSender.Request.Builder builder = httpSender.get(url).accept(accept);
+            HttpSender.Request.Builder builder = sender.get(url).accept(accept);
             applyAuth(builder, registry);
             request = builder.build();
         } catch (Exception e) {
-            throw new NodeRegistryException(Reason.UNREACHABLE, registry.getUrl(), name, version,
-                    "Invalid registry URL: " + url, e);
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
+                    "Invalid registry URL: " + Urls.stripUserinfo(url), null);
         }
-        try (HttpSender.Response response = httpSender.send(request)) {
+        try (HttpSender.Response response = sender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
                 throw new NodeRegistryException(Reason.AUTH_FAILED, safeUrl(registry), name, version,
-                        "HTTP " + code + " from " + url + unresolvedCredentialsHint(registry), null);
+                        "HTTP " + code + " from " + Urls.stripUserinfo(url) + unresolvedCredentialsHint(registry), null);
             }
             if (code == 404) {
                 Reason reason = packument ? Reason.PACKAGE_NOT_FOUND : Reason.VERSION_NOT_FOUND;
                 throw new NodeRegistryException(reason, safeUrl(registry), name, version,
-                        "HTTP 404 from " + url, null);
+                        "HTTP 404 from " + Urls.stripUserinfo(url), null);
             }
             if (!response.isSuccessful()) {
                 throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
-                        "HTTP " + code + " from " + url, null);
+                        "HTTP " + code + " from " + Urls.stripUserinfo(url), null);
             }
             return response.getBodyAsBytes();
         } catch (NodeRegistryException e) {
             throw e;
         } catch (Exception e) {
             throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
-                    "Failed to fetch " + url + ": " + e, e);
+                    "Failed to fetch " + Urls.stripUserinfo(url) + " through the configured registry transport (" + failureKind(e) + ")", null);
         }
+    }
+
+    private static String failureKind(Exception failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getSimpleName();
     }
 
     private void guard(NodeRegistry registry) {
