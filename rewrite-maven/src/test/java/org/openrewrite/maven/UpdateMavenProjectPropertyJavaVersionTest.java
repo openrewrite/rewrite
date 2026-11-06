@@ -18,9 +18,11 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.Assertions.withLocalRepository;
@@ -1248,6 +1250,369 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       """
                 )
             )
+        );
+    }
+
+    @Test
+    void updateAliasedReleaseWithoutChangingSharedProperties() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>8</shared.level>
+                  <intermediate.level>${shared.level}</intermediate.level>
+                  <unrelated.consumer>${shared.level}</unrelated.consumer>
+                  <maven.compiler.release>${intermediate.level}</maven.compiler.release>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>8</shared.level>
+                  <intermediate.level>${shared.level}</intermediate.level>
+                  <unrelated.consumer>${shared.level}</unrelated.consumer>
+                  <maven.compiler.release>17</maven.compiler.release>
+                </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(document -> {
+                var pom = document.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                assertThat(pom.getValue("${maven.compiler.release}")).isEqualTo("17");
+                assertThat(pom.getValue("${shared.level}")).isEqualTo("8");
+            })
+          )
+        );
+    }
+
+    @Test
+    void overrideReleaseInheritedFromActiveParentProfile() {
+        withLocalRepository(
+          //language=xml
+          """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example</groupId>
+              <artifactId>compiler-parent</artifactId>
+              <version>1.0</version>
+              <packaging>pom</packaging>
+              <properties>
+                <compiler.level>8</compiler.level>
+              </properties>
+              <profiles>
+                <profile>
+                  <id>compiler-level</id>
+                  <activation>
+                    <activeByDefault>true</activeByDefault>
+                  </activation>
+                  <properties>
+                    <maven.compiler.release>${compiler.level}</maven.compiler.release>
+                  </properties>
+                </profile>
+              </profiles>
+            </project>
+            """,
+          () -> rewriteRun(
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>compiler-parent</artifactId>
+                    <version>1.0</version>
+                    <relativePath/>
+                  </parent>
+                  <artifactId>app</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                    <maven.compiler.source>17</maven.compiler.source>
+                    <maven.compiler.target>17</maven.compiler.target>
+                  </properties>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>compiler-parent</artifactId>
+                    <version>1.0</version>
+                    <relativePath/>
+                  </parent>
+                  <artifactId>app</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                    <maven.compiler.release>17</maven.compiler.release>
+                    <maven.compiler.source>17</maven.compiler.source>
+                    <maven.compiler.target>17</maven.compiler.target>
+                  </properties>
+                </project>
+                """,
+              spec -> spec.afterRecipe(document -> {
+                  var pom = document.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getValue("${maven.compiler.release}")).isEqualTo("17");
+                  assertThat(pom.getValue("${compiler.level}")).isEqualTo("8");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void preserveNewerAliasedRelease() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>31</shared.level>
+                  <maven.compiler.release>${shared.level}</maven.compiler.release>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveUnresolvedReleaseAlias() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <maven.compiler.release>${unknown.level}</maven.compiler.release>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCyclicReleaseAlias() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <first.level>${second.level}</first.level>
+                  <second.level>${first.level}</second.level>
+                  <maven.compiler.release>${first.level}</maven.compiler.release>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void overrideChildAliasWithoutDowngradingReactorParent() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>child</module>
+                </modules>
+                <properties>
+                  <maven.compiler.release>31</maven.compiler.release>
+                  <shared.level>8</shared.level>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <relativePath/>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                    <maven.compiler.release>${shared.level}</maven.compiler.release>
+                  </properties>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0</version>
+                    <relativePath/>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                    <maven.compiler.release>17</maven.compiler.release>
+                  </properties>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void updateActiveProfileReleaseOverride() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>8</shared.level>
+                  <maven.compiler.release>17</maven.compiler.release>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>compiler-level</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <maven.compiler.release>${shared.level}</maven.compiler.release>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>8</shared.level>
+                  <maven.compiler.release>17</maven.compiler.release>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>compiler-level</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <maven.compiler.release>17</maven.compiler.release>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            spec -> spec.afterRecipe(document -> {
+                var pom = document.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                assertThat(pom.getValue("${maven.compiler.release}")).isEqualTo("17");
+                assertThat(pom.getValue("${shared.level}")).isEqualTo("8");
+            })
+          )
+        );
+    }
+
+    @Test
+    void preserveInactiveProfileRelease() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>8</shared.level>
+                  <maven.compiler.release>17</maven.compiler.release>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>compiler-level</id>
+                    <properties>
+                      <maven.compiler.release>${shared.level}</maven.compiler.release>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveNewerActiveProfileRelease() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <shared.level>31</shared.level>
+                  <maven.compiler.release>17</maven.compiler.release>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>compiler-level</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <maven.compiler.release>${shared.level}</maven.compiler.release>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
         );
     }
 }
