@@ -30,8 +30,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static java.util.Collections.emptyList;
+import java.util.function.Predicate;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
@@ -93,27 +92,41 @@ public class AnnotationMatcher {
 
     public boolean matches(J.Annotation annotation) {
         JavaType.FullyQualified type = TypeUtils.asFullyQualified(annotation.getType());
-        if (type == null) {
-            return false;
-        }
-        if (matcher.matches(type.getFullyQualifiedName())) {
+        if (type != null && matcher.matches(type.getFullyQualifiedName())) {
             return matchesSingleParameter(annotation) && matchesNamedParameters(annotation);
         }
-        return matchMetaAnnotations && matchesMetaAnnotationWithValues(type, new HashSet<>());
+        return matchesMetaAnnotation(type, this::matchesElementValues, null);
     }
 
-    private boolean matchesMetaAnnotationWithValues(JavaType.FullyQualified type, Set<String> seenAnnotations) {
-        for (JavaType.FullyQualified annotation : type.getAnnotations()) {
+    public boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn) {
+        return fqn != null && (matcher.matches(fqn.getFullyQualifiedName()) ||
+                               matchesMetaAnnotation(fqn, annotation -> true, null));
+    }
+
+    private boolean matchesMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
+                                          Predicate<JavaType.FullyQualified> matchesValues,
+                                          @Nullable Set<String> seenAnnotations) {
+        if (fqn == null || !matchMetaAnnotations) {
+            return false;
+        }
+        for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
             //noinspection ConstantValue
             if (annotation == null) {
+                // Workaround for parsing bug that caused these annotations
+                // to sometimes be null.
                 continue;
             }
             if (matcher.matches(annotation.getFullyQualifiedName())) {
-                if (matchesElementValues(annotation)) {
+                if (matchesValues.test(annotation)) {
                     return true;
                 }
-            } else if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                       matchesMetaAnnotationWithValues(annotation, seenAnnotations)) {
+                continue;
+            }
+            if (seenAnnotations == null) {
+                seenAnnotations = new HashSet<>();
+            }
+            if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
+                matchesMetaAnnotation(annotation, matchesValues, seenAnnotations)) {
                 return true;
             }
         }
@@ -121,15 +134,13 @@ public class AnnotationMatcher {
     }
 
     private boolean matchesElementValues(JavaType.FullyQualified annotation) {
-        List<JavaType.Annotation.ElementValue> values = annotation instanceof JavaType.Annotation ?
-                ((JavaType.Annotation) annotation).getValues() : emptyList();
         if (match.elementValue() != null) {
-            return elementValueMatches(values, "value", match.elementValue().getText());
+            return elementValueMatches(annotation, "value", match.elementValue().getText());
         }
         AnnotationSignatureParser.ElementValuePairsContext pairs = match.elementValuePairs();
         if (pairs != null && pairs.elementValuePair() != null) {
             for (AnnotationSignatureParser.ElementValuePairContext pair : pairs.elementValuePair()) {
-                if (!elementValueMatches(values, pair.Identifier().getText(), pair.elementValue().getText())) {
+                if (!elementValueMatches(annotation, pair.Identifier().getText(), pair.elementValue().getText())) {
                     return false;
                 }
             }
@@ -137,117 +148,37 @@ public class AnnotationMatcher {
         return true;
     }
 
-    private static boolean elementValueMatches(List<JavaType.Annotation.ElementValue> values, String name, String matchText) {
-        for (JavaType.Annotation.ElementValue elementValue : values) {
+    private static boolean elementValueMatches(JavaType.FullyQualified annotation, String name, String matchText) {
+        if (!(annotation instanceof JavaType.Annotation)) {
+            return false;
+        }
+        for (JavaType.Annotation.ElementValue elementValue : ((JavaType.Annotation) annotation).getValues()) {
             if (elementValue.getElement() instanceof JavaType.Method &&
                 name.equals(((JavaType.Method) elementValue.getElement()).getName())) {
                 Object value = elementValue.getValue();
-                if (value instanceof List) {
-                    return ((List<?>) value).stream().anyMatch(v -> typedValueMatches(v, matchText));
-                }
-                return typedValueMatches(value, matchText);
+                return value instanceof List ?
+                        ((List<?>) value).stream().anyMatch(v -> valueMatches(v, matchText)) :
+                        valueMatches(value, matchText);
             }
         }
         return false;
     }
 
-    private static boolean typedValueMatches(@Nullable Object value, String matchText) {
-        if (value instanceof String) {
-            return matchText.equals('"' + escape((String) value, '"') + '"');
-        } else if (value instanceof Character) {
-            return matchText.equals("'" + escape(value.toString(), '\'') + "'");
-        } else if (value instanceof Boolean) {
-            return matchText.equals(value.toString());
-        } else if (value instanceof Number) {
-            return numberMatches((Number) value, matchText);
-        } else if (value instanceof JavaType.Variable) {
+    private static boolean valueMatches(@Nullable Object value, String matchText) {
+        if (value instanceof JavaType.Variable) {
             JavaType.Variable variable = (JavaType.Variable) value;
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
             return owner != null && matchText.equals(owner.getFullyQualifiedName() + "." + variable.getName());
         } else if (value instanceof JavaType.FullyQualified) {
-            String className = stripClassLiteralSuffix(matchText);
-            return className != null && TypeUtils.fullyQualifiedNamesAreEqual(
-                    JavaType.ShallowClass.build(className).getFullyQualifiedName(),
+            return matchText.endsWith(".class") && TypeUtils.fullyQualifiedNamesAreEqual(
+                    matchText.substring(0, matchText.length() - 6),
                     ((JavaType.FullyQualified) value).getFullyQualifiedName());
+        } else if (value instanceof String) {
+            return matchText.equals('"' + (String) value + '"');
+        } else if (value instanceof Character) {
+            return matchText.equals("'" + value + "'");
         }
-        return false;
-    }
-
-    private static String escape(String value, char quote) {
-        StringBuilder escaped = new StringBuilder(value.length());
-        for (char c : value.toCharArray()) {
-            if (c == quote || c == '\\') {
-                escaped.append('\\').append(c);
-            } else if (c == '\n') {
-                escaped.append("\\n");
-            } else if (c == '\r') {
-                escaped.append("\\r");
-            } else if (c == '\t') {
-                escaped.append("\\t");
-            } else {
-                escaped.append(c);
-            }
-        }
-        return escaped.toString();
-    }
-
-    private static boolean numberMatches(Number value, String matchText) {
-        String literal = matchText.replace("_", "");
-        try {
-            if (value instanceof Float) {
-                return Float.parseFloat(literal) == value.floatValue();
-            } else if (value instanceof Double) {
-                return Double.parseDouble(literal) == value.doubleValue();
-            }
-            if (literal.endsWith("l") || literal.endsWith("L")) {
-                literal = literal.substring(0, literal.length() - 1);
-            }
-            long parsed = literal.startsWith("0b") || literal.startsWith("0B") ?
-                    Long.parseLong(literal.substring(2), 2) :
-                    Long.decode(literal);
-            return parsed == value.longValue();
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    private static @Nullable String stripClassLiteralSuffix(String matchText) {
-        for (String suffix : new String[]{".class", "::class.java", "::class"}) {
-            if (matchText.endsWith(suffix)) {
-                return matchText.substring(0, matchText.length() - suffix.length());
-            }
-        }
-        return null;
-    }
-
-    public boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn) {
-        return matchesAnnotationOrMetaAnnotation(fqn, null);
-    }
-
-    private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
-                                                      @Nullable Set<String> seenAnnotations) {
-        if (fqn != null) {
-            if (matcher.matches(fqn.getFullyQualifiedName())) {
-                return true;
-            } else if (matchMetaAnnotations) {
-                for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
-                    //noinspection ConstantValue
-                    if (annotation == null) {
-                        // Workaround for parsing bug that caused these annotations
-                        // to sometimes be null.
-                        continue;
-                    }
-                    if (seenAnnotations == null) {
-                        seenAnnotations = new HashSet<>();
-                    }
-                    if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return matchText.equals(String.valueOf(value));
     }
 
     private boolean matchesNamedParameters(J.Annotation annotation) {
