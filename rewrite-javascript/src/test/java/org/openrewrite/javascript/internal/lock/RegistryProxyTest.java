@@ -45,8 +45,25 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"cafile", "strict-ssl"})
+    void trustedHostTlsSettingsReachTheExistingRegistryGuard(String setting) {
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH)
+                .npmrc(new Npmrc(NpmrcScope.User, Map.of("registry", "https://registry.invalid/", setting,
+                        "cafile".equals(setting) ? "/nonexistent-synthetic-ca.pem" : "false"))).build();
+        var source = new NpmRegistryPackuments(host.transport(), new NpmRegistryClient(new HttpUrlConnectionSender()))
+                .withOptions(NpmOptions.fromNpmrc(NpmReleases.installedAs("11.19.1"),
+                        host.userNpmrcWithNetwork(HostInputs.GLOBAL_AND_USER), null));
+        assertThatThrownBy(() -> source.packument("https://registry.invalid/", "synthetic", false))
+                .isInstanceOf(NodeRegistryException.class).hasMessageContaining("TLS-capable HttpSender");
+        // A workspace-selected destination may be absent from the discovered .npmrc registry URLs.
+        assertThatThrownBy(() -> source.packument("https://workspace-registry.invalid/", "synthetic", false))
+                .isInstanceOfAny(CannotKnow.class, NodeRegistryException.class).hasMessageContaining("TLS-capable HttpSender");
+    }
+
     @Test
     void hostNetworkProjectionKeepsManagerKeysAndTrustedSources() {
         HostInputs host = HostInputs.builder().now(Instant.EPOCH)

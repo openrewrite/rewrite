@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.registry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.net.InetSocketAddress;
@@ -37,8 +38,15 @@ public final class RegistryTransport {
     private final @Nullable String httpProxy;
     private final @Nullable String httpsProxy;
     private final @Nullable String noProxy;
+    private final boolean requiresCustomTls;
 
     public RegistryTransport(@Nullable String httpProxy, @Nullable String httpsProxy, @Nullable String noProxy) {
+        this(httpProxy, httpsProxy, noProxy, false);
+    }
+
+    private RegistryTransport(@Nullable String httpProxy, @Nullable String httpsProxy, @Nullable String noProxy,
+                              boolean requiresCustomTls) {
+        this.requiresCustomTls = requiresCustomTls;
         this.httpProxy = emptyToNull(httpProxy);
         this.httpsProxy = emptyToNull(httpsProxy);
         this.noProxy = noProxy;
@@ -68,7 +76,7 @@ public final class RegistryTransport {
                 capabilities.put(key, value);
             }
         }
-        requireCapabilities(capabilities, false);
+        boolean customTls = requireCapabilities(capabilities, false);
         String proxy = npmSetting(config, env, "https-proxy");
         if (proxy == null) {
             proxy = npmSetting(config, env, "proxy");
@@ -79,11 +87,11 @@ public final class RegistryTransport {
         }
         return new RegistryTransport(proxy != null ? proxy : first(env(env, "https_proxy"),
                 first(env(env, "http_proxy"), env(env, "proxy"))),
-                proxy != null ? proxy : env(env, "https_proxy"), bypass);
+                proxy != null ? proxy : env(env, "https_proxy"), bypass, customTls);
     }
 
     public static RegistryTransport pnpm(Map<String, ?> config, Map<String, String> env) {
-        requireCapabilities(config, true);
+        boolean customTls = requireCapabilities(config, true);
         String https = text(config.get("httpsProxy"));
         if (https == null) {
             // pnpm's nullish fallback preserves an explicit false proxy.
@@ -98,7 +106,7 @@ public final class RegistryTransport {
         if (bypass == null) {
             bypass = config.get("noproxy") != null ? text(config.get("noproxy")) : env(env, "no_proxy");
         }
-        return new RegistryTransport(http, https, bypass);
+        return new RegistryTransport(http, https, bypass, customTls);
     }
 
     /** pnpm's package-manager download uses trusted npmrc network settings with null/false disabling fallback. */
@@ -109,14 +117,14 @@ public final class RegistryTransport {
             config.put("local-address".equals(key) ? "localAddress" : "strict-ssl".equals(key) ? "strictSsl" : key,
                     entry.getValue());
         }
-        requireCapabilities(config, true);
+        boolean customTls = requireCapabilities(config, true);
         Object httpsValue = trusted.get("https-proxy") != null ? trusted.get("https-proxy") : trusted.get("proxy");
         String https = bootstrapProxy(httpsValue, env(env, "https_proxy"),
                 trusted.get("https-proxy") != null || trusted.containsKey("proxy"));
         String http = bootstrapProxy(trusted.get("http-proxy"),
                 first(https, first(env(env, "http_proxy"), env(env, "proxy"))), trusted.containsKey("http-proxy"));
         Object bypass = trusted.get("no-proxy") != null ? trusted.get("no-proxy") : trusted.get("noproxy");
-        return new RegistryTransport(http, https, bypass == null ? env(env, "no_proxy") : text(bypass));
+        return new RegistryTransport(http, https, bypass == null ? env(env, "no_proxy") : text(bypass), customTls);
     }
 
     private static @Nullable String bootstrapProxy(@Nullable Object value, @Nullable String fallback, boolean present) {
@@ -126,8 +134,8 @@ public final class RegistryTransport {
         return first(text(value), fallback);
     }
 
-    private static void requireCapabilities(Map<String, ?> config, boolean camelCase) {
-        for (String key : Arrays.asList("ca", "cafile", "cert", "key", "local-address")) {
+    private static boolean requireCapabilities(Map<String, ?> config, boolean camelCase) {
+        for (String key : Arrays.asList("ca", "cert", "key", "local-address")) {
             String name = camelCase && "local-address".equals(key) ? "localAddress" : key;
             Object value = config.get(name);
             if (value != null && !Boolean.FALSE.equals(value) && !"".equals(value)) {
@@ -136,9 +144,8 @@ public final class RegistryTransport {
             }
         }
         Object strict = config.get(camelCase ? "strictSsl" : "strict-ssl");
-        if (Boolean.FALSE.equals(strict) || "false".equals(strict)) {
-            throw new CannotKnow("the configured registry transport disables TLS verification, which this transport cannot apply");
-        }
+        Object cafile = config.get("cafile");
+        return cafile != null && !"".equals(cafile) || Boolean.FALSE.equals(strict) || "false".equals(strict);
     }
 
     private static @Nullable String npmSetting(Map<String, ?> config, Map<String, String> env, String key) {
@@ -186,6 +193,11 @@ public final class RegistryTransport {
     }
 
     public HttpSender sender(HttpSender sender, String url) {
+        // Preserve the existing host contract: a custom injected sender supplies TLS configuration itself.
+        if (requiresCustomTls && sender.getClass() == HttpUrlConnectionSender.class) {
+            throw new CannotKnow("the configured registry transport requires custom TLS (cafile/strict-ssl), " +
+                                 "but no TLS-capable HttpSender was injected");
+        }
         URI target;
         try {
             target = URI.create(url);

@@ -142,9 +142,21 @@ class RegistryTransportTest {
         assertThat(((InetSocketAddress) sender.route.address()).getPort()).isEqualTo(1234);
         pnpm.sender(sender, "http://registry.invalid/");
         assertThat(((InetSocketAddress) sender.route.address()).getPort()).isEqualTo(2345);
-        for (String key : new String[]{"ca", "cafile", "cert", "key", "local-address", "strict-ssl"}) {
+        for (String key : new String[]{"ca", "cert", "key", "local-address"}) {
             assertThatThrownBy(() -> RegistryTransport.npm(Map.of(key, "strict-ssl".equals(key) ? false : "synthetic"), Map.of()))
                     .isInstanceOf(CannotKnow.class);
+        }
+    }
+
+    @Test
+    void tlsOptionsPreserveTheExistingInjectedSenderContract() {
+        HttpSender custom = request -> { throw new AssertionError("selection only"); };
+        for (Map<String, Object> config : java.util.List.of(Map.<String, Object>of("cafile", "synthetic-ca.pem"),
+                Map.<String, Object>of("strict-ssl", false))) {
+            RegistryTransport transport = RegistryTransport.npm(config, Map.of());
+            assertThatThrownBy(() -> transport.sender(new HttpUrlConnectionSender(), "https://registry.invalid/"))
+                    .isInstanceOf(CannotKnow.class).hasMessageContaining("TLS-capable HttpSender");
+            assertThat(transport.sender(custom, "https://registry.invalid/")).isSameAs(custom);
         }
     }
 

@@ -220,8 +220,18 @@ public class HostInputs {
                 }
             }
         }
-        Set<String> keys = new LinkedHashSet<>();
         NodeRegistry registry = user.getDefaultRegistry();
+        if (network != NetworkConfig.NONE && registries.isEmpty()) {
+            // Keep the existing trusted expansion and injected-sender contract for these TLS settings, including
+            // requests to a registry named later by the manager's workspace config.
+            if (registry.getCafile() != null) {
+                npmrc.append("cafile=").append(EcmaScript.quote(registry.getCafile())).append('\n');
+            }
+            if (!registry.isStrictSsl()) {
+                npmrc.append("strict-ssl=false\n");
+            }
+        }
+        Set<String> keys = new LinkedHashSet<>();
         if (namesDefault(scopes)) {
             npmrc.append("registry=").append(registry.getUrl()).append('\n');
         }
