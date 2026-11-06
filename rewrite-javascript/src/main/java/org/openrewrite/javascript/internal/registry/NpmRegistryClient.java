@@ -38,8 +38,10 @@ public class NpmRegistryClient {
     private static final String FULL_ACCEPT = "application/json";
 
     private final HttpSender httpSender;
-    private final Map<String, byte[]> tarballCache = new ConcurrentHashMap<>();
-    private final Map<String, String> documentCache = new ConcurrentHashMap<>();
+    // Never let a response obtained with one credential bypass another project's registry authorization.
+    // Registry values are memory-only keys; credentials are not embedded in printable URL/cache-key strings.
+    private final Map<NodeRegistry, Map<String, byte[]>> tarballCache = new ConcurrentHashMap<>();
+    private final Map<NodeRegistry, Map<String, String>> documentCache = new ConcurrentHashMap<>();
 
     public NpmRegistryClient(HttpSender httpSender) {
         this.httpSender = httpSender;
@@ -51,13 +53,14 @@ public class NpmRegistryClient {
      */
     public String getPackumentText(NodeRegistry registry, String name, boolean fullMetadata) {
         String key = (fullMetadata ? "full:" : "corgi:") + registry.getUrl() + "#" + name;
-        String cached = documentCache.get(key);
+        Map<String, String> cache = documentCache.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
+        String cached = cache.get(key);
         if (cached == null) {
             guard(registry);
             String url = base(registry) + "/" + Urls.encodeName(name);
             cached = new String(send(registry, name, null, url, fullMetadata ? FULL_ACCEPT : PACKUMENT_ACCEPT, true),
                     StandardCharsets.UTF_8);
-            documentCache.put(key, cached);
+            cache.put(key, cached);
         }
         return cached;
     }
@@ -67,12 +70,13 @@ public class NpmRegistryClient {
      */
     public String getManifestText(NodeRegistry registry, String name, String version) {
         String key = "manifest:" + registry.getUrl() + "#" + name + "@" + version;
-        String cached = documentCache.get(key);
+        Map<String, String> cache = documentCache.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
+        String cached = cache.get(key);
         if (cached == null) {
             guard(registry);
             String url = base(registry) + "/" + Urls.encodeName(name) + "/" + version;
             cached = new String(send(registry, name, version, url, FULL_ACCEPT, false), StandardCharsets.UTF_8);
-            documentCache.put(key, cached);
+            cache.put(key, cached);
         }
         return cached;
     }
@@ -83,11 +87,12 @@ public class NpmRegistryClient {
      */
     public String getDocumentText(NodeRegistry registry, String name, String version, String url) {
         String key = "document:" + url;
-        String cached = documentCache.get(key);
+        Map<String, String> cache = documentCache.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
+        String cached = cache.get(key);
         if (cached == null) {
             guard(registry);
             cached = new String(send(registry, name, version, url, FULL_ACCEPT, false), StandardCharsets.UTF_8);
-            documentCache.put(key, cached);
+            cache.put(key, cached);
         }
         return cached;
     }
@@ -97,10 +102,11 @@ public class NpmRegistryClient {
      * a Yarn Berry checksum, which hashes the tarball's repacked contents.
      */
     public byte[] getTarball(NodeRegistry registry, String name, @Nullable String version, String tarballUrl) {
-        byte[] cached = tarballCache.get(tarballUrl);
+        Map<String, byte[]> cache = tarballCache.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
+        byte[] cached = cache.get(tarballUrl);
         if (cached == null) {
             cached = send(registry, name, version, tarballUrl, HttpSender.Request.Builder.APPLICATION_JSON, false);
-            tarballCache.put(tarballUrl, cached);
+            cache.put(tarballUrl, cached);
         }
         return cached;
     }

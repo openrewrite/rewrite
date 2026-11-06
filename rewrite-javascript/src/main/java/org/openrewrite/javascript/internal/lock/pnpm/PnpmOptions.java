@@ -75,6 +75,14 @@ public final class PnpmOptions {
      */
     private final Map<String, String> registries;
 
+    private final Map<String, @Nullable Object> registryConfig;
+    private final Map<String, @Nullable Object> trustedRegistryConfig;
+
+    /** Credentials after this release has applied source trust, precedence and environment substitution. */
+    public PnpmAuthHeaders authHeaders() {
+        return new PnpmAuthHeaders(registryConfig, release);
+    }
+
     /**
      * 11.5.3's {@code packageManagerRegistries}: the registries of the user's .npmrc and the environment alone, which
      * pnpm resolves itself from; null where a release before 11.5.3 could not read them.
@@ -107,7 +115,10 @@ public final class PnpmOptions {
                         @Nullable Map<String, String> packageManagerRegistries,
                         @Nullable List<String> workspacePackagePatterns,
                         @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
-                        PnpmRelease release) {
+                        PnpmRelease release, Map<String, @Nullable Object> registryConfig,
+                        Map<String, @Nullable Object> trustedRegistryConfig) {
+        this.registryConfig = registryConfig;
+        this.trustedRegistryConfig = trustedRegistryConfig;
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
@@ -125,7 +136,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withPackageManagerVersion(String version) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, version, release);
+                workspacePackagePatterns, wantedPackageManager, version, release, registryConfig, trustedRegistryConfig);
     }
 
     /**
@@ -133,7 +144,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withRelease(PnpmRelease release) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release);
+                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release, registryConfig, trustedRegistryConfig);
     }
 
     /**
@@ -143,7 +154,7 @@ public final class PnpmOptions {
      * asked where the two differ.
      */
     PnpmOptions packageManagerBootstrap(PnpmRelease running) {
-        if (packageManagerRegistries == null || packageManagerRegistries.equals(registries) ||
+        if (packageManagerRegistries == null ||
             !running.resolvesThePackageManagerFromTrustedConfig()) {
             return this;
         }
@@ -151,7 +162,7 @@ public final class PnpmOptions {
         bootstrapConfig.put("registries", packageManagerRegistries);
         return new PnpmOptions(bootstrapConfig, explicitlySetKeys, catalogs, packageManagerRegistries,
                 packageManagerRegistries, workspacePackagePatterns, wantedPackageManager, packageManagerVersion,
-                release);
+                release, trustedRegistryConfig, trustedRegistryConfig);
     }
 
     @Value
@@ -246,6 +257,11 @@ public final class PnpmOptions {
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
+        Map<String, @Nullable Object> trustedRegistryConfig = new LinkedHashMap<>();
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
+                envScopedConfig, jsonAuth.auth)) {
+            trustedRegistryConfig.putAll(pickIniConfig(source));
+        }
         Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig,
                 envScopedConfig, jsonAuth, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
@@ -381,7 +397,7 @@ public final class PnpmOptions {
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
-                wantedPackageManager, release.toString(), release);
+                wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig);
     }
 
     // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.
@@ -883,6 +899,19 @@ public final class PnpmOptions {
             // pnpm warns of the file and reads nothing from it
             return result;
         }
+        // npm-conf (pnpm 10) discards the whole file when any substitution fails, before its trust filter runs.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            try {
+                for (String key : Js.keys(raw)) {
+                    envReplace(key, env);
+                    if (raw.get(key) instanceof String) {
+                        envReplace((String) raw.get(key), env);
+                    }
+                }
+            } catch (JsError e) {
+                return result;
+            }
+        }
         for (String rawKey : Js.keys(raw)) {
             Object rawValue = raw.get(rawKey);
             boolean keyFromEnv = repositoryControlled && hasEnvPlaceholder(rawKey);
@@ -903,7 +932,7 @@ public final class PnpmOptions {
                     continue;
                 }
                 // a credential or network value reaches no lock, so an environment the host does not know is no matter
-                value = env == null && !readByALockOnlyInstall(key) ? rawValue :
+                value = env == null && !readByALockOnlyInstall(key) && !isAuthValueKey(key) ? rawValue :
                         substituteEnv((String) rawValue, env, release);
             }
             if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
@@ -973,9 +1002,9 @@ public final class PnpmOptions {
         return scoped;
     }
 
-    // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
+    // Credentials are read by registry requests, even though they never appear in the resulting lock.
     private static boolean leavesOutAnEntryFromTheEnvironment(String key, PnpmRelease release) {
-        return !readByALockOnlyInstall(key) || release.ignoresTheEnvironmentInRepositoryRequestDestinations();
+        return release.ignoresTheEnvironmentInRepositoryRequestDestinations();
     }
 
     private static final Pattern ENV_PLACEHOLDER = Pattern.compile("\\$\\{[^}]+}");
@@ -1104,7 +1133,7 @@ public final class PnpmOptions {
 
     /**
      * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
-     * credentials themselves and the certificates are the host's.
+     * credentials are retained for the store controller's fetcher; certificates remain the host's.
      */
     static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> registries = new LinkedHashMap<>();
@@ -1245,7 +1274,7 @@ public final class PnpmOptions {
 
     // parseCreds' decodeBase64Credential of 11.1.3, its padding mended before it fails; before, atob alone, whose
     // InvalidCharacterError pnpm does not catch (PnpmRelease#decodesACredentialForgivingItsPadding)
-    private static String decodeBase64Credential(String value, String key, PnpmRelease release) {
+    static String decodeBase64Credential(String value, String key, PnpmRelease release) {
         String decoded = atob(value);
         if (decoded == null && !release.decodesACredentialForgivingItsPadding()) {
             throw new JsError("InvalidCharacterError", atobError(value));
