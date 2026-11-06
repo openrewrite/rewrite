@@ -1568,6 +1568,18 @@ public class ClassDeclarationTests : RewriteTest
     }
 
     [Fact]
+    public void SpaceBeforeTrailingSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Outer { class Inner { } ; } ;
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void GenericConstraintWhitespace()
     {
         RewriteRun(

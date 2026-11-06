@@ -828,8 +828,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var enumMarkers = Markers.Empty;
         if (node.SemicolonToken.Span.Length > 0)
         {
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
             enumMarkers = Markers.Build([new Semicolon(Tree.RandomId())]);
         }
 
@@ -1075,8 +1075,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // Record types can have both a block body AND a trailing semicolon: `record C { };`
             if (node.SemicolonToken.Span.Length > 0)
             {
-                SkipTo(node.SemicolonToken.SpanStart);
-                SkipToken(node.SemicolonToken);
+                _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+                _cursor = node.SemicolonToken.Span.End;
                 trailingSemicolon = true;
             }
         }
