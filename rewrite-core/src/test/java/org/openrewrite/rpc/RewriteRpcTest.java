@@ -55,6 +55,7 @@ import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.internal.FindTreesOfType;
 import org.openrewrite.rpc.request.PrepareRecipeResponse;
 import org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition;
@@ -1214,7 +1215,11 @@ class RewriteRpcTest implements RewriteTest {
           editGatedBy(languageGate(PlainText.class.getName()),
             "org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A")),
           editGatedBy(languageGate(PlainText.class.getName()),
-            "org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"))));
+            "org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B")),
+          // A peer whose visitor handles several tree types gates on any of them
+          editGatedBy(new Precondition(null, null, "or",
+              List.of(languageGate(PlainText.class.getName()), languageGate(Quark.class.getName()))),
+            "org.openrewrite.text.FindAndReplace", Map.of("find", "B", "replace", "C"))));
         sentByClient.clear();
 
         RecipeRun run = new RecipeScheduler().scheduleRun(composite,
@@ -1222,7 +1227,7 @@ class RewriteRpcTest implements RewriteTest {
             PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 
-        assertThat(run.getChangeset().getAllResults()).extracting(r -> r.getAfter().printAll()).containsExactly("B");
+        assertThat(run.getChangeset().getAllResults()).extracting(r -> r.getAfter().printAll()).containsExactly("C");
         assertThat(sentByClient).filteredOn(method -> method.endsWith("Visit")).containsExactly("BatchVisit");
     }
 
