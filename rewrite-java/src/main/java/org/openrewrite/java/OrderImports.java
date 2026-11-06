@@ -23,6 +23,7 @@ import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.internal.ImportComments;
+import org.openrewrite.java.internal.StaticImportBindings;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -104,6 +105,9 @@ public class OrderImports extends Recipe {
                 parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, comments);
                 try {
                     J result = super.visit(comments.getPrepared(), ctx);
+                    if (result instanceof J.CompilationUnit) {
+                        result = StaticImportBindings.preserve(comments.getPrepared(), (J.CompilationUnit) result);
+                    }
                     if (result == comments.getPrepared()) {
                         return (J.CompilationUnit) tree;
                     }
