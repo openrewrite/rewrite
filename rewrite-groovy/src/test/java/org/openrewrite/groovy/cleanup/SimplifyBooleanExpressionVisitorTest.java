@@ -18,6 +18,7 @@ package org.openrewrite.groovy.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
@@ -66,6 +67,57 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void stringLiteralEqualsAsStatement() {
+        rewriteRun(groovy("class A{void f(){\"foo\".equals(\"bar\");}}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"foo\".equals(\"bar\")", "\"\".isEmpty()", "value.equals(value)"})
+    void preserveStringCallsInStatementPositions(String invocation) {
+        rewriteRun(groovy(
+          """
+            class A {
+                void f(String value, boolean flag, String[] values) {
+                    %1$s;
+                    if (flag) %1$s; else %1$s;
+                    while (flag) %1$s;
+                    do %1$s while (flag);
+                    for (; flag;) %1$s;
+                    for (String item : values) %1$s;
+                    for (%1$s; flag; %1$s) {}
+                    label: %1$s;
+                    switch (value) { case "foo": %1$s; break; }
+                }
+            }
+            """.formatted(invocation)
+        ));
+    }
+
+    @Test
+    void foldStringExpressionsInsideStatementArguments() {
+        rewriteRun(groovy(
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f() {
+                    accept("foo".equals("bar"), "".isEmpty())
+                    return "foo".equals("bar")
+                }
+            }
+            """,
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f() {
+                    accept(false, true)
+                    return false
+                }
+            }
+            """
+        ));
     }
 
     @Override
