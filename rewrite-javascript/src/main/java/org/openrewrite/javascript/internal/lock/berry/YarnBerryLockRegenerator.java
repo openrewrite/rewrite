@@ -144,6 +144,10 @@ public final class YarnBerryLockRegenerator {
         @Nullable
         Map<String, String> env;
 
+        /** Host request settings only, applied by Configuration's typed environment layer. */
+        @Builder.Default
+        Map<String, String> networkEnvironment = java.util.Collections.emptyMap();
+
         @Builder.Default
         Host host = Host.UNKNOWN;
 
@@ -476,7 +480,7 @@ public final class YarnBerryLockRegenerator {
             rcFiles.put(Configuration.HOME + file.getKey(), file.getValue());
         }
         try {
-            return Configuration.load(rcFiles, HostEnvironment.of(inputs.getEnv()), release);
+            return Configuration.load(rcFiles, HostEnvironment.of(inputs.getEnv()), release, inputs.getNetworkEnvironment());
         } catch (JsError e) {
             throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
         }

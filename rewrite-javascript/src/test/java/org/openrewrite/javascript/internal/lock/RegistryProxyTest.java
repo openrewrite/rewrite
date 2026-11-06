@@ -20,6 +20,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
@@ -48,6 +49,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
+    @ParameterizedTest
+    @CsvSource({"YARN_ENABLE_OFFLINE_MODE,false", "YARN_ENABLE_OFFLINE_MODE,0",
+            "YARN_ENABLE_NETWORK,true", "YARN_ENABLE_NETWORK,1",
+            "YARN_ENABLE_STRICT_SSL,true", "YARN_ENABLE_STRICT_SSL,1"})
+    void ordinaryYarnHostDefaultsDoNotRequireAnUnboundPolicy(String key, String value) {
+        AtomicInteger sent = new AtomicInteger();
+        Environment environment = new Environment() {
+            public String getenv(String name) { return key.equals(name) ? value : null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        Request request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"))
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: http://registry.invalid/\n")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n").build();
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager(PackageManager.YarnBerry).packageManagerVersion("4.17.0").build();
+        Result result;
+        try {
+            result = YarnBerryInputs.PORT.regenerate(LockDirectory.of(request), host,
+                    new NpmRegistryClient(r -> {
+                        sent.incrementAndGet();
+                        throw new IllegalStateException("synthetic sender boundary");
+                    }));
+        } catch (NodeRegistryException e) {
+            result = Result.failure(LockOnlyInstall.failure(e));
+        }
+        assertThat(sent).hasValue(1);
+        assertThat(result.getErrorMessage()).doesNotContain("network policy");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"yarn1", "yarn4", "bun"})
     void anUnboundManagerPolicyCannotSendDirectRequests(String manager) {
