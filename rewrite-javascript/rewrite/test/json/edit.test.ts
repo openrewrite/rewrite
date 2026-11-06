@@ -14,9 +14,13 @@
  * limitations under the License.
  */
 import {
+    appendElement,
+    elementsOf,
     emptyArray,
     emptyObject,
     fromPlain,
+    insertElement,
+    isArray,
     isEmptyContainer,
     isMember,
     isObject,
@@ -24,11 +28,13 @@ import {
     json,
     JsonParser,
     JsonVisitor,
+    mapElements,
     jsonLiteral,
     findMember,
     membersOf,
     pathOf,
     removeAt,
+    removeElements,
     removeMember,
     setAt,
     setMember,
@@ -60,6 +66,13 @@ async function editRoot(text: string, edit: (obj: Json.Object) => Json.Object): 
 async function editDocument(text: string, edit: (doc: Json.Document) => Json.Document): Promise<string> {
     return TreePrinters.print(edit(await parse(text)));
 }
+
+async function editArray(text: string, edit: (arr: Json.Array) => Json.Array): Promise<string> {
+    const doc = await parse(text);
+    return TreePrinters.print({...doc, value: edit(doc.value as Json.Array)} as Json.Document);
+}
+
+const isValue = (text: string) => (v: Json.Value) => toPlain(v) === text;
 
 function withIndentationOnKeys(doc: Json.Document): Json.Document {
     const move = (value: Json.Value): Json.Value => {
@@ -756,6 +769,209 @@ describe("building", () => {
 
         // then
         expect(printed).toBe(JSON.stringify(value, null, "\t"));
+    });
+});
+
+describe("array elements", () => {
+    test("elementsOf skips the Empty of a trailing comma and of an empty array", async () => {
+        // given
+        const doc = await parse(`{"a": ["x", "y",], "b": []}`);
+
+        // when
+        const a = elementsOf(valueAt(doc, ["a"]) as Json.Array);
+        const b = elementsOf(valueAt(doc, ["b"]) as Json.Array);
+
+        // then
+        expect(a.map(toPlain)).toEqual(["x", "y"]);
+        expect(b).toEqual([]);
+    });
+
+    test("appends to an array on one line", async () => {
+        expect(await editArray(`["a", "b"]`, arr => appendElement(arr, jsonLiteral("c")))).toBe(`["a", "b", "c"]`);
+        expect(await editArray(`["a"]`, arr => appendElement(arr, jsonLiteral("b")))).toBe(`["a", "b"]`);
+    });
+
+    test.each(["  ", "    ", "\t"])("appends to an array indented by %j", async indent => {
+        expect(await editArray(`[\n${indent}"a",\n${indent}"b"\n]`, arr => appendElement(arr, jsonLiteral("c"))))
+            .toBe(`[\n${indent}"a",\n${indent}"b",\n${indent}"c"\n]`);
+    });
+
+    test("fills an empty array inline, or on its own line where the brackets are or an indent is given", async () => {
+        expect(await editArray(`[]`, arr => appendElement(arr, jsonLiteral("a")))).toBe(`["a"]`);
+        expect(await editArray(`[
+]`, arr => appendElement(arr, jsonLiteral("a"), {indent: "  "}))).toBe(`[
+  "a"
+]`);
+        expect(await editArray(`[]`, arr => appendElement(arr, jsonLiteral("a"), {indent: "  "}))).toBe(`[
+  "a"
+]`);
+        expect(await editDocument(`{
+  "types": []
+}`, doc => updateAt(doc, ["types"], v => isArray(v) ? appendElement(v, jsonLiteral("node"), {indent: "  ", depth: 1}) : v))).toBe(`{
+  "types": [
+    "node"
+  ]
+}`);
+    });
+
+    test("keeps a trailing comma", async () => {
+        expect(await editArray(`["a", "b",]`, arr => appendElement(arr, jsonLiteral("c")))).toBe(`["a", "b", "c",]`);
+        expect(await editArray(`["a", "b",]`, arr => removeElements(arr, isValue("b")))).toBe(`["a",]`);
+    });
+
+    test("keeps a comment on the line of the element before", async () => {
+        const text = `[
+  "a", // about a
+  "b"
+]`;
+        expect(await editArray(text, arr => appendElement(arr, jsonLiteral("c")))).toBe(`[
+  "a", // about a
+  "b",
+  "c"
+]`);
+        expect(await editArray(text, arr => insertElement(arr, 1, jsonLiteral("x")))).toBe(`[
+  "a", // about a
+  "x",
+  "b"
+]`);
+        expect(await editArray(text, arr => removeElements(arr, isValue("b")))).toBe(`[
+  "a" // about a
+]`);
+    });
+
+    test("removes the removed element's own comment with it", async () => {
+        expect(await editArray(`[
+  "a", // about a
+  "b", // about b
+  "c"
+]`, arr => removeElements(arr, isValue("b")))).toBe(`[
+  "a", // about a
+  "c"
+]`);
+    });
+
+    test("gives the first element's position to the next one", async () => {
+        expect(await editArray(`[
+  "a",
+  "b"
+]`, arr => removeElements(arr, isValue("a")))).toBe(`[
+  "b"
+]`);
+        expect(await editArray(`["a", "b"]`, arr => removeElements(arr, isValue("a")))).toBe(`["b"]`);
+    });
+
+    test("inserts first", async () => {
+        expect(await editArray(`[
+  "a"
+]`, arr => insertElement(arr, 0, jsonLiteral("z")))).toBe(`[
+  "z",
+  "a"
+]`);
+        expect(await editArray(`["a"]`, arr => insertElement(arr, 0, jsonLiteral("z")))).toBe(`["z", "a"]`);
+    });
+
+    test("empties an array to [] unless a comment remains", async () => {
+        expect(await editArray(`[
+  "a",
+  "b"
+]`, arr => removeElements(arr, () => true))).toBe(`[]`);
+        expect(await editArray(`[ // list
+  "a"
+]`, arr => removeElements(arr, () => true))).toBe(`[ // list
+]`);
+    });
+
+    test("removes several elements at once as it would one at a time", async () => {
+        // given
+        const text = `[
+  "a", // about a
+  "b", // about b
+  "c", // about c
+  "d"
+]`;
+        const removed = (v: Json.Value) => toPlain(v) === "b" || toPlain(v) === "c";
+
+        // when
+        const atOnce = await editArray(text, arr => removeElements(arr, removed));
+        const oneAtATime = await editArray(text, arr => removeElements(removeElements(arr, isValue("b")), isValue("c")));
+
+        // then
+        expect(atOnce).toBe(`[
+  "a", // about a
+  "d"
+]`);
+        expect(oneAtATime).toBe(atOnce);
+    });
+
+    test("keeps the formatting of object and array elements", async () => {
+        const text = `[
+  {"name": "x",  "path": "a"},
+  [1,  2],
+  "s"
+]`;
+        expect(await editArray(text, arr => removeElements(arr, isValue("s")))).toBe(`[
+  {"name": "x",  "path": "a"},
+  [1,  2]
+]`);
+        expect(await editArray(text, arr => appendElement(arr, fromPlain({name: "y"}, "  ", 1)))).toBe(`[
+  {"name": "x",  "path": "a"},
+  [1,  2],
+  "s",
+  {
+    "name": "y"
+  }
+]`);
+    });
+
+    test("mapElements replaces the first match and removes the others in one pass", async () => {
+        // given
+        const text = `{
+  "compilerOptions": {
+    "types": ["jest", "@types/jest", "node"]
+  }
+}`;
+        const jestTypes = new Set(["jest", "@types/jest"]);
+
+        // when
+        const printed = await editDocument(text, doc => updateAt(doc, ["compilerOptions", "types"], types => {
+            if (!isArray(types)) {
+                return types;
+            }
+            let replaced = false;
+            return mapElements(types, v => {
+                if (!jestTypes.has(toPlain(v) as string)) {
+                    return v;
+                }
+                if (replaced) {
+                    return undefined;
+                }
+                replaced = true;
+                return jsonLiteral("vitest/globals");
+            });
+        }));
+
+        // then
+        expect(printed).toBe(`{
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"]
+  }
+}`);
+    });
+
+    test("mapElements places a new element where the old one was, and keeps a prefix derived from it", async () => {
+        expect(await editArray(`["a",  "b"]`, arr => mapElements(arr, v => isValue("b")(v) ? jsonLiteral("c") : v))).toBe(`["a",  "c"]`);
+        expect(await editArray(`["a", "b"]`, arr => mapElements(arr, v => isValue("b")(v) ? {...v, prefix: space("   ")} : v))).toBe(`["a",   "b"]`);
+    });
+
+    test("returns the same array when nothing changes", async () => {
+        // given
+        const arr = (await parse(`["a", "b"]`)).value as Json.Array;
+
+        // then
+        expect(mapElements(arr, v => v)).toBe(arr);
+        expect(removeElements(arr, () => false)).toBe(arr);
+        expect(appendElement(arr, jsonLiteral("a"), {unique: true})).toBe(arr);
+        expect(appendElement(arr, jsonLiteral("a"))).not.toBe(arr);
     });
 });
 

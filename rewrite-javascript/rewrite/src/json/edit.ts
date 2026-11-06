@@ -36,22 +36,30 @@ import {
 
 export type JsonRoot = Json.Document | Json.Value;
 
-export interface SetMemberOptions {
+export interface LayoutOptions {
+    /**
+     * The indentation unit, e.g. `"  "`, used to lay out a member or element added to an empty object or array,
+     * which has no sibling to copy the indentation from. Without it, the addition stays on the same line: `{"a": 1}`,
+     * `["a"]`. The `*At` functions default it to the document's {@link detectIndent} when given a document laid out
+     * over several lines.
+     */
+    indent?: string;
+    /** How deep the object or array is nested, the root being 0. Used together with {@link indent}. */
+    depth?: number;
+}
+
+export interface SetMemberOptions extends LayoutOptions {
     /**
      * Where a new member goes: `"last"` (the default), `"first"`, or `"sorted"`, which places it
      * before the first member whose key sorts after it, the way npm keeps its dependency sections.
      * A member that already exists keeps its place.
      */
     position?: "first" | "last" | "sorted";
-    /**
-     * The indentation unit, e.g. `"  "`, used to lay out a member added to an object that has no member
-     * to copy the indentation from. Without it, a member added to `{}` stays on the same line.
-     * The `*At` functions default it to the document's {@link detectIndent} when given a document laid out
-     * over several lines.
-     */
-    indent?: string;
-    /** How deep the object is nested, the root object being 0. Used together with {@link indent}. */
-    depth?: number;
+}
+
+export interface AppendElementOptions extends LayoutOptions {
+    /** Whether to leave the array unchanged if one of its elements already holds the same data as the value. */
+    unique?: boolean;
 }
 
 export interface SetAtOptions extends SetMemberOptions {
@@ -177,47 +185,14 @@ export function setMember(obj: Json.Object, key: string, value: Json.Value, opti
         return withElementAt(obj, index, {...existing, value: withPrefix(value, existing.value.prefix)});
     }
 
-    const present = obj.members.map((m, i) => i).filter(i => obj.members[i].element.kind !== Json.Kind.Empty);
-    if (present.length === 0) {
-        const closing = obj.members.length > 0 ? obj.members[obj.members.length - 1].after : emptySpace;
-        const layout = emptyObjectLayout(closing, options);
-        const added = newMember(key, value, space(layout.member), emptySpace, space(" "));
-        return {...obj, members: [rightPadded<Json>(added, layout.closing)]};
-    }
-
+    const present = presentIndexes(obj.members);
     const insertAt = options.position === "first" ? 0 :
-        options.position === "sorted" ? sortedIndex(obj, present, key) :
+        options.position === "sorted" ? sortedIndex(obj.members, present, key) :
             present.length;
-    const neighbour = obj.members[present[Math.min(insertAt, present.length - 1)]].element as Json.Member;
-    const following = followingWhitespace(obj, present);
-    const added = newMember(key, value, space(following), neighbour.key.after, space(neighbour.value.prefix.whitespace));
-
-    const elements = [...obj.members];
-    if (insertAt < present.length) {
-        const at = present[insertAt];
-        const next = elements[at].element as Json.Member;
-        const nextSpace = leadingSpace(next);
-        const {ending, rest} = splitAtLineEnd(nextSpace);
-        if (ending.length > 0) {
-            elements[at] = {...elements[at], element: withLeadingSpace(next, rest)};
-            elements.splice(at, 0, rightPadded<Json>({...added, prefix: withLeadingComments(nextSpace.whitespace, ending, added.prefix)}, emptySpace));
-        } else if (insertAt === 0) {
-            elements[at] = {...elements[at], element: withLeadingWhitespace(next, following)};
-            elements.splice(at, 0, rightPadded<Json>({...added, prefix: space(leadingWhitespace(next))}, emptySpace));
-        } else {
-            elements.splice(at, 0, rightPadded<Json>(added, emptySpace));
-        }
-    } else {
-        const last = present[present.length - 1];
-        if (last === elements.length - 1) {
-            const {trailing, closing} = splitTrailingComment(elements[last].after, following);
-            elements.push(rightPadded<Json>(trailing ? {...added, prefix: trailing} : added, closing));
-            elements[last] = {...elements[last], after: emptySpace};
-        } else {
-            elements.splice(last + 1, 0, rightPadded<Json>(added, emptySpace));
-        }
-    }
-    return {...obj, members: elements};
+    const neighbour = present.length === 0 ? undefined :
+        obj.members[present[Math.min(insertAt, present.length - 1)]].element as Json.Member;
+    const added = newMember(key, value, emptySpace, neighbour?.key.after ?? emptySpace, space(neighbour?.value.prefix.whitespace ?? " "));
+    return {...obj, members: insertIntoList(obj.members, insertAt, added, options)};
 }
 
 /**
@@ -234,8 +209,7 @@ export function updateMember(obj: Json.Object, key: string, fn: (old: Json.Value
     if (value === existing.value) {
         return obj;
     }
-    const placed = value.id !== existing.value.id && isEmptySpace(value.prefix) ? withPrefix(value, existing.value.prefix) : value;
-    return withElementAt(obj, index, {...existing, value: placed});
+    return withElementAt(obj, index, {...existing, value: placedAs(value, existing.value)});
 }
 
 /**
@@ -249,28 +223,69 @@ export function removeMember(obj: Json.Object, key: string): Json.Object {
     if (index < 0) {
         return obj;
     }
-    const removed = obj.members[index];
-    const removedMember = removed.element as Json.Member;
-    const removedSpace = leadingSpace(removedMember);
-    const kept = commentsEndingPreviousLine(removedSpace);
-    const keep = (to: Json.Space) => withLeadingComments(removedSpace.whitespace, kept, splitAtLineEnd(to).rest);
-    const elements = obj.members.filter((_, i) => i !== index);
-    const present = elements.filter(m => m.element.kind !== Json.Kind.Empty);
+    return {...obj, members: removeFromList(obj.members, index)};
+}
 
-    if (present.length === 0) {
-        const closing = keep(elements.length > 0 ? elements[elements.length - 1].after : removed.after);
-        return {...obj, members: [rightPadded<Json>(emptyElement(), closing.comments.length === 0 ? emptySpace : closing)]};
+/**
+ * The elements of an array, without the `Json.Empty` of an empty array or a trailing comma.
+ */
+export function elementsOf(arr: Json.Array): Json.Value[] {
+    return arr.values.map(v => v.element).filter(v => v.kind !== Json.Kind.Empty);
+}
+
+/**
+ * Adds an element after the last one. It copies its indentation from a sibling; in an array without elements,
+ * it is laid out by {@link LayoutOptions.indent} and {@link LayoutOptions.depth}, or stays inline: `["a"]`.
+ */
+export function appendElement(arr: Json.Array, value: Json.Value, options: AppendElementOptions = {}): Json.Array {
+    const elements = elementsOf(arr);
+    if (options.unique && elements.some(e => sameData(e, value))) {
+        return arr;
     }
-    if (index === elements.length) {
-        elements[index - 1] = {...elements[index - 1], after: keep(removed.after)};
-    } else if (!isMember(elements[index].element)) {
-        elements[index] = {...elements[index], after: keep(elements[index].after)};
-    } else {
-        const next = withLeadingSpace(elements[index].element as Json.Member, keep(leadingSpace(elements[index].element)));
-        const element = kept.length === 0 && index === 0 ? withLeadingWhitespace(next, leadingWhitespace(removedMember)) : next;
-        elements[index] = {...elements[index], element};
+    return withValues(arr, insertIntoList(arr.values, elements.length, value, options));
+}
+
+/**
+ * Adds an element before the one at `index`, or after the last one if `index` is past the end.
+ */
+export function insertElement(arr: Json.Array, index: number, value: Json.Value, options: LayoutOptions = {}): Json.Array {
+    const count = elementsOf(arr).length;
+    return withValues(arr, insertIntoList(arr.values, Math.max(0, Math.min(index, count)), value, options));
+}
+
+/**
+ * Removes the elements that `pred` matches, with the same handling of whitespace and comments as {@link removeMember}.
+ * An array left without elements prints as `[]` unless a comment remains in it.
+ */
+export function removeElements(arr: Json.Array, pred: (value: Json.Value, index: number) => boolean): Json.Array {
+    return mapElements(arr, (v, i) => pred(v, i) ? undefined : v);
+}
+
+/**
+ * Replaces each element with what `fn` makes of it, or removes it where `fn` returns `undefined`.
+ * Replacing and removing in one pass covers e.g. replacing the first match and dropping the others.
+ * A value that `fn` derives from the old one keeps the prefix `fn` gives it; a new value without a prefix takes the
+ * old element's place. Elements are compared by reference: return the element itself to leave it unchanged.
+ */
+export function mapElements(arr: Json.Array, fn: (value: Json.Value, index: number) => Json.Value | undefined): Json.Array {
+    const removed: Json.Value[] = [];
+    let index = 0;
+    let values: Json.RightPadded<Json>[] = arr.values.map(padded => {
+        const old = padded.element;
+        if (old.kind === Json.Kind.Empty) {
+            return padded;
+        }
+        const value = fn(old, index++);
+        if (value === undefined) {
+            removed.push(old);
+            return padded;
+        }
+        return value === old ? padded : {...padded, element: placedAs(value, old)};
+    });
+    for (const old of removed) {
+        values = removeFromList(values, values.findIndex(p => p.element.id === old.id));
     }
-    return {...obj, members: elements};
+    return values.every((p, i) => p === arr.values[i]) && values.length === arr.values.length ? arr : withValues(arr, values);
 }
 
 /**
@@ -389,6 +404,93 @@ export function emptyArray(prefix: Json.Space = emptySpace): Json.Array {
     };
 }
 
+function withValues(arr: Json.Array, values: Json.RightPadded<Json>[]): Json.Array {
+    return {...arr, values: values as Json.RightPadded<Json.Value>[]};
+}
+
+function presentIndexes(list: Json.RightPadded<Json>[]): number[] {
+    return list.map((_, i) => i).filter(i => list[i].element.kind !== Json.Kind.Empty);
+}
+
+/**
+ * Inserts an element into the members of an object or the values of an array, before the `insertAt`-th element
+ * that isn't `Json.Empty`, or after the last one. The element's leading space comes from where it is placed.
+ */
+function insertIntoList(list: Json.RightPadded<Json>[], insertAt: number, added: Json, options: LayoutOptions): Json.RightPadded<Json>[] {
+    const present = presentIndexes(list);
+    if (present.length === 0) {
+        const closing = list.length > 0 ? list[list.length - 1].after : emptySpace;
+        const layout = emptyLayout(closing, options);
+        return [rightPadded<Json>(withLeadingSpace(added, space(layout.element)), layout.closing)];
+    }
+
+    const following = followingWhitespace(list, present);
+    const placed = withLeadingSpace(added, space(following));
+    const elements = [...list];
+    if (insertAt < present.length) {
+        const at = present[insertAt];
+        const next = elements[at].element;
+        const nextSpace = leadingSpace(next);
+        const {ending, rest} = splitAtLineEnd(nextSpace);
+        if (ending.length > 0) {
+            elements[at] = {...elements[at], element: withLeadingSpace(next, rest)};
+            elements.splice(at, 0, rightPadded<Json>(withLeadingSpace(placed, withLeadingComments(nextSpace.whitespace, ending, space(following))), emptySpace));
+        } else if (insertAt === 0) {
+            elements[at] = {...elements[at], element: withLeadingWhitespace(next, following)};
+            elements.splice(at, 0, rightPadded<Json>(withLeadingSpace(placed, space(leadingWhitespace(next))), emptySpace));
+        } else {
+            elements.splice(at, 0, rightPadded<Json>(placed, emptySpace));
+        }
+    } else {
+        const last = present[present.length - 1];
+        if (last === elements.length - 1) {
+            const {trailing, closing} = splitTrailingComment(elements[last].after, following);
+            elements.push(rightPadded<Json>(trailing ? withLeadingSpace(placed, trailing) : placed, closing));
+            elements[last] = {...elements[last], after: emptySpace};
+        } else {
+            elements.splice(last + 1, 0, rightPadded<Json>(placed, emptySpace));
+        }
+    }
+    return elements;
+}
+
+/**
+ * Removes the element at `index` from the members of an object or the values of an array. The space before the
+ * closing bracket stays where it is, a removed first element's indentation passes to the next one, a comment on the
+ * line before the element stays and one on the element's own line goes with it. A list left without elements holds
+ * a single `Json.Empty`, which prints without space unless a comment remains.
+ */
+function removeFromList(list: Json.RightPadded<Json>[], index: number): Json.RightPadded<Json>[] {
+    const removed = list[index];
+    const removedSpace = leadingSpace(removed.element);
+    const kept = commentsEndingPreviousLine(removedSpace);
+    const keep = (to: Json.Space) => withLeadingComments(removedSpace.whitespace, kept, splitAtLineEnd(to).rest);
+    const elements = list.filter((_, i) => i !== index);
+
+    if (presentIndexes(elements).length === 0) {
+        const closing = keep(elements.length > 0 ? elements[elements.length - 1].after : removed.after);
+        return [rightPadded<Json>(emptyElement(), closing.comments.length === 0 ? emptySpace : closing)];
+    }
+    if (index === elements.length) {
+        elements[index - 1] = {...elements[index - 1], after: keep(removed.after)};
+    } else if (elements[index].element.kind === Json.Kind.Empty) {
+        elements[index] = {...elements[index], after: keep(elements[index].after)};
+    } else {
+        const next = withLeadingSpace(elements[index].element, keep(leadingSpace(elements[index].element)));
+        const element = kept.length === 0 && index === 0 ? withLeadingWhitespace(next, leadingWhitespace(removed.element)) : next;
+        elements[index] = {...elements[index], element};
+    }
+    return elements;
+}
+
+/**
+ * A replacement value as `fn` gave it if it derives from the old one, otherwise after the old value's prefix
+ * unless it brings its own.
+ */
+function placedAs(value: Json.Value, old: Json.Value): Json.Value {
+    return value.id !== old.id && isEmptySpace(value.prefix) ? withPrefix(value, old.prefix) : value;
+}
+
 function indexOfMember(obj: Json.Object, key: string): number {
     return obj.members.findIndex(m => isMember(m.element) && getMemberKeyName(m.element) === key);
 }
@@ -463,12 +565,12 @@ function sameInteger(a: string, b: string): boolean {
  * The indentation of a member that isn't the first, which may differ from the first one's in an object
  * laid out on one line.
  */
-function followingWhitespace(obj: Json.Object, present: number[]): string {
+function followingWhitespace(list: Json.RightPadded<Json>[], present: number[]): string {
     if (present.length > 1) {
-        const second = leadingSpace(obj.members[present[1]].element);
+        const second = leadingSpace(list[present[1]].element);
         return lastLineBreak(second) ?? second.whitespace;
     }
-    return lastLineBreak(leadingSpace(obj.members[present[0]].element)) ?? " ";
+    return lastLineBreak(leadingSpace(list[present[0]].element)) ?? " ";
 }
 
 /**
@@ -479,9 +581,9 @@ function lastLineBreak(s: Json.Space): string | undefined {
     return text === undefined ? undefined : "\n" + text.substring(text.lastIndexOf("\n") + 1);
 }
 
-function sortedIndex(obj: Json.Object, present: number[], key: string): number {
+function sortedIndex(list: Json.RightPadded<Json>[], present: number[], key: string): number {
     const index = present.findIndex(i => {
-        const m = obj.members[i].element;
+        const m = list[i].element;
         const name = isMember(m) ? getMemberKeyName(m) : undefined;
         return name !== undefined && name.localeCompare(key, "en") > 0;
     });
@@ -538,16 +640,16 @@ function withLeadingComments(whitespace: string, comments: Json.Comment[], to: J
     };
 }
 
-function emptyObjectLayout(closing: Json.Space, options: SetMemberOptions): { member: string, closing: Json.Space } {
+function emptyLayout(closing: Json.Space, options: LayoutOptions): { element: string, closing: Json.Space } {
     const lineBreak = lastLineBreak(closing);
     if (lineBreak !== undefined) {
-        return {member: lineBreak + (options.indent ?? "    "), closing};
+        return {element: lineBreak + (options.indent ?? "    "), closing};
     }
     if (options.indent !== undefined) {
         const base = "\n" + options.indent.repeat(options.depth ?? 0);
-        return {member: base + options.indent, closing: space(base)};
+        return {element: base + options.indent, closing: space(base)};
     }
-    return {member: "", closing};
+    return {element: "", closing};
 }
 
 /**
@@ -558,35 +660,29 @@ function indentationOnKey(m: Json.Member): boolean {
 }
 
 /**
- * The space a member starts with: its prefix, or its key's prefix where the indentation is on the key.
+ * The space an element starts with: its prefix, or a member's key's prefix where the indentation is on the key.
  */
 function leadingSpace(element: Json): Json.Space {
     return isMember(element) && indentationOnKey(element) ? element.key.element.prefix : element.prefix;
 }
 
-function withLeadingSpace(m: Json.Member, prefix: Json.Space): Json.Member {
-    if (leadingSpace(m) === prefix) {
-        return m;
+function withLeadingSpace<T extends Json>(element: T, prefix: Json.Space): T {
+    if (leadingSpace(element) === prefix) {
+        return element;
     }
-    if (indentationOnKey(m)) {
-        return {...m, key: {...m.key, element: {...m.key.element, prefix}}};
+    if (isMember(element) && indentationOnKey(element)) {
+        return {...element, key: {...element.key, element: {...element.key.element, prefix}}};
     }
-    return {...m, prefix};
+    return {...element, prefix};
 }
 
-function leadingWhitespace(m: Json.Member): string {
-    return indentationOnKey(m) ? m.key.element.prefix.whitespace : m.prefix.whitespace;
+function leadingWhitespace(element: Json): string {
+    return leadingSpace(element).whitespace;
 }
 
-function withLeadingWhitespace(m: Json.Member, whitespace: string): Json.Member {
-    if (leadingWhitespace(m) === whitespace) {
-        return m;
-    }
-    if (indentationOnKey(m)) {
-        const key = m.key.element;
-        return {...m, key: {...m.key, element: {...key, prefix: {...key.prefix, whitespace}}}};
-    }
-    return {...m, prefix: {...m.prefix, whitespace}};
+function withLeadingWhitespace<T extends Json>(element: T, whitespace: string): T {
+    const prefix = leadingSpace(element);
+    return prefix.whitespace === whitespace ? element : withLeadingSpace(element, {...prefix, whitespace});
 }
 
 function editRoot<T extends JsonRoot>(root: T, path: readonly string[], options: SetMemberOptions,
