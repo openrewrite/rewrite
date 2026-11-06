@@ -41,13 +41,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                       return !!(left == right)
                   }
               }
-              """,
-            """
-              class Test {
-                  boolean same(String left, String right) {
-                      return left == right
-                  }
-              }
               """
           )
         );
@@ -231,6 +224,45 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void preserveSpockDoubleNotOptOut() {
+        rewriteRun(
+          groovy(
+            """
+              class Conditions {
+                  void check(String foo, String bar, Boolean boxed) {
+                      assert !!(foo == bar)
+                      assert !!(foo != bar)
+                      assert !!(foo.length() > bar.length())
+                      assert !!boxed
+                      assert !!true
+                      assert !!(foo == bar) : "foobar"
+                      assert !!(foo.isEmpty() || bar.isEmpty())
+                      assert !!(foo.length() == bar.length())
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveDoubleNotByLanguageRatherThanFileExtension() {
+        rewriteRun(
+          groovy(
+            """
+              assert !!(1 == 2)
+              assert !false
+              """,
+            """
+              assert !!(1 == 2)
+              assert true
+              """,
+            spec -> spec.path("conditions.java")
+          )
+        );
+    }
+
+    @Test
     void doubleNegationWithParentheses() {
         rewriteRun(
           groovy(
@@ -239,14 +271,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   def m() {
                       boolean a = !!(!(!true))
                       boolean b = !(!a)
-                  }
-              }
-              """,
-            """
-              class A {
-                  def m() {
-                      boolean a = true
-                      boolean b = a
                   }
               }
               """
