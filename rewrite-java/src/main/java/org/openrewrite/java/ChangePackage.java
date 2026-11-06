@@ -232,11 +232,8 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                     visited.getName().getFieldType() != null) {
                 return false;
             }
-            if (original.isFullyQualifiedClassReference(newPackageName)) {
-                return false;
-            }
-            for (Cursor parent = getCursor().getParent(); parent != null && parent.getValue() instanceof J.FieldAccess; parent = parent.getParent()) {
-                if (((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName)) {
+            for (Cursor c = getCursor(); c != null && c.getValue() instanceof J.FieldAccess; c = c.getParent()) {
+                if (((J.FieldAccess) c.getValue()).isFullyQualifiedClassReference(newPackageName)) {
                     return false;
                 }
             }
