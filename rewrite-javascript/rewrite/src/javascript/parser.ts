@@ -2670,6 +2670,9 @@ export class JavaScriptParserVisitor {
             case ts.SyntaxKind.CommaToken:
                 binaryOperator = JS.Binary.Type.Comma;
                 break;
+            case ts.SyntaxKind.AsteriskAsteriskToken:
+                binaryOperator = JS.Binary.Type.Exponentiation;
+                break;
         }
 
         if (binaryOperator !== undefined) {
@@ -2710,9 +2713,6 @@ export class JavaScriptParserVisitor {
                     break;
                 case ts.SyntaxKind.BarBarEqualsToken:
                     assignmentOperation = JS.AssignmentOperation.Type.Or;
-                    break;
-                case ts.SyntaxKind.AsteriskAsteriskToken:
-                    assignmentOperation = JS.AssignmentOperation.Type.Power;
                     break;
                 case ts.SyntaxKind.AsteriskAsteriskEqualsToken:
                     assignmentOperation = JS.AssignmentOperation.Type.Exp;
