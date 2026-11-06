@@ -21,8 +21,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -171,6 +177,43 @@ class FindAnnotationsTest implements RewriteTest {
               /*~~>*/@Composed class A {}
               @Bar class B {}
               """
+          )
+        );
+    }
+
+    @Test
+    void matchMetaAnnotationConstantsStoredAsStrings() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+              public @interface Meta {
+                  int size();
+                  boolean enabled();
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Meta(size = 2, enabled = true)
+              public @interface Bar {}
+              """
+          ),
+          java(
+            """
+              import com.example.Bar;
+              @Bar class A {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Annotation bar = cu.getClasses().getFirst().getLeadingAnnotations().getFirst();
+                JavaType.Class barType = (JavaType.Class) bar.getType();
+                JavaType.Annotation meta = (JavaType.Annotation) barType.getAnnotations().getFirst();
+                J.Annotation stringified = bar.withType(barType.withAnnotations(List.of(meta.withValues(
+                  ListUtils.map(meta.getValues(), v -> new JavaType.Annotation.SingleElementValue(v.getElement(), String.valueOf(v.getValue()), null))))));
+                assertThat(new AnnotationMatcher("@com.example.Meta(size=2, enabled=true)", true).matches(stringified)).isTrue();
+                assertThat(new AnnotationMatcher("@com.example.Meta(size=3)", true).matches(stringified)).isFalse();
+            })
           )
         );
     }

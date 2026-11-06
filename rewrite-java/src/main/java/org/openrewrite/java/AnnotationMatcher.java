@@ -173,12 +173,10 @@ public class AnnotationMatcher {
             return matchText.endsWith(".class") && TypeUtils.fullyQualifiedNamesAreEqual(
                     matchText.substring(0, matchText.length() - 6),
                     ((JavaType.FullyQualified) value).getFullyQualifiedName());
-        } else if (value instanceof String) {
-            return matchText.equals('"' + (String) value + '"');
-        } else if (value instanceof Character) {
-            return matchText.equals("'" + value + "'");
         }
-        return matchText.equals(String.valueOf(value));
+        // Serialized LSTs may hold any constant as its string form, so compare text, not Java type
+        String text = String.valueOf(value);
+        return matchText.equals(text) || matchText.equals('"' + text + '"') || matchText.equals("'" + text + "'");
     }
 
     private boolean matchesNamedParameters(J.Annotation annotation) {
