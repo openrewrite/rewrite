@@ -688,6 +688,8 @@ public class TypesInUse {
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
                         !(cursor.getValue() instanceof J.Lambda) &&
+                        // A source file may carry the type it declares, as a CFML file carries its component or
+                        // template. Like a class declaration's type, that type isn't in use just for being declared.
                         !(cursor.getValue() instanceof JavaSourceFile)) {
                     if (isFullyQualifiedJavaDocReference(cursor)) {
                         if (javaType instanceof JavaType.FullyQualified) {
