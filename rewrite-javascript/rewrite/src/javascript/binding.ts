@@ -16,7 +16,9 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf, valuesDeclaredAtTopLevel} from "./scope";
+import {
+    compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf, valuesDeclaredAtTopLevel
+} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
@@ -386,9 +388,10 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
 }
 
 /**
- * The name the moved binding takes, or undefined where a pinned alias cannot be bound verbatim,
- * since deconflicting it would leave the references the caller emits unbound. The rule is
- * CLAUDE.md: Which name a rebind binds.
+ * The name the moved binding takes, or undefined where a pinned alias can't be used as given:
+ * it is taken, and renaming it would leave the caller's references unbound, or the binding shares
+ * its name with a module-scope value, which another name would split it from.
+ * The rule is CLAUDE.md: Which name a rebind binds.
  */
 function rebindingName(
     visitor: JavaScriptVisitor<any>,
@@ -399,22 +402,27 @@ function rebindingName(
     const taken = (name: string) => nameTaken(name, noNames, visitor) ||
         (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
     const alias = options.to.alias;
+    if (sharesNameWithValue(cu, existing)) {
+        return alias === undefined || alias === existing.localName ? existing.localName : undefined;
+    }
     if (alias !== undefined) {
-        return isBindableName(alias) && (alias === existing.localName ||
-            !sharesNameWithValue(cu, existing) && !taken(alias)) ? alias : undefined;
+        return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
     }
     const member = memberName(options.to.member);
-    if (existing.aliased || member === undefined || member === '*' || member === existing.localName ||
-        sharesNameWithValue(cu, existing)) {
+    if (existing.aliased || member === undefined || member === '*' || member === existing.localName) {
         return existing.localName;
     }
     return taken(member) ? existing.localName : member;
 }
 
 /**
- * Whether a value the module scope declares shares the import's name, as one binding no value may:
- * `import type {X}; const X = 1`. A rename would have to split the name's readers, and `export {X}`
- * publishes both, so the binding keeps its name.
+ * Whether a module-scope value has the import's name, as it can when the import binds only a type:
+ * `import type {X} from "m"; const X = 1`. Renaming would also rename the value's reads, and
+ * `export {X}` exports both, so the binding keeps its name.
+ *
+ * Scope also counts a function declared in a block and a `declare global` variable here, though
+ * neither is module-scope in an ES module. The alias that keeps is sometimes unneeded, but safe:
+ * scope can't yet tell their reads from the import's, so a rename would move those too.
  */
 function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBinding): boolean {
     return !existing.viaRequire && valuesDeclaredAtTopLevel(cu).has(existing.localName);

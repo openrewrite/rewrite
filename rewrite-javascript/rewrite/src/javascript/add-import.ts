@@ -2092,7 +2092,7 @@ function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boole
         !sameModule(moduleNameOf(specifier as J.Literal), module)) {
         return false;
     }
-    // A type-only import names a default or named bindings, never both: `import type R, {X}` doesn't compile
+    // A type-only import takes a default or named members, not both: `import type R, {X}` is TS1363
     if (clause.typeOnly && clause.name !== undefined) {
         return false;
     }
@@ -2191,11 +2191,11 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
 }
 
 /**
- * Drops the binding for `member` from `jsImport`'s clause — the default, the namespace alias, or
- * the one entry of the named list that binds `localName`, whichever `member` names — keeping
- * everything else the clause binds, another entry of the same member included. `ElementRemovalFormatter`
- * carries the dropped binding's prefix onto whatever prints next, and a dropped last entry's trailing
- * space onto the new last, as `RemoveImport` does.
+ * Drops one binding from `jsImport`'s clause: the default, the namespace alias, or the named entry
+ * that binds `member` as `localName`. Everything else stays, another entry of the same member
+ * included (`import {a, a as b}`). `ElementRemovalFormatter` carries the dropped binding's prefix
+ * onto whatever prints next, and a dropped last entry's trailing space onto the new last, as
+ * `RemoveImport` does.
  */
 function removeBinding(jsImport: JS.Import, member: string | undefined, localName: string): JS.Import {
     const importClause = jsImport.importClause;
@@ -2235,13 +2235,15 @@ function removeBinding(jsImport: JS.Import, member: string | undefined, localNam
         return jsImport;
     }
     const namedImports = importClause.namedBindings as JS.NamedImports;
-    // `import {a, a as b}` binds one member twice, and only the binding that moves goes
-    const removed = (specifier: JS.ImportSpecifier) =>
-        namedSpecifierImports(specifier.specifier, key) && specifierBinding(specifier)?.name === localName;
+    // `import {a, a as b}` binds `a` twice: drop only the entry that moves
+    const moves = (specifier: JS.ImportSpecifier) => {
+        const binding = specifierBinding(specifier);
+        return binding?.member === key && binding.name === localName;
+    };
     const formatter = new ElementRemovalFormatter<JS.ImportSpecifier>();
     const kept: J.RightPadded<JS.ImportSpecifier>[] = [];
     for (const entry of namedImports.elements.elements) {
-        if (removed(entry.element)) {
+        if (moves(entry.element)) {
             formatter.markRemoved(entry.element);
         } else {
             kept.push({...entry, element: formatter.processKept(entry.element)});
@@ -2255,7 +2257,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined, localNam
     // The space before `}` and any trailing comma belong to the last entry, so they move onto the
     // new last entry when the old one is dropped.
     const originalLast = namedImports.elements.elements[namedImports.elements.elements.length - 1];
-    if (removed(originalLast.element)) {
+    if (moves(originalLast.element)) {
         kept[kept.length - 1] = {...kept[kept.length - 1], after: originalLast.after, markers: originalLast.markers};
     }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
