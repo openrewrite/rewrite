@@ -472,7 +472,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         SequenceStartEvent sse = (SequenceStartEvent) event;
                         int nextLastEnd = event.getEndMark().getIndex();
-                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                        if (shouldUseYamlParserBugWorkaround(reader, sse)) {
                             nextLastEnd--;
                         }
 
@@ -647,19 +647,20 @@ public class YamlParser implements org.openrewrite.Parser {
     The SnakeYAML parser library unfortunately returns inconsistent marks.
     If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
     If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
+    Characters are read from our own reader by absolute index, as a mark's buffer is only SnakeYAML's sliding window.
     */
-    private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
-        int startCharIndex = event.getStartMark().getPointer();
-        int endCharIndex = event.getEndMark().getPointer();
-        if (endCharIndex >= event.getEndMark().getBuffer().length) {
+    private static boolean shouldUseYamlParserBugWorkaround(FormatPreservingReader reader, SequenceStartEvent event) {
+        int startIndex = event.getStartMark().getIndex();
+        int endIndex = event.getEndMark().getIndex();
+        String startChar = reader.readStringFromBuffer(startIndex, startIndex);
+        String endChar = reader.readStringFromBuffer(endIndex, endIndex);
+        if (startChar.isEmpty() || endChar.isEmpty() || endChar.charAt(0) == '-') {
             return false;
         }
-        int startChar = event.getStartMark().getBuffer()[startCharIndex];
-        int endChar = event.getEndMark().getBuffer()[endCharIndex];
-        if (startChar == '&' || startChar == '!') { // anchor or tag
-            return event.getEndMark().getBuffer()[endCharIndex - 1] == '-' && endChar != '-';
+        if (startChar.charAt(0) == '&' || startChar.charAt(0) == '!') { // anchor or tag
+            return endIndex > startIndex && reader.readStringFromBuffer(endIndex - 1, endIndex - 1).equals("-");
         }
-        return startChar == '-' && endChar != '-';
+        return startChar.charAt(0) == '-';
     }
 
     private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
