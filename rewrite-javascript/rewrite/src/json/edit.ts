@@ -35,7 +35,8 @@ export interface SetMemberOptions {
     /**
      * The indentation unit, e.g. `"  "`, used to lay out a member added to an object that has no member
      * to copy the indentation from. Without it, a member added to `{}` stays on the same line.
-     * The `*At` functions default it to the document's {@link detectIndent} when given a document.
+     * The `*At` functions default it to the document's {@link detectIndent} when given a document laid out
+     * over several lines.
      */
     indent?: string;
     /** How deep the object is nested, the root object being 0. Used together with {@link indent}. */
@@ -185,7 +186,8 @@ export function setMember(obj: Json.Object, key: string, value: Json.Value, opti
     } else {
         const last = present[present.length - 1];
         if (last === elements.length - 1) {
-            elements.push(rightPadded<Json>(added, elements[last].after));
+            const {trailing, closing} = splitTrailingComment(elements[last].after, following);
+            elements.push(rightPadded<Json>(trailing ? {...added, prefix: trailing} : added, closing));
             elements[last] = {...elements[last], after: emptySpace};
         } else {
             elements.splice(last + 1, 0, rightPadded<Json>(added, emptySpace));
@@ -279,9 +281,12 @@ export function literal(value: string | number | boolean | null, prefix: Json.Sp
 /**
  * A JSON value for plain data, laid out one element per line like `JSON.stringify(value, null, indent)`.
  * `depth` is how deep the value will be nested, so that its elements line up with the surrounding document.
- * Object properties that are `undefined` are left out, as `JSON.stringify` does.
+ * Object properties that are `undefined` are left out and a `toJSON` method is called, as `JSON.stringify` does.
  */
 export function fromPlain(value: unknown, indent: string, depth: number = 0): Json.Value {
+    if (typeof (value as { toJSON?: unknown } | null | undefined)?.toJSON === "function") {
+        return fromPlain((value as { toJSON(): unknown }).toJSON(), indent, depth);
+    }
     if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return literal(value);
     }
@@ -405,10 +410,25 @@ function sortedIndex(obj: Json.Object, present: number[], key: string): number {
     return index < 0 ? present.length : index;
 }
 
+/**
+ * A comment on the same line as the last member, which goes after the comma that a member appended to it adds,
+ * the way the parsers attach such a comment to the member after it.
+ */
+function splitTrailingComment(after: Json.Space, following: string): { trailing?: Json.Space, closing: Json.Space } {
+    if (after.comments.length === 0 || after.whitespace.includes("\n")) {
+        return {closing: after};
+    }
+    const [comment, ...rest] = after.comments;
+    return {
+        trailing: {kind: Json.Kind.Space, whitespace: after.whitespace, comments: [{...comment, suffix: following}]},
+        closing: rest.length === 0 ? space(comment.suffix) : {kind: Json.Kind.Space, whitespace: comment.suffix, comments: rest}
+    };
+}
+
 function emptyObjectLayout(closing: Json.Space, options: SetMemberOptions): { member: string, closing: Json.Space } {
-    const newline = closing.whitespace.lastIndexOf("\n");
-    if (newline >= 0) {
-        return {member: closing.whitespace + (options.indent ?? "    "), closing};
+    const lineBreak = [closing.whitespace, ...closing.comments.map(c => c.suffix)].filter(s => s.includes("\n")).pop();
+    if (lineBreak !== undefined) {
+        return {member: "\n" + lineBreak.substring(lineBreak.lastIndexOf("\n") + 1) + (options.indent ?? "    "), closing};
     }
     if (options.indent !== undefined) {
         const base = "\n" + options.indent.repeat(options.depth ?? 0);
@@ -449,10 +469,19 @@ function editRoot<T extends JsonRoot>(root: T, path: readonly string[], options:
         if (!isObject(doc.value)) {
             return root;
         }
-        const value = edit(doc.value, {...options, indent: options.indent ?? detectIndent(doc)});
+        const value = edit(doc.value, {...options, indent: options.indent ?? documentIndent(doc, doc.value)});
         return value === doc.value ? root : {...doc, value} as T;
     }
     return isObject(root as Json.Value) ? edit(root as Json.Object, options) as T : root;
+}
+
+function documentIndent(doc: Json.Document, obj: Json.Object): string | undefined {
+    const first = members(obj)[0];
+    if (first === undefined) {
+        return detectIndent(doc);
+    }
+    const whitespace = leadingWhitespace(first);
+    return whitespace.includes("\n") ? whitespace.match(/\n([ \t]+)$/)?.[1] ?? detectIndent(doc) : undefined;
 }
 
 function setIn(obj: Json.Object, path: readonly string[], value: Json.Value, options: SetAtOptions): Json.Object {

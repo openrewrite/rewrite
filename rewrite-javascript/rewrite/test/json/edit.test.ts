@@ -291,6 +291,33 @@ describe("setMember", () => {
 }`);
     });
 
+    test("fills an empty object in a document on one line inline", async () => {
+        expect(await editDocument(`{"a": {}}`, doc => setAt(doc, ["a", "b"], literal(1)))).toBe(`{"a": {"b": 1}}`);
+        expect(await editDocument(`{"a": 1}`, doc => setAt(doc, ["x", "b"], literal(1), {createMissing: true}))).toBe(`{"a": 1, "x": {"b": 1}}`);
+    });
+
+    test("fills an empty object that holds a comment", async () => {
+        expect(await editDocument(`{
+  "a": {
+    // nothing yet
+  }
+}`, doc => setAt(doc, ["a", "b"], literal(1)))).toBe(`{
+  "a": {
+    "b": 1
+    // nothing yet
+  }
+}`);
+    });
+
+    test("keeps a comment after the last member on its line", async () => {
+        expect(await editRoot(`{
+  "a": 1 // about a
+}`, obj => setMember(obj, "b", literal(2)))).toBe(`{
+  "a": 1, // about a
+  "b": 2
+}`);
+    });
+
     test("adds to a single-member object", async () => {
         expect(await editRoot(`{"a": 1}`, obj => setMember(obj, "b", literal(2)))).toBe(`{"a": 1, "b": 2}`);
     });
@@ -555,7 +582,7 @@ describe("building", () => {
 
     test("fromPlain matches JSON.stringify", async () => {
         // given
-        const value = {a: 1, b: [true, null, "x"], c: {d: {}}, e: [], skipped: undefined};
+        const value = {a: 1, b: [true, null, "x"], c: {d: {}}, e: [], f: new Date(0), skipped: undefined};
 
         // when
         const printed = await TreePrinters.print({...await parse(`{}`), value: fromPlain(value, "\t")} as Json.Document);
