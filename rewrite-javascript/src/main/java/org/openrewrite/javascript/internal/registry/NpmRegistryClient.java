@@ -16,11 +16,13 @@
 package org.openrewrite.javascript.internal.registry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException.Reason;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -128,6 +130,10 @@ public class NpmRegistryClient {
     private byte[] send(NodeRegistry registry, String name, @Nullable String version, String url,
                         String accept, boolean packument) {
         guard(registry);
+        if (hasAuthorization(registry) && !sameHttpsAuthority(registry.getUrl(), url)) {
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry), name, version,
+                    "Registry credentials cannot be safely applied outside the configured HTTPS authority", null);
+        }
         HttpSender sender = transport.sender(httpSender, url);
         HttpSender.Request request;
         try {
@@ -171,6 +177,10 @@ public class NpmRegistryClient {
     }
 
     private void guard(NodeRegistry registry) {
+        if (hasAuthorization(registry) && !isHttps(registry.getUrl())) {
+            throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
+                    "Registry credentials require HTTPS; anonymous fallback cannot honor this configuration");
+        }
         if (registry.isUnresolvedPlaceholders()) {
             throw new NodeRegistryException(Reason.UNREACHABLE, safeUrl(registry),
                     "Registry URL contains unresolved environment placeholders: " + safeUrl(registry));
@@ -199,8 +209,8 @@ public class NpmRegistryClient {
     }
 
     private static void applyAuth(HttpSender.Request.Builder builder, NodeRegistry registry) {
-        // Never send credentials over a non-TLS scheme — a cleartext (or unknown-scheme) registry could
-        // exfiltrate the token. npm's own default is to refuse auth over http.
+        // The request boundary rejects credentialed non-TLS and other-authority targets before this method.
+        // Anonymous registries remain usable over HTTP.
         if (!isHttps(registry.getUrl())) {
             return;
         }
@@ -210,6 +220,28 @@ public class NpmRegistryClient {
             builder.withAuthentication("Basic", registry.getAuthBase64());
         } else if (registry.getUsername() != null) {
             builder.withBasicAuthentication(registry.getUsername(), registry.getPassword());
+        }
+    }
+
+    private static boolean hasAuthorization(NodeRegistry registry) {
+        if (registry.getAuthToken() != null) {
+            return !StringUtils.isBlank(registry.getAuthToken());
+        }
+        if (registry.getAuthBase64() != null) {
+            return !StringUtils.isBlank(registry.getAuthBase64());
+        }
+        return !StringUtils.isBlank(registry.getUsername());
+    }
+
+    private static boolean sameHttpsAuthority(String registry, String target) {
+        try {
+            URI from = URI.create(registry);
+            URI to = URI.create(target);
+            return "https".equalsIgnoreCase(from.getScheme()) && "https".equalsIgnoreCase(to.getScheme()) &&
+                   from.getHost() != null && from.getHost().equalsIgnoreCase(to.getHost()) &&
+                   (from.getPort() < 0 ? 443 : from.getPort()) == (to.getPort() < 0 ? 443 : to.getPort());
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 
