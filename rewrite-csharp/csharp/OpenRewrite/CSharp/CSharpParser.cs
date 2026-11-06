@@ -1588,13 +1588,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var arguments = ParseArgumentList(node.Initializer.ArgumentList);
 
+            var initializerType = _typeMapping?.MethodType(node.Initializer);
             var initInvocation = new MethodInvocation(
                 Tree.RandomId(), kwPrefix, Markers.Empty,
                 null, // select
-                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, null, null),
+                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, initializerType, null),
                 null, // typeParameters
                 arguments,
-                null // methodType
+                initializerType
             );
 
             defaultValue = new JLeftPadded<Expression>(colonPrefix, initInvocation);
@@ -7671,6 +7672,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// </summary>
     private MethodDeclaration ParsePrimaryConstructor(ParameterListSyntax paramList)
     {
+        var methodType = _typeMapping?.MethodType(paramList);
         var paramsPrefix = ExtractSpaceBefore(paramList.OpenParenToken);
         _cursor = paramList.OpenParenToken.Span.End;
 
@@ -7707,7 +7709,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Build([new Implicit(Tree.RandomId())]),
             [],
             "<constructor>",
-            null,
+            methodType,
             null
         );
 
@@ -7726,7 +7728,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,    // Throws
             null,    // Body
             null,    // DefaultValue
-            null     // MethodType
+            methodType
         );
     }
 
