@@ -270,6 +270,16 @@ class LatestReleaseTest {
     }
 
     @Test
+    void longTermSupportVersionIsARelease() {
+        assertThat(latestRelease.isValid(null, "14.0.14-LTS")).isTrue();
+        assertThat(latestRelease.isValid(null, "14.0.14-lts")).isTrue();
+
+        assertThat(latestRelease.compare(null, "14.0.13-LTS", "14.0.12")).isPositive();
+        assertThat(latestRelease.compare(null, "14.0.17-LTS", "14.0.18")).isNegative();
+        assertThat(latestRelease.compare(null, "14.0.13-LTS", "14.0.14-LTS")).isNegative();
+    }
+
+    @Test
     void preReleaseVersionsShouldBeLessThanReleaseVersions() {
         assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
         assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);

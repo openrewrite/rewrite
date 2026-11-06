@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
     Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.\\d+)*(?<qualifier>[-.+].*?$)?");
-    String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
+    String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release", "-lts"};
     Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
 
     boolean isValid(@Nullable String currentVersion, String version);

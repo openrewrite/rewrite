@@ -21,6 +21,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SetRangeTest {
     @Test
+    void longTermSupportVersionIsInRange() {
+        SetRange setRange = SetRange.build("[14,16)", null).getValue();
+
+        assertThat(setRange).isNotNull();
+        assertThat(setRange.isValid(null, "14.0.14-LTS")).isTrue();
+        assertThat(setRange.isValid(null, "13.0.26-LTS")).isFalse();
+    }
+
+    @Test
     void exclusiveRange() {
         SetRange setRange = SetRange.build("(1,2)", null).getValue();
 
