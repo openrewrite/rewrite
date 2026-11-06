@@ -2828,5 +2828,6 @@ function denotation(literal: J.Literal): string {
         const quoted = source.startsWith("'") || source.startsWith('"');
         return JSON.stringify([primitive, quoted ? source.slice(1, -1) : source, literal.unicodeEscapes]);
     }
-    return JSON.stringify([primitive, literal.value]);
+    const value = typeof literal.value === 'bigint' ? literal.value.toString() : literal.value;
+    return JSON.stringify([primitive, value]);
 }

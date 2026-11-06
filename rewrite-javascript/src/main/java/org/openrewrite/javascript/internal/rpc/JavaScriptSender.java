@@ -24,6 +24,8 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.math.BigInteger;
+
 import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
@@ -629,6 +631,20 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public J visitLiteral(J.Literal literal, RpcSendQueue q) {
+            // A number would lose precision in JavaScript, so a bigint travels as its decimal text,
+            // interned because the queue compares by identity and would resend an unchanged value
+            q.getAndSend(literal, l -> l.getValue() instanceof BigInteger ? l.getValue().toString().intern() : l.getValue());
+            q.getAndSend(literal, J.Literal::getValueSource);
+            q.getAndSendList(literal, J.Literal::getUnicodeEscapes, s -> s.getValueSourceIndex() + s.getCodePoint(), s -> {
+                q.getAndSend(s, J.Literal.UnicodeEscape::getValueSourceIndex);
+                q.getAndSend(s, J.Literal.UnicodeEscape::getCodePoint);
+            });
+            q.getAndSend(literal, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
+            return literal;
         }
     }
 }
