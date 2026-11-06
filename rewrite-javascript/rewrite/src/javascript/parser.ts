@@ -3873,6 +3873,7 @@ export class JavaScriptParserVisitor {
                 })(),
                 markers: emptyMarkers,
                 typeOnly: node.isTypeOnly,
+                deferred: false,
                 name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
                 namedBindings: undefined
             },
@@ -3908,6 +3909,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeOnly: node.isTypeOnly,
+            deferred: node.phaseModifier === ts.SyntaxKind.DeferKeyword,
             name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             namedBindings: node.namedBindings && this.visit(node.namedBindings)
         };

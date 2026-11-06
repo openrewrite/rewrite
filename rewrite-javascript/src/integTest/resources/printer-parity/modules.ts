@@ -21,6 +21,7 @@ import legacy from "./legacy.json" assert { type: "json" };
 import fs = require("fs");
 import "./side-effect";
 import surrogate from './e\uD83D\uDE00m';
+import /*1*/ defer /*2*/ * as deferred from "./module-i";
 
 export * from "./module-d";
 export * as ns from "./module-e";
@@ -30,6 +31,7 @@ export type * as B from "B" /*a*/ with /*b*/ { type: "json" }/*c*/;
 export default everything;
 
 export const lazy = import("./module-f");
+export const lazyDeferred = import.defer("./module-i");
 export type Imported = import("./module-g").Thing<string>;
 export type Queried = typeof import("./module-h");
 export type Attributed = import("pkg", { with: { "resolution-mode": "import" } }).ImportInterface;

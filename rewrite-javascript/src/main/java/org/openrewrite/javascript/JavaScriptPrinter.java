@@ -227,6 +227,8 @@ public class JavaScriptPrinter<P> extends JavaScriptVisitor<PrintOutputCapture<P
         beforeSyntax(jsImportClause, p);
         if (jsImportClause.isTypeOnly()) {
             p.append("type");
+        } else if (jsImportClause.isDeferred()) {
+            p.append("defer");
         }
         if (jsImportClause.getPadding().getName() != null) {
             visitRightPadded(jsImportClause.getPadding().getName(), p);

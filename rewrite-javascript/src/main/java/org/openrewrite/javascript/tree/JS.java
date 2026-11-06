@@ -1330,6 +1330,10 @@ public interface JS extends J {
         @With
         boolean typeOnly;
 
+        @Getter
+        @With
+        boolean deferred;
+
         @Nullable
         JRightPadded<J.Identifier> name;
 
@@ -1376,7 +1380,7 @@ public interface JS extends J {
             }
 
             public ImportClause withName(@Nullable JRightPadded<J.Identifier> name) {
-                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, name, t.namedBindings);
+                return t.name == name ? t : new ImportClause(t.id, t.prefix, t.markers, t.typeOnly, t.deferred, name, t.namedBindings);
             }
         }
     }

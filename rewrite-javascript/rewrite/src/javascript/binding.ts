@@ -163,13 +163,22 @@ function dynamicallyImportedModule(declaration: J.VariableDeclarations): string 
     }
     const call = awaited as JS.FunctionCall;
     const callee = call.function?.element;
-    if (callee?.kind !== J.Kind.Identifier || (callee as J.Identifier).simpleName !== "import") {
+    if (!isImportIdentifier(callee) && !isImportDefer(callee)) {
         return undefined;
     }
     const argument = call.arguments.elements[0]?.element;
     return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
         ? moduleNameOf(argument as J.Literal)
         : undefined;
+}
+
+function isImportIdentifier(expression: J | undefined): boolean {
+    return expression?.kind === J.Kind.Identifier && (expression as J.Identifier).simpleName === "import";
+}
+
+function isImportDefer(expression: J | undefined): boolean {
+    return expression?.kind === J.Kind.FieldAccess && isImportIdentifier((expression as J.FieldAccess).target) &&
+        (expression as J.FieldAccess).name.element.simpleName === "defer";
 }
 
 /** Bindings from top-level `const X = <moduleOf-recognised call>` declarations, all of one shape. */
