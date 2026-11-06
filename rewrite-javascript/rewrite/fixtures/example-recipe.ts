@@ -18,6 +18,7 @@ import {FindIdentifier} from "./search-recipe";
 import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
 import {ChangeVersion} from "./change-version";
+import {ChangeXmlAttribute} from "./change-xml-attribute";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
 import {RecipeWithRpcSubRecipe} from "./recipe-with-rpc-sub-recipe";
 import {RecipeWithSameTypeChildren} from "./recipe-with-same-type-children";
@@ -41,6 +42,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
     await marketplace.install(CreateText, JavaScript);
     await marketplace.install(ChangeVersion, JavaScript);
+    await marketplace.install(ChangeXmlAttribute, JavaScript);
     await marketplace.install(RecipeWithRecipeList, JavaScript);
     await marketplace.install(RecipeWithRpcSubRecipe, JavaScript);
     await marketplace.install(RecipeWithSameTypeChildren, JavaScript);

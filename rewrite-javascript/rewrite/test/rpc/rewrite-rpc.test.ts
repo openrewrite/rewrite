@@ -19,6 +19,7 @@ import {Cursor, JavaScript, Recipe, RecipeMarketplace, rootCursor} from "../../s
 import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
 import {json, Json} from "../../src/json";
+import {xml, Xml} from "../../src/xml";
 import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
@@ -142,6 +143,18 @@ describe("Rewrite RPC", () => {
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse XML", async () => {
+        // when
+        const sourceFile = (await client.parse([{
+            text: "<root a='b'/>",
+            sourcePath: "webapp/view/App.view.xml"
+        }], Xml.Kind.Document))[0];
+
+        // then
+        expect(sourceFile.kind).toEqual(Xml.Kind.Document);
+        expect(await client.print(sourceFile)).toEqual("<root a='b'/>");
     });
 
     test("parse an input that names a file without giving its text", async () => {
@@ -291,6 +304,56 @@ describe("Rewrite RPC", () => {
             }
         );
     });
+
+    test("languages include XML", async () => {
+        expect(await client.languages()).toContainEqual(Xml.Kind.Document);
+    });
+
+    test("run an XML recipe", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.xml.change-attribute",
+            {key: "controllerName", value: "my.app.controller.Home"});
+        await spec.rewriteRun(
+            {
+                //language=xml
+                ...xml(
+                    `
+                      <?xml version="1.0" encoding="UTF-8"?>
+                      <!DOCTYPE View [<!ENTITY app "my.app">]>
+                      <mvc:View controllerName="my.app.controller.Main" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                          <!-- page -->
+                          <Page title='&app;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+                      </mvc:View>
+                    `,
+                    `
+                      <?xml version="1.0" encoding="UTF-8"?>
+                      <!DOCTYPE View [<!ENTITY app "my.app">]>
+                      <mvc:View controllerName="my.app.controller.Home" xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+                          <!-- page -->
+                          <Page title='&app;'><content><![CDATA[x]]>text<?pi data?></content></Page>
+                      </mvc:View>
+                    `
+                ),
+                path: "webapp/view/Main.view.xml"
+            }
+        );
+    });
+
+    test("print XML", () => spec.rewriteRun(
+        {
+            //language=xml
+            ...xml(
+                `
+                  <root a = 'b'>
+                      <child/>  text &amp; <b></b>
+                  </root>
+                `
+            ),
+            beforeRecipe: async (document: Xml.Document) => {
+                expect(await client.print(document)).toEqual("<root a = 'b'>\n    <child/>  text &amp; <b></b>\n</root>\n");
+                return document;
+            }
+        }
+    ));
 
     test("runScanningRecipeThatGenerates", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.create-text", {

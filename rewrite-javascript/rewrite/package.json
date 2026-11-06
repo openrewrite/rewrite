@@ -55,6 +55,10 @@
     "./yaml": {
       "types": "./dist/yaml/index.d.ts",
       "default": "./dist/yaml/index.js"
+    },
+    "./xml": {
+      "types": "./dist/xml/index.d.ts",
+      "default": "./dist/xml/index.js"
     }
   },
   "scripts": {
