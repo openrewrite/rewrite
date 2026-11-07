@@ -84,6 +84,8 @@ public abstract class RewriteTest
         // 1. Parse all sources and validate round-trip
         var validations = recipeSpec.Validations;
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
+        // The ids of the sources whose output Validations.OutputTypeAttribution checks.
+        var typed = new HashSet<Guid>();
 
         // Collect all csproj-related specs and parse them together in a shared temp directory
         // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
@@ -150,14 +152,18 @@ public abstract class RewriteTest
                 var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
                 source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
 
-                if (validations.TypeAttribution && semanticModel != null &&
+                if ((validations.TypeAttribution || validations.OutputTypeAttribution) && semanticModel != null &&
                     semanticModel.GetDiagnostics().All(d => d.Severity != DiagnosticSeverity.Error))
                 {
                     var missing = FindMissingTypes.Find(source);
-                    Assert.True(missing.Count == 0,
+                    Assert.True(!validations.TypeAttribution || missing.Count == 0,
                         "The source compiles, and the parser left these nodes of it without type attribution:\n" +
                         string.Join("\n", missing) + "\nFix the type mapping, or opt out with " +
                         "spec.SetValidations(new Validations { TypeAttribution = false }).");
+                    if (missing.Count == 0)
+                    {
+                        typed.Add(source.Id);
+                    }
                 }
 
                 // Verify no non-whitespace content leaked into Space fields
@@ -269,6 +275,19 @@ public abstract class RewriteTest
                 if (validations.ParserShapedTrees && fresh != null)
                 {
                     TreeShapes.AssertParserShaped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.OutputTypeAttribution)
+                {
+                    var untyped = results
+                        .Where(r => r.Before != null && typed.Contains(r.Before.Id) && r.After != null)
+                        .Select(r => (r.After!.SourcePath, Missing: FindMissingTypes.Find(r.After!)))
+                        .Where(r => r.Missing.Count > 0)
+                        .Select(r => $"  {r.SourcePath}\n" + string.Join("\n", r.Missing.Select(m => "    " + m)))
+                        .ToList();
+                    Assert.True(untyped.Count == 0,
+                        "The recipe's output lacks type attribution that its input had:\n" + string.Join("\n", untyped) +
+                        "\nAttribute the nodes the recipe makes, or opt out with " +
+                        "spec.SetValidations(new Validations { OutputTypeAttribution = false }).");
                 }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
                 UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);

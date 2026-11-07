@@ -53,6 +53,13 @@ public sealed class Validations
     public bool TypeAttribution { get; init; } = true;
 
     /// <summary>
+    /// Whether the recipe's output keeps the type attribution of its input, so that it makes no node without the type
+    /// that a recipe after it looks for. A source is checked where its input compiles without errors and has every
+    /// type that <see cref="OpenRewrite.CSharp.Search.FindMissingTypes"/> looks for. Default: enabled.
+    /// </summary>
+    public bool OutputTypeAttribution { get; init; } = true;
+
+    /// <summary>
     /// Whether the formatting reconciler validates structural compatibility between
     /// recipe output and Roslyn-formatted output. When enabled (default), the reconciler
     /// reports mismatches as test failures. When disabled, mismatches are silently

@@ -28,7 +28,7 @@ public class ValidationsTests
     {
         var all = Validations.All;
         Assert.True(all.WhitespaceInSpaces && all.PrintEqualsInput && all.PrintIdempotence && all.TypeAttribution &&
-                    all.FormattingReconciliation && all.ReportingMarkersOnly && all.ExecutionContextUnchanged &&
+                    all.OutputTypeAttribution && all.FormattingReconciliation && all.ReportingMarkersOnly && all.ExecutionContextUnchanged &&
                     all.NoEditsInScanningPhase && all.LightweightAccumulators && all.ParserShapedTrees &&
                     all.MinimalFormatting);
     }
@@ -39,7 +39,7 @@ public class ValidationsTests
         var none = Validations.None;
         Assert.False(none.WhitespaceInSpaces || none.PrintEqualsInput || none.PrintIdempotence || none.TypeAttribution ||
                      none.FormattingReconciliation);
-        Assert.True(none.ReportingMarkersOnly && none.ExecutionContextUnchanged && none.NoEditsInScanningPhase &&
+        Assert.True(none.OutputTypeAttribution && none.ReportingMarkersOnly && none.ExecutionContextUnchanged && none.NoEditsInScanningPhase &&
                     none.LightweightAccumulators && none.ParserShapedTrees && none.MinimalFormatting);
     }
 }

@@ -13,12 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
+using Xunit.Sdk;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Core;
 
 public class TypeAttributionTests : RewriteTest
 {
+    private const string CallsFoo =
+        """
+        class C
+        {
+            void M()
+            {
+                Foo();
+            }
+
+            void Foo() { }
+            void Bar() { }
+        }
+        """;
+
+    private const string CallsBar =
+        """
+        class C
+        {
+            void M()
+            {
+                Bar();
+            }
+
+            void Foo() { }
+            void Bar() { }
+        }
+        """;
+
     [Fact]
     public void SourceThatDoesNotCompileIsNotChecked()
     {
@@ -35,5 +68,49 @@ public class TypeAttributionTests : RewriteTest
                 """
             )
         );
+    }
+
+    [Fact]
+    public void OutputWithoutTheTypesItsInputHadFails()
+    {
+        var failure = Assert.ThrowsAny<XunitException>(() => RewriteRun(
+            spec => spec.SetRecipe(new CallBarWithoutItsMethod()),
+            CSharp(CallsFoo, CallsBar)
+        ));
+
+        Assert.Contains("MethodInvocation type is missing: Bar()", failure.Message);
+    }
+
+    [Fact]
+    public void OutputIsUncheckedWhereItsInputDoesNotCompileOrWhenOptedOut()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new CallBarWithoutItsMethod()),
+            CSharp(CallsFoo.Replace("Foo();", "Foo(); Undefined();"), CallsBar.Replace("Bar();", "Bar(); Undefined();"))
+        );
+        RewriteRun(
+            spec => spec.SetRecipe(new CallBarWithoutItsMethod())
+                .SetValidations(new Validations { OutputTypeAttribution = false }),
+            CSharp(CallsFoo, CallsBar)
+        );
+    }
+
+    private class CallBarWithoutItsMethod : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Call Bar without its method";
+        public override string Description => "Renames calls to Foo to Bar and drops their method type.";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+        private class Visitor : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
+            {
+                var call = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
+                return call.Name.SimpleName == "Foo"
+                    ? call.WithName(call.Name.WithSimpleName("Bar")).WithMethodType(null)
+                    : call;
+            }
+        }
     }
 }

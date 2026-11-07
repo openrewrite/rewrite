@@ -467,8 +467,10 @@ public class RewriteRuleTests : RewriteTest
     public void TypedCaptureWithTypeParametersMatchesDictionary()
     {
         RewriteRun(
+            // `key` is untyped, an object in the template, so the ContainsKey call the template makes binds no method.
             spec => spec.SetRecipe(new UseContainsKeyRecipe())
-                .SetReferenceAssemblies(Assemblies.Net90),
+                .SetReferenceAssemblies(Assemblies.Net90)
+                .SetValidations(new Validations { OutputTypeAttribution = false }),
             CSharp(
                 """
                 using System.Collections.Generic;
@@ -543,7 +545,7 @@ public class RewriteRuleTests : RewriteTest
     public void PreservesNullConditionalInRewrite()
     {
         var x = Capture.Expression(type: "IEnumerable<T>", typeParameters: ["T"]);
-        var pred = Capture.Expression();
+        var pred = Capture.Expression(type: "Func<T, bool>");
 
         RewriteRun(
             spec => spec.SetRecipe(new RewriteRecipe(
@@ -648,7 +650,7 @@ public class RewriteRuleTests : RewriteTest
     public void NullConditionalNotAddedWhenOriginalHasNone()
     {
         var x = Capture.Expression(type: "IEnumerable<T>", typeParameters: ["T"]);
-        var pred = Capture.Expression();
+        var pred = Capture.Expression(type: "Func<T, bool>");
 
         RewriteRun(
             spec => spec.SetRecipe(new RewriteRecipe(

@@ -1073,7 +1073,9 @@ public class AutoFormatTests : RewriteTest
     public void AutoFormatIndentsSynthesizedMemberOfClassAfterBlankLine()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe()),
+            // The recipe builds the constructor by hand, without the method it declares or calls.
+            spec => spec.SetRecipe(new AddConstructorWithAutoFormatRecipe())
+                .SetValidations(new Validations { OutputTypeAttribution = false }),
             CSharp(
                 "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
                 "using System;\n\nclass Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"

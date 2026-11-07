@@ -119,7 +119,7 @@ public class ParserShapedTreesTests : RewriteTest
             spec => spec
                 .SetRecipe(new ReturnNull(literal =>
                     new Identifier(literal.Id, literal.Prefix, literal.Markers, [], "null", null, null)))
-                .SetValidations(new Validations { ParserShapedTrees = false }),
+                .SetValidations(new Validations { ParserShapedTrees = false, OutputTypeAttribution = false }),
             CSharp(Returns("0"), Returns("null"))
         );
     }
