@@ -71,7 +71,7 @@ class TypeAttributionTest implements RewriteTest {
             spec -> spec.beforeRecipe(cu ->
               // a built-in function is a method of cfml, named as the language spells it, as are an extension's
               assertThat(calls(cu)).extracting(TypeAttributionTest::declaredBy)
-                .containsExactly("cfml.arrayLen", "cfml.len", null, "cfml.ImageNew"))
+                .containsExactly("cfml.arrayLen", "cfml.len", null, "cfml.imageNew"))
           )
         );
     }
@@ -739,8 +739,8 @@ class TypeAttributionTest implements RewriteTest {
             spec -> spec.path("models/UserService.cfc").beforeRecipe(cu ->
               // options only known when the function runs may ask for any type
               assertThat(calls(cu)).extracting(TypeAttributionTest::declaredBy).containsExactly(
-                "cfml.QueryExecute", "cfml.queryRecordCount", "cfml.QueryExecute", "cfml.queryEach",
-                "cfml.QueryExecute", "cfml.arrayLen", "cfml.QueryExecute", null))
+                "cfml.queryExecute", "cfml.queryRecordCount", "cfml.queryExecute", "cfml.queryEach",
+                "cfml.queryExecute", "cfml.arrayLen", "cfml.queryExecute", null))
           )
         );
     }
@@ -844,8 +844,8 @@ class TypeAttributionTest implements RewriteTest {
             spec -> spec.path("models/Finder.cfc").beforeRecipe(cu ->
               // directoryList gives an array of paths unless its listInfo asks for a query
               assertThat(calls(cu)).extracting(TypeAttributionTest::declaredBy).containsExactly(
-                "cfml.queryRecordCount", "cfml.DirectoryList", "cfml.arrayLen", "cfml.DirectoryList",
-                "cfml.queryRecordCount", "cfml.DirectoryList", null))
+                "cfml.queryRecordCount", "cfml.directoryList", "cfml.arrayLen", "cfml.directoryList",
+                "cfml.queryRecordCount", "cfml.directoryList", null))
           )
         );
     }
