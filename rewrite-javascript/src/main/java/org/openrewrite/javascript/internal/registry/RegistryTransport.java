@@ -110,6 +110,10 @@ public final class RegistryTransport {
     }
 
     public static RegistryTransport pnpm(Map<String, ?> config, Map<String, String> env) {
+        // PnpmOptions passes only explicitly configured fetchTimeout, after release/source filtering.
+        if (config.containsKey("fetchTimeout") && config.get("fetchTimeout") != null) {
+            throw new CannotKnow("pnpm network policy requires fetchTimeout, which this transport cannot safely apply");
+        }
         boolean customTls = requireCapabilities(config, true);
         String https = text(config.get("httpsProxy"));
         if (https == null) {

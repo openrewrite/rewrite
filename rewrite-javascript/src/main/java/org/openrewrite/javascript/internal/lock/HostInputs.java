@@ -203,6 +203,9 @@ public class HostInputs {
                 networkKeys.add("offline");
                 networkKeys.add("fetch-timeout");
             }
+            if (network == NetworkConfig.PNPM_10) {
+                networkKeys.add("fetch-timeout");
+            }
             if (network != NetworkConfig.PNPM_11) {
                 networkKeys.add("noproxy");
                 networkKeys.add("noproxy[]");

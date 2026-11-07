@@ -72,8 +72,15 @@ public final class PnpmOptions {
 
     /** Request routes after this release has filtered its config sources. */
     public RegistryTransport transport() {
-        return bootstrapTransport ? RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment) :
-                RegistryTransport.pnpm(config, transportEnvironment);
+        if (bootstrapTransport) {
+            return RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment);
+        }
+        // Defaults in the normalized config are not a request for a custom deadline.
+        Map<String, @Nullable Object> transportConfig = new LinkedHashMap<>(config);
+        if (!explicitlySetKeys.contains("fetchTimeout")) {
+            transportConfig.remove("fetchTimeout");
+        }
+        return RegistryTransport.pnpm(transportConfig, transportEnvironment);
     }
 
     private final Set<String> explicitlySetKeys;
@@ -250,6 +257,17 @@ public final class PnpmOptions {
             }
         }
 
+        // npm-conf supplies pnpm 10's npm_config_ settings before workspace settings. pnpm 11 reads
+        // pnpm_config_ instead, below. Keep this request policy out of unrelated configuration parsing.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            String timeout = envVarOf(env, "npm_config_", "fetch_timeout");
+            if (timeout != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, env.get(timeout), env);
+                if (value != Js.UNDEFINED) {
+                    mergedConfig.put("fetch-timeout", value);
+                }
+            }
+        }
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
         for (String key : Js.keys(defaultOptions)) {
             config.put(camelcase(key), defaultOptions.get(key));
@@ -260,6 +278,11 @@ public final class PnpmOptions {
             }
         }
         Set<String> explicitlySetKeys = new LinkedHashSet<>();
+        if (mergedConfig.containsKey("fetch-timeout") &&
+            (userConfig.containsKey("fetch-timeout") || workspaceNpmrc.containsKey("fetch-timeout") ||
+             env != null && envVarOf(env, "npm_config_", "fetch_timeout") != null && release.readsSettingsFromNpmrc())) {
+            explicitlySetKeys.add("fetchTimeout");
+        }
         for (String option : CLI_OPTIONS) {
             explicitlySetKeys.add(camelcase(option));
         }
@@ -375,7 +398,8 @@ public final class PnpmOptions {
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
         for (ConfigPair pair : parseEnvVars(ENV_TYPES, env, release)) {
-            if (pair.value == Js.UNDEFINED) {
+            if (pair.value == Js.UNDEFINED ||
+                "fetchTimeout".equals(pair.key) && release.readsSettingsFromNpmrc()) {
                 continue;
             }
             if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
