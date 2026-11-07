@@ -1331,13 +1331,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return whitespaceBeforeAsString(Character::isWhitespace);
     }
 
-    /**
-     * Whitespace within a line: a space or a tab, not a line break. Java 25 strips a Javadoc's common indentation,
-     * tabs included, so a tab after the margin has to be put back as a space is ({@link Character#isSpaceChar} is
-     * false for a tab).
-     */
+    /// Mirrors what javac's `JavadocTokenizer.getIndent` strips as a Javadoc's common indentation.
     private static boolean isInlineWhitespace(char c) {
-        return c != '\n' && c != '\r' && (Character.isWhitespace(c) || Character.isSpaceChar(c));
+        return c != '\n' && c != '\r' && Character.isWhitespace(c);
     }
 
     private String whitespaceBeforeAsString(Predicate<Character> whitespace) {

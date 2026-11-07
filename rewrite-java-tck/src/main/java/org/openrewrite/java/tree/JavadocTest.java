@@ -2703,6 +2703,21 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nonBreakingSpaceAfterMargin() {
+        rewriteRun(
+          java(
+            """
+              /**
+               *  a
+               * \u00A0b
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {
