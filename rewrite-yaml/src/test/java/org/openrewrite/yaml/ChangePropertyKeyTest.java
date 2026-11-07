@@ -908,6 +908,53 @@ class ChangePropertyKeyTest implements RewriteTest {
     }
 
     @Test
+    void doNotLeaveBlankLineWhenRemovedFirstEntryWasFollowedByOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "management.tracing.sampling.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+
+              after: here
+              more: there
+              """,
+            """
+              after: here
+              more: there
+              management.tracing.sampling.probability: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotLeaveBlankLineWhenRemovedFirstNestedEntryWasFollowedByOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "spring.tracing.probability", null, null, null)),
+          yaml(
+            """
+              spring:
+                sleuth:
+                  sampler:
+                    probability: 1.0
+
+                config: x
+              after: here
+              """,
+            """
+              spring:
+                config: x
+                tracing.probability: 1.0
+              after: here
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotCopyCommentOfRemovedFirstEntryOntoSoleRemainingSibling() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("spring.sleuth.sampler.probability", "spring.tracing.probability", null, null, null)),

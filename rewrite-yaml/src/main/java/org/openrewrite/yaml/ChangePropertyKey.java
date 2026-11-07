@@ -251,6 +251,15 @@ public class ChangePropertyKey extends Recipe {
         return lineBreak < 0 ? "" : prefix.substring(lineBreak + 1);
     }
 
+    private static String withoutLeadingBlankLines(String prefix) {
+        int lineBreak = prefix.indexOf('\n');
+        while (lineBreak >= 0 && prefix.substring(0, lineBreak).trim().isEmpty()) {
+            prefix = prefix.substring(lineBreak + 1);
+            lineBreak = prefix.indexOf('\n');
+        }
+        return prefix;
+    }
+
     private List<String> excludedSubKeys() {
         return except != null ? except : emptyList();
     }
@@ -303,8 +312,7 @@ public class ChangePropertyKey extends Recipe {
                     String prefix = path.get(i).getPrefix();
                     // An inline comment belongs to the parent; standalone comments belong to this entry.
                     if (!removed[i - 1]) {
-                        int breakAt = prefix.indexOf('\n');
-                        prefix = breakAt < 0 ? "" : prefix.substring(breakAt);
+                        prefix = afterFirstLineBreak(prefix);
                     }
                     if (prefix.contains("#")) {
                         if (!newEntryPrefix.contains("\n")) {
@@ -510,12 +518,12 @@ public class ChangePropertyKey extends Recipe {
                 }
             }
 
-            if (entries.size() == 1) {
+            if (!entries.isEmpty() && entries.get(0) != m.getEntries().get(0)) {
                 // Comments of a removed first entry travel with the moved property, not onto the survivor
                 String firstEntryPrefix = m.getEntries().get(0).getPrefix();
                 int lineBreak = firstEntryPrefix.indexOf('\n');
                 String lead = lineBreak < 0 ? firstEntryPrefix : firstEntryPrefix.substring(0, lineBreak + 1);
-                entries = ListUtils.map(entries, e -> e.withPrefix(lead + afterFirstLineBreak(e.getPrefix())));
+                entries = ListUtils.mapFirst(entries, e -> e.withPrefix(lead + withoutLeadingBlankLines(afterFirstLineBreak(e.getPrefix()))));
             }
 
             if (changed) {
