@@ -188,18 +188,21 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
-    public void LeavesTheUnnamedVariableOfAnExceptionFilterUnmarked()
+    public void LeavesNamesTheSourceOmitsUnmarked()
     {
         RewriteRun(
             spec => spec.SetRecipe(new FindMissingTypes()),
             CSharp(
                 """
+                using System.Collections.Generic;
+
                 class A
                 {
                     void M()
                     {
                         try { } catch (System.Exception) when (true) { }
                         try { } catch when (true) { }
+                        var t = typeof(Dictionary<,>);
                     }
                 }
                 """

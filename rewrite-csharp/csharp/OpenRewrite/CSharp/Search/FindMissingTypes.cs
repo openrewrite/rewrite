@@ -104,8 +104,10 @@ public class FindMissingTypes : Recipe
         /// </summary>
         private bool NamesWhatHasNoType(Identifier id)
         {
-            if (Cursor.FirstEnclosing<UsingDirective>() != null || Cursor.FirstEnclosing<DefineDirective>() != null ||
-                Cursor.FirstEnclosing<PragmaWarningDirective>() != null)
+            // The parser gives an empty name to what the source leaves out, such as each type argument of
+            // `typeof(Dictionary<,>)` or the variable of `catch (E) when (..)`.
+            if (id.SimpleName == "" || Cursor.FirstEnclosing<UsingDirective>() != null ||
+                Cursor.FirstEnclosing<DefineDirective>() != null || Cursor.FirstEnclosing<PragmaWarningDirective>() != null)
                 return true;
             var parent = Cursor.ParentTree;
             return parent.Value switch
@@ -124,8 +126,7 @@ public class FindMissingTypes : Recipe
                 Interpolation interpolation => interpolation.Format?.Element == id,
                 NamedExpression ne => ne.Name.Element == id && parent.ParentTree.Value is not PropertyPattern,
                 Case => id.SimpleName == "default",
-                // A discard, or the unnamed variable that holds the filter of `catch (E) when (..)`.
-                NamedVariable => id.SimpleName is "_" or "",
+                NamedVariable => id.SimpleName == "_",
                 _ => false
             };
         }
