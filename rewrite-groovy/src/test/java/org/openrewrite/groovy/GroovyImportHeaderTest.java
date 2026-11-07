@@ -128,6 +128,58 @@ public class GroovyImportHeaderTest implements RewriteTest {
     }
 
     @Test
+    void addImportPreservesStatementBeforeAnnotatedImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.math.RoundingMode", null, false))),
+          groovy(
+            """
+              /* License header */
+              println 'before imports'
+
+              @Deprecated import java.util.List
+
+              def modes = []
+              """,
+            """
+              /* License header */
+              println 'before imports'
+
+              import java.math.RoundingMode
+              @Deprecated import java.util.List
+
+              def modes = []
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnnotatedImportPreservesLeadingStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new RemoveImport<>("java.util.List"))),
+          groovy(
+            """
+              /* License header */
+              println 'before imports'
+
+              @Deprecated import java.util.List
+              import java.util.Set
+
+              def modes = []
+              """,
+            """
+              /* License header */
+              println 'before imports'
+
+              import java.util.Set
+
+              def modes = []
+              """
+          )
+        );
+    }
+
+    @Test
     void addExistingImportDoesNotMoveStatements() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
