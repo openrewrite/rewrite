@@ -121,6 +121,9 @@ public class FindMissingTypes : Recipe
             if (id.SimpleName == "" || Cursor.FirstEnclosing<UsingDirective>() != null ||
                 Cursor.FirstEnclosing<DefineDirective>() != null || Cursor.FirstEnclosing<PragmaWarningDirective>() != null)
                 return true;
+            // `nameof` takes a name, which may be a namespace or a group of overloads, and neither has a type.
+            if (Cursor.FirstEnclosing<MethodInvocation>() is { Select: null, Name.SimpleName: "nameof" })
+                return true;
             var parent = Cursor.ParentTree;
             return parent.Value switch
             {

@@ -261,6 +261,22 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public void LeavesNamesWithoutATypeInNameofUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A
+                {
+                    string M() => nameof(System) + nameof(System.Enum.Parse);
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void ChecksOnlyThePreprocessorBranchParsedWithTypes()
     {
         RewriteRun(
