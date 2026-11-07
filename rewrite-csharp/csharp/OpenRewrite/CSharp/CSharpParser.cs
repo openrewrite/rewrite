@@ -8611,7 +8611,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 leftIdent.Identifier.Text,
-                null,
+                _typeMapping?.Type(leftIdent),
                 null
             );
         }
@@ -8625,7 +8625,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 qualified.Left.ToString(),
-                null,
+                _typeMapping?.Type(qualified.Left),
                 null
             );
         }

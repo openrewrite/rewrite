@@ -916,6 +916,23 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal(["int", "System.String"], names.Select(n => TypeUtils.GetFullyQualifiedName(n.Type)));
     }
 
+    [Fact]
+    public async Task QualifierOfANestedTypeCarriesItsType()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            class Outer { public class Inner { } }
+            class G<T> { public class Inner { } }
+            class C
+            {
+                Outer.Inner A;
+                G<int>.Inner B;
+            }
+            """);
+
+        Assert.Equal(["Outer", "G"], Collect<VariableDeclarations>(cu)
+            .Select(v => TypeUtils.GetFullyQualifiedName((v.TypeExpression as FieldAccess)?.Target.Type)));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();
