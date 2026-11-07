@@ -27,7 +27,7 @@ public class FindMissingTypes : Recipe
 
     public override string Description =>
         "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration, " +
-        "identifier or field access without a type, or a method declaration or invocation without a method type.";
+        "identifier or field access without a type, or a method or operator declaration or an invocation without a method type.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
@@ -67,6 +67,20 @@ public class FindMissingTypes : Recipe
         {
             var md = base.VisitMethodDeclaration(method, p);
             return md is MethodDeclaration { MethodType: null } ? missing(md, "MethodDeclaration type is missing", p) : md;
+        }
+
+        public override J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
+        {
+            var od = base.VisitOperatorDeclaration(operatorDeclaration, p);
+            return od is OperatorDeclaration { MethodType: null } ? missing(od, "OperatorDeclaration type is missing", p) : od;
+        }
+
+        public override J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration conversion, P p)
+        {
+            var cod = base.VisitConversionOperatorDeclaration(conversion, p);
+            return cod is ConversionOperatorDeclaration { MethodType: null }
+                ? missing(cod, "ConversionOperatorDeclaration type is missing", p)
+                : cod;
         }
 
         public override J VisitMethodInvocation(MethodInvocation mi, P p)

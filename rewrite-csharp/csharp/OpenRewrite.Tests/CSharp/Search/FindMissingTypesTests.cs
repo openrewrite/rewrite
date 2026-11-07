@@ -106,6 +106,37 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public async Task MarksOperatorDeclarationsWithoutAMethodType()
+    {
+        const string source = """
+            class A
+            {
+                public static A operator +(A a, A b) => a;
+                public static implicit operator A(int i) => new A();
+            }
+            """;
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
+
+        Assert.Empty(FindMissingTypes.Find(cu));
+        Assert.Equal(
+            ["OperatorDeclaration type is missing: public static A operator +(A a, A b) => a;",
+             "ConversionOperatorDeclaration type is missing: public static implicit operator A(int i) => new A()"],
+            FindMissingTypes.Find((CompilationUnit)new OperatorMethodTypeRemover().Visit(cu, 0)!));
+    }
+
+    private sealed class OperatorMethodTypeRemover : CSharpVisitor<int>
+    {
+        public override J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, int p) =>
+            ((OperatorDeclaration)base.VisitOperatorDeclaration(operatorDeclaration, p)).WithMethodType(null);
+
+        public override J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration conversion, int p) =>
+            ((ConversionOperatorDeclaration)base.VisitConversionOperatorDeclaration(conversion, p)).WithMethodType(null);
+    }
+
+    [Fact]
     public void LeavesAttributedMethodsUnmarked()
     {
         RewriteRun(
