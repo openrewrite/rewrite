@@ -26,8 +26,8 @@ public class FindMissingTypes : Recipe
     public override string DisplayName => "Find missing type information on C# LSTs";
 
     public override string Description =>
-        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration or " +
-        "identifier without a type, or a method declaration or invocation without a method type.";
+        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration, " +
+        "identifier or field access without a type, or a method declaration or invocation without a method type.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
@@ -86,6 +86,18 @@ public class FindMissingTypes : Recipe
                    n.Clazz is not Expression { Type: JavaType.GenericTypeVariable } &&
                    !n.Arguments.Elements.Any(a => Unknown(a.Element))
                 ? missing(visited, "NewClass type is missing", p)
+                : visited;
+        }
+
+        /// <summary>
+        /// An access whose name has no type is marked at its name. A method group's name has its method, while the
+        /// group has no type.
+        /// </summary>
+        public override J VisitFieldAccess(FieldAccess fieldAccess, P p)
+        {
+            var visited = base.VisitFieldAccess(fieldAccess, p);
+            return fieldAccess is { Type: null, Name.Element.Type: not (null or JavaType.Method) }
+                ? missing(visited, "FieldAccess type is missing", p)
                 : visited;
         }
 

@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Search;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.CSharp.Search;
@@ -75,6 +78,31 @@ public class FindMissingTypesTests : RewriteTest
             ["MethodInvocation type is missing: M()", "MethodDeclaration type is missing: void M() ...",
              "ClassDeclaration type is missing: class A ..."],
             FindMissingTypes.Find(cu));
+    }
+
+    [Fact]
+    public async Task MarksAMemberAccessWithoutATypeWhoseNameHasOne()
+    {
+        const string source = """
+            class A
+            {
+                int M(string s) => s.Length;
+                System.Action G() => System.Console.WriteLine;
+            }
+            """;
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
+
+        Assert.Equal(["FieldAccess type is missing: s.Length"],
+            FindMissingTypes.Find((CompilationUnit)new LengthTypeRemover().Visit(cu, 0)!));
+    }
+
+    private sealed class LengthTypeRemover : CSharpVisitor<int>
+    {
+        public override J VisitFieldAccess(FieldAccess fieldAccess, int p) =>
+            fieldAccess.Name.Element.SimpleName == "Length" ? fieldAccess.WithType(null) : base.VisitFieldAccess(fieldAccess, p);
     }
 
     [Fact]
