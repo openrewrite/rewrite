@@ -6449,7 +6449,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     name,
                     typeParameters,
                     arguments,
-                    null
+                    _typeMapping?.MethodType(invocation)
                 );
             }
             else if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
@@ -6506,7 +6506,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     methodName,
                     typeParameters,
                     arguments,
-                    null
+                    _typeMapping?.MethodType(invocation)
                 );
             }
             else if (invocation.Expression is MemberAccessExpressionSyntax memberAccessChain)
@@ -6620,7 +6620,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName,
                     firstTypeParams,
                     firstArgs,
-                    null
+                    _typeMapping?.MethodType(innerInvocation)
                 );
             }
             else if (innerConditional.Expression is ElementBindingExpressionSyntax innerElementBinding)
@@ -6871,7 +6871,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 name,
                 typeParameters,
                 arguments,
-                null
+                _typeMapping?.MethodType(invocation)
             );
         }
         else if (whenNotNull is InvocationExpressionSyntax invocationWithChain &&
@@ -6972,7 +6972,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName,
                     firstTypeParams,
                     firstArgs,
-                    null
+                    _typeMapping?.MethodType(innerInvocation)
                 );
             }
             else if (innerConditional.Expression is ElementBindingExpressionSyntax innerElementBinding)
@@ -7152,7 +7152,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 return new MethodInvocation(
                     Tree.RandomId(), Space.Empty,
                     nullSafeMarker != null ? Markers.Build([nullSafeMarker]) : Markers.Empty,
-                    select, name, typeParams, args, null);
+                    select, name, typeParams, args, _typeMapping?.MethodType(invocation));
             }
 
             case ElementBindingExpressionSyntax elementBinding:
