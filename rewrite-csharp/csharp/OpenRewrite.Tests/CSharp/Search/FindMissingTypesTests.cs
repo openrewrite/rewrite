@@ -33,6 +33,7 @@ public class FindMissingTypesTests : RewriteTest
                     void M()
                     {
                         M();
+                        new A();
                     }
                 }
                 """,
@@ -42,6 +43,7 @@ public class FindMissingTypesTests : RewriteTest
                     /*~~(MethodDeclaration type is missing)~~>*/void M()
                     {
                         /*~~(MethodInvocation type is missing)~~>*/M();
+                        /*~~(NewClass type is missing)~~>*/new A();
                     }
                 }
                 """

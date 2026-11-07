@@ -78,6 +78,14 @@ public class FindMissingTypes : Recipe
                 : visited;
         }
 
+        public override J VisitNewClass(NewClass newClass, P p)
+        {
+            var visited = base.VisitNewClass(newClass, p);
+            return visited is NewClass { ConstructorType: null } n && !n.Arguments.Elements.Any(a => Unknown(a.Element))
+                ? missing(visited, "NewClass type is missing", p)
+                : visited;
+        }
+
         private static bool OperatorWrittenAsCall(MethodInvocation mi) =>
             mi.Name.SimpleName is "nameof" or "__makeref" or "__reftype" or "__refvalue";
 
