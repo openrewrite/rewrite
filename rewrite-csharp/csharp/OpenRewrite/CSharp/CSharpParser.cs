@@ -6381,6 +6381,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return nullSafe;
     }
 
+    /// <summary>
+    /// A name after <c>.</c> or <c>?.</c>, typed as any member name is. The name of a call has the method the call
+    /// invokes, and any other name has the member's type and variable.
+    /// </summary>
+    private Identifier MemberName(Space prefix, SimpleNameSyntax name)
+    {
+        var (type, fieldType) = name.Parent is { Parent: InvocationExpressionSyntax invocation } access &&
+                                invocation.Expression == access
+            ? (_typeMapping?.InvokedNameType(invocation), null)
+            : _typeMapping?.TypeAndFieldType(name) ?? (null, null);
+        return new Identifier(Tree.RandomId(), prefix, Markers.Empty, [], name.Identifier.Text, type, fieldType);
+    }
+
     public override J VisitConditionalAccessExpression(ConditionalAccessExpressionSyntax node)
     {
         var prefix = ExtractPrefix(node);
@@ -6413,30 +6426,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        genericName.Identifier.Text,
-                        null,
-                        null
-                    );
+                    name = MemberName(namePrefix, genericName);
                     typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(memberBinding.Name.Identifier);
                     _cursor = memberBinding.Name.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        memberBinding.Name.Identifier.Text,
-                        null,
-                        null
-                    );
+                    name = MemberName(namePrefix, memberBinding.Name);
                 }
 
                 var arguments = ParseArgumentList(invocation.ArgumentList);
@@ -6470,30 +6467,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericMethodName.Identifier);
                     _cursor = genericMethodName.Identifier.Span.End;
-                    methodName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        genericMethodName.Identifier.Text,
-                        null,
-                        null
-                    );
+                    methodName = MemberName(namePrefix, genericMethodName);
                     typeParameters = ParseTypeArgumentList(genericMethodName.TypeArgumentList);
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(memberAccess.Name.Identifier);
                     _cursor = memberAccess.Name.Identifier.Span.End;
-                    methodName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        memberAccess.Name.Identifier.Text,
-                        null,
-                        null
-                    );
+                    methodName = MemberName(namePrefix, memberAccess.Name);
                 }
 
                 var arguments = ParseArgumentList(invocation.ArgumentList);
@@ -6527,15 +6508,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var namePrefix = ExtractSpaceBefore(memberBinding.Name.Identifier);
             _cursor = memberBinding.Name.Identifier.Span.End;
-            var name = new Identifier(
-                Tree.RandomId(),
-                namePrefix,
-                Markers.Empty,
-                [],
-                memberBinding.Name.Identifier.Text,
-                null,
-                null
-            );
+            var name = MemberName(namePrefix, memberBinding.Name);
 
             return new FieldAccess(
                 Tree.RandomId(),
@@ -6584,30 +6557,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
-                    firstName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        genericName.Identifier.Text,
-                        null,
-                        null
-                    );
+                    firstName = MemberName(namePrefix, genericName);
                     firstTypeParams = ParseTypeArgumentList(genericName.TypeArgumentList);
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(innerMemberBinding.Name.Identifier);
                     _cursor = innerMemberBinding.Name.Identifier.Span.End;
-                    firstName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        innerMemberBinding.Name.Identifier.Text,
-                        null,
-                        null
-                    );
+                    firstName = MemberName(namePrefix, innerMemberBinding.Name);
                 }
 
                 var firstArgs = ParseArgumentList(innerInvocation.ArgumentList);
@@ -6835,30 +6792,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                 _cursor = genericName.Identifier.Span.End;
-                name = new Identifier(
-                    Tree.RandomId(),
-                    namePrefix,
-                    Markers.Empty,
-                    [],
-                    genericName.Identifier.Text,
-                    null,
-                    null
-                );
+                name = MemberName(namePrefix, genericName);
                 typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
             }
             else
             {
                 var namePrefix = ExtractSpaceBefore(memberBinding.Name.Identifier);
                 _cursor = memberBinding.Name.Identifier.Span.End;
-                name = new Identifier(
-                    Tree.RandomId(),
-                    namePrefix,
-                    Markers.Empty,
-                    [],
-                    memberBinding.Name.Identifier.Text,
-                    null,
-                    null
-                );
+                name = MemberName(namePrefix, memberBinding.Name);
             }
 
             var arguments = ParseArgumentList(invocation.ArgumentList);
@@ -6896,15 +6837,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var tbNullSafe = AdvancePastDotWithNullSafe(terminalBinding.OperatorToken);
             var namePrefix = ExtractSpaceBefore(terminalBinding.Name.Identifier);
             _cursor = terminalBinding.Name.Identifier.Span.End;
-            var name = new Identifier(
-                Tree.RandomId(),
-                namePrefix,
-                Markers.Empty,
-                [],
-                terminalBinding.Name.Identifier.Text,
-                null,
-                null
-            );
+            var name = MemberName(namePrefix, terminalBinding.Name);
             return new FieldAccess(
                 Tree.RandomId(),
                 prefix,
@@ -6936,30 +6869,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
-                    firstName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        genericName.Identifier.Text,
-                        null,
-                        null
-                    );
+                    firstName = MemberName(namePrefix, genericName);
                     firstTypeParams = ParseTypeArgumentList(genericName.TypeArgumentList);
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(innerMemberBinding.Name.Identifier);
                     _cursor = innerMemberBinding.Name.Identifier.Span.End;
-                    firstName = new Identifier(
-                        Tree.RandomId(),
-                        namePrefix,
-                        Markers.Empty,
-                        [],
-                        innerMemberBinding.Name.Identifier.Text,
-                        null,
-                        null
-                    );
+                    firstName = MemberName(namePrefix, innerMemberBinding.Name);
                 }
 
                 var firstArgs = ParseArgumentList(innerInvocation.ArgumentList);
@@ -7018,24 +6935,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(), namePrefix, Markers.Empty,
-                        [],
-                        genericName.Identifier.Text, null,
-                        null
-                        );
+                    name = MemberName(namePrefix, genericName);
                     _cursor = genericName.TypeArgumentList.Span.End;
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(memberBinding.Name.Identifier);
                     _cursor = memberBinding.Name.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(), namePrefix, Markers.Empty,
-                        [],
-                        memberBinding.Name.Identifier.Text, null,
-                        null
-                        );
+                    name = MemberName(namePrefix, memberBinding.Name);
                 }
                 return new FieldAccess(
                     Tree.RandomId(), Space.Empty, Markers.Build([mbNs]),
@@ -7053,24 +6960,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(), namePrefix, Markers.Empty,
-                        [],
-                        genericName.Identifier.Text, null,
-                        null
-                        );
+                    name = MemberName(namePrefix, genericName);
                     _cursor = genericName.TypeArgumentList.Span.End;
                 }
                 else
                 {
                     var namePrefix = ExtractSpaceBefore(memberAccess.Name.Identifier);
                     _cursor = memberAccess.Name.Identifier.Span.End;
-                    name = new Identifier(
-                        Tree.RandomId(), namePrefix, Markers.Empty,
-                        [],
-                        memberAccess.Name.Identifier.Text, null,
-                        null
-                        );
+                    name = MemberName(namePrefix, memberAccess.Name);
                 }
                 return new FieldAccess(
                     Tree.RandomId(), Space.Empty, Markers.Empty,
@@ -7091,24 +6988,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     {
                         var np = ExtractSpaceBefore(gn.Identifier);
                         _cursor = gn.Identifier.Span.End;
-                        name = new Identifier(
-                            Tree.RandomId(), np, Markers.Empty,
-                            [],
-                            gn.Identifier.Text, null,
-                            null
-                            );
+                        name = MemberName(np, gn);
                         typeParams = ParseTypeArgumentList(gn.TypeArgumentList);
                     }
                     else
                     {
                         var np = ExtractSpaceBefore(binding.Name.Identifier);
                         _cursor = binding.Name.Identifier.Span.End;
-                        name = new Identifier(
-                            Tree.RandomId(), np, Markers.Empty,
-                            [],
-                            binding.Name.Identifier.Text, null,
-                            null
-                            );
+                        name = MemberName(np, binding.Name);
                     }
                     select = new JRightPadded<Expression>(target, operatorSpace, Markers.Empty);
                 }
@@ -7121,24 +7008,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     {
                         var np = ExtractSpaceBefore(gn.Identifier);
                         _cursor = gn.Identifier.Span.End;
-                        name = new Identifier(
-                            Tree.RandomId(), np, Markers.Empty,
-                            [],
-                            gn.Identifier.Text, null,
-                            null
-                            );
+                        name = MemberName(np, gn);
                         typeParams = ParseTypeArgumentList(gn.TypeArgumentList);
                     }
                     else
                     {
                         var np = ExtractSpaceBefore(memberAccess.Name.Identifier);
                         _cursor = memberAccess.Name.Identifier.Span.End;
-                        name = new Identifier(
-                            Tree.RandomId(), np, Markers.Empty,
-                            [],
-                            memberAccess.Name.Identifier.Text, null,
-                            null
-                            );
+                        name = MemberName(np, memberAccess.Name);
                     }
                     select = new JRightPadded<Expression>(selectExpr, dotSpace, Markers.Empty);
                 }

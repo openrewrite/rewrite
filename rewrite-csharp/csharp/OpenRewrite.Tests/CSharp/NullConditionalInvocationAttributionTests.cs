@@ -24,7 +24,7 @@ namespace OpenRewrite.Tests.CSharp;
 public class NullConditionalInvocationAttributionTests
 {
     [Fact]
-    public async Task EachInvocationInANullConditionalChainCarriesItsMethod()
+    public async Task EachInvocationInANullConditionalChainAndItsNameCarryItsMethod()
     {
         const string source = """
             using System.Linq;
@@ -42,18 +42,61 @@ public class NullConditionalInvocationAttributionTests
                 }
             }
             """;
-        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
-        var syntax = CSharpSyntaxTree.ParseText(source);
-        var compilation = CSharpCompilation.Create("NullConditional", [syntax], refs,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
-        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(syntax));
+        var cu = await ParseAsync(source);
 
         var invocations = new List<MethodInvocation>();
         new InvocationCollector().Visit(cu, invocations);
         Assert.Equal(
             ["Trim", "ToUpper", "ToUpper", "ToLower", "Trim", "ToUpper", "ToLower", "ToString", "Where", "First", "Select"],
             invocations.Select(mi => mi.MethodType?.Name ?? $"<none for {mi.Name.SimpleName}>"));
+        Assert.All(invocations, mi => Assert.Same(mi.MethodType, mi.Name.Type));
+    }
+
+    [Fact]
+    public async Task EachMemberInANullConditionalChainCarriesItsVariable()
+    {
+        var cu = await ParseAsync("""
+            class D
+            {
+                public event System.EventHandler? Changed;
+            }
+            class C
+            {
+                void M(string s, string[] arr, D d, System.EventHandler h)
+                {
+                    var a = s?.Length;
+                    var b = s?.Trim().Length;
+                    var c = arr?[0].Length;
+                    var e = s?.Trim()?.Length;
+                    d?.Changed -= h;
+                }
+            }
+            """);
+
+        var members = new List<Identifier>();
+        new MemberNameCollector().Visit(cu, members);
+        Assert.Equal(["Length", "Length", "Length", "Length", "Changed"],
+            members.Select(m => (m.FieldType as JavaType.Variable)?.Name ?? $"<none for {m.SimpleName}>"));
+    }
+
+    private static async Task<CompilationUnit> ParseAsync(string source)
+    {
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var syntax = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("NullConditional", [syntax], refs,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        return new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(syntax));
+    }
+
+    private sealed class MemberNameCollector : CSharpVisitor<List<Identifier>>
+    {
+        public override J VisitIdentifier(Identifier identifier, List<Identifier> found)
+        {
+            if (identifier.SimpleName is "Length" or "Changed" && Cursor.FirstEnclosing<MethodDeclaration>() != null)
+                found.Add(identifier);
+            return identifier;
+        }
     }
 
     private sealed class InvocationCollector : CSharpVisitor<List<MethodInvocation>>
