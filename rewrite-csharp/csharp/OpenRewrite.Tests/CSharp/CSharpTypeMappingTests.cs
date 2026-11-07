@@ -793,6 +793,27 @@ public class CSharpTypeMappingTests : RewriteTest
         }
     }
 
+    [Fact]
+    public async Task VarIsTypedAsTheTypeItInfers()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            using System.Text;
+            class C
+            {
+                void M(Exception e)
+                {
+                    var builder = new StringBuilder();
+                    if (e is var exception) { }
+                }
+            }
+            """);
+
+        Assert.Equal(
+            ["System.Text.StringBuilder", "System.Exception"],
+            new IdentifierFinder("var").Collect(cu).Select(var => TypeUtils.GetFullyQualifiedName(var.Type)));
+    }
+
     private class IdentifierFinder(string name) : CSharpVisitor<int>
     {
         private readonly List<Identifier> _found = [];

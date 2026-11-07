@@ -2957,7 +2957,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.VarKeyword.Span.End;
 
         // Create 'var' as the type
-        var varType = new Identifier(Tree.RandomId(), prefix, Markers.Empty, [], "var", null, null);
+        var varType = new Identifier(Tree.RandomId(), prefix, Markers.Empty, [], "var", _typeMapping?.Type(node), null);
 
         // Handle the designation (variable name or discard)
         NamedVariable? namedVar = null;
@@ -8472,32 +8472,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (type is IdentifierNameSyntax identifier)
         {
-            // Could be 'var' or a user-defined type
             _cursor = identifier.Identifier.Span.End;
-            if (identifier.Identifier.Text == "var")
-            {
-                return new Identifier(
-                    Tree.RandomId(),
-                    prefix,
-                    Markers.Empty,
-                    [],
-                    "var",
-                    null,
-                    null
-                );
-            }
-            else
-            {
-                return new Identifier(
-                    Tree.RandomId(),
-                    prefix,
-                    Markers.Empty,
-                    [],
-                    identifier.Identifier.Text,
-                    _typeMapping?.Type(identifier),
-                    null
-                );
-            }
+            return new Identifier(
+                Tree.RandomId(),
+                prefix,
+                Markers.Empty,
+                [],
+                identifier.Identifier.Text,
+                _typeMapping?.Type(identifier),
+                null
+            );
         }
         else if (type is GenericNameSyntax genericName)
         {
