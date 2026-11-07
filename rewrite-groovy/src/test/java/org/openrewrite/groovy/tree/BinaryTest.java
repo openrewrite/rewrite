@@ -448,7 +448,14 @@ class BinaryTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"f % f", "f << 1", "f & f", "list + 1", "list << 1", "obj() + obj()"})
+    @ValueSource(strings = {
+      "f % f",
+      "f << 1",
+      "f & f",
+      "list + 1",
+      "list << 1",
+      "obj() + obj()"
+    })
     void binaryTypeStaysObjectWhereGroovyDecidesAtRuntime(String expression) {
         rewriteRun(
           groovy(
