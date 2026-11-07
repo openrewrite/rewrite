@@ -597,6 +597,8 @@ func (s *JavaSender) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(aa, func(v any) any { return v.(*java.ArrayAccess).Dimension },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(aa, func(v any) any { return AsRef(v.(*java.ArrayAccess).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return aa
 }
 
