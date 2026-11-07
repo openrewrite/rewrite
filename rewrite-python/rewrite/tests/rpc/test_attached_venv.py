@@ -34,7 +34,7 @@ _MODULE = textwrap.dedent('''
 def _prebuilt_venv(venv_dir):
     """A venv holding one distribution that declares two ``openrewrite.recipes`` entry points."""
     venv.create(venv_dir, with_pip=False, symlinks=os.name != "nt")
-    site_packages = venv_manager._site_packages(venv_dir)
+    site_packages = venv_manager.site_packages(venv_dir)
     (site_packages / "two_eps.py").write_text(_MODULE)
     dist_info = site_packages / "two_eps-0.1.0.dist-info"
     dist_info.mkdir()
@@ -50,7 +50,7 @@ def test_an_attached_venv_lists_every_entry_point_of_its_distribution(tmp_path):
     prebuilt = tmp_path / "prebuilt"
     _prebuilt_venv(prebuilt)
 
-    children = BundleChildren(sys.executable, tmp_path / "venvs", upstream=lambda *a: None)
+    children = BundleChildren(sys.executable, tmp_path / "venvs", upstream=lambda *a: None, activate=None)
     try:
         resp = Facade(children).install_recipes({"recipes": str(src), "venv": str(prebuilt)})
         rows = children.marketplace()

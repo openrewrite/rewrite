@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 
 from rewrite.rpc import venv_manager
@@ -170,3 +171,17 @@ def test_purge_is_a_noop_on_a_missing_root_and_is_idempotent(tmp_path):
     (root / "junk").mkdir()
     assert venv_manager.purge_non_venv_entries(root) == ["junk"]
     assert venv_manager.purge_non_venv_entries(root) == []   # nothing left but the venv
+
+
+def test_built_by_running_interpreter_reads_the_recorded_version(tmp_path):
+    running = "%d.%d.%d" % sys.version_info[:3]
+    (tmp_path / "venv").mkdir()
+    (tmp_path / "venv" / "pyvenv.cfg").write_text(f"home = /x\nversion = {running}\n")
+    (tmp_path / "uv").mkdir()
+    (tmp_path / "uv" / "pyvenv.cfg").write_text(f"home = /x\nversion_info = {running}\n")
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / "pyvenv.cfg").write_text("home = /x\nversion = 3.0.1\n")
+
+    assert venv_manager.built_by_running_interpreter(tmp_path / "venv")
+    assert venv_manager.built_by_running_interpreter(tmp_path / "uv")
+    assert not venv_manager.built_by_running_interpreter(tmp_path / "other")
