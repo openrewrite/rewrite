@@ -16,12 +16,13 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedWithin, scopeOf} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
-    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
-    isCommonJs, memberName, moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
-    requiredModuleOfDeclaration, requireJoinTarget
+    AddImportOptions, bindImport, bindingShape, bindsWithRequire, canImport, containerId, existingImportBinding,
+    ExistingImportBinding, hasEsmSyntax, ImportContainer, importContainerOf, ImportStyle, isCommonJs, memberName,
+    moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf, requiredModuleOfDeclaration,
+    requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {sameModule} from "./package-name";
@@ -115,11 +116,14 @@ export function moduleBindings(
     }
 
     const cu = compilationUnitOf(visitor);
-    const bound = cu === undefined ? [] : moduleObjectBindings(cu);
+    const container = importContainerOf(visitor);
+    const bound = container === undefined ? [] : moduleObjectBindings(container);
     return {
         // Read on demand, so a caller asking only for bindings never reads the file's module syntax.
+        // An ambient module declaration's body binds with imports, whatever the script around it holds.
         get moduleSystem() {
-            return cu === undefined ? "none" : isCommonJs(cu) ? "commonjs" : hasEsmSyntax(cu) ? "esm" : "none";
+            return cu === undefined ? "none" : container !== cu ? "esm" :
+                isCommonJs(cu) ? "commonjs" : hasEsmSyntax(cu) ? "esm" : "none";
         },
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
         bindingOf: module => bound.find(b => sameModule(b.module, module))?.name
@@ -181,14 +185,14 @@ function isImportDefer(expression: J | undefined): boolean {
         (expression as J.FieldAccess).name.element.simpleName === "defer";
 }
 
-/** Bindings from top-level `const X = <moduleOf-recognised call>` declarations, all of one shape. */
+/** Bindings from `const X = <moduleOf-recognised call>` declarations directly in `container`, all of one shape. */
 function wholeModuleBindingsVia(
-    cu: JS.CompilationUnit,
+    container: ImportContainer,
     moduleOf: (declaration: J.VariableDeclarations) => string | undefined,
     shape: ModuleObjectBinding["shape"]
 ): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
-    for (const stmt of cu.statements) {
+    for (const stmt of container.statements) {
         for (const declaration of declarationsOf(stmt.element)) {
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
@@ -201,9 +205,9 @@ function wholeModuleBindingsVia(
 }
 
 /** Only whole-module bindings: a named member does not name the module object. */
-function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
+function moduleObjectBindings(container: ImportContainer): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
-    for (const stmt of cu.statements) {
+    for (const stmt of container.statements) {
         const statement = stmt.element;
         if (statement?.kind !== JS.Kind.Import) {
             continue;
@@ -232,8 +236,8 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
             }
         }
     }
-    bindings.push(...wholeModuleBindingsVia(cu, requiredModuleOfDeclaration, "require"));
-    bindings.push(...wholeModuleBindingsVia(cu, dynamicallyImportedModule, "namespace"));
+    bindings.push(...wholeModuleBindingsVia(container, requiredModuleOfDeclaration, "require"));
+    bindings.push(...wholeModuleBindingsVia(container, dynamicallyImportedModule, "namespace"));
     return bindings;
 }
 
@@ -250,7 +254,9 @@ function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace:
  * A local binding for `module` or one of its members, creating one where none exists, or
  * `undefined` where no safe binding is possible. The lane — AMD or ESM/CommonJS — is decided
  * from the cursor; AMD binds only the whole module, so a `member` request there refuses rather
- * than guess. `onlyIfReferenced` defaults to true, so the import may never appear.
+ * than guess. So is the `declare module` body of a script that the import belongs in, see
+ * CLAUDE.md: Imports inside `declare module`. `onlyIfReferenced` defaults to true, so the import
+ * may never appear.
  */
 export function maybeBind(
     visitor: JavaScriptVisitor<any>,
@@ -272,16 +278,16 @@ export function maybeBind(
             calleesOf(options), options.alias !== undefined);
     }
 
-    const cu = compilationUnitOf(visitor);
+    const container = importContainerOf(visitor);
     const isWholeModule = !options.sideEffectOnly && (key === undefined || key === "*");
-    if (isWholeModule && cu) {
+    if (isWholeModule && container) {
         const scope = scopeOf(cursorOf(visitor)!);
-        const bound = moduleObjectBindings(cu).find(b =>
+        const bound = moduleObjectBindings(container).find(b =>
             sameModule(b.module, module) && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
             // A pinned alias asks for a binding of that name, so another name for the same
             // module does not answer it; `bindImport`'s own lookup applies the same rule.
             (options.alias === undefined || b.name === options.alias) &&
-            scope.declaringScope(b.name) === cu);
+            scope.declaringScope(b.name) === container);
         if (bound !== undefined) {
             return bound.name;
         }
@@ -296,9 +302,9 @@ export function maybeBind(
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
     // refusal here only has to gate the point where it would create a new one.
-    const refuseCreate = (options.typeOnly ?? false) && (options.style === undefined
-        ? cu !== undefined && isCommonJs(cu)
-        : options.style === ImportStyle.CommonJS);
+    const refuseCreate = (options.typeOnly ?? false) && (container === undefined
+        ? options.style === ImportStyle.CommonJS
+        : bindsWithRequire(container, options.style));
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)
@@ -308,7 +314,8 @@ export function maybeBind(
 /**
  * Removes `module`'s import(s) where unused, or one `member` of it — `'default'` and `'*'` select
  * the default and namespace import regardless of local name. A member-scoped request does not
- * apply to an AMD dependency, which binds a module rather than one of its members.
+ * apply to an AMD dependency, which binds a module rather than one of its members. An import in a
+ * script's `declare module` body goes once nothing in that body uses it.
  */
 export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbindOptions | string): void {
     if (typeof options === "string") {
@@ -336,7 +343,8 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
 
 /**
  * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
- * changing nothing, where the move cannot be expressed safely. One call moves one binding.
+ * changing nothing, where the move cannot be expressed safely. One call moves one binding: the
+ * file's, or the one the `declare module` body around the cursor holds in a script.
  * Named members of one import moved to one module, a call each, end up in one import of it,
  * whether the calls share a visit or come from separate recipes.
  * On an ES import, every type in the file naming what moved is renamed the way a parse of the result names it.
@@ -365,11 +373,11 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         return binding;
     }
 
-    const cu = compilationUnitOf(visitor);
-    if (cu === undefined) {
+    const container = importContainerOf(visitor);
+    if (container === undefined || !canImport(container, options.to.module)) {
         return undefined;
     }
-    const existing = existingImportBinding(cu, options.from.module, options.from.member);
+    const existing = existingImportBinding(container, options.from.module, options.from.member);
     if (existing === undefined) {
         return undefined;
     }
@@ -378,18 +386,19 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         return undefined;
     }
     // `RebindImport` replaces an import it cannot rewrite in place, and a CommonJS file can gain no import.
-    if (!existing.viaRequire && isCommonJs(cu) &&
+    if (!existing.viaRequire && bindsWithRequire(container) &&
         (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
-    const boundName = rebindingName(visitor, cu, options, existing);
+    const boundName = rebindingName(visitor, container, options, existing);
     if (boundName === undefined) {
         return undefined;
     }
-    if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport &&
+    const within = containerId(container);
+    if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport && v.container === within &&
         sameModule(v.from.module, options.from.module) && v.from.member === options.from.member &&
         v.localName === existing.localName)) {
-        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
+        visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName, within));
     }
     return boundName;
 }
@@ -401,12 +410,12 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
  */
 function rebindingName(
     visitor: JavaScriptVisitor<any>,
-    cu: JS.CompilationUnit,
+    container: ImportContainer,
     options: MaybeRebindOptions,
     existing: ExistingImportBinding
 ): string | undefined {
-    const taken = (name: string) => nameTaken(name, noNames, visitor) ||
-        (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
+    const taken = (name: string) => nameTaken(name, noNames, visitor, containerId(container)) ||
+        (namesUsedWithin(container).has(name) && !reusesTargetImport(container, name, options.to, existing));
     const alias = options.to.alias;
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
@@ -422,26 +431,26 @@ const noNames: ReadonlySet<string> = new Set();
 
 /** Whether the moved binding can merge into a value import of `to`'s named member that `name` binds. */
 function reusesTargetImport(
-    cu: JS.CompilationUnit,
+    container: ImportContainer,
     name: string,
     to: MaybeRebindOptions["to"],
     moved: ExistingImportBinding
 ): boolean {
-    const target = existingImportBinding(cu, to.module, to.member);
+    const target = existingImportBinding(container, to.module, to.member);
     // An import and a require of one module are separate declarations of the name.
     // A require takes the move in only where `AddImport` joins it.
-    const joinTarget = moved.viaRequire ? requireJoinTarget(cu, to.module) : undefined;
+    const joinTarget = moved.viaRequire ? requireJoinTarget(container, to.module) : undefined;
     const joined = !moved.viaRequire || (!moved.reassignable && joinTarget !== undefined &&
         requireBinds(joinTarget, to.module, to.member) === name);
     return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
-        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
+        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(container, name);
 }
 
 /**
  * Whether every spelling of `name` outside the imports is a reference. Any binder spells its name
  * in a declaring position, so each reference then reads the import, whatever kind of scope it is in.
  */
-function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
+function onlyReferences(container: ImportContainer, name: string): boolean {
     let references = true;
     const visit = (node: any, parent: Cursor): void => {
         if (!references) {
@@ -459,9 +468,9 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
             Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));
         }
     };
-    const root = new Cursor(cu);
+    const root = new Cursor(container);
     // An import, a top-level require or an `export {…}` binds nothing the name could collide with.
-    cu.statements
+    container.statements
         .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration &&
             requireDeclarationOf(s.element) === undefined)
         .forEach(s => visit(s, root));
