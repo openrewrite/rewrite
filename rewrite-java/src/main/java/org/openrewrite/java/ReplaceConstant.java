@@ -20,9 +20,15 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -55,7 +61,7 @@ public class ReplaceConstant extends Recipe {
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (isConstant(fieldAccess.getName().getFieldType())) {
                     maybeRemoveImport(owningType);
-                    return buildLiteral().withPrefix(fieldAccess.getPrefix());
+                    return buildReplacement(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
             }
@@ -64,7 +70,7 @@ public class ReplaceConstant extends Recipe {
             public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
                     maybeRemoveImport(owningType);
-                    return buildLiteral().withPrefix(ident.getPrefix());
+                    return buildReplacement(ident);
                 }
                 return super.visitIdentifier(ident, ctx);
             }
@@ -91,6 +97,48 @@ public class ReplaceConstant extends Recipe {
 
                 return constantName.equals(declaration.getVariables().get(0).getSimpleName()) &&
                         owningType.equals(ownerFqn.getFullyQualifiedName());
+            }
+
+            private J buildReplacement(Expression reference) {
+                J.Literal replacement = buildLiteral();
+                JavaType type = reference.getType();
+                Cursor argument = getCursor();
+                Cursor parent = argument.getParentTreeCursor();
+                while (parent.getValue() instanceof J.Parentheses) {
+                    argument = parent;
+                    parent = argument.getParentTreeCursor();
+                }
+                if (replacement.getType() == JavaType.Primitive.Null && TypeUtils.isWellFormedType(type) &&
+                        (!(type instanceof JavaType.Primitive) || TypeUtils.isString(type)) &&
+                        parent.getValue() instanceof MethodCall &&
+                        ((MethodCall) parent.getValue()).getArguments().contains(argument.getValue())) {
+                    MethodCall call = parent.getValue();
+                    JavaType.Method method = call.getMethodType();
+                    if (method != null && !method.getParameterTypes().isEmpty()) {
+                        List<JavaType> parameters = method.getParameterTypes();
+                        int index = call.getArguments().indexOf(argument.getValue());
+                        JavaType parameter = parameters.get(Math.min(index, parameters.size() - 1));
+                        if (method.hasFlags(Flag.Varargs) && index >= parameters.size() - 1 &&
+                                parameter instanceof JavaType.Array && !TypeUtils.isAssignableTo(parameter, type)) {
+                            parameter = ((JavaType.Array) parameter).getElemType();
+                        }
+                        // The constant's type may be inaccessible at the call site. Prefer the selected parameter.
+                        if (!(parameter instanceof JavaType.Primitive) &&
+                                !(parameter instanceof JavaType.GenericTypeVariable) && TypeUtils.isWellFormedType(parameter)) {
+                            type = parameter;
+                        }
+                    }
+                    // Preserve overload and varargs selection when null loses the constant's declared type.
+                    // https://github.com/openrewrite/rewrite/issues/2579
+                    String castType = TypeUtils.toFullyQualifiedName(TypeUtils.toString(type));
+                    J.TypeCast cast = JavaTemplate.builder("(" + castType + ") null")
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), reference.getCoordinates().replace());
+                    doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(cast));
+                    return cast.withPrefix(reference.getPrefix());
+                }
+                return replacement.withPrefix(reference.getPrefix());
             }
 
             private J.Literal buildLiteral() {
