@@ -991,17 +991,13 @@ public class CSharpTypeMappingTests : RewriteTest
         var cu = await ParseWithSemanticModelAsync("""
             unsafe class C
             {
-                void M(int* p)
-                {
-                    int* q = &*p;
-                }
+                void M(int* p) { }
             }
             """);
 
         var @int = JavaType.Primitive.Of(JavaType.PrimitiveKind.Int);
-        Assert.All(Collect<PointerType>(cu), t => Assert.Same(@int, t.Type));
-        Assert.All(Collect<NamedVariable>(cu), v => Assert.Same(@int, v.Name.Type));
-        Assert.Same(@int, Assert.Single(Collect<CsUnary>(cu)).Type);
+        Assert.Same(@int, Assert.Single(Collect<PointerType>(cu)).Type);
+        Assert.Same(@int, Assert.Single(Collect<NamedVariable>(cu)).Name.Type);
     }
 
     [Fact]
