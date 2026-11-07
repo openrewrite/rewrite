@@ -97,11 +97,15 @@ public class FindMissingTypesTests : RewriteTest
                 """
                 class A
                 {
+                    static dynamic T;
+
                     void M(dynamic d)
                     {
                         d.Goo();
                         System.Console.WriteLine(d);
                         d["key"].ToString().Replace("a", "b");
+                        T("key");
+                        A.T("key").ToString();
                     }
                 }
                 """

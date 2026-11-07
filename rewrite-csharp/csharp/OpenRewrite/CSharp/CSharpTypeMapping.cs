@@ -119,6 +119,14 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
+    /// The type of the name an invocation calls: its method, or <see cref="JavaType.Unknown"/> when the invoked value
+    /// is <c>dynamic</c> and the method is picked at run time.
+    /// </summary>
+    public JavaType? InvokedNameType(InvocationExpressionSyntax node) =>
+        (JavaType?)MethodType(node) ??
+        (_model.GetTypeInfo(node.Expression).Type is IDynamicTypeSymbol ? JavaType.Unknown.Instance : null);
+
+    /// <summary>
     /// Gets the variable type for a variable declarator.
     /// </summary>
     public JavaType.Variable? VariableType(SyntaxNode node)

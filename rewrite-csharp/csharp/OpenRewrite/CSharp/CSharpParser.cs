@@ -5597,7 +5597,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     public override J VisitInvocationExpression(InvocationExpressionSyntax node)
     {
         var prefix = ExtractPrefix(node);
-        var invocationMethodType = _typeMapping?.MethodType(node);
+        var nameType = _typeMapping?.InvokedNameType(node);
 
         JRightPadded<Expression>? select = null;
         Identifier name;
@@ -5663,7 +5663,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Markers.Empty,
                     [],
                     genericName.Identifier.Text,
-                    invocationMethodType,
+                    nameType,
                     null
                 );
                 typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
@@ -5680,7 +5680,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Markers.Empty,
                     [],
                     simpleName.Identifier.Text,
-                    invocationMethodType,
+                    nameType,
                     null
                 );
             }
@@ -5696,7 +5696,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 genericName.Identifier.Text,
-                invocationMethodType,
+                nameType,
                 null
             );
             typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
@@ -5712,7 +5712,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 identifierName.Identifier.Text,
-                invocationMethodType,
+                nameType,
                 null
             );
         }
