@@ -1224,7 +1224,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithReturnType(VisitLeftPadded(node.ReturnType, p)!)
             .WithParameters(VisitContainer(node.Parameters, p)!)
             .WithExpressionBody(VisitLeftPadded(node.ExpressionBody, p))
-            .WithBody((Block?)Visit(node.Body, p));
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
     public virtual J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
