@@ -30,20 +30,26 @@ public class FindMissingTypesTests : RewriteTest
                 """
                 class A
                 {
+                    A a;
+
                     void M()
                     {
                         M();
                         new A();
+                        a.a = null;
                     }
                 }
                 """,
                 """
                 /*~~(ClassDeclaration type is missing)~~>*/class A
                 {
+                    /*~~(Identifier type is missing)~~>*/A /*~~(Identifier type is missing)~~>*/a;
+
                     /*~~(MethodDeclaration type is missing)~~>*/void M()
                     {
                         /*~~(MethodInvocation type is missing)~~>*/M();
                         /*~~(NewClass type is missing)~~>*/new A();
+                        /*~~(Identifier type is missing)~~>*/a./*~~(Identifier type is missing)~~>*/a = null;
                     }
                 }
                 """

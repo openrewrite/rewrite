@@ -26,8 +26,8 @@ public class FindMissingTypes : Recipe
     public override string DisplayName => "Find missing type information on C# LSTs";
 
     public override string Description =>
-        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration without a " +
-        "type, or a method declaration or invocation without a method type.";
+        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration or " +
+        "identifier without a type, or a method declaration or invocation without a method type.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
@@ -88,6 +88,78 @@ public class FindMissingTypes : Recipe
                 ? missing(visited, "NewClass type is missing", p)
                 : visited;
         }
+
+        public override J VisitIdentifier(Identifier identifier, P p)
+        {
+            var visited = base.VisitIdentifier(identifier, p);
+            return identifier.Type == null && !NamesWhatHasNoType(identifier)
+                ? missing(visited, "Identifier type is missing", p)
+                : visited;
+        }
+
+        /// <summary>
+        /// Whether the identifier names what has no type, such as a namespace, label, preprocessor symbol, argument
+        /// name or discard. The name of a call, class, method or object creation is left to the check of that node.
+        /// </summary>
+        private bool NamesWhatHasNoType(Identifier id)
+        {
+            if (Cursor.FirstEnclosing<UsingDirective>() != null || Cursor.FirstEnclosing<DefineDirective>() != null ||
+                Cursor.FirstEnclosing<PragmaWarningDirective>() != null)
+                return true;
+            var parent = Cursor.ParentTree;
+            return parent.Value switch
+            {
+                NamespaceDeclaration or Label or GotoStatement => true,
+                FieldAccess => InNamespace(id, parent),
+                MethodInvocation mi => mi.Name == id,
+                ClassDeclaration cd => cd.Name == id,
+                MethodDeclaration md => md.Name == id,
+                NewClass nc => nc.Clazz == id,
+                IndexerDeclaration indexer => indexer.Indexer == id,
+                TypeParameter tp => tp.Name == id,
+                ConstrainedTypeParameter ctp => ctp.Name == id || ctp.WhereConstraint?.Element == id,
+                TupleElement te => te.Name == id,
+                Interpolation interpolation => interpolation.Format?.Element == id,
+                NamedExpression ne => ne.Name.Element == id && parent.ParentTree.Value is not PropertyPattern,
+                Case => id.SimpleName == "default",
+                NamedVariable => id.SimpleName == "_",
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Whether a qualified name is a namespace, as <c>System</c> and <c>System.Collections</c> are in
+        /// <c>System.Collections.Generic.List&lt;int&gt;</c>. The first type that the name goes on to qualify says
+        /// what its namespace is.
+        /// </summary>
+        private static bool InNamespace(Identifier id, Cursor parent)
+        {
+            J name = id;
+            if (parent.Value is FieldAccess access && access.Name.Element == id)
+            {
+                name = access;
+                parent = parent.ParentTree;
+            }
+            var qualified = QualifiedName(name);
+            for (; parent.Value is FieldAccess outer && outer.Target == name; parent = parent.ParentTree)
+            {
+                if (TypeUtils.AsClass(outer.Type) is { } type)
+                {
+                    var outermost = type.FullyQualifiedName.Split('$')[0];
+                    var ns = outermost.Contains('.') ? outermost[..outermost.LastIndexOf('.')] : "";
+                    return ns == qualified || ns.StartsWith(qualified + ".");
+                }
+                name = outer;
+            }
+            return parent.Value is NamespaceDeclaration;
+        }
+
+        private static string? QualifiedName(J name) => name switch
+        {
+            Identifier i => i.SimpleName,
+            FieldAccess fa => $"{QualifiedName(fa.Target)}.{fa.Name.Element.SimpleName}",
+            _ => null
+        };
 
         private static bool OperatorWrittenAsCall(MethodInvocation mi) =>
             mi.Name.SimpleName is "nameof" or "__makeref" or "__reftype" or "__refvalue";
