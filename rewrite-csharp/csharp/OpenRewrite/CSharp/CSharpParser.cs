@@ -9173,11 +9173,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Identifier with right padding (space before "in")
         var identPrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var variable = _typeMapping?.RangeVariableType(node);
         var ident = new Identifier(
             Tree.RandomId(), identPrefix, Markers.Empty,
             [],
-            node.Identifier.Text, null,
-            null
+            node.Identifier.Text, variable?.Type,
+            variable
         );
         var afterIdent = ExtractSpaceBefore(node.InKeyword);
         _cursor = node.InKeyword.Span.End;
@@ -9203,11 +9204,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Identifier with right padding (space before "=")
         var identPrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var variable = _typeMapping?.RangeVariableType(node);
         var ident = new Identifier(
             Tree.RandomId(), identPrefix, Markers.Empty,
             [],
-            node.Identifier.Text, null,
-            null
+            node.Identifier.Text, variable?.Type,
+            variable
         );
         var afterIdent = ExtractSpaceBefore(node.EqualsToken);
         _cursor = node.EqualsToken.Span.End;
@@ -9231,11 +9233,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Identifier
         var identPrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var variable = _typeMapping?.RangeVariableType(node);
         var ident = new Identifier(
             Tree.RandomId(), identPrefix, Markers.Empty,
             [],
-            node.Identifier.Text, null,
-            null
+            node.Identifier.Text, variable?.Type,
+            variable
         );
         var afterIdent = ExtractSpaceBefore(node.InKeyword);
         _cursor = node.InKeyword.Span.End;
@@ -9281,11 +9284,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var identPrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var variable = _typeMapping?.RangeVariableType(node);
         var ident = new Identifier(
             Tree.RandomId(), identPrefix, Markers.Empty,
             [],
-            node.Identifier.Text, null,
-            null
+            node.Identifier.Text, variable?.Type,
+            variable
         );
 
         return new JoinIntoClause(
@@ -9409,11 +9413,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var identPrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var variable = _typeMapping?.RangeVariableType(node);
         var ident = new Identifier(
             Tree.RandomId(), identPrefix, Markers.Empty,
             [],
-            node.Identifier.Text, null,
-            null
+            node.Identifier.Text, variable?.Type,
+            variable
         );
 
         var body = (QueryBody)VisitQueryBody(node.Body);

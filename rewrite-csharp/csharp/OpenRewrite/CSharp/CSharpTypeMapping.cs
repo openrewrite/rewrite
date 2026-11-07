@@ -140,6 +140,22 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
+    /// The variable that a query clause declares, such as <c>w</c> in <c>from w in words</c>. Roslyn gives a range
+    /// variable no type of its own, so it has the type of its uses in the query.
+    /// </summary>
+    public JavaType.Variable? RangeVariableType(SyntaxNode clause)
+    {
+        if (_model.GetDeclaredSymbol(clause) is not IRangeVariableSymbol variable)
+            return null;
+        var type = clause.FirstAncestorOrSelf<QueryExpressionSyntax>()?.DescendantNodes().OfType<IdentifierNameSyntax>()
+            .Where(n => n.Identifier.ValueText == variable.Name &&
+                        SymbolEqualityComparer.Default.Equals(_model.GetSymbolInfo(n).Symbol, variable))
+            .Select(n => _model.GetTypeInfo(n).Type)
+            .FirstOrDefault(t => t != null);
+        return MapVariable(variable, variable.Name, null, MapType(type));
+    }
+
+    /// <summary>
     /// Gets the variable type for an identifier reference (not a declaration).
     /// Returns null if the identifier doesn't reference a field, local, parameter, or property.
     /// </summary>

@@ -955,6 +955,29 @@ public class CSharpTypeMappingTests : RewriteTest
             .Select(i => (i.Type as JavaType.Method)?.Name ?? "<none>"));
     }
 
+    [Fact]
+    public async Task RangeVariableNamesCarryTheirVariable()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System.Linq;
+            class C
+            {
+                object M(string[] words, int[] lengths) =>
+                    from w in words
+                    join l in lengths on w.Length equals l into ls
+                    let n = w.Length
+                    select w + n + ls.Count() into r
+                    select r.Length;
+            }
+            """);
+
+        var declared = Collect<Identifier>(cu).Where(i => i.SimpleName is "w" or "l" or "ls" or "n" or "r")
+            .GroupBy(i => i.SimpleName).Select(g => g.First()).ToList();
+        Assert.Equal(["w", "l", "ls", "n", "r"], declared.Select(i => (i.FieldType as JavaType.Variable)?.Name));
+        Assert.Equal(["System.String", "int", "System.Collections.Generic.IEnumerable", "int", "System.String"],
+            declared.Select(i => TypeUtils.GetFullyQualifiedName(i.Type)));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();
