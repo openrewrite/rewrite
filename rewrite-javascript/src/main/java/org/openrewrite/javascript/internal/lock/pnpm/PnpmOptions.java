@@ -69,11 +69,47 @@ public final class PnpmOptions {
     private final Map<String, @Nullable Object> config;
     private final Map<String, String> transportEnvironment;
     private final boolean bootstrapTransport;
+    private final boolean workspaceFetchTimeout;
 
     /** Request routes after this release has filtered its config sources. */
     public RegistryTransport transport() {
-        return bootstrapTransport ? RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment) :
-                RegistryTransport.pnpm(config, transportEnvironment);
+        return transport(Collections.emptyMap());
+    }
+
+    /** Selected host request settings, kept out of project placeholder expansion. */
+    public RegistryTransport transport(Map<String, String> requestEnvironment) {
+        if (bootstrapTransport) {
+            return RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment);
+        }
+        // Defaults in the normalized config are not a request for a custom deadline.
+        Map<String, @Nullable Object> transportConfig = new LinkedHashMap<>(config);
+        if (!explicitlySetKeys.contains("fetchTimeout")) {
+            transportConfig.remove("fetchTimeout");
+        }
+        if (release.readsSettingsFromNpmrc()) {
+            // npm-conf's environment precedes workspace settings in pnpm 10.
+            String key = envVarOf(requestEnvironment, "npm_config_", "fetch_timeout");
+            if (!workspaceFetchTimeout && key != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, requestEnvironment.get(key), requestEnvironment);
+                if (value != Js.UNDEFINED) {
+                    transportConfig.put("fetchTimeout", value);
+                }
+            }
+        } else {
+            // pnpm 11's typed environment follows the workspace. Invalid numeric values are ignored.
+            Object previous = Js.UNDEFINED;
+            for (ConfigPair pair : parseEnvVars(ENV_TYPES, requestEnvironment, release)) {
+                if (!"fetchTimeout".equals(pair.key) || pair.value == Js.UNDEFINED) {
+                    continue;
+                }
+                if (previous != Js.UNDEFINED && !Js.strictEquals(previous, pair.value)) {
+                    throw new CannotKnow("conflicting upper- and lower-case pnpm fetchTimeout environment settings");
+                }
+                transportConfig.put("fetchTimeout", pair.value);
+                previous = pair.value;
+            }
+        }
+        return RegistryTransport.pnpm(transportConfig, transportEnvironment);
     }
 
     private final Set<String> explicitlySetKeys;
@@ -126,7 +162,9 @@ public final class PnpmOptions {
                         @Nullable List<String> workspacePackagePatterns,
                         @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
                         PnpmRelease release, Map<String, @Nullable Object> registryConfig,
-                        Map<String, @Nullable Object> trustedRegistryConfig, Map<String, String> transportEnvironment, boolean bootstrapTransport) {
+                        Map<String, @Nullable Object> trustedRegistryConfig, Map<String, String> transportEnvironment, boolean bootstrapTransport,
+                        boolean workspaceFetchTimeout) {
+        this.workspaceFetchTimeout = workspaceFetchTimeout;
         this.bootstrapTransport = bootstrapTransport;
         this.transportEnvironment = transportEnvironment;
         this.registryConfig = registryConfig;
@@ -148,7 +186,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withPackageManagerVersion(String version) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, version, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport);
+                workspacePackagePatterns, wantedPackageManager, version, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -156,7 +194,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withRelease(PnpmRelease release) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport);
+                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -174,7 +212,7 @@ public final class PnpmOptions {
         bootstrapConfig.put("registries", packageManagerRegistries);
         return new PnpmOptions(bootstrapConfig, explicitlySetKeys, catalogs, packageManagerRegistries,
                 packageManagerRegistries, workspacePackagePatterns, wantedPackageManager, packageManagerVersion,
-                release, trustedRegistryConfig, trustedRegistryConfig, transportEnvironment, true);
+                release, trustedRegistryConfig, trustedRegistryConfig, transportEnvironment, true, workspaceFetchTimeout);
     }
 
     @Value
@@ -250,6 +288,17 @@ public final class PnpmOptions {
             }
         }
 
+        // npm-conf supplies pnpm 10's npm_config_ settings before workspace settings. pnpm 11 reads
+        // pnpm_config_ instead, below. Keep this request policy out of unrelated configuration parsing.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            String timeout = envVarOf(env, "npm_config_", "fetch_timeout");
+            if (timeout != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, env.get(timeout), env);
+                if (value != Js.UNDEFINED) {
+                    mergedConfig.put("fetch-timeout", value);
+                }
+            }
+        }
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
         for (String key : Js.keys(defaultOptions)) {
             config.put(camelcase(key), defaultOptions.get(key));
@@ -260,6 +309,11 @@ public final class PnpmOptions {
             }
         }
         Set<String> explicitlySetKeys = new LinkedHashSet<>();
+        if (mergedConfig.containsKey("fetch-timeout") &&
+            (userConfig.containsKey("fetch-timeout") || workspaceNpmrc.containsKey("fetch-timeout") ||
+             env != null && envVarOf(env, "npm_config_", "fetch_timeout") != null && release.readsSettingsFromNpmrc())) {
+            explicitlySetKeys.add("fetchTimeout");
+        }
         for (String option : CLI_OPTIONS) {
             explicitlySetKeys.add(camelcase(option));
         }
@@ -310,6 +364,7 @@ public final class PnpmOptions {
 
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
+        boolean workspaceFetchTimeout = false;
         if (workspaceManifest != null) {
             Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest,
                     release);
@@ -320,6 +375,7 @@ public final class PnpmOptions {
                 if (!release.readsSettingsFromWorkspaceManifest()) {
                     newSettings.clear();
                 }
+                workspaceFetchTimeout = newSettings.containsKey("fetchTimeout");
                 for (String option : CLI_OPTIONS) {
                     newSettings.put(camelcase(option), true);
                 }
@@ -375,7 +431,8 @@ public final class PnpmOptions {
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
         for (ConfigPair pair : parseEnvVars(ENV_TYPES, env, release)) {
-            if (pair.value == Js.UNDEFINED) {
+            if (pair.value == Js.UNDEFINED ||
+                "fetchTimeout".equals(pair.key) && release.readsSettingsFromNpmrc()) {
                 continue;
             }
             if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
@@ -414,7 +471,7 @@ public final class PnpmOptions {
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
-                wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig, env == null ? Collections.emptyMap() : env, false);
+                wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig, env == null ? Collections.emptyMap() : env, false, workspaceFetchTimeout);
     }
 
     // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.

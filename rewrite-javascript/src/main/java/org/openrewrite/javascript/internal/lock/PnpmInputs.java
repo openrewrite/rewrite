@@ -86,7 +86,7 @@ final class PnpmInputs implements Port {
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client)).regenerate();
+        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client, host.pnpmRequestEnvironment())).regenerate();
     }
 
     /**

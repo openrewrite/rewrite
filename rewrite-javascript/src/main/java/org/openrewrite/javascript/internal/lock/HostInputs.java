@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Base64;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -180,6 +181,23 @@ public class HostInputs {
         return userNpmrc(scopes, NetworkConfig.NPM);
     }
 
+    /** Request policy only: these host variables do not become project placeholder values. */
+    public Map<String, String> pnpmRequestEnvironment() {
+        if (environment.process() != null) {
+            // An explicitly supplied environment has already been resolved by PnpmOptions.
+            return Collections.emptyMap();
+        }
+        Map<String, String> settings = new LinkedHashMap<>();
+        for (String key : Arrays.asList("pnpm_config_fetch_timeout", "PNPM_CONFIG_FETCH_TIMEOUT",
+                "npm_config_fetch_timeout", "NPM_CONFIG_FETCH_TIMEOUT")) {
+            String value = system.getenv(key);
+            if (value != null) {
+                settings.put(key, value);
+            }
+        }
+        return settings;
+    }
+
     /** pnpm's network keys, in the trusted user/global file rather than the project's expansion context. */
     public String userPnpmrc(Set<NpmrcScope> scopes, boolean legacy) {
         return userNpmrc(scopes, legacy ? NetworkConfig.PNPM_10 : NetworkConfig.PNPM_11);
@@ -201,6 +219,9 @@ public class HostInputs {
             List<String> networkKeys = new ArrayList<>(Arrays.asList("proxy", "https-proxy", "ca", "ca[]", "cert", "key", "local-address"));
             if (network == NetworkConfig.NPM) {
                 networkKeys.add("offline");
+                networkKeys.add("fetch-timeout");
+            }
+            if (network == NetworkConfig.PNPM_10) {
                 networkKeys.add("fetch-timeout");
             }
             if (network != NetworkConfig.PNPM_11) {

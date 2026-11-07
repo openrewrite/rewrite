@@ -24,6 +24,9 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * The packuments and attestations a pnpm install reads, from the registry pnpm's own config names for each package.
  */
@@ -32,12 +35,19 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
     private final @Nullable PnpmAuthHeaders auth;
+    private final Map<String, String> requestEnvironment;
 
     PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client) {
-        this(registries, client, null);
+        this(registries, client, Collections.emptyMap());
     }
 
-    private PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client, @Nullable PnpmAuthHeaders auth) {
+    PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client, Map<String, String> requestEnvironment) {
+        this(registries, client, null, requestEnvironment);
+    }
+
+    private PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client, @Nullable PnpmAuthHeaders auth,
+                                 Map<String, String> requestEnvironment) {
+        this.requestEnvironment = requestEnvironment;
         this.auth = auth;
         this.registries = registries;
         this.client = client;
@@ -45,7 +55,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
 
     @Override
     public RegistryMetadata withOptions(PnpmOptions options) {
-        return new PnpmRegistryMetadata(registries, client.withTransport(options.transport()), options.authHeaders());
+        return new PnpmRegistryMetadata(registries, client.withTransport(options.transport(requestEnvironment)), options.authHeaders(), requestEnvironment);
     }
 
     private NodeRegistry request(String name, String url) {
