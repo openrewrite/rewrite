@@ -2235,13 +2235,11 @@ public class GroovyParserVisitor {
                     if (source.charAt(cursor) == '-' || source.charAt(cursor) == '+') {
                         i = indexOfNextNonWhitespace(cursor + 1, source);
                     }
-                    // a decimal literal's exponent may be signed (1.2E+12); in a hex literal, e is a digit
+                    // in a hex literal, e is a digit rather than an exponent marker
                     boolean hex = source.startsWith("0x", i) || source.startsWith("0X", i);
                     for (; i < source.length(); i++) {
                         char c = source.charAt(i);
-                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))) ||
-                              (!hex && (c == '+' || c == '-') && (source.charAt(i - 1) == 'e' || source.charAt(i - 1) == 'E') &&
-                               source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))))) {
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && isDigitAt(i + 1)) || (!hex && isExponentSign(i)))) {
                             break;
                         }
                     }
@@ -3873,6 +3871,16 @@ public class GroovyParserVisitor {
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
+    }
+
+    private boolean isDigitAt(int i) {
+        return i < source.length() && Character.isDigit(source.charAt(i));
+    }
+
+    private boolean isExponentSign(int i) {
+        char c = source.charAt(i);
+        return (c == '+' || c == '-') && i > 0 &&
+               (source.charAt(i - 1) == 'e' || source.charAt(i - 1) == 'E') && isDigitAt(i + 1);
     }
 
     private int positionOfNext(String untilDelim) {
