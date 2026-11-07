@@ -887,6 +887,20 @@ public class CSharpTypeMappingTests : RewriteTest
             is JavaType.Method method ? method.Name : null));
     }
 
+    [Fact]
+    public async Task AttributePropertyNamesCarryTheirProperty()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+            class A : Attribute { }
+            """);
+
+        var name = Assert.IsType<Identifier>(Assert.Single(Collect<Assignment>(cu)).Variable);
+        Assert.Equal("AllowMultiple", (name.FieldType as JavaType.Variable)?.Name);
+        Assert.Equal("boolean", TypeUtils.GetFullyQualifiedName(name.Type));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();

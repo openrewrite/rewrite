@@ -1257,8 +1257,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     // Named argument with equals: b = c
                     var argPrefix = ExtractSpaceBefore(arg.NameEquals.Name.Identifier);
                     _cursor = arg.NameEquals.Name.Identifier.Span.End;
+                    var (type, property) = _typeMapping?.TypeAndFieldType(arg.NameEquals.Name) ?? (null, null);
                     var nameIdentifier = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [],
-                        arg.NameEquals.Name.Identifier.Text, null, null);
+                        arg.NameEquals.Name.Identifier.Text, type, property);
                     var eqSpace = ExtractSpaceBefore(arg.NameEquals.EqualsToken);
                     _cursor = arg.NameEquals.EqualsToken.Span.End;
                     var valueExpr = (Expression)Visit(arg.Expression)!;
