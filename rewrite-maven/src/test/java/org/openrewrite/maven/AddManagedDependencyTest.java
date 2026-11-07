@@ -15,8 +15,10 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Validated;
@@ -295,6 +297,108 @@ class AddManagedDependencyTest implements RewriteTest {
                     <version>7.0.0</version>
                   </dependency>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"test", "provided", "runtime"})
+    void currentVersionLookupIgnoresTagScopeRegardlessOfValue(@Nullable String scope) {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.tngtech.archunit", "archunit", "latest.patch", scope,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.tngtech.archunit</groupId>
+                    <artifactId>archunit-junit5</artifactId>
+                    <version>1.3.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec2 -> spec2.after(actual -> assertThat(actual)
+              .as("expected archunit to be managed at 1.3.2 or later, as the current version lookup should " +
+                "ignore the scope tag rather than resolve 1.3.0 from archunit-junit5")
+              .containsPattern("<dependencyManagement>\\s*<dependencies>\\s*<dependency>\\s*" +
+                "<groupId>com\\.tngtech\\.archunit</groupId>\\s*<artifactId>archunit</artifactId>\\s*" +
+                "<version>1\\.3\\.(?:[2-9]|\\d\\d+)</version>\\s*" +
+                (scope == null ? "" : "<scope>" + scope + "</scope>\\s*") +
+                "</dependency>")
+              .containsPattern("<artifactId>archunit-junit5</artifactId>\\s*<version>1\\.3\\.0</version>")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void currentVersionLookupIgnoresTagScopeRegardlessOfValueImport() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.tngtech.archunit", "archunit", "latest.patch", "import",
+              "pom", null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.tngtech.archunit</groupId>
+                    <artifactId>archunit-junit5</artifactId>
+                    <version>1.3.0</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec2 -> spec2.after(actual -> assertThat(actual)
+              .as("expected archunit to be managed at 1.3.2 or later, as the current version lookup should " +
+                "ignore the scope tag rather than resolve 1.3.0 from archunit-junit5")
+              .containsPattern("<dependencyManagement>\\s*<dependencies>\\s*<dependency>\\s*" +
+                "<groupId>com\\.tngtech\\.archunit</groupId>\\s*<artifactId>archunit</artifactId>\\s*" +
+                "<version>1\\.3\\.(?:[2-9]|\\d\\d+)</version>\\s*<type>pom</type>\\s*<scope>import</scope>\\s*" +
+                "</dependency>")
+              .containsPattern("<artifactId>archunit-junit5</artifactId>\\s*<version>1\\.3\\.0</version>")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateWhenExistingEntryMatchesGroupIdAndArtifactIdProperties() {
+        // Recipe's own groupId/artifactId are properties; resolve them before matching the existing entry.
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("${archunit.group}", "${archunit.artifact}", "1.3.2", null,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <archunit.group>com.tngtech.archunit</archunit.group>
+                  <archunit.artifact>archunit</archunit.artifact>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.tngtech.archunit</groupId>
+                      <artifactId>archunit</artifactId>
+                      <version>1.3.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
               </project>
               """
           )
