@@ -10101,7 +10101,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (node.NameEquals != null)
         {
             var prefix = ExtractPrefix(node);
-            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], node.NameEquals.Name.Identifier.Text, null, null);
+            var property = _typeMapping?.VariableType(node);
+            var name = new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], node.NameEquals.Name.Identifier.Text,
+                property?.Type, property);
             _cursor = node.NameEquals.Name.Span.End;
 
             var eqSpace = ExtractSpaceBefore(node.NameEquals.EqualsToken);

@@ -901,6 +901,21 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal("boolean", TypeUtils.GetFullyQualifiedName(name.Type));
     }
 
+    [Fact]
+    public async Task AnonymousObjectMemberNamesCarryTheirProperty()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            class C
+            {
+                object M() => new { Id = 1, Name = "n" };
+            }
+            """);
+
+        var names = Collect<Assignment>(cu).Select(a => Assert.IsType<Identifier>(a.Variable)).ToList();
+        Assert.Equal(["Id", "Name"], names.Select(n => (n.FieldType as JavaType.Variable)?.Name));
+        Assert.Equal(["int", "System.String"], names.Select(n => TypeUtils.GetFullyQualifiedName(n.Type)));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();
