@@ -93,16 +93,15 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
-    /// Gets the method type for a method/constructor declaration or invocation.
+    /// Gets the method type for a method, constructor, destructor or operator declaration, or for an invocation.
     /// A primary constructor is identified by its parameter list and exact declaring syntax.
     /// </summary>
     public JavaType.Method? MethodType(SyntaxNode node)
     {
         ISymbol? symbol = node switch
         {
-            MethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
+            BaseMethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
             LocalFunctionStatementSyntax => _model.GetDeclaredSymbol(node),
-            ConstructorDeclarationSyntax => _model.GetDeclaredSymbol(node),
             ParameterListSyntax { Parent: TypeDeclarationSyntax declaration } =>
                 (_model.GetDeclaredSymbol(declaration) as INamedTypeSymbol)?.InstanceConstructors
                     .SingleOrDefault(c => c.DeclaringSyntaxReferences.Any(r =>

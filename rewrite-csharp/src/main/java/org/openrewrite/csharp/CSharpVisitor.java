@@ -94,7 +94,8 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         operatorDeclaration = operatorDeclaration.getPadding().withOperatorToken(visitLeftPadded(operatorDeclaration.getPadding().getOperatorToken(), CsLeftPadded.Location.OPERATOR_DECLARATION_OPERATOR_TOKEN, p));
         operatorDeclaration = operatorDeclaration.withReturnType(visitAndCast(operatorDeclaration.getReturnType(), p));
         operatorDeclaration = operatorDeclaration.getPadding().withParameters(visitContainer(operatorDeclaration.getPadding().getParameters(), CsContainer.Location.OPERATOR_DECLARATION_PARAMETERS, p));
-        return operatorDeclaration.withBody(visitAndCast(operatorDeclaration.getBody(), p));
+        operatorDeclaration = operatorDeclaration.withBody(visitAndCast(operatorDeclaration.getBody(), p));
+        return operatorDeclaration.withMethodType((JavaType.Method) visitType(operatorDeclaration.getMethodType(), p));
     }
 
     public J visitRefExpression(Cs.RefExpression refExpression, P p) {
@@ -1014,7 +1015,8 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withReturnType(visitLeftPadded(conversionOperatorDeclaration.getPadding().getReturnType(), CsLeftPadded.Location.CONVERSION_OPERATOR_DECLARATION_RETURN_TYPE, p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withParameters(visitContainer(conversionOperatorDeclaration.getPadding().getParameters(), CsContainer.Location.CONVERSION_OPERATOR_DECLARATION_PARAMETERS, p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withExpressionBody(visitLeftPadded(conversionOperatorDeclaration.getPadding().getExpressionBody(), CsLeftPadded.Location.CONVERSION_OPERATOR_DECLARATION_EXPRESSION_BODY, p));
-        return conversionOperatorDeclaration.withBody(visitAndCast(conversionOperatorDeclaration.getBody(), p));
+        conversionOperatorDeclaration = conversionOperatorDeclaration.withBody(visitAndCast(conversionOperatorDeclaration.getBody(), p));
+        return conversionOperatorDeclaration.withMethodType((JavaType.Method) visitType(conversionOperatorDeclaration.getMethodType(), p));
     }
 
     // Cs.TypeParameter visitor DELETED — replaced by visitConstrainedTypeParameter

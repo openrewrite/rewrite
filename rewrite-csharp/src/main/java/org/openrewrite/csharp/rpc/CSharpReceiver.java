@@ -674,7 +674,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withReturnType(q.receive(conversionOperatorDeclaration.getPadding().getReturnType(), el -> visitLeftPadded(el, q)))
                 .getPadding().withParameters(q.receive(conversionOperatorDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
                 .getPadding().withExpressionBody(q.receive(conversionOperatorDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
-                .withBody(q.receive(conversionOperatorDeclaration.getBody(), el -> (J.Block) visitNonNull(el, q)));
+                .withBody(q.receive(conversionOperatorDeclaration.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withMethodType(q.receive(conversionOperatorDeclaration.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
     }
 
     // Cs.TypeParameter receiver DELETED — replaced by visitConstrainedTypeParameter
