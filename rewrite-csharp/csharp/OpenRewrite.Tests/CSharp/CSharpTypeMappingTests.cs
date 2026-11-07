@@ -978,6 +978,22 @@ public class CSharpTypeMappingTests : RewriteTest
             declared.Select(i => TypeUtils.GetFullyQualifiedName(i.Type)));
     }
 
+    [Fact]
+    public async Task GenericMethodGroupNamesCarryTheirMethod()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                static T Id<T>(T t) => t;
+                Func<int, int> M() => Id<int>;
+            }
+            """);
+
+        var name = Collect<ParameterizedType>(cu).Select(p => p.Clazz).OfType<Identifier>().Single(i => i.SimpleName == "Id");
+        Assert.Equal("Id", (name.Type as JavaType.Method)?.Name);
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();

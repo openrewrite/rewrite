@@ -8373,7 +8373,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 genericName.Identifier.Text,
-                _typeMapping?.RawType(genericName),
+                // A generic method group, such as `Id<int>` in `Func<int, int> f = Id<int>;`, names its method.
+                _typeMapping?.RawType(genericName) ?? _typeMapping?.TypeAndFieldType(genericName).type,
                 null
             );
 
