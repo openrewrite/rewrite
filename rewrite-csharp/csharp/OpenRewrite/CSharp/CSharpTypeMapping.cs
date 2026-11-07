@@ -100,9 +100,8 @@ internal class CSharpTypeMapping
     {
         ISymbol? symbol = node switch
         {
-            MethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
+            BaseMethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
             LocalFunctionStatementSyntax => _model.GetDeclaredSymbol(node),
-            ConstructorDeclarationSyntax => _model.GetDeclaredSymbol(node),
             ParameterListSyntax { Parent: TypeDeclarationSyntax declaration } =>
                 (_model.GetDeclaredSymbol(declaration) as INamedTypeSymbol)?.InstanceConstructors
                     .SingleOrDefault(c => c.DeclaringSyntaxReferences.Any(r =>
