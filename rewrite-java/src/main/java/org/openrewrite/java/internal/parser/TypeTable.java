@@ -39,16 +39,17 @@ import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.enumeration;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.toList;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
@@ -102,6 +103,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static final Map<GroupArtifactVersion, CompletableFuture<Path>> jarByArtifact = new ConcurrentHashMap<>();
 
+    private static final Map<String, Set<String>> searchedArtifactNamesByTypeTable = new ConcurrentHashMap<>();
+
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
             ClassLoader callerClassLoader = findCaller().getClassLoader();
@@ -129,7 +132,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
-        read(url, artifactNames, ctx);
+        this(ctx, enumeration(singletonList(url)), artifactNames);
     }
 
     TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
@@ -139,13 +142,15 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
-        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames);
+        Set<String> searchedArtifactNames = searchedArtifactNamesByTypeTable
+                .computeIfAbsent(url.toString(), typeTable -> ConcurrentHashMap.newKeySet());
+        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames, searchedArtifactNames);
         if (missingArtifacts.isEmpty()) {
             // all artifacts have already been extracted
             return;
         }
 
-        Reader.Options options = Reader.Options.builder().artifactPrefixes(artifactNames).build();
+        Reader.Options options = Reader.Options.builder().artifactPrefixes(missingArtifacts).build();
         try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
             new Reader(ctx).read(inflate, options);
         } catch (ZipException e) {
@@ -158,21 +163,28 @@ public class TypeTable implements JavaParserClasspathLoader {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        searchedArtifactNames.addAll(missingArtifacts);
     }
 
-    private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
-        Collection<String> notWritten = new ArrayList<>(artifactNames);
+    /// A jar whose artifactId merely starts with the requested name (`netty-transport-classes-epoll` for
+    /// `netty-transport`) does not count as written until this type table has been searched for that name once,
+    /// so that the artifact the name actually refers to still gets extracted.
+    private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames,
+                                                             Set<String> searchedArtifactNames) {
+        Collection<String> notWritten = new ArrayList<>(artifactNames.size());
         for (String artifactName : artifactNames) {
-            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
-            for (GroupArtifactVersion groupArtifactVersion : jarByArtifact.keySet()) {
-                if (artifactPattern
-                        .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
-                        .matches()) {
-                    notWritten.remove(artifactName);
-                }
+            boolean coveredOnly = !searchedArtifactNames.contains(artifactName);
+            if (select(artifactName, coveredOnly) == null) {
+                notWritten.add(artifactName);
             }
         }
         return notWritten;
+    }
+
+    private static Map.@Nullable Entry<GroupArtifactVersion, CompletableFuture<Path>> select(String artifactName,
+                                                                                           boolean coveredOnly) {
+        return new ArtifactNameMatcher(artifactName).select(jarByArtifact.entrySet(),
+                jar -> jar.getKey().getArtifactId(), jar -> jar.getKey().artifactIdAndVersion(), coveredOnly);
     }
 
     /**
@@ -215,11 +227,11 @@ public class TypeTable implements JavaParserClasspathLoader {
                  * @param artifactPrefixes Collection of artifact name prefixes to match
                  */
                 public Builder artifactPrefixes(Collection<String> artifactPrefixes) {
-                    Set<Pattern> patterns = artifactPrefixes.stream()
-                            .map(prefix -> Pattern.compile(prefix + ".*"))
-                            .collect(toSet());
-                    this.artifactMatcher(artifactVersion -> patterns.stream()
-                            .anyMatch(pattern -> pattern.matcher(artifactVersion).matches()));
+                    List<ArtifactNameMatcher> matchers = artifactPrefixes.stream()
+                            .map(ArtifactNameMatcher::new)
+                            .collect(toList());
+                    this.artifactMatcher(artifactVersion -> matchers.stream()
+                            .anyMatch(matcher -> matcher.matches(artifactVersion)));
                     return this;
                 }
             }
@@ -293,10 +305,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                         nestedTypesByOwner.clear();
                         resourcesByPath.clear();
 
-                        String artifactVersion = row.getArtifactId() + "-" + row.getVersion();
-
                         // Check if this artifact matches our predicate
-                        if (options.getArtifactMatcher().test(artifactVersion)) {
+                        if (options.getArtifactMatcher().test(rowGav.artifactIdAndVersion())) {
                             matchedGav = rowGav;
                         }
                     }
@@ -682,7 +692,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             throw new UncheckedIOException(new IOException("Failed to create directory " + artifactDir));
         }
 
-        return artifactDir.resolve(gav.getArtifactId() + "-" + gav.getVersion() + ".jar");
+        return artifactDir.resolve(gav.artifactIdAndVersion() + ".jar");
     }
 
     public static Writer newWriter(OutputStream out) {
@@ -695,22 +705,15 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        for (Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> gavAndJar : jarByArtifact.entrySet()) {
-            GroupArtifactVersion gav = gavAndJar.getKey();
-            if (Pattern.compile(artifactName + ".*")
-                    .matcher(gav.getArtifactId() + "-" + gav.getVersion())
-                    .matches()) {
-                return gavAndJar.getValue().join();
-            }
-        }
-        return null;
+        Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> jar = select(artifactName, false);
+        return jar == null ? null : jar.getValue().join();
     }
 
     @Override
     public Collection<String> availableArtifacts() {
         List<String> available = new ArrayList<>(jarByArtifact.size());
         for (GroupArtifactVersion gav : jarByArtifact.keySet()) {
-            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+            available.add(gav.artifactIdAndVersion());
         }
         sort(available);
         return available;
@@ -1160,6 +1163,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         String groupId;
         String artifactId;
         String version;
+
+        String artifactIdAndVersion() {
+            return artifactId + "-" + version;
+        }
     }
 
     @Value
