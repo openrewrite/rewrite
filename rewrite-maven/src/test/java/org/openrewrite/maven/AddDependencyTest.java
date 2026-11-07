@@ -393,7 +393,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void doNotAddBecauseAlreadyTransitiveNoCompileScope() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.7.1", null, true)),
           mavenProject(
             "project",
             srcTestJava(
@@ -490,6 +490,195 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void addWhenTransitiveVersionIsOutsideTheRequestedRange(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.x", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope)),
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.validation</groupId>
+                          <artifactId>jakarta.validation-api</artifactId>
+                          <version>3.0.2</version>%s
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope), scopeElement(scope))
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    @Test
+    void addWhenTransitiveVersionIsNotTheRequestedExactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.2", null, "compile", true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.validation</groupId>
+                          <artifactId>jakarta.validation-api</artifactId>
+                          <version>3.0.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void doNotAddWhenTransitiveVersionSatisfiesTheRequestedRange(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:3.0.x", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>8.0.2.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compile", "provided", "test"})
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    void doNotAddWhenTransitiveVersionSatisfiesLatestRelease(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.validation:jakarta.validation-api:latest.release", null, scope, true)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.validator</groupId>
+                          <artifactId>hibernate-validator</artifactId>
+                          <version>6.2.5.Final</version>%s
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(scopeElement(scope))
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/3117")
+    @Test
+    void addWithoutVersionWhenTransitiveIsNewerThanTheRequestedRangeButManaged() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.annotation:jakarta.annotation-api:2.0.x", null, "compile", true)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.0.5</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.0.5</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.annotation</groupId>
+                    <artifactId>jakarta.annotation-api</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
           )
         );
     }
@@ -1526,7 +1715,7 @@ class AddDependencyTest implements RewriteTest {
               )
             )
             .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+              new AddDependency("org.checkerframework", "checker-qual", "3.12.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
@@ -1598,7 +1787,7 @@ class AddDependencyTest implements RewriteTest {
                           <dependency>
                               <groupId>org.checkerframework</groupId>
                               <artifactId>checker-qual</artifactId>
-                              <version>3.44.0</version>
+                              <version>3.12.0</version>
                           </dependency>
                           <dependency>
                               <groupId>com.google.guava</groupId>
@@ -1628,7 +1817,7 @@ class AddDependencyTest implements RewriteTest {
               )
             )
             .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+              new AddDependency("org.checkerframework", "checker-qual", "3.12.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
               new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
@@ -2454,6 +2643,10 @@ class AddDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static String scopeElement(String scope) {
+        return "compile".equals(scope) ? "" : "\n            <scope>" + scope + "</scope>";
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
