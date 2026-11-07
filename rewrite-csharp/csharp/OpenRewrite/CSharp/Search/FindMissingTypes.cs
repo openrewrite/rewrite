@@ -67,7 +67,7 @@ public class FindMissingTypes : Recipe
         {
             var visited = base.VisitMethodInvocation(mi, p);
             return visited is MethodInvocation { MethodType: null } invocation &&
-                   !BoundAtRunTime(invocation) && !OperatorWrittenAsCall(invocation)
+                   !OnUnknownValue(invocation) && !OperatorWrittenAsCall(invocation)
                 ? missing(visited, "MethodInvocation type is missing", p)
                 : visited;
         }
@@ -76,11 +76,13 @@ public class FindMissingTypes : Recipe
             mi.Name.SimpleName is "nameof" or "__makeref" or "__reftype" or "__refvalue";
 
         /// <summary>
-        /// <c>dynamic</c> maps to an unknown type. A call with a dynamic receiver or argument picks its method at run
-        /// time.
+        /// <c>dynamic</c>, and a type that does not resolve, map to an unknown type. A call that takes such a value as
+        /// its receiver or an argument has no method to attribute, and its own value is unknown too.
         /// </summary>
-        private static bool BoundAtRunTime(MethodInvocation mi) =>
-            mi.Select?.Element.Type is JavaType.Unknown ||
-            mi.Arguments.Elements.Any(a => a.Element.Type is JavaType.Unknown);
+        private static bool OnUnknownValue(MethodInvocation mi) =>
+            Unknown(mi.Select?.Element) || mi.Arguments.Elements.Any(a => Unknown(a.Element));
+
+        private static bool Unknown(Expression? e) =>
+            e?.Type is JavaType.Unknown || e is MethodInvocation { MethodType: null } call && OnUnknownValue(call);
     }
 }

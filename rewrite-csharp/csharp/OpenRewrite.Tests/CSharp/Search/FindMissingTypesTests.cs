@@ -101,6 +101,7 @@ public class FindMissingTypesTests : RewriteTest
                     {
                         d.Goo();
                         System.Console.WriteLine(d);
+                        d["key"].ToString().Replace("a", "b");
                     }
                 }
                 """
