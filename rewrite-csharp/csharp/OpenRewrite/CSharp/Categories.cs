@@ -32,4 +32,6 @@ public static class Categories
     public sealed class XmlAttribute() : CategoryDescriptorAttribute("XML", "XML transformation recipes");
 
     public sealed class MigrationAttribute() : CategoryDescriptorAttribute("Migration", "Recipes for migrating between versions");
+
+    public sealed class SearchAttribute() : CategoryDescriptorAttribute("Search", "Recipes that find code without changing it");
 }
