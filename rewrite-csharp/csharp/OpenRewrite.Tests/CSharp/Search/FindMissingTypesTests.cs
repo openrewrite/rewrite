@@ -88,6 +88,7 @@ public class FindMissingTypesTests : RewriteTest
             {
                 int M(string s) => s.Length;
                 System.Action G() => System.Console.WriteLine;
+                string N() => nameof(A.G);
             }
             """;
         var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
@@ -95,14 +96,16 @@ public class FindMissingTypesTests : RewriteTest
         var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
 
-        Assert.Equal(["FieldAccess type is missing: s.Length"],
-            FindMissingTypes.Find((CompilationUnit)new LengthTypeRemover().Visit(cu, 0)!));
+        Assert.Equal(["FieldAccess type is missing: s.Length", "FieldAccess type is missing: System.Console.WriteLine"],
+            FindMissingTypes.Find((CompilationUnit)new MemberTypeRemover().Visit(cu, 0)!));
     }
 
-    private sealed class LengthTypeRemover : CSharpVisitor<int>
+    private sealed class MemberTypeRemover : CSharpVisitor<int>
     {
         public override J VisitFieldAccess(FieldAccess fieldAccess, int p) =>
-            fieldAccess.Name.Element.SimpleName == "Length" ? fieldAccess.WithType(null) : base.VisitFieldAccess(fieldAccess, p);
+            fieldAccess.Name.Element.SimpleName is "Length" or "WriteLine"
+                ? fieldAccess.WithType(null)
+                : base.VisitFieldAccess(fieldAccess, p);
     }
 
     [Fact]

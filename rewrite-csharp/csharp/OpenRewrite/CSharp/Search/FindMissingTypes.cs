@@ -104,13 +104,13 @@ public class FindMissingTypes : Recipe
         }
 
         /// <summary>
-        /// An access whose name has no type is marked at its name. A method group's name has its method, while the
-        /// group has no type.
+        /// An access whose name has no type is marked at its name. A method group in <c>nameof</c> converts to no
+        /// delegate, so it has no type.
         /// </summary>
         public override J VisitFieldAccess(FieldAccess fieldAccess, P p)
         {
             var visited = base.VisitFieldAccess(fieldAccess, p);
-            return fieldAccess is { Type: null, Name.Element.Type: not (null or JavaType.Method) }
+            return fieldAccess is { Type: null, Name.Element.Type: not null } && !InNameof()
                 ? missing(visited, "FieldAccess type is missing", p)
                 : visited;
         }
@@ -135,8 +135,7 @@ public class FindMissingTypes : Recipe
             if (id.SimpleName == "" || Cursor.FirstEnclosing<UsingDirective>() != null ||
                 Cursor.FirstEnclosing<DefineDirective>() != null || Cursor.FirstEnclosing<PragmaWarningDirective>() != null)
                 return true;
-            // `nameof` takes a name, which may be a namespace or a group of overloads, and neither has a type.
-            if (Cursor.FirstEnclosing<MethodInvocation>() is { Select: null, Name.SimpleName: "nameof" })
+            if (InNameof())
                 return true;
             var parent = Cursor.ParentTree;
             return parent.Value switch
@@ -159,6 +158,12 @@ public class FindMissingTypes : Recipe
                 _ => false
             };
         }
+
+        /// <summary>
+        /// <c>nameof</c> takes a name, which may be a namespace or a group of overloads, and neither has a type.
+        /// </summary>
+        private bool InNameof() =>
+            Cursor.FirstEnclosing<MethodInvocation>() is { Select: null, Name.SimpleName: "nameof" };
 
         /// <summary>
         /// Whether a qualified name is a namespace, as <c>System</c> and <c>System.Collections</c> are in
