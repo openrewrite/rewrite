@@ -122,7 +122,8 @@ public class FindMissingTypes : Recipe
                 Interpolation interpolation => interpolation.Format?.Element == id,
                 NamedExpression ne => ne.Name.Element == id && parent.ParentTree.Value is not PropertyPattern,
                 Case => id.SimpleName == "default",
-                NamedVariable => id.SimpleName == "_",
+                // A discard, or the unnamed variable that holds the filter of `catch (E) when (..)`.
+                NamedVariable => id.SimpleName is "_" or "",
                 _ => false
             };
         }

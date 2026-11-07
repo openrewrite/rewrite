@@ -139,6 +139,26 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public void LeavesTheUnnamedVariableOfAnExceptionFilterUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A
+                {
+                    void M()
+                    {
+                        try { } catch (System.Exception) when (true) { }
+                        try { } catch when (true) { }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void LeavesOperatorsWrittenAsCallsUnmarked()
     {
         RewriteRun(
