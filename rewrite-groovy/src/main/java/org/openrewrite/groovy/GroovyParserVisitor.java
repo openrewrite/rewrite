@@ -2235,9 +2235,13 @@ public class GroovyParserVisitor {
                     if (source.charAt(cursor) == '-' || source.charAt(cursor) == '+') {
                         i = indexOfNextNonWhitespace(cursor + 1, source);
                     }
+                    // a decimal literal's exponent may be signed (1.2E+12); in a hex literal, e is a digit
+                    boolean hex = source.startsWith("0x", i) || source.startsWith("0X", i);
                     for (; i < source.length(); i++) {
                         char c = source.charAt(i);
-                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))))) {
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))) ||
+                              (!hex && (c == '+' || c == '-') && (source.charAt(i - 1) == 'e' || source.charAt(i - 1) == 'E') &&
+                               source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))))) {
                             break;
                         }
                     }
