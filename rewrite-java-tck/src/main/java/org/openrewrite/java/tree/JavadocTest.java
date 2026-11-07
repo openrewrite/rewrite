@@ -2099,6 +2099,69 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doubledCarriageReturnBeforeLineFeed() {
+        rewriteRun(
+          java("" +
+               "class A {\r\r\n" +
+               "\t/**\r\r\n" +
+               "\t * Plain text.\r\r\n" +
+               "\t *\r\r\n" +
+               "\t * @param a the value.\r\r\n" +
+               "\t * @return the result.\r\r\n" +
+               "\t */\r\r\n" +
+               "\tint m(int a) { return 0; }\r\r\n" +
+               "}\r\r\n",
+            spec -> spec.afterRecipe(cu -> assertThat(javadocTags(cu))
+              .containsExactly(Javadoc.Parameter.class, Javadoc.Return.class))
+          )
+        );
+    }
+
+    @Test
+    void doubledCarriageReturnPlainText() {
+        rewriteRun(
+          java("" +
+               "class A {\r\r\n" +
+               "\t/**\r\r\n" +
+               "\t * Line 1.\r\r\n" +
+               "\t * Line 2.\r\r\n" +
+               "\t */\r\r\n" +
+               "\tint m() { return 0; }\r\r\n" +
+               "}\r\r\n"
+          )
+        );
+    }
+
+    @Test
+    void carriageReturnOnlyLineEndings() {
+        rewriteRun(
+          java("" +
+               "class A {\r" +
+               "    /**\r" +
+               "     * Line 1.\r" +
+               "     *\r" +
+               "     * @param a the value.\r" +
+               "     * @return the result.\r" +
+               "     */\r" +
+               "    int m(int a) { return 0; }\r" +
+               "}\r",
+            spec -> spec.afterRecipe(cu -> assertThat(javadocTags(cu))
+              .containsExactly(Javadoc.Parameter.class, Javadoc.Return.class))
+          )
+        );
+    }
+
+    private static List<Class<?>> javadocTags(J.CompilationUnit cu) {
+        J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+        return method.getComments().stream()
+          .filter(Javadoc.DocComment.class::isInstance)
+          .flatMap(comment -> ((Javadoc.DocComment) comment).getBody().stream())
+          .filter(tag -> tag instanceof Javadoc.Parameter || tag instanceof Javadoc.Return)
+          .map(Object::getClass)
+          .collect(toList());
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1090")
     @Test
     void paramNoDescriptionWithCRLF() {
@@ -3114,6 +3177,21 @@ class JavadocTest implements RewriteTest {
     @Nested
     @MinimumJava25
     class MarkdownDocComment {
+        @Test
+        void tripleSlashDoubledCarriageReturnBeforeLineFeed() {
+            rewriteRun(
+              java("" +
+                   "class A {\r\r\n" +
+                   "    /// Line 1.\r\r\n" +
+                   "    ///\r\r\n" +
+                   "    /// @param a the value.\r\r\n" +
+                   "    /// @return the result.\r\r\n" +
+                   "    int m(int a) { return 0; }\r\r\n" +
+                   "}\r\r\n"
+              )
+            );
+        }
+
         @Test
         void tripleSlashRoundTrip() {
             rewriteRun(
