@@ -358,4 +358,191 @@ class PnpmLockAdapterTest {
         assertThat(PnpmLockAdapter.parsePackageKey("")).isNull();
         assertThat(PnpmLockAdapter.parsePackageKey(null)).isNull();
     }
+
+    @Test
+    void topLevelIsTheVersionTheRootImporterResolves() {
+        // given
+        String pnpm = """
+                lockfileVersion: '9.0'
+
+                importers:
+
+                  .:
+                    dependencies:
+                      lodash:
+                        specifier: ^4.17.21
+                        version: 4.17.21
+                      legacy:
+                        specifier: 1.0.0
+                        version: 1.0.0
+
+                packages:
+
+                  legacy@1.0.0:
+                    resolution: {integrity: sha512-a}
+
+                  lodash@3.10.1:
+                    resolution: {integrity: sha512-b}
+
+                  lodash@4.17.21:
+                    resolution: {integrity: sha512-c}
+
+                snapshots:
+
+                  legacy@1.0.0:
+                    dependencies:
+                      lodash: 3.10.1
+
+                  lodash@3.10.1: {}
+
+                  lodash@4.17.21: {}
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.resolve("lodash", "^4.17.21", "").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.getTopLevel().get("legacy").getDependencies())
+                .extracting(d -> d.getResolved().getVersion())
+                .containsExactly("3.10.1");
+    }
+
+    @Test
+    void topLevelIsTheVersionTheRootResolvesInLockfileVersion6() {
+        // given
+        String pnpm = """
+                lockfileVersion: '6.0'
+
+                dependencies:
+                  lodash:
+                    specifier: ^4.17.21
+                    version: 4.17.21
+
+                packages:
+
+                  /lodash@3.10.1:
+                    resolution: {integrity: sha512-b}
+
+                  /lodash@4.17.21:
+                    resolution: {integrity: sha512-c}
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void topLevelIsTheVersionTheRootResolvesInLockfileVersion5() {
+        // given
+        String pnpm = """
+                lockfileVersion: 5.4
+
+                specifiers:
+                  lodash: ^4.17.21
+
+                dependencies:
+                  lodash: 4.17.21
+
+                packages:
+
+                  /lodash/3.10.1:
+                    resolution: {integrity: sha512-b}
+
+                  /lodash/4.17.21:
+                    resolution: {integrity: sha512-c}
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void readsTheLockfileDocumentOfALockWithAnEnvDocument() {
+        // given
+        String pnpm = """
+                ---
+                lockfileVersion: '9.0'
+
+                importers:
+
+                  .:
+                    configDependencies: {}
+                    packageManagerDependencies:
+                      pnpm:
+                        specifier: 11.2.2
+                        version: 11.2.2
+
+                packages:
+
+                  pnpm@11.2.2:
+                    resolution: {integrity: sha512-a}
+
+                snapshots:
+
+                  pnpm@11.2.2: {}
+
+                ---
+                lockfileVersion: '9.0'
+
+                importers:
+
+                  .:
+                    dependencies:
+                      wrappy:
+                        specifier: 1.0.2
+                        version: 1.0.2
+
+                packages:
+
+                  wrappy@1.0.2:
+                    resolution: {integrity: sha512-b}
+
+                snapshots:
+
+                  wrappy@1.0.2: {}
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getAll())
+                .extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactly("wrappy@1.0.2");
+        assertThat(result.getTopLevel()).containsOnlyKeys("wrappy");
+    }
+
+    @Test
+    void lockWithOnlyAnEnvDocumentHasNoPackages() {
+        // given
+        String pnpm = """
+                ---
+                lockfileVersion: '9.0'
+
+                importers:
+
+                  .:
+                    configDependencies: {}
+
+                packages: {}
+
+                snapshots: {}
+
+                ---
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getAll()).isEmpty();
+    }
 }

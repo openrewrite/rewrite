@@ -92,7 +92,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, PrintOutputCapture<P> p) {
         visit(annotatedExpression.getAnnotations(), p);
         visit(annotatedExpression.getExpression(), p);
-        afterSyntax(annotatedExpression, p);
         return annotatedExpression;
     }
 
@@ -161,7 +160,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(constructor.getPadding().getInvocation().getBefore(), KSpace.Location.CONSTRUCTOR_COLON, p);
         p.append(':');
         visit(constructor.getInvocation(), p);
-        afterSyntax(constructor, p);
+        afterSyntax(method, p);
 
         visit(method.getBody(), p);
 
@@ -183,7 +182,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(delegatedSuperType.getBy(), KSpace.Location.DELEGATED_SUPER_TYPE_BY, p);
         p.append("by");
         visit(delegatedSuperType.getDelegate(), p);
-        afterSyntax(delegatedSuperType, p);
         return delegatedSuperType;
     }
 
@@ -407,6 +405,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(equals);
             }
             visit(nv.getInitializer(), p);
+            afterSyntax(nv, p);
         }
 
         if (property.getTypeConstraints() != null) {
@@ -466,6 +465,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append("=");
             visit(nv.getInitializer(), p);
         }
+        afterSyntax(nv, p);
         afterSyntax(backingField, p);
     }
 
@@ -500,6 +500,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitRightPadded(annotationType.getPadding().getUseSite(), p);
         p.append(":");
         visit(annotationType.getCallee(), p);
+        afterSyntax(annotationType, p);
         return annotationType;
     }
 
@@ -513,6 +514,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]", p);
+        afterSyntax(multiAnnotationType, p);
         return multiAnnotationType;
     }
 
@@ -1194,8 +1196,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
-                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(return_.getMarkers(), p);
+                beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
                 visit(return_.getExpression(), p);
                 afterSyntax(return_, p);
                 return return_;
@@ -1224,6 +1225,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(as);
 
             visit(controlParens.getTree(), p);
+            afterSyntax(controlParens, p);
             afterSyntax(typeCast, p);
             return typeCast;
         }
@@ -1331,6 +1333,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
 
                 visit(variable.getElement().getInitializer(), p);
+                afterSyntax(variable.getElement(), p);
 
                 if (i < variables.size() - 1) {
                     p.append(",");

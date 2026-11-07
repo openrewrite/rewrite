@@ -76,7 +76,7 @@ public static class Preconditions
     public static ITreeVisitor<ExecutionContext> And(
         params Recipe[] recipes)
     {
-        return new AndVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
+        return new AndVisitor(recipes.Select(AsPrecondition).ToArray());
     }
 
     /// <summary>
@@ -106,6 +106,13 @@ public static class Preconditions
         {
             throw new ArgumentException("Preconditions.Or requires at least two operands", nameof(recipes));
         }
-        return new OrVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
+        return new OrVisitor(recipes.Select(AsPrecondition).ToArray());
     }
+
+    /// <summary>
+    /// The visitor that gates on <paramref name="recipe"/>. A recipe that delegates to Java gates as a
+    /// <see cref="RecipeRef"/> to that Java recipe, which the host can evaluate.
+    /// </summary>
+    internal static ITreeVisitor<ExecutionContext> AsPrecondition(Recipe recipe) =>
+        recipe is IDelegatesTo del ? new RecipeRef(del.JavaRecipeName, del.Options) : recipe.GetVisitor();
 }

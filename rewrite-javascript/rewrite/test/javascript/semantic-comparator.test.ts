@@ -76,9 +76,7 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                     )
                 );
 
-                // Both import styles should match the pattern
-                expect(matches).toContain('named');
-                expect(matches).toContain('namespace');
+                expect(matches).toEqual(['named', 'namespace']);
             }, {unsafeCleanup: true});
         }, 60000);
 
@@ -685,7 +683,9 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
 
             await spec.rewriteRun(
                 //language=typescript
-                typescript('export function f() {}\nexport @dec function f() {}')
+                typescript(`
+                    export function f() {}
+                    export @dec function f() {}`)
             );
 
             expect(matches).toEqual([true, false]);

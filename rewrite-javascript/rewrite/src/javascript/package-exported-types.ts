@@ -17,8 +17,7 @@ import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
 import {JavaScriptTypeMapping} from "./type-mapping";
-
-const TYPESCRIPT_FILE = /\.[cm]?tsx?$/;
+import {isTypeScript} from "./tree";
 
 // Free functions are not exported-type entries; only nominal types (and value modules, which are
 // descended into for nested types) qualify.
@@ -56,7 +55,7 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         forceConsistentCasingInFileNames: false,
     };
 
-    const host = ts.createCompilerHost(compilerOptions);
+    const host = withCachedLibFiles(ts.createCompilerHost(compilerOptions), compilerOptions);
     // Default node resolution from each file's on-disk location, falling back to the
     // explicit reference roots when a dependency isn't co-located with the own package.
     host.resolveModuleNameLiterals = (moduleLiterals, containingFile) =>
@@ -155,13 +154,39 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
     return [...byFqn.values()];
 }
 
+/**
+ * Every package's program loads TypeScript's default lib: 93 files, 3 MB of declarations, against a
+ * typical package's few KB. Parsed and bound once and shared by every program after, as a language
+ * service shares them across projects, a package costs only its own files.
+ */
+const LIB_SOURCE_FILES = new Map<string, ts.SourceFile>();
+
+function withCachedLibFiles(host: ts.CompilerHost, options: ts.CompilerOptions): ts.CompilerHost {
+    const libDir = path.dirname(ts.getDefaultLibFilePath(options)) + path.sep;
+    const getSourceFile = host.getSourceFile;
+    host.getSourceFile = (fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) => {
+        if (!fileName.startsWith(libDir)) {
+            return getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+        }
+        let sourceFile = LIB_SOURCE_FILES.get(fileName);
+        if (sourceFile === undefined) {
+            sourceFile = getSourceFile.call(host, fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile);
+            if (sourceFile) {
+                LIB_SOURCE_FILES.set(fileName, sourceFile);
+            }
+        }
+        return sourceFile;
+    };
+    return host;
+}
+
 function arity(cls: Type.Class): number {
     return cls.typeParameters?.length ?? 0;
 }
 
 /** A TypeScript declaration/source FILE (e.g. a `lib.*.d.ts` of ambient globals), used directly as a program entry. */
 function declarationFileEntry(artifact: string): string | undefined {
-    return ts.sys.fileExists(artifact) && TYPESCRIPT_FILE.test(artifact) ? artifact : undefined;
+    return ts.sys.fileExists(artifact) && isTypeScript(artifact) ? artifact : undefined;
 }
 
 /** Top-level ambient type declarations of a script (non-module) file — a `lib.*.d.ts`'s globals; namespaces descended for nested types. */
@@ -205,7 +230,7 @@ function resolvePackageEntry(dir: string, options: ts.CompilerOptions, host: ts.
         for (const attempt of [conditions, [...conditions, "require"]]) {
             const resolved = ts.resolveModuleName(manifest.name, path.join(dir, "__entry__.ts"),
                 {...options, customConditions: attempt}, host).resolvedModule?.resolvedFileName;
-            if (resolved && TYPESCRIPT_FILE.test(resolved) && containedIn(dir, resolved)) {
+            if (resolved && isTypeScript(resolved) && containedIn(dir, resolved)) {
                 return resolved;
             }
         }

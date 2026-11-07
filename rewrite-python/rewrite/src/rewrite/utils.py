@@ -260,26 +260,27 @@ def list_map(fn: FnType[T], lst: List[T]) -> List[T]:
 
 
 def list_flat_map(fn: FlatMapFnType[T], lst: List[T]) -> List[T]:
-    changed = False
-    result: List[T] = []
+    result: List[T] | None = None
 
     arg_count = _callable_arg_count(fn)
     with_index = arg_count == 2
     for index, item in enumerate(lst):
         new_items = fn(item, index) if with_index else fn(item)  # type: ignore
         if new_items is None:
-            changed = True
-            continue
-
-        if isinstance(new_items, list) and (len(new_items) != 1 or new_items[0] is not item):
-            changed = True
-            result.extend(new_items)
-        elif not isinstance(new_items, list):
-            if changed or new_items is not item:
+            if result is None:
+                result = lst[:index]
+        elif isinstance(new_items, list):
+            if result is None and (len(new_items) != 1 or new_items[0] is not item):
+                result = lst[:index]
+            if result is not None:
+                result.extend(new_items)
+        else:
+            if result is None and new_items is not item:
+                result = lst[:index]
+            if result is not None:
                 result.append(new_items)
-            changed = True
 
-    return result if changed else lst
+    return lst if result is None else result
 
 
 def list_map_last(fn: Callable[[T], Union[T, None]], lst: List[T]) -> List[T]:

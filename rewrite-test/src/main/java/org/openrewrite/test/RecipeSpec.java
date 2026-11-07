@@ -89,8 +89,15 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    /**
+     * @deprecated Use {@link #recipeQualityValidation}'s {@link RecipeQualityValidation#types}.
+     */
+    @Deprecated
     @Nullable
     TypeValidation afterTypeValidation;
+
+    @Nullable
+    RecipeQualityValidation recipeQualityValidation;
 
     boolean serializationValidation = true;
 
@@ -209,6 +216,9 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * The cycles to run, by default one more than {@link #expectedCyclesThatMakeChanges(int)} and at least two.
+     */
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
         return this;
@@ -302,10 +312,6 @@ public class RecipeSpec {
         return this;
     }
 
-    int getCycles() {
-        return cycles == null ? 2 : cycles;
-    }
-
     int getExpectedCyclesThatMakeChanges(int cycles) {
         return expectedCyclesThatMakeChanges == null ? cycles - 1 :
                 expectedCyclesThatMakeChanges;
@@ -316,8 +322,21 @@ public class RecipeSpec {
         return this;
     }
 
+    /**
+     * @deprecated Use {@link #recipeQualityValidation(RecipeQualityValidation)} with
+     * {@link RecipeQualityValidation#types}.
+     */
+    @Deprecated
     public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
         this.afterTypeValidation = typeValidation;
+        return this;
+    }
+
+    /**
+     * Checks of how the recipe behaves and what it produces, including the type attribution of its output.
+     */
+    public RecipeSpec recipeQualityValidation(RecipeQualityValidation recipeQualityValidation) {
+        this.recipeQualityValidation = recipeQualityValidation;
         return this;
     }
 

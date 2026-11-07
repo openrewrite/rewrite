@@ -195,7 +195,8 @@ public class CSharpFormatStyle extends NamedStyles implements RpcCodec<CSharpFor
     public CSharpFormatStyle rpcReceive(CSharpFormatStyle before, RpcReceiveQueue q) {
         return new CSharpFormatStyle(
                 q.receiveAndGet(before.getId(), UUID::fromString),
-                q.receive(before.flags),
+                // Flags that fit in an int (e.g. both wrapping bits cleared) arrive as an Integer
+                q.receive((Number) before.flags).longValue(),
                 q.receive(before.indentSize),
                 q.receive(before.tabSize),
                 q.<String, String>receiveAndGet(before.newLine, x -> x),

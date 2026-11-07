@@ -86,6 +86,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),
@@ -109,8 +110,22 @@ describe('capture types', () => {
         return spec.rewriteRun(
             //language=typescript
             typescript(
-                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().getCurrentNavigation();',
-                'class Router {\n    getCurrentNavigation() {}\n\n    currentNavigation() {}\n}\n\nnew Router().currentNavigation();'
+                `
+                class Router {
+                    getCurrentNavigation() {}
+
+                    currentNavigation() {}
+                }
+
+                new Router().getCurrentNavigation();`,
+                `
+                class Router {
+                    getCurrentNavigation() {}
+
+                    currentNavigation() {}
+                }
+
+                new Router().currentNavigation();`
             )
         );
     });
@@ -129,7 +144,12 @@ describe('capture types', () => {
         });
         return spec.rewriteRun({
             //language=typescript
-            ...typescript('const s = "abc";\nconst b = new Buffer(s);', 'const s = "abc";\nconst b = Buffer.from(s);'),
+            ...typescript(`
+                const s = "abc";
+                const b = new Buffer(s);`,
+                `
+                const s = "abc";
+                const b = Buffer.from(s);`),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const b = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
                 const returnType = (b.initializer!.element as J.MethodInvocation).methodType!.returnType as Type.Parameterized;
@@ -152,6 +172,146 @@ describe('capture types', () => {
             {value: {...typed(Type.Primitive.String), kind: J.Kind.ClassDeclaration}},
             {value: {...typed(Type.Primitive.String), kind: JS.Kind.As}}
         ], values)).toEqual(['let __PLACEHOLDER_0__: number;', 'let __PLACEHOLDER_1__: boolean;', 'let __PLACEHOLDER_4__: string;']);
+    });
+
+    test('a parameter of a generic type is declared with its type arguments', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}))
+            .orElse(rewrite(() => ({before: pattern`lookup(${x})`, after: template`${x}.get("k")`})));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `
+                const arr: number[] = [1];
+                const map = new Map<string, number>();
+                has(arr);
+                lookup(map);`,
+                `
+                const arr: number[] = [1];
+                const map = new Map<string, number>();
+                arr.includes(1);
+                map.get("k");`
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const [includes, get] = [2, 3].map(i => (cu.statements[i].element as J.MethodInvocation).methodType!);
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+                expect(includes.returnType).toBe(Type.Primitive.Boolean);
+                expect((get.declaringType as Type.Class).fullyQualifiedName).toBe('Map');
+                expect(get.returnType).toBe(Type.Primitive.Double);
+            }
+        });
+    });
+
+    test('a parameter of a recursive generic type is declared with any where the type holds itself', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`has(${x})`, after: template`${x}.includes(1)`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `
+                type Nested = Array<Nested>;
+                const nested: Nested = [];
+                has(nested);`,
+                `
+                type Nested = Array<Nested>;
+                const nested: Nested = [];
+                nested.includes(1);`
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const includes = (cu.statements[2].element as J.MethodInvocation).methodType!;
+                expect((includes.declaringType as Type.Class).fullyQualifiedName).toBe('Array');
+            }
+        });
+    });
+
+    test('a union, an intersection, a type variable or a generic type left without its arguments is declared as a parse reads it', () => {
+        const x = capture('x');
+        const rule = rewrite(() => ({before: pattern`use(${x})`, after: template`${x}.valueOf()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, m) ?? m;
+            }
+        });
+        const name = (t: Type): string => Type.isClass(t) ? t.fullyQualifiedName : Type.isPrimitive(t) ? t.keyword :
+            t.kind === Type.Kind.Union ? (t as Type.Union).bounds.map(name).join(' | ') : 'unknown';
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `
+                    function f<T, D extends Date>(
+                        xs: Array<T>, t: T, d: D, u: string | number, i: Date & {n: 1}, b: bigint
+                    ) {
+                        use(xs);
+                        use(t);
+                        use(d);
+                        use(u);
+                        use(i);
+                        use(b);
+                    }
+                `,
+                `
+                    function f<T, D extends Date>(
+                        xs: Array<T>, t: T, d: D, u: string | number, i: Date & {n: 1}, b: bigint
+                    ) {
+                        xs.valueOf();
+                        t.valueOf();
+                        d.valueOf();
+                        u.valueOf();
+                        i.valueOf();
+                        b.valueOf();
+                    }
+                `
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const calls = (cu.statements[0].element as J.MethodDeclaration).body!.statements
+                    .map(s => (s.element as J.MethodInvocation).methodType!);
+                // What a parse of the same code gives each call
+                expect(calls.map(m => `${name(m.declaringType)} ${name(m.returnType)}`)).toEqual([
+                    'Object Object', 'Object Object', 'Date double',
+                    'unknown String | double', 'Date double', 'BigInt long'
+                ]);
+            }
+        });
+    });
+
+    test('a type is declared as TypeScript writes it, in parentheses where it binds less tightly than where it stands', () => {
+        const variable = (name: string, ...bounds: Type[]) => ({
+            kind: Type.Kind.GenericTypeVariable, name, variance: Type.GenericTypeVariable.Variance.Invariant, bounds
+        } as Type.GenericTypeVariable);
+        const cls = (fullyQualifiedName: string, ...typeParameters: Type[]) =>
+            ({kind: Type.Kind.Class, fullyQualifiedName, typeParameters} as unknown as Type.Class);
+        const union = (...bounds: Type[]) => ({kind: Type.Kind.Union, bounds} as Type.Union);
+        const intersection = (...bounds: Type[]) => ({kind: Type.Kind.Intersection, bounds} as Type.Intersection);
+        const array = (elemType: Type) => ({kind: Type.Kind.Array, elemType, annotations: []} as Type.Array);
+        const {String: str, Double: num, Null: nul, None: undef} = Type.Primitive;
+        expect(TemplateEngine.parameterPreamble([
+            cls('Box', variable('T', str)),
+            intersection(union(str, num), cls('Date'), cls('{}')),
+            array(union(str, undef)),
+            union(str, str, nul),
+            // A module-qualified class can't be named, and an unconstrained type variable could be anything
+            union(str, cls('src/a.Foo')),
+            union(str, variable('T'))
+        ].map(type => ({value: typed(type)})))).toEqual([
+            'let __PLACEHOLDER_0__: Box<string>;',
+            'let __PLACEHOLDER_1__: (string | number) & Date;',
+            'let __PLACEHOLDER_2__: (string | undefined)[];',
+            'let __PLACEHOLDER_3__: string | null;',
+            'let __PLACEHOLDER_5__: unknown;'
+        ]);
     });
 
     test('capture without type still works', () => {
@@ -185,8 +345,18 @@ describe('capture types', () => {
         return spec.rewriteRun({
             //language=typescript
             ...typescript(
-                'export class Foo {\n}\n\nconst f = new Foo();\nuse(f);',
-                'export class Foo {\n}\n\nconst f = new Foo();\nwrap(f);'
+                `
+                export class Foo {
+                }
+
+                const f = new Foo();
+                use(f);`,
+                `
+                export class Foo {
+                }
+
+                const f = new Foo();
+                wrap(f);`
             ),
             // The module path is what qualifies `Foo`, giving the parameter a type no preamble can name
             path: 'src/a.ts'
@@ -227,6 +397,7 @@ describe('capture types', () => {
                 return binary;
             }
         });
+        spec.cycles = 1;
         return spec.rewriteRun(
             //language=typescript
             typescript('const a = 1 + 2', 'const a = 2 + 1'),

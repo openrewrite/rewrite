@@ -27,8 +27,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion24Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/j2ee", "2.4", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/j2ee", "2.4", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.4"
@@ -53,8 +52,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion25Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.5"
@@ -79,8 +77,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion30Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.0"
@@ -105,8 +102,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion31Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.1"
@@ -131,8 +127,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion32Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.2"
@@ -259,6 +254,29 @@ class ChangeNamespaceValueTest implements RewriteTest {
     }
 
     @Test
+    void replaceSchemaLocationKeepsOtherPairs() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
+          xml(
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.4"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd http://other.namespace http://other.namespace/other.xsd">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """,
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd http://other.namespace http://other.namespace/other.xsd">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceNamespaceUriAndAddMissingSchemaLocation() {
         rewriteRun(
           spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
@@ -272,6 +290,99 @@ class ChangeNamespaceValueTest implements RewriteTest {
             """
               <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5"
                   id="WebApp_ID" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addSchemaLocationWithTheBoundSchemaInstancePrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
+          xml(
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.4"
+                  xmlns:x="http://www.w3.org/2001/XMLSchema-instance">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """,
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5"
+                  xmlns:x="http://www.w3.org/2001/XMLSchema-instance" x:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """
+          )
+        );
+    }
+
+    @Test
+    void declareSchemaInstancePrefixWhenAddingSchemaLocation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("//web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", null, true, null, "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
+          xml(
+            """
+              <root>
+                  <web-app xmlns="http://java.sun.com/xml/ns/j2ee">
+                  </web-app>
+              </root>
+              """,
+            """
+              <root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+                  <web-app xmlns="http://java.sun.com/xml/ns/javaee">
+                  </web-app>
+              </root>
+              """
+          ),
+          xml(
+            """
+              <root xmlns="http://www.w3.org/2001/XMLSchema-instance" a="1" a="2">
+                  <web-app xmlns="http://java.sun.com/xml/ns/j2ee">
+                  </web-app>
+              </root>
+              """,
+            """
+              <root xmlns="http://www.w3.org/2001/XMLSchema-instance" a="1" a="2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+                  <web-app xmlns="http://java.sun.com/xml/ns/javaee">
+                  </web-app>
+              </root>
+              """,
+            spec -> spec.path("default-namespace.xml")
+          )
+        );
+    }
+
+    @Test
+    void attributeNamedLikeADeclarationIsNotOne() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue(null, "http://old.namespace", "https://new.namespace", null, true, null, null)),
+          xml(
+            """
+              <root xmlns="http://old.namespace" xmlnsLegacy="http://old.namespace"/>
+              """,
+            """
+              <root xmlns="https://new.namespace" xmlnsLegacy="http://old.namespace"/>
+              """
+          )
+        );
+    }
+
+    @Test
+    void rebindMisspelledSchemaInstanceNamespace() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", "http://java.sun.com/xml/ns/j2ee", "http://java.sun.com/xml/ns/javaee", "2.4", true, "2.5", "http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd")),
+          xml(
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.4"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-Instance">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
+              """,
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
                   <display-name>testWebDDNamespace</display-name>
               </web-app>
               """

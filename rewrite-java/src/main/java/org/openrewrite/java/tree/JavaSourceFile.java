@@ -19,8 +19,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.ImportValidationService;
 import org.openrewrite.internal.NamingService;
+import org.openrewrite.internal.TreeShapeValidationService;
+import org.openrewrite.internal.TypeMatchingValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
+import org.openrewrite.java.internal.JavaImportValidationService;
+import org.openrewrite.java.internal.JavaTreeShapeValidationService;
+import org.openrewrite.java.internal.JavaTypeMatchingValidationService;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.*;
@@ -75,6 +81,14 @@ public interface JavaSourceFile extends J, SourceFile {
             } else if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 // Only unit tests should need to use this service, so no classloading concerns
                 return (T) new JavaWhitespaceValidationService();
+            } else if (TypeMatchingValidationService.class.getName().equals(service.getName())) {
+                return (T) new JavaTypeMatchingValidationService();
+            } else if (ImportValidationService.class.getName().equals(service.getName())) {
+                return (T) new JavaImportValidationService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName()) &&
+                       this instanceof J.CompilationUnit) {
+                // Kotlin and Groovy decide some kinds of node from types and position, which isn't modeled yet
+                return (T) new JavaTreeShapeValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
             } else if (CommentService.class.getName().equals(service.getName())) {

@@ -130,7 +130,7 @@ class GoTypeAttributionIntegTest implements RewriteTest {
                             new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
                                 public J.TypeCast visitTypeCast(J.TypeCast cast, ExecutionContext ctx) {
-                                    conversions.add(cast.printTrimmed(getCursor()));
+                                    conversions.add(cast.printTrimmed(getCursor().getParentOrThrow()));
                                     conversionTypes.add(cast.getType());
                                     return super.visitTypeCast(cast, ctx);
                                 }

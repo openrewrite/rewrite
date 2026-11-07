@@ -59,7 +59,12 @@ class MSBuildProjectTest {
         assertThat(resolved.getDependencyRanges()).isEmpty();
         assertThat(app.getDependencyRanges()).containsEntry("Newtonsoft.Json", "[13.0.1, )");
 
-        MSBuildProject.ProjectReference projRef = new MSBuildProject.ProjectReference("../Lib/Lib.csproj");
+        MSBuildProject.ProjectReference projRef = MSBuildProject.ProjectReference.builder()
+          .include("../Lib/Lib.csproj")
+          .name("Lib")
+          .depth(0)
+          .resolvedPackages(singletonList(resolved))
+          .build();
 
         MSBuildProject.TargetFramework tfm = MSBuildProject.TargetFramework.builder()
           .targetFramework("net8.0")
@@ -89,6 +94,10 @@ class MSBuildProjectTest {
           .isEqualTo("13.0.3");
         assertThat(marker.getTargetFrameworks().getFirst().getResolvedPackages()).hasSize(1);
         assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences()).hasSize(1);
+        assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences().getFirst().getName())
+          .isEqualTo("Lib");
+        assertThat(marker.getTargetFrameworks().getFirst().getProjectReferences().getFirst().getResolvedPackages())
+          .containsExactly(resolved);
         assertThat(marker.getProperties()).containsKey("NJVersion");
         assertThat(marker.getProperties().get("NJVersion").getDefinedIn())
           .isEqualTo(Paths.get("project.csproj"));

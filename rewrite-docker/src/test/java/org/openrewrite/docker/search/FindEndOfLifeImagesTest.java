@@ -152,7 +152,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN pip install flask
               """,
             """
-              ~~(EOL: python:3.7 (ended 2023-06-27, suggest 3.14 or 3.13))~~>FROM python:3.7
+              ~~(EOL: python:3.7 (ended 2023-06-27, suggest 3.15 or 3.14))~~>FROM python:3.7
               RUN pip install flask
               """
           )
@@ -168,7 +168,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN pip install flask
               """,
             """
-              ~~(EOL: python:3.7-alpine (ended 2023-06-27, suggest 3.14 or 3.13))~~>FROM python:3.7-alpine
+              ~~(EOL: python:3.7-alpine (ended 2023-06-27, suggest 3.15 or 3.14))~~>FROM python:3.7-alpine
               RUN pip install flask
               """
           )

@@ -23,6 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import java.util.List;
 import java.util.function.Predicate;
 
 @Value
@@ -134,7 +135,7 @@ public class ChangeMethodName extends Recipe {
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
                                         classDecl != null && methodMatcher.matches(method, classDecl);
-                if (methodMatches) {
+                if (methodMatches && !declaresSiblingWithNewName(method)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {
                         type = type.withName(newMethodName);
@@ -143,6 +144,46 @@ public class ChangeMethodName extends Recipe {
                             .withMethodType(type);
                 }
                 return m;
+            }
+
+            /**
+             * A declaration should not be renamed when the enclosing type already declares a method
+             * with the new name and the same parameter types, as that would produce a duplicate method.
+             */
+            private boolean declaresSiblingWithNewName(J.MethodDeclaration method) {
+                J.Block body = getCursor().firstEnclosing(J.Block.class);
+                if (body == null) {
+                    return false;
+                }
+                for (Statement statement : body.getStatements()) {
+                    if (statement != method && statement instanceof J.MethodDeclaration) {
+                        J.MethodDeclaration sibling = (J.MethodDeclaration) statement;
+                        if (sibling.getSimpleName().equals(newMethodName) && sameParameterTypes(method, sibling)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private boolean sameParameterTypes(J.MethodDeclaration m1, J.MethodDeclaration m2) {
+                JavaType.Method t1 = m1.getMethodType();
+                JavaType.Method t2 = m2.getMethodType();
+                if (t1 == null || t2 == null) {
+                    // Without type attribution, assume a clash when the arity matches
+                    return m1.getParameters().size() == m2.getParameters().size();
+                }
+                List<JavaType> p1 = t1.getParameterTypes();
+                List<JavaType> p2 = t2.getParameterTypes();
+                if (p1.size() != p2.size()) {
+                    return false;
+                }
+                for (int i = 0; i < p1.size(); i++) {
+                    if (!TypeUtils.isOfType(p1.get(i), p2.get(i))) {
+                        return false;
+                    }
+                }
+                return true;
             }
 
             @Override

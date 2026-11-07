@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 export function tap<T>(obj: T, fn: (x: T) => void) {
     fn(obj);
 }

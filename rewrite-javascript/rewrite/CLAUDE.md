@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the OpenRewrite Typ
 
 ## Module Overview
 
-TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON and YAML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
+TypeScript implementation of OpenRewrite for JavaScript/TypeScript source code transformations, plus JSON, YAML and XML support. Includes parsers, AST models, visitors, printers, and an RPC bridge for Java communication.
 
 Self-contained Node.js project, separate from the Java monorepo build system.
 
@@ -40,7 +40,7 @@ npm run typecheck
 npm run testhelper -- test/javascript/recipes/order-imports.test.ts
 ```
 
-Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
+Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `start`.
 
 ### Java RPC Integration Tests
 
@@ -52,6 +52,10 @@ Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.m
 ```
 
 This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
+
+Name such a test `test/rpc/java-*.test.ts`, or add it to `javaTests` in `vitest.config.mts`. That puts it in the `java` vitest project, which Gradle runs as `npmTestJava` and reruns when the Java side changes. Gradle runs the `typescript` project as `npmTestTypeScript`, without the Java classpath.
+
+`./gradlew :rewrite-javascript:npmTest` runs `npmTypecheck`, `npmTestTypeScript` and `npmTestJava` but does no work itself, so `npmTest --rerun` reruns nothing. To force a rerun, pass `--rerun` to `npmTestTypeScript` or `npmTestJava`.
 
 ## Directory Structure
 
@@ -86,6 +90,7 @@ rewrite-javascript/rewrite/
 │   │   └── templating/                  # Template engine
 │   ├── json/                            # JSON support (tree, visitor, print, rpc, recipes)
 │   ├── yaml/                            # YAML support (tree, visitor, print, rpc, recipes)
+│   ├── xml/                             # XML support (tree, visitor, print, parser, rpc, assertions)
 │   ├── search/                          # Cross-language search utilities
 │   ├── text/                            # Plain text support
 │   ├── rpc/                             # RPC infrastructure
@@ -104,7 +109,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser/, format/, cleanup/   # Category tests
 │   │   └── search/, templating/, migrate/
 │   ├── java/                            # Java model tests
-│   ├── json/, yaml/                     # JSON/YAML tests
+│   ├── json/, yaml/, xml/               # JSON/YAML/XML tests
 │   └── rpc/                             # RPC integration tests
 ├── tsconfig.json
 ├── vitest.config.mts
@@ -199,14 +204,23 @@ describe('OrderImports', () => {
 
     test('sorts imports', () =>
         spec.rewriteRun(
+            //language=typescript
             typescript(
-                `import {z} from 'zebra';\nimport {a} from 'alpha';`,
-                `import {a} from 'alpha';\nimport {z} from 'zebra';`
+                `
+                import {z} from 'zebra';
+                import {a} from 'alpha';
+                `,
+                `
+                import {a} from 'alpha';
+                import {z} from 'zebra';
+                `
             )
         )
     );
 });
 ```
+
+Prefer writing test sources over real lines rather than with `\n`.
 
 ### Sharing a `RecipeSpec` across tests
 
@@ -243,16 +257,17 @@ else, since a rename onto a name already in use would capture its references or 
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
-moved binding is a value too. Outside the imports the file may spell it only as a reference, and no
-queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
+moved binding is a value too. Outside the imports and `export {…}` clauses the file may spell it only
+as a reference, and no queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
 alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
 default or namespace target, would get a second declaration of the name instead, so the name stays
 taken there.
 
 Where the name changes, the file's references to the binding change with it — the occurrences that
-resolve to the binding, so a name a nearer scope binds and a property that merely reads alike both
-stay put. The rename belongs here rather than in the caller: from the returned name alone a caller
-cannot find those occurrences, since the binding it would resolve them against is already gone.
+resolve to the binding, so a name a nearer scope binds with the same meaning, a value over a value or
+a type over a type, and a property that merely reads alike both stay put. The rename belongs here
+rather than in the caller: from the returned name alone a caller cannot find those occurrences, since
+the binding it would resolve them against is already gone.
 
 Two positions spell a name and a reference with one identifier, and the rename splits them: `{a}`
 becomes `{a: renamed}`, keeping the property its object publishes, and `export {a}` becomes
@@ -293,12 +308,40 @@ sees what the rebinds before it left: a statement another rebind emptied, or an 
 target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
 renames only the types naming its own member, so a later rebind still finds its own.
 
+### A rebind of a `require`
+
+Only a top-level `const … = require('m')` declaration binds a module for a rebind, and the file stays
+CommonJS. A binding that has its statement to itself is rewritten in place, changing shape as needed:
+
+```js
+const D = require('_stream_duplex');   →   const {Duplex: D} = require('stream');
+```
+
+A binding leaving a statement that binds other names is placed the way `maybeBind` places a new
+`require`, as is a `const` one that the target's joinable `require` can take.
+
+A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
+
+### A `require` that `maybeBind` creates
+
+A `.cjs` or `.cts` file is CommonJS. So is a file without ES module syntax that calls `require` or
+reads `exports` or `module.exports` anywhere, inside a function too. There `maybeBind` binds with
+`require`, since an `import` would make the file an ES module. A function whose own parameters are
+`require`, `exports` or `module`, as an AMD factory's are, does not count.
+
+A new `require` goes among the file's leading requires, the run after a shebang and any directives
+(`'use strict'`, `'use client'`, `/// <reference … />`, ...)
+that every other top-level statement follows, so nothing at top level reads the binding before it
+is initialised. A member joins a `const` destructuring `require` of its module there that has no
+rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
+`const name = require('mod')`. A file with no leading requires takes it first.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
-- the file binds its modules with `require` and one would have to be created (`ImportStyle.CommonJS`
-  has no add path), which covers an existing `require` shadowed where the caller asked
+- a `typeOnly` request that `require` would bind, since a `require` binds values only. That is one
+  in a CommonJS file with no import `style` asked for, or one with `style: ImportStyle.CommonJS`
 - no legal identifier can be derived from the module's last path segment and no `preferredName`
   or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
 - a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller
@@ -312,10 +355,13 @@ The four above that still apply, plus these:
 - nothing binds `from`
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
+- `from` is destructured beside a rest element, which would gain the property the move takes out
+- `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
+- `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
-- the file binds its modules with `require` and the move would need a new import, because `from`'s
-  statement binds something else too or the two differ in default/namespace/named shape
+- the file binds its modules with `require`, `from` is an ES import, and the move would need a new
+  import, because that import binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.

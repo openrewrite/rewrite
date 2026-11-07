@@ -24,6 +24,7 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -53,7 +54,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
         "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects"})
 @Getter
 @Builder
-public class ResolvedPom {
+public class ResolvedPom implements Heavyweight {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
@@ -163,9 +164,9 @@ public class ResolvedPom {
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
-        requestedDependencies = ListUtils.map(requestedDependencies,
+        requestedDependencies = ListUtils.filter(requestedDependencies,
                 d -> uniqueDependencies.add(
-                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
+                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())));
         return this;
     }
 
@@ -540,16 +541,17 @@ public class ResolvedPom {
 
         private void resolveParentPluginsRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
+            boolean fromAncestor = pomAncestry.size() > 1;
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergePluginManagement(profile.getPluginManagement());
-                    mergePlugins(profile.getPlugins());
+                    mergePluginManagement(profile.getPluginManagement(), fromAncestor);
+                    mergePlugins(profile.getPlugins(), fromAncestor);
                 }
             }
 
-            mergePluginManagement(pom.getPluginManagement());
-            mergePlugins(pom.getPlugins());
+            mergePluginManagement(pom.getPluginManagement(), fromAncestor);
+            mergePlugins(pom.getPlugins(), fromAncestor);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -799,12 +801,12 @@ public class ResolvedPom {
             );
         }
 
-        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins, boolean fromAncestor) {
             Map<PluginKey, Plugin> pluginMap = new HashMap<>();
             plugins.forEach(p -> pluginMap.put(getPluginKey(p), p));
 
             for (Plugin incomingPlugin : incomingPlugins) {
-                if ("false".equals(incomingPlugin.getInherited())) {
+                if (fromAncestor && "false".equals(incomingPlugin.getInherited())) {
                     continue;
                 }
                 Plugin plugin = pluginMap.get(getPluginKey(incomingPlugin));
@@ -817,25 +819,25 @@ public class ResolvedPom {
             }
         }
 
-        private void mergePlugins(List<Plugin> incomingPlugins) {
+        private void mergePlugins(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (plugins == null || plugins.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     plugins = new ArrayList<>();
                 }
-                mergePlugins(plugins, incomingPlugins);
+                mergePlugins(plugins, incomingPlugins, fromAncestor);
             }
         }
 
-        private void mergePluginManagement(List<Plugin> incomingPlugins) {
+        private void mergePluginManagement(List<Plugin> incomingPlugins, boolean fromAncestor) {
             if (!incomingPlugins.isEmpty()) {
                 if (pluginManagement == null || pluginManagement.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
                     pluginManagement = new ArrayList<>();
                 }
-                mergePlugins(pluginManagement, incomingPlugins);
+                mergePlugins(pluginManagement, incomingPlugins, fromAncestor);
             }
         }
 
@@ -1028,7 +1030,7 @@ public class ResolvedPom {
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.transitiveOf(scope) == scope) {
+            if (dScope.isDirectlyIncludedIn(scope)) {
                 // For direct dependencies that are duplicated, last declaration wins
                 // TODO: We could introduce a ResolutionStrategy to handle this differently for Gradle which uses highest version
                 rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));

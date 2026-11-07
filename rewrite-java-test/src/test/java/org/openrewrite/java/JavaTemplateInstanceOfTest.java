@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -68,7 +69,9 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
               }
           }))
           // custom missing type validation
-          .afterTypeValidationOptions(TypeValidation.none())
+          .recipeQualityValidation(RecipeQualityValidation.builder()
+            .types(TypeValidation.none())
+            .build())
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 

@@ -15,13 +15,17 @@
  */
 package org.openrewrite.gradle.toolingapi;
 
+import org.gradle.util.GradleVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +35,11 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
 class AssertionsTest implements RewriteTest {
+
+    // The Gradle running this build has its distribution downloaded already, so a wrapper pointing at it downloads
+    // nothing, and the tests that use one share a daemon
+    private static final URI CURRENT_GRADLE_DISTRIBUTION = URI.create(
+      "https://services.gradle.org/distributions/gradle-" + GradleVersion.current().getVersion() + "-bin.zip");
 
     @Test
     void withToolingApi() {
@@ -51,7 +60,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void withCustomDistributionUri() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://artifactory.moderne.ninja/artifactory/gradle-distributions/gradle-8.6-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(CURRENT_GRADLE_DISTRIBUTION)),
           //language=groovy
           buildGradle(
             """
@@ -65,35 +74,29 @@ class AssertionsTest implements RewriteTest {
     }
 
     @Test
-    void customInitScript() {
+    void customInitScript() throws IOException {
+        // The plugin comes from the jars this build made rather than whatever snapshot a remote repository has,
+        // and the group shows that this script is the one that ran
+        StringBuilder jars = new StringBuilder();
+        for (String jar : Files.readAllLines(Paths.get(System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath")))) {
+            if (!jar.trim().isEmpty()) {
+                jars.append(jars.length() == 0 ? "'" : ", '").append(jar.trim().replace("\\", "\\\\")).append('\'');
+            }
+        }
         //language=groovy
-        String alternateInit = """
-          initscript{
-              repositories{
-                  mavenLocal()
-                  maven{ url = uri("https://central.sonatype.com/repository/maven-snapshots") }
-                  mavenCentral()
-              }
-
-              configurations.all{
-                  resolutionStrategy{
-                      cacheChangingModulesFor 0, 'seconds'
-                      cacheDynamicVersionsFor 0, 'seconds'
-                  }
-              }
-
-              dependencies{
-                  classpath 'org.openrewrite.gradle.tooling:plugin:latest.integration'
-                  classpath 'org.openrewrite:rewrite-maven:latest.integration'
+        String alternateInit = String.format("""
+          initscript {
+              dependencies {
+                  classpath files(%s)
               }
           }
 
-          allprojects{
+          allprojects {
+              group = 'org.openrewrite.custom.init'
               apply plugin: org.openrewrite.gradle.toolingapi.ToolingApiOpenRewriteModelPlugin
           }
-
-          """;
-        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://services.gradle.org/distributions/gradle-8.6-bin.zip"), null);
+          """, jars);
+        GradleWrapper gradleWrapper = GradleWrapper.create(CURRENT_GRADLE_DISTRIBUTION, null);
         rewriteRun(
           spec -> spec.beforeRecipe(Assertions.withToolingApi(gradleWrapper, alternateInit)),
           //language=groovy
@@ -103,7 +106,8 @@ class AssertionsTest implements RewriteTest {
                   id 'java'
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getMarkers().findFirst(GradleProject.class)).isPresent())
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getMarkers().findFirst(GradleProject.class))
+              .hasValueSatisfying(gp -> assertThat(gp.getGroup()).isEqualTo("org.openrewrite.custom.init")))
           )
         );
     }
@@ -222,7 +226,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleSubprojectGetsItsOwnGradleProjectOnGradle9() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(CURRENT_GRADLE_DISTRIBUTION)),
           //language=groovy
           settingsGradle(
             """
@@ -273,7 +277,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleResolvesAgainstBuildRoot() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(CURRENT_GRADLE_DISTRIBUTION)),
           //language=groovy
           settingsGradle(
             """

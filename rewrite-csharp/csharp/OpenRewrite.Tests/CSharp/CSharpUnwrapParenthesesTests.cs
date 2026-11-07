@@ -86,6 +86,42 @@ public class CSharpUnwrapParenthesesTests
     }
 
     [Fact]
+    public void IsUnwrappable_SameOpOnRight_False()
+    {
+        // a + (b + c) => cannot unwrap, a + b + c parses as (a + b) + c
+        var parens = MakeParens(MakeBinary(Binary.OperatorType.Addition, MakeId("b"), MakeId("c")));
+        var parent = MakeBinary(Binary.OperatorType.Addition, MakeId("a"), parens);
+        var root = new Cursor(null, "root");
+        var parentCursor = new Cursor(root, parent);
+        var parensCursor = new Cursor(parentCursor, parens);
+        Assert.False(CSharpUnwrapParentheses<int>.IsUnwrappable(parensCursor));
+    }
+
+    [Fact]
+    public void IsUnwrappable_NullCoalescingOnLeft_False()
+    {
+        // (a ?? b) ?? c => cannot unwrap, a ?? b ?? c parses as a ?? (b ?? c)
+        var parens = MakeParens(MakeNullCoalescing(MakeId("a"), MakeId("b")));
+        var parent = MakeNullCoalescing(parens, MakeId("c"));
+        var root = new Cursor(null, "root");
+        var parentCursor = new Cursor(root, parent);
+        var parensCursor = new Cursor(parentCursor, parens);
+        Assert.False(CSharpUnwrapParentheses<int>.IsUnwrappable(parensCursor));
+    }
+
+    [Fact]
+    public void IsUnwrappable_NullCoalescingOnRight_True()
+    {
+        // a ?? (b ?? c) => can unwrap, ?? groups to the right
+        var parens = MakeParens(MakeNullCoalescing(MakeId("b"), MakeId("c")));
+        var parent = MakeNullCoalescing(MakeId("a"), parens);
+        var root = new Cursor(null, "root");
+        var parentCursor = new Cursor(root, parent);
+        var parensCursor = new Cursor(parentCursor, parens);
+        Assert.True(CSharpUnwrapParentheses<int>.IsUnwrappable(parensCursor));
+    }
+
+    [Fact]
     public void IsUnwrappable_InsideTypeCast_False()
     {
         // (int)(x) => cannot unwrap parens that are the expression of a type cast

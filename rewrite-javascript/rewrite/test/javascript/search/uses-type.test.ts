@@ -53,8 +53,14 @@ describe('UsesType visitor', () => {
         //language=typescript
         await spec.rewriteRun(
             typescript(
-                `class Base {}\nclass Leaf extends Base {}\nnew Leaf()`,
-                `/*~~>*/class /*~~>*/Base {}\n/*~~>*/class /*~~>*/Leaf extends /*~~>*/Base {}\nnew /*~~>*/Leaf()`
+                `
+                class Base {}
+                class Leaf extends Base {}
+                new Leaf()`,
+                `
+                /*~~>*/class /*~~>*/Base {}
+                /*~~>*/class /*~~>*/Leaf extends /*~~>*/Base {}
+                new /*~~>*/Leaf()`
             )
         );
 
@@ -62,8 +68,14 @@ describe('UsesType visitor', () => {
         //language=typescript
         await spec.rewriteRun(
             typescript(
-                `class Base {}\nclass Leaf extends Base {}\nnew Leaf()`,
-                `/*~~>*/class /*~~>*/Base {}\nclass Leaf extends /*~~>*/Base {}\nnew Leaf()`
+                `
+                class Base {}
+                class Leaf extends Base {}
+                new Leaf()`,
+                `
+                /*~~>*/class /*~~>*/Base {}
+                class Leaf extends /*~~>*/Base {}
+                new Leaf()`
             )
         );
     });
@@ -74,15 +86,24 @@ describe('UsesType visitor', () => {
         //language=typescript
         await spec.rewriteRun(
             typescript(
-                `declare const n: number;\nn.toFixed(2);\nn.toFixed?.(2);`,
-                `declare const n: number;\n/*~~>*/n.toFixed(2);\n/*~~>*/n.toFixed?.(2);`
+                `
+                declare const n: number;
+                n.toFixed(2);
+                n.toFixed?.(2);`,
+                `
+                declare const n: number;
+                /*~~>*/n.toFixed(2);
+                /*~~>*/n.toFixed?.(2);`
             )
         );
 
         spec.recipe = fromVisitor(usesType('Number').localVisitor!);
         //language=typescript
         await spec.rewriteRun(
-            typescript(`declare const n: number;\nn.toFixed(2);\nn.toFixed?.(2);`)
+            typescript(`
+                declare const n: number;
+                n.toFixed(2);
+                n.toFixed?.(2);`)
         );
     });
 

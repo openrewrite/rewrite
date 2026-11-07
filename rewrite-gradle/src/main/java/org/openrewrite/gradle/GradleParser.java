@@ -45,7 +45,8 @@ public class GradleParser implements Parser {
             "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
             "import org.gradle.plugin.use.PluginDependencySpec\n" +
             "fun Project.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
-            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n" +
+            "fun Project.android(block: com.android.build.api.dsl.ApplicationExtension.() -> Unit) {}\n";
 
     @SuppressWarnings("LanguageMismatch")
     private static final String KTS_SETTINGS_STUBS =

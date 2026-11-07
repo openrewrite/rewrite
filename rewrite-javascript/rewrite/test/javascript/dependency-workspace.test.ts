@@ -141,6 +141,65 @@ describe('dependency workspace', () => {
         }
     });
 
+    test('installs a workspace again once its node_modules has lost a dependency', async () => {
+        // given
+        const dependencies = {'has-flag': '4.0.0'};
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        fs.rmSync(path.join(workspaceDir, 'node_modules', 'has-flag'), {recursive: true, force: true});
+
+        // when
+        const again = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+
+        // then
+        expect(again).toBe(workspaceDir);
+        expect(fs.existsSync(path.join(again, 'node_modules', 'has-flag', 'package.json'))).toBe(true);
+    }, 60000);
+
+    test('a cleanup cut short leaves no part of a workspace under its key', () => {
+        // given a day-old workspace that cannot be deleted whole, as one is not when the deletion is cut short
+        const base = path.join(os.tmpdir(), 'openrewrite-js-workspaces');
+        const tag = `cutshorttest-${process.pid}-${Date.now()}`;
+        const workspaceDir = path.join(base, tag);
+        const stuck = path.join(workspaceDir, 'node_modules', 'stuck');
+        fs.mkdirSync(stuck, {recursive: true});
+        fs.writeFileSync(path.join(workspaceDir, 'package.json'), '{"dependencies": {}}');
+        fs.writeFileSync(path.join(stuck, 'index.js'), '');
+        fs.chmodSync(stuck, 0o555);
+        const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        fs.utimesSync(workspaceDir, twoDaysAgo, twoDaysAgo);
+
+        try {
+            // when
+            DependencyWorkspace.cleanupOldWorkspaces();
+
+            // then
+            expect(fs.existsSync(workspaceDir)).toBe(false);
+        } finally {
+            for (const entry of fs.readdirSync(base).filter(name => name.startsWith(tag))) {
+                const left = path.join(base, entry, 'node_modules', 'stuck');
+                if (fs.existsSync(left)) {
+                    fs.chmodSync(left, 0o755);
+                }
+                fs.rmSync(path.join(base, entry), {recursive: true, force: true});
+            }
+        }
+    });
+
+    test('a cleanup keeps a workspace used since it was installed', async () => {
+        // given a workspace installed two days ago and used again now
+        const dependencies = {'is-windows': '1.0.2'};
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+        const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        fs.utimesSync(workspaceDir, twoDaysAgo, twoDaysAgo);
+        await DependencyWorkspace.getOrCreateWorkspace({dependencies});
+
+        // when
+        DependencyWorkspace.cleanupOldWorkspaces();
+
+        // then
+        expect(fs.existsSync(path.join(workspaceDir, 'node_modules', 'is-windows', 'package.json'))).toBe(true);
+    }, 60000);
+
     test('type attribution with on-disk dependencies (comparison)', async () => {
         const spec = new RecipeSpec();
 

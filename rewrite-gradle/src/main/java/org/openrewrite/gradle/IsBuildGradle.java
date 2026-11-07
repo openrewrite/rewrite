@@ -17,8 +17,10 @@ package org.openrewrite.gradle;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
@@ -31,7 +33,8 @@ import java.nio.file.Path;
 public class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
 
     /**
-     * Only match `build.gradle` and `build.gradle.kts` files, not any `dependencies.gradle` or similar files.
+     * Only match the project's build script, not a `dependencies.gradle` or similar file applied with
+     * `apply from:`.
      */
     boolean exactMatch;
 
@@ -48,15 +51,29 @@ public class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
         stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile sourceFile = (JavaSourceFile) tree;
-            Path sourcePath = sourceFile.getSourcePath();
             if (exactMatch) {
-                return sourcePath.endsWith("build.gradle") || sourcePath.endsWith("build.gradle.kts") ? SearchResult.found(sourceFile) : tree;
+                return isBuildFile(sourceFile) ? SearchResult.found(sourceFile) : tree;
             }
-            if (matches(sourcePath)) {
+            if (matches(sourceFile.getSourcePath())) {
                 return SearchResult.found(sourceFile);
             }
         }
         return tree;
+    }
+
+    /**
+     * Compared by suffix because {@link GradleProject#getBuildFilePath()} is relative to the project directory
+     * while source paths are relative to the repository root.
+     */
+    private static boolean isBuildFile(SourceFile sourceFile) {
+        String buildFilePath = sourceFile.getMarkers().findFirst(GradleProject.class)
+                .map(GradleProject::getBuildFilePath)
+                .orElse(null);
+        Path sourcePath = sourceFile.getSourcePath();
+        if (buildFilePath == null || buildFilePath.isEmpty()) {
+            return sourcePath.endsWith("build.gradle") || sourcePath.endsWith("build.gradle.kts");
+        }
+        return sourcePath.endsWith(buildFilePath);
     }
 
     public static boolean matches(Path sourcePath) {

@@ -75,8 +75,9 @@ type findModulePathVisitor struct {
 func (v *findModulePathVisitor) VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree {
 	d = v.GoVisitor.VisitGoModDirective(d, p).(*golang.GoModDirective)
 	if d.Keyword == "module" && len(d.Values) > 0 {
-		marked := d.Values[0].WithMarkers(java.FoundSearchResult(d.Values[0].Markers, "found module"))
-		d = d.WithValues(append([]*golang.GoModValue{marked}, d.Values[1:]...))
+		if marked := d.Values[0].WithMarkers(java.FoundSearchResult(d.Values[0].Markers, "found module")); marked != d.Values[0] {
+			d = d.WithValues(append([]*golang.GoModValue{marked}, d.Values[1:]...))
+		}
 	}
 	return d
 }

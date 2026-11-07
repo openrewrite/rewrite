@@ -17,6 +17,7 @@ import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {create, Draft} from "mutative";
 import {mapAsync, updateIfChanged} from "./util";
+import {registerHeavyweight} from "./heavyweight";
 
 type Objectish = Record<string, any> | Array<any>;
 
@@ -164,6 +165,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
         return updateIfChanged(before, { markers: newMarkers } as Partial<T>);
     }
 }
+
+registerHeavyweight(TreeVisitor);
 
 export function noopVisitor<T extends Tree, P>(): TreeVisitor<T, P> {
     return new class extends TreeVisitor<T, P> {

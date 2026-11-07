@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 export * from "./tree";
+export * from "./edit";
 export * from "./visitor";
 export * from "./assertions";
 export * from "./parser";

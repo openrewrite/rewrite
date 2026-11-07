@@ -20,17 +20,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.internal.RemoveStatementsVisitor;
 import org.openrewrite.gradle.internal.SpringBomProperty;
 import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -51,7 +48,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.*;
@@ -180,10 +176,9 @@ public class SyncGradleExtPropertiesWithBom extends ScanningRecipe<SyncGradleExt
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new RemoveStatementsVisitor<ExecutionContext>() {
             final ExtraProperty.Matcher matcher = new ExtraProperty.Matcher().matchVariableDeclarations(false);
             final LatestRelease versionComparator = new LatestRelease(null);
-            final Set<UUID> redundant = new HashSet<>();
             @Nullable
             Map<String, String> bomProperties;
 
@@ -274,7 +269,7 @@ public class SyncGradleExtPropertiesWithBom extends ScanningRecipe<SyncGradleExt
                         if (bomVersion != null) {
                             int cmp = versionComparator.compare(null, prop.getValue(), bomVersion);
                             if (remove && cmp <= 0 && !acc.reads.contains(prop.getName())) {
-                                redundant.add(statement.getId());
+                                remove(statement);
                                 return statement;
                             }
                             if (cmp < 0) {
@@ -286,101 +281,12 @@ public class SyncGradleExtPropertiesWithBom extends ScanningRecipe<SyncGradleExt
                         String bomVersion = name == null || acc.reads.contains(name) ? null : getBomProperties(ctx).get(name);
                         String value = bomVersion == null ? null : referencedValue(statement);
                         if (value != null && versionComparator.compare(null, value, bomVersion) <= 0) {
-                            redundant.add(statement.getId());
+                            remove(statement);
                             return statement;
                         }
                     }
                 }
                 return super.visitStatement(statement, ctx);
-            }
-
-            @Override
-            public @Nullable J postVisit(J tree, ExecutionContext ctx) {
-                if (tree instanceof J.Block) {
-                    J.Block block = (J.Block) tree;
-                    List<Statement> statements = block.getStatements();
-                    // A Kotlin script wraps its statements in a block, and what follows the last one is the end of the file
-                    boolean script = getCursor().getParentTreeCursor().getValue() instanceof JavaSourceFile;
-                    return block.withStatements(withoutRedundant(statements, script))
-                            .withEnd(script ? block.getEnd() : afterRedundant(statements, statements.size(), block.getEnd(), false));
-                }
-                if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) tree;
-                    // The statements as they were, since those of a Kotlin script have lost the redundant ones by now
-                    List<Statement> statements = SpringBomProperty.topLevelStatements(getCursor().getValue());
-                    if (cu instanceof G.CompilationUnit) {
-                        cu = ((G.CompilationUnit) cu).withStatements(withoutRedundant(((G.CompilationUnit) cu).getStatements(), true));
-                    }
-                    if (!statements.isEmpty() && isRedundant(statements.get(0))) {
-                        cu = SpringBomProperty.withTopLevelStatements(cu, ListUtils.mapFirst(SpringBomProperty.topLevelStatements(cu),
-                                first -> first.withPrefix(first.getPrefix().withWhitespace(""))));
-                    }
-                    return cu.withEof(afterRedundant(statements, statements.size(), cu.getEof(), true));
-                }
-                return tree;
-            }
-
-            private List<Statement> withoutRedundant(List<Statement> statements, boolean script) {
-                return ListUtils.map(statements, (i, statement) -> isRedundant(statement) ? null :
-                        statement.withPrefix(afterRedundant(statements, i, statement.getPrefix(), script)));
-            }
-
-            /**
-             * The space of what follows the statement before {@code index}. After a run of redundant overrides it
-             * loses the comment on the line of the last one, and takes what the first one's prefix holds that is
-             * not about the override: the comment on the line before it, and the comments a blank line sets apart.
-             */
-            private Space afterRedundant(List<Statement> statements, int index, Space space, boolean script) {
-                int first = index;
-                while (first > 0 && isRedundant(statements.get(first - 1))) {
-                    first--;
-                }
-                if (first == index) {
-                    return space;
-                }
-                Space after = withoutTrailingComment(space);
-                Space before = statements.get(first).getPrefix();
-                List<Comment> comments = before.getComments();
-                // Nothing precedes the first statement of a script, and what starts the file is its header
-                boolean header = script && first == 0;
-                int kept = header ? 0 : comments.size() - withoutTrailingComment(before).getComments().size();
-                for (int i = comments.size(); i > kept; i--) {
-                    if (blankLines(comments.get(i - 1).getSuffix()) > 0) {
-                        kept = i;
-                    }
-                }
-                if (header && kept == 0) {
-                    kept = comments.size();
-                }
-                if (kept == 0) {
-                    return after;
-                }
-                String suffix = comments.get(kept - 1).getSuffix();
-                String indent = after.getWhitespace().substring(after.getWhitespace().lastIndexOf('\n') + 1);
-                String separator = blankLines(suffix) > blankLines(after.getWhitespace()) ?
-                        suffix.substring(0, suffix.lastIndexOf('\n') + 1) + indent : after.getWhitespace();
-                return Space.build(before.getWhitespace(), ListUtils.concatAll(
-                        ListUtils.mapLast(comments.subList(0, kept), comment -> comment.withSuffix(separator)), after.getComments()));
-            }
-
-            private int blankLines(String whitespace) {
-                return Math.max(0, StringUtils.countOccurrences(whitespace, "\n") - 1);
-            }
-
-            private boolean isRedundant(Statement statement) {
-                // The last statement of a closure is its implicit return
-                Tree override = statement instanceof J.Return && ((J.Return) statement).getExpression() != null ?
-                        ((J.Return) statement).getExpression() : statement;
-                return redundant.contains(override.getId());
-            }
-
-            // A comment on the line of a removed override is held by whatever follows the override
-            private Space withoutTrailingComment(Space space) {
-                while (!space.getComments().isEmpty() && !space.getWhitespace().contains("\n")) {
-                    List<Comment> comments = space.getComments();
-                    space = space.withWhitespace(comments.get(0).getSuffix()).withComments(comments.subList(1, comments.size()));
-                }
-                return space;
             }
         });
     }

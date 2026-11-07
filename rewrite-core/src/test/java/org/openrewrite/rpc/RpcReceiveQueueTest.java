@@ -17,15 +17,26 @@ package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import io.moderne.jsonrpc.JsonRpcSuccess;
+import io.moderne.jsonrpc.RawJson;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.text.PlainText;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -177,6 +188,23 @@ class RpcReceiveQueueTest {
         assertThat(after.getCreationTime().getNano()).isEqualTo(123456789);
     }
 
+    @ParameterizedTest
+    @ValueSource(longs = {0, 42, Integer.MAX_VALUE, Integer.MAX_VALUE + 1L})
+    @Issue("https://github.com/openrewrite/rewrite/issues/9417")
+    void fileAttributeSizeRoundTripsThroughJson(long size) throws IOException {
+        FileAttributes before = new FileAttributes(null, null, null, true, true, false, 100);
+        FileAttributes after = before.withSize(size);
+
+        // A different baseline forces the size through the CHANGE path rather than NO_CHANGE.
+        sq.send(after, before, null);
+        replaceBatchesWithTheirJsonDecoding();
+        assertThat(rq.receive(before)).isEqualTo(after);
+
+        sq.send(after, null, null);
+        replaceBatchesWithTheirJsonDecoding();
+        assertThat(rq.<FileAttributes>receive(null)).isEqualTo(after);
+    }
+
     @Test
     void detectsMissingCodecOnReceiverSide() {
         // given
@@ -212,6 +240,16 @@ class RpcReceiveQueueTest {
         assertThat(received.getMarkers().get(0)).isNull();
         assertThat(received.findFirst(BuildTool.class)).hasValueSatisfying(bt ->
           assertThat(bt.getVersion()).isEqualTo("8.0"));
+    }
+
+    private void replaceBatchesWithTheirJsonDecoding() throws IOException {
+        JsonMessageFormatter formatter = new JsonMessageFormatter(new ParameterNamesModule());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        formatter.serialize(new JsonRpcSuccess(1, RawJson.of(
+          batches.stream().flatMap(List::stream).collect(toList()))), out);
+        batches.clear();
+        batches.addLast(((JsonRpcSuccess) formatter.deserialize(new ByteArrayInputStream(out.toByteArray())))
+          .getResult(GetObjectResponse.class));
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {

@@ -451,6 +451,20 @@ describe('class mapping', () => {
             `)
         ));
 
+    test('static block with control flow statements', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                class A {
+                    static {
+                        for (;;) a() ;
+                        if (x) b() ; else c() ;
+                        l: d() ;
+                    }
+                }
+            `)
+        ));
+
     test('class with SemicolonClassElement', () =>
         spec.rewriteRun(
             //@formatter:off

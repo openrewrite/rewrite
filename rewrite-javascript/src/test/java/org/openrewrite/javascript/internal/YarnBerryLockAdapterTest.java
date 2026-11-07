@@ -109,4 +109,28 @@ class YarnBerryLockAdapterTest {
                         () -> YarnBerryLockAdapter.toNpmV3("not: valid: yaml: content: here:"))
                 .isInstanceOf(RuntimeException.class);
     }
+
+    @Test
+    void resolvesDeclaredConstraintWhenOlderVersionIsListedFirst() {
+        // given
+        String yarn = """
+                __metadata:
+                  version: 6
+
+                "lodash@npm:^3.10.1":
+                  version: 3.10.1
+                  resolution: "lodash@npm:3.10.1"
+
+                "lodash@npm:^4.17.21":
+                  version: 4.17.21
+                  resolution: "lodash@npm:4.17.21"
+                """;
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(YarnBerryLockAdapter.toNpmV3(yarn));
+
+        // then
+        assertThat(result.resolve("lodash", "^4.17.21", "").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.resolve("lodash", "^3.10.1", "").getVersion()).isEqualTo("3.10.1");
+    }
 }

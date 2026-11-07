@@ -20,15 +20,19 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -58,6 +62,75 @@ class TabsAndIndentsTest implements RewriteTest {
               )
             )
           )));
+    }
+
+    @Test
+    void formatChangedControlWithOriginalLoopCursor() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop.Control visitForControl(J.ForLoop.Control control, ExecutionContext ctx) {
+                  J.VariableDeclarations declaration = (J.VariableDeclarations) control.getInit().getFirst();
+                  J.VariableDeclarations.NamedVariable variable = declaration.getVariables().getFirst();
+                  J.Literal initializer = (J.Literal) variable.getInitializer();
+                  if (Integer.valueOf(0).equals(initializer.getValue())) {
+                      declaration = declaration.withVariables(List.of(variable.withInitializer(
+                        initializer.withValue(1).withValueSource("1"))));
+                      control = control.withInit(List.of(declaration));
+                  }
+                  return (J.ForLoop.Control) new AutoFormatVisitor<ExecutionContext>()
+                    .visitNonNull(control, ctx, getCursor().getParentTreeCursor());
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 0;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(int end) {
+                      for (int i = 1;
+                           i < end; i++) System.out.print(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void formatMultilineForSubtree() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                  return autoFormat(forLoop, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j=handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void print(String handler, int maxNameLen) {
+                      for (int j = handler.length();
+                           j < maxNameLen; j++) System.out.print(" ");
+                  }
+              }
+              """
+          )
+        );
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
@@ -1071,7 +1144,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
+            .types(TypeValidation.none())
+            .build()),
           java(
             """
               import lombok.EqualsAndHashCode;

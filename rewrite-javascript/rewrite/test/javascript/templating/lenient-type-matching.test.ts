@@ -13,8 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {foundSearchResult} from "../../../src";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
+import {
+    capture,
+    JavaScriptVisitor,
+    npm,
+    packageJson,
+    pattern,
+    rewrite,
+    RewriteRule,
+    template,
+    tsx,
+    typescript
+} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
@@ -543,4 +555,224 @@ function greet(): string { return "hello"; }
             expect(namespaceImportDeclaringType).toBe('React');
         }, {unsafeCleanup: true});
     }, 60000);
+});
+
+describe('a type annotation the pattern spells out', () => {
+    const spec = new RecipeSpec();
+
+    /** Applies `rule` to every variable and function declaration. */
+    function recipeApplying(rule: RewriteRule) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitVariableDeclarations(variables: J.VariableDeclarations, p: any): Promise<J | undefined> {
+                const visited = await super.visitVariableDeclarations(variables, p) as J.VariableDeclarations;
+                return await rule.tryOn(this.cursor, visited) || visited;
+            }
+
+            override async visitMethodDeclaration(method: J.MethodDeclaration, p: any): Promise<J | undefined> {
+                const visited = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+                return await rule.tryOn(this.cursor, visited) || visited;
+            }
+        });
+    }
+
+    test('a variable annotated in the pattern matches only a variable annotated alike', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), value = capture('value');
+            return {
+                before: pattern`const ${name}: number = ${value}`,
+                after: template`let ${name}: number = ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const a: number = 1;
+                const b = 2;
+                const c: string = "s";
+                `,
+                `
+                let a: number = 1;
+                const b = 2;
+                const c: string = "s";
+                `
+            )
+        );
+    });
+
+    test('a variable the pattern leaves unannotated matches a variable with or without an annotation', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), value = capture('value');
+            return {
+                before: pattern`const ${name} = ${value}`,
+                after: template`let ${name} = ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const a: number = 1;
+                const b = 2;
+                `,
+                `
+                let a = 1;
+                let b = 2;
+                `
+            )
+        );
+    });
+
+    test('a return type annotated in the pattern matches only a function annotated alike', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), value = capture('value');
+            return {
+                before: pattern`function ${name}(): string { return ${value}; }`,
+                after: template`const ${name} = (): string => ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                function label(): string { return "s"; }
+                function count() { return 1; }
+                `,
+                `
+                const label = (): string => "s"
+                function count() { return 1; }
+                `
+            )
+        );
+    });
+
+    test('a parameter annotated in the pattern matches only a parameter annotated alike', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), param = capture('param'), value = capture('value');
+            return {
+                before: pattern`function ${name}(${param}: number) { return ${value}; }`,
+                after: template`const ${name} = (${param}: number) => ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                function half(n: number) { return n / 2; }
+                function third(n) { return n / 3; }
+                `,
+                `
+                const half = (n: number) => n / 2
+                function third(n) { return n / 3; }
+                `
+            )
+        );
+    });
+
+    test('a rule reading a type argument off the annotation leaves a declaration without one alone', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), P = capture('P'), props = capture('props'), body = capture('body');
+            return {
+                before: pattern`const ${name}: FC<${P}> = (${props}) => ${body}`
+                    .configure({context: [`import {FC} from "react"`]}),
+                after: template`const ${name} = (${props}: ${P}) => ${body}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import {FC} from "react";
+                const Greeting: FC<{ name: string }> = (props) => props.name;
+                const double = (n) => n * 2;
+                `,
+                `
+                import {FC} from "react";
+                const Greeting = (props: { name: string }) => props.name;
+                const double = (n) => n * 2;
+                `
+            )
+        );
+    });
+
+    test('strict matching does not let an unannotated pattern match an annotated variable', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), value = capture('value');
+            return {
+                before: pattern`const ${name} = ${value}`.configure({lenientTypeMatching: false}),
+                after: template`let ${name} = ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const a: number = 1;
+                const b = 2;
+                `,
+                `
+                const a: number = 1;
+                let b = 2;
+                `
+            )
+        );
+    });
+
+    test('strict matching does not let an annotated pattern match an unannotated variable', () => {
+        spec.recipe = recipeApplying(rewrite(() => {
+            const name = capture('name'), value = capture('value');
+            return {
+                before: pattern`const ${name}: number = ${value}`.configure({lenientTypeMatching: false}),
+                after: template`let ${name}: number = ${value}`
+            };
+        }));
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const a: number = 1;
+                const b = 2;
+                `,
+                `
+                let a: number = 1;
+                const b = 2;
+                `
+            )
+        );
+    });
+
+    test('a repeated capture matches whichever occurrence has the annotation', () => {
+        const x = capture('x');
+        const pat = pattern`f(${x}, ${x})`.configure({lenientTypeMatching: true});
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(invocation: J.MethodInvocation): Promise<J | undefined> {
+                return await pat.match(invocation, this.cursor) ? foundSearchResult(invocation) : invocation;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                f((n: number) => n, (n) => n);
+                f((n) => n, (n: number) => n);
+                f(function (): number { return 1; }, function () { return 1; });
+                f(function () { return 1; }, function (): number { return 1; });
+                `,
+                `
+                /*~~>*/f((n: number) => n, (n) => n);
+                /*~~>*/f((n) => n, (n: number) => n);
+                /*~~>*/f(function (): number { return 1; }, function () { return 1; });
+                /*~~>*/f(function () { return 1; }, function (): number { return 1; });
+                `
+            )
+        );
+    });
 });

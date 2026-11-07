@@ -864,7 +864,11 @@ public class ImportLayoutStyle implements JavaStyle {
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
         if (anImport.getElement().isStatic()) {
-            return typeName;
+            // Group by the owner of the imported member, not the imported type itself.
+            // Modifier.Keyword and Modifier.Keyword.* import from different owners.
+            Expression owner = anImport.getElement().getQualid().getTarget();
+            JavaType.FullyQualified ownerType = TypeUtils.asFullyQualified(owner.getType());
+            return ownerType == null ? owner.printTrimmed(new JavaPrinter<>()) : ownerType.getFullyQualifiedName();
         } else {
             if (typeName.contains("$")) {
                 return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');

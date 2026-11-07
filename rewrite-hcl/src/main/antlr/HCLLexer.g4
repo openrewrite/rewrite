@@ -76,8 +76,8 @@ fragment Letter
 
 fragment EscapeSequence
     : '\\' [nrt"\\]
-    | '\\' HexDigit HexDigit HexDigit HexDigit
-    | '\\' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
+    | '\\' 'u' HexDigit HexDigit HexDigit HexDigit
+    | '\\' 'U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
     ;
 
 fragment HexDigit

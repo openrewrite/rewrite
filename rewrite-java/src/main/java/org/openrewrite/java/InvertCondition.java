@@ -53,6 +53,17 @@ public class InvertCondition extends JavaVisitor<ExecutionContext> {
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         switch (binary.getOperator()) {
             case LessThan:
+            case GreaterThan:
+            case LessThanOrEqual:
+            case GreaterThanOrEqual:
+                // Ordered floating-point comparisons are not complementary when either operand is NaN.
+                if (!isKnownIntegral(binary.getLeft().getType()) || !isKnownIntegral(binary.getRight().getType())) {
+                    return negate(binary);
+                }
+                break;
+        }
+        switch (binary.getOperator()) {
+            case LessThan:
                 return binary.withOperator(J.Binary.Type.GreaterThanOrEqual);
             case GreaterThan:
                 return binary.withOperator(J.Binary.Type.LessThanOrEqual);
@@ -66,6 +77,21 @@ public class InvertCondition extends JavaVisitor<ExecutionContext> {
                 return binary.withOperator(J.Binary.Type.Equal);
         }
 
+        return negate(binary);
+    }
+
+    private static boolean isKnownIntegral(@Nullable JavaType type) {
+        return type == JavaType.Primitive.Byte || type == JavaType.Primitive.Short ||
+               type == JavaType.Primitive.Int || type == JavaType.Primitive.Long ||
+               type == JavaType.Primitive.Char ||
+               TypeUtils.isOfClassType(type, "java.lang.Byte") ||
+               TypeUtils.isOfClassType(type, "java.lang.Short") ||
+               TypeUtils.isOfClassType(type, "java.lang.Integer") ||
+               TypeUtils.isOfClassType(type, "java.lang.Long") ||
+               TypeUtils.isOfClassType(type, "java.lang.Character");
+    }
+
+    private static J.Unary negate(J.Binary binary) {
         return new J.Unary(
                 randomId(),
                 binary.getPrefix(),

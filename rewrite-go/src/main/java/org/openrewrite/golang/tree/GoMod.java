@@ -112,7 +112,7 @@ public class GoMod implements SourceFile, GoModTree {
     /**
      * One line of tokens, e.g. {@code module example.com/foo}, {@code go 1.21}, or a
      * single-line {@code require example.com/x v1.2.3}. Used for block entry lines too,
-     * in which case {@link #getKeyword()} is empty.
+     * in which case {@link #keyword} is empty.
      */
     @lombok.Value
     @With

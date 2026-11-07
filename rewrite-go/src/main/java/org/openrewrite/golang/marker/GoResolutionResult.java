@@ -21,6 +21,7 @@ import lombok.ToString;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -49,7 +50,7 @@ import static java.util.Collections.emptyList;
  */
 @Value
 @With
-public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> {
+public class GoResolutionResult implements Marker, Heavyweight, RpcCodec<GoResolutionResult> {
     UUID id;
 
     /**

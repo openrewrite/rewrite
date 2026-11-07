@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {json} from "../../src/json";
+import {json, Json} from "../../src/json";
 
 describe('JSON parsing', () => {
     const spec = new RecipeSpec();
@@ -255,6 +255,23 @@ describe('JSON parsing', () => {
 }`
         )
     ));
+
+    test.each([
+        ['lone high mid-string', 'a\\ud800b', 'a\\ud800b'],
+        ['lone high at end', 'a\\ud800', 'a\\ud800'],
+        ['lone low', '\\udfaa', '\\udfaa'],
+        ['two highs in a row', '\\ud83d\\ud83d\\ude00', '\\ud83d😀'],
+        ['reversed pair', '\\ude00\\ud83d', '\\ude00\\ud83d'],
+        ['upper case hex', '\\uD800', '\\ud800'],
+        ['valid pair', '\\ud83d\\ude00', '😀'],
+    ])('keeps an unpaired surrogate as its escape and joins a pair: %s', (_, escapes, decoded) => spec.rewriteRun({
+        ...json(`{"${escapes}": "${escapes}"}`),
+        afterRecipe: doc => {
+            const member = (doc.value as Json.Object).members[0].element as Json.Member;
+            expect((member.key.element as Json.Literal).value).toBe(decoded);
+            expect((member.value as Json.Literal).value).toBe(decoded);
+        }
+    }));
 
     test('parses multiline comment with URL', () => spec.rewriteRun(
         json(

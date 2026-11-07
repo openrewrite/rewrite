@@ -21,6 +21,8 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.test.RewriteTest;
 
@@ -32,6 +34,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -402,4 +406,21 @@ class KotlinParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void cloneDoesNotShareStylesWithOriginal() {
+        // given
+        KotlinParser.Builder original = KotlinParser.builder();
+        NamedStyles styles = new NamedStyles(Tree.randomId(), "test", "test", "test", emptySet(), emptyList());
+
+        // when
+        KotlinParser.Builder clone = original.clone().styles(singletonList(styles));
+
+        // then
+        assertThat(parse(clone, "class A").getMarkers().findFirst(NamedStyles.class)).contains(styles);
+        assertThat(parse(original, "class B").getMarkers().findFirst(NamedStyles.class)).isEmpty();
+    }
+
+    private static SourceFile parse(KotlinParser.Builder builder, String source) {
+        return builder.build().parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow();
+    }
 }

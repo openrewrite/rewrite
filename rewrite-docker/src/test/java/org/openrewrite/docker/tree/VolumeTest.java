@@ -137,4 +137,16 @@ class VolumeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void jsonFormWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              VOLUME ["/a" , "/b"	, "/c"]
+              """
+          )
+        );
+    }
 }

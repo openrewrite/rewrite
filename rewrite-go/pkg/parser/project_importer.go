@@ -465,10 +465,13 @@ func readGoFilesIn(dir string) ([]projectFile, error) {
 	return out, nil
 }
 
+// parsePackage checks declarations only. Its callers read a package's declared API
+// alone, and no function body changes that API. GoParser checks the files under
+// parse in full.
 func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (*types.Package, error) {
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
-		a, err := parser.ParseFile(p.fset, f.path, f.content, parser.ParseComments)
+		a, err := parser.ParseFile(p.fset, f.path, f.content, parser.SkipObjectResolution)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f.path, err)
 		}
@@ -479,11 +482,8 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 		Importer: p,
 		// Type errors in sibling code shouldn't break the caller's parse —
 		// we still want partial type info.
-		Error: func(error) {},
-	}
-	info := &types.Info{
-		Defs: make(map[*ast.Ident]types.Object),
-		Uses: make(map[*ast.Ident]types.Object),
+		Error:            func(error) {},
+		IgnoreFuncBodies: true,
 	}
 	// The package's Path() — here the full import path, e.g. "github.com/x/y"
 	// — MUST be the full import path, not just the package name, because
@@ -509,6 +509,6 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 	p.cache[importPath] = pkg
 	p.checking = append(p.checking, importPath)
 	defer func() { p.checking = p.checking[:len(p.checking)-1] }()
-	_ = types.NewChecker(&conf, p.fset, pkg, info).Files(asts)
+	_ = types.NewChecker(&conf, p.fset, pkg, &types.Info{}).Files(asts)
 	return pkg, nil
 }

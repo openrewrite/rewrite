@@ -40,6 +40,7 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.internal.EngineInstall;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -50,8 +51,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -272,19 +271,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<CSharpRewriteRpc> {
-        private static final String TOOL_COMMAND = "rewrite-csharp";
+        static final String TOOL_COMMAND = "rewrite-csharp";
         private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
-
-        /**
-         * Serializes tool installs within this JVM. {@code RewriteRpcProcessManager}
-         * holds one RPC per thread, so several threads can each trigger an install of
-         * the same version at once. A {@link FileLock} alone is per-JVM (a second
-         * channel lock from the same JVM throws {@code OverlappingFileLockException}
-         * rather than blocking), so cross-thread serialization needs this monitor in
-         * addition to the cross-process file lock.
-         */
-        private static final Object INSTALL_LOCK = new Object();
-
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = new ArrayList<>();
@@ -386,7 +374,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Set the working directory for the dotnet process.
+         * Set the working directory for the dotnet process. Ignored when the server entry is a
+         * {@code .csproj}: {@code dotnet run} resolves the SDK from its working directory, so it
+         * runs from the project's directory to avoid the SDK pin in the target repository's
+         * {@code global.json}.
          *
          * @param workingDirectory The working directory for the dotnet process
          * @return This builder
@@ -473,10 +464,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
-            return startProcess(cmd, dotnetPath);
+            return startProcess(cmd, dotnetPath, processWorkingDirectory(serverEntry, workingDirectory));
         }
 
-        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
+        static @Nullable Path processWorkingDirectory(@Nullable Path serverEntry, @Nullable Path workingDirectory) {
+            return serverEntry != null && serverEntry.toString().endsWith(".csproj") ?
+                    serverEntry.toAbsolutePath().normalize().getParent() :
+                    workingDirectory;
+        }
+
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath, @Nullable Path processWorkingDirectory) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             Map<String, String> env = new LinkedHashMap<>(environment);
 
@@ -508,7 +505,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             RewriteRpcProcess process = RewriteRpcProcess.forLanguage("csharp")
                     .command(cmdArr)
-                    .workingDirectory(workingDirectory)
+                    .workingDirectory(processWorkingDirectory)
                     .stderrRedirect(log)
                     .environment(env)
                     .build();
@@ -594,16 +591,12 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * Uses {@code dotnet tool install --tool-path} which handles authentication
          * correctly. The tool-path is version-specific so multiple versions can coexist;
          * concurrent installs of the <em>same</em> version (parallel Gradle test forks
-         * hitting a fresh daily snapshot) are serialized by {@link #installToolPath}.
+         * hitting a fresh daily snapshot) are made once, by {@link #installTool}.
          */
         private Stream<@Nullable String> buildToolPathCommand(Path dotnetPath, String version) {
-            Path toolPath = Paths.get(System.getProperty("user.home"),
-                    ".dotnet", "rewrite-tools", version);
-            Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
-
-            if (!Files.isRegularFile(toolExecutable)) {
-                installTool(dotnetPath, version, toolPath, toolExecutable);
-            }
+            Path toolsDir = Paths.get(System.getProperty("user.home"), ".dotnet", "rewrite-tools");
+            Path toolExecutable = installTool(toolsDir, version,
+                    toolPath -> runDotnetInstall(dotnetPath, version, toolPath)).resolve(TOOL_COMMAND);
 
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
@@ -614,38 +607,24 @@ public class CSharpRewriteRpc extends RewriteRpc {
             );
         }
 
-        private void installTool(Path dotnetPath, String version, Path toolPath, Path toolExecutable) {
-            installToolPath(toolPath.getParent(), version, toolExecutable,
-                    () -> runDotnetInstall(dotnetPath, version, toolPath));
-        }
-
         /**
-         * Runs {@code install} at most once for {@code toolExecutable}, serialized
-         * against other threads in this JVM and other processes on this host.
-         * {@code dotnet tool install} is not safe to run concurrently into a single
-         * {@code --tool-path}: racing installs of the same not-yet-cached version fail
-         * with "Directory not empty". Gradle runs test forks in parallel (one JVM per
-         * core), each lazily triggering an install of the same daily snapshot, so the
-         * install is guarded by an exclusive lock on a {@code <version>.lock} file in
-         * the shared tools directory. The executable presence is re-checked under the
-         * lock so a winner's install is reused rather than repeated.
+         * The tool-path {@code <toolsDir>/<version>}, with the tool installed in it by {@code install} unless it already
+         * was. {@code dotnet tool install} is not safe to run concurrently into a single {@code --tool-path}: racing
+         * installs of the same not-yet-cached version fail with "Directory not empty". Gradle runs test forks in
+         * parallel (one JVM per core), each lazily triggering an install of the same daily snapshot, so the install is
+         * made once ({@link EngineInstall}): into a private directory that is moved into place once the tool is in it,
+         * while the other threads and processes wait on a lock beside it and then use it. A tool-path that a crashed
+         * install left without its completion marker is installed again rather than run. The tool's shim names its
+         * entry point relative to itself, so the tool runs from where it is moved.
          */
-        static void installToolPath(Path toolsDir, String version, Path toolExecutable, Runnable install) {
-            synchronized (INSTALL_LOCK) {
-                try {
-                    Files.createDirectories(toolsDir);
-                    Path lockFile = toolsDir.resolve(version + ".lock");
-                    try (FileChannel channel = FileChannel.open(lockFile,
-                            StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-                         FileLock ignored = channel.lock()) {
-                        if (!Files.isRegularFile(toolExecutable)) {
-                            install.run();
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID + "@" + version, e);
+        static Path installTool(Path toolsDir, String version, EngineInstall.Installer install) {
+            return EngineInstall.ensureInstalled(toolsDir.resolve(version), version, toolPath -> {
+                install.install(toolPath);
+                if (!Files.isRegularFile(toolPath.resolve(TOOL_COMMAND))) {
+                    throw new IllegalStateException("Installing " + NUGET_PACKAGE_ID + "@" + version + " left no " +
+                                                    TOOL_COMMAND + " in " + toolPath);
                 }
-            }
+            });
         }
 
         private void runDotnetInstall(Path dotnetPath, String version, Path toolPath) {

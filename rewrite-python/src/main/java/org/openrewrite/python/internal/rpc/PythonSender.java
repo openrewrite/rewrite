@@ -24,6 +24,7 @@ import org.openrewrite.python.tree.Py;
 import org.openrewrite.python.tree.PyComment;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -52,7 +53,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
             // and the receiver skips them anyway.
             return j;
         }
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.getAndSend(j, j2 -> spaceRef(j2.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
@@ -67,7 +68,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
         q.getAndSend(cu, Py.CompilationUnit::getFileAttributes);
         q.getAndSendList(cu, c -> c.getPadding().getImports(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Py.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, c -> spaceRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
 
         return cu;
     }
@@ -95,7 +96,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     public J visitBinary(Py.Binary binary, RpcSendQueue q) {
         q.getAndSend(binary, Py.Binary::getLeft, el -> visit(el, q));
         q.getAndSend(binary, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));
-        q.getAndSend(binary, Py.Binary::getNegation, space -> visitSpace(space, q));
+        q.getAndSend(binary, b -> spaceRef(b.getNegation()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(binary, Py.Binary::getRight, el -> visit(el, q));
         q.getAndSend(binary, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return binary;
@@ -215,7 +216,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
         q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getKind);
         q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getResult, el -> visit(el, q));
         q.getAndSendList(comprehensionExpression, Py.ComprehensionExpression::getClauses, Tree::getId, el -> visit(el, q));
-        q.getAndSend(comprehensionExpression, Py.ComprehensionExpression::getSuffix, space -> visitSpace(space, q));
+        q.getAndSend(comprehensionExpression, c -> spaceRef(c.getSuffix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(comprehensionExpression, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return comprehensionExpression;
     }

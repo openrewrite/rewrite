@@ -40,6 +40,19 @@ def test_renames_a_call():
 
 `python(before, after)` asserts a change; `python(before)` asserts no change.
 
+`data_table` asserts on the rows a recipe writes to a data table, given either
+the `DataTable` or its name. The run fails when the recipe writes no rows to it:
+
+```python
+def test_reports_deprecated_usages():
+    def expect_usages(rows):
+        assert rows == [DeprecatedUsage(source_path="a.py", symbol="foo")]
+
+    spec = RecipeSpec(recipe=FindDeprecatedUsages()).data_table(
+        FindDeprecatedUsages.table, expect_usages)
+    spec.rewrite_run(python("foo()", "/*~~>*/foo()", path=Path("a.py")))
+```
+
 ## Writing a recipe
 
 A recipe is a `@dataclass` subclassing `Recipe` that returns a visitor from

@@ -27,6 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.Style;
 import org.openrewrite.template.SourceTemplate;
 
+import javax.annotation.CheckReturnValue;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -44,11 +45,13 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         this.templateParser = new HclTemplateParser(onAfterVariableSubstitution, onBeforeParseTemplate);
     }
 
+    @CheckReturnValue
     public static <H extends Hcl> H apply(String template, Cursor scope, HclCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }
 
     @Override
+    @CheckReturnValue
     public <H extends Hcl> H apply(Cursor scope, HclCoordinates coordinates, Object... parameters) {
         if (!(scope.getValue() instanceof Hcl)) {
             throw new IllegalArgumentException("`scope` must point to a Hcl instance.");

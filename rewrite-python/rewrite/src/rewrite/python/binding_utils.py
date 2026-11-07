@@ -200,12 +200,11 @@ def _is_target(parent: Optional[J], node: J) -> bool:
         return any(variable is node for variable in parent.variables)
     if isinstance(parent, ForEachLoop.Control):
         return parent.variable is node
-    if isinstance(parent, ComprehensionExpression):
-        # A clause holds its target directly, so the comprehension is the node above the name.
-        return any(clause.iterator_variable is node for clause in parent.clauses)
+    if isinstance(parent, ComprehensionExpression.Clause):
+        return parent.iterator_variable is node
     if isinstance(parent, Case):
         return any(capture is node for label in parent.case_labels for capture in captures(label))
-    # A pattern nested in another holds its own cursor, so the case above it is out of reach.
+    # A pattern holds its own cursor, so the case above it is out of reach.
     return (isinstance(parent, (MatchCase, MatchCase.Pattern))
             and any(capture is node for capture in captures(parent)))
 

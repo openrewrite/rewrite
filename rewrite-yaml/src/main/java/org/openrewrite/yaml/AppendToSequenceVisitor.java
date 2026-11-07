@@ -127,22 +127,49 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
 
     private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {
         // Try to parse the value as YAML to detect if it's a complex structure (mapping/sequence)
-        return YamlParser.builder()
-                .build()
-                .parse(value)
-                .findFirst()
-                .filter(Yaml.Documents.class::isInstance)
-                .map(Yaml.Documents.class::cast)
-                .map(docs -> docs.getDocuments().get(0).getBlock())
-                .<Yaml.Block>flatMap(block -> {
-                    if (block instanceof Yaml.Mapping) {
-                        // Calculate the base indentation for the new item
-                        String baseIndent = StringUtils.indent(entryPrefix.replace("\n", ""));
-                        return Optional.of(adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent));
-                    }
-                    return Optional.empty();
-                })
-                .orElseGet(() -> new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value));
+        for (String yaml : new String[]{value, alignLaterLines(value)}) {
+            Optional<Yaml.Block> mapping = YamlParser.builder()
+                    .build()
+                    .parse(yaml)
+                    .findFirst()
+                    .filter(Yaml.Documents.class::isInstance)
+                    .map(Yaml.Documents.class::cast)
+                    .map(docs -> docs.getDocuments().get(0).getBlock())
+                    .flatMap(block -> {
+                        if (block instanceof Yaml.Mapping) {
+                            // Calculate the base indentation for the new item
+                            String baseIndent = StringUtils.indent(entryPrefix.replace("\n", ""));
+                            return Optional.of(adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent));
+                        }
+                        return Optional.empty();
+                    });
+            if (mapping.isPresent()) {
+                return mapping.get();
+            }
+        }
+        return new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
+    }
+
+    /**
+     * The value with its lines after the first moved left until the least indented of them lines up with the first,
+     * as when a mapping written in one string indents its later lines for where it will go.
+     */
+    private static String alignLaterLines(String value) {
+        String[] lines = value.split("\n", -1);
+        int least = Integer.MAX_VALUE;
+        for (int i = 1; i < lines.length; i++) {
+            if (!lines[i].trim().isEmpty()) {
+                least = Math.min(least, StringUtils.indexOfNonWhitespace(lines[i]));
+            }
+        }
+        if (least == Integer.MAX_VALUE || least == 0) {
+            return value;
+        }
+        StringBuilder aligned = new StringBuilder(lines[0]);
+        for (int i = 1; i < lines.length; i++) {
+            aligned.append('\n').append(lines[i].length() >= least ? lines[i].substring(least) : lines[i].trim());
+        }
+        return aligned.toString();
     }
 
     /**

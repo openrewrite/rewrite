@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,10 +35,19 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Un
 from ..java import JavaType
 
 
+_BOM = '\ufeff'
+
+# Python ends a line at \r\n, \r or \n only, where str.splitlines also breaks at \f, \v and others.
+_LINE = re.compile(r'[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+')
+
+
 def compute_source_line_data(
         source: str,
 ) -> Tuple[List[str], List[int], Optional[Dict[int, List[int]]]]:
     """Split source into lines and compute byte offsets and byte-to-char mappings in one pass.
+
+    A leading byte order mark is no part of the first line, but its bytes count in every offset,
+    as they do in ty's.
 
     Returns:
         source_lines: Lines with line endings stripped.
@@ -45,10 +55,13 @@ def compute_source_line_data(
         byte_to_char: Per-line byte-offset → char-offset mapping for non-ASCII lines only,
                       or None when the source is pure ASCII.
     """
+    bom = source.startswith(_BOM)
+    if bom:
+        source = source[1:]
     is_ascii = source.isascii()
-    lines_with_endings = source.splitlines(True)
+    lines_with_endings = _LINE.findall(source)
     source_lines: List[str] = []
-    offsets: List[int] = [0]
+    offsets: List[int] = [len(_BOM.encode('utf-8')) if bom else 0]
     byte_to_char: Dict[int, List[int]] = {}
 
     for lineno, line in enumerate(lines_with_endings, start=1):
@@ -87,7 +100,6 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'bool': JavaType.Primitive.Boolean,
     'None': JavaType.Primitive.Null,
     'NoneType': JavaType.Primitive.Null,
-    'bytes': JavaType.Primitive.String,  # Close enough for matching
     'LiteralString': JavaType.Primitive.String,
 }
 
@@ -103,6 +115,16 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
+
+# The kind ty gives a declaration statement's own binding.
+# A decorator binds its result instead, which can come from any module.
+_DECLARED_KINDS = {'StmtClassDef': 'classLiteral', 'StmtFunctionDef': 'function', 'StmtAsyncFunctionDef': 'function'}
+
+
+def _is_module_function(descriptor: Dict[str, Any]) -> bool:
+    """Whether ty describes a function declared outside any class, at module level or nested."""
+    return descriptor.get('kind') == 'function' and 'declaringClassId' not in descriptor
+
 
 # `os.path` binds whichever of these the running platform provides, so a symbol
 # defined in one has no portable defining name. `os.path` names the same module
@@ -295,6 +317,25 @@ class SessionTypeCache:
         self.by_fqn.clear()
 
 
+class _WithFallback(dict):
+    """A file's own entries, falling back on lookup to a table the ty session keeps.
+
+    The session's tables grow with every file, so copying them into each file's
+    made a parse or an exported-types enumeration quadratic in its file count.
+    Only ``get`` falls back; iteration and ``in`` see the file's own entries.
+    """
+
+    __slots__ = ('_fallback',)
+
+    def __init__(self, fallback: Dict[Any, Any]):
+        super().__init__()
+        self._fallback = fallback
+
+    def get(self, key, default=None):
+        value = dict.get(self, key)
+        return value if value is not None else self._fallback.get(key, default)
+
+
 class PythonTypeMapping:
     """Maps Python types to JavaType for recipe matching.
 
@@ -325,7 +366,7 @@ class PythonTypeMapping:
                          together with line_byte_offsets, avoids re-splitting source.
             line_byte_offsets: Pre-computed cumulative byte offsets per line.
         """
-        self._source = source
+        self._source = source.removeprefix(_BOM)
         self._file_path = file_path
         self._temp_file: Optional[Path] = None
 
@@ -337,12 +378,13 @@ class PythonTypeMapping:
         else:
             self._source_lines, self._line_byte_offsets, _ = compute_source_line_data(source)
 
-        # Caches for byte offset and type ID lookups
-        self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
+        # Cache for type ID lookups
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
-        # Lazily populated by _module_ast / _import_bindings
+        # Lazily populated by _module_ast / _import_bindings / _source_module_name
         self._module_ast_parsed = False
+        self._source_module_searched = False
+        self._source_module: Optional[str] = None
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
@@ -372,11 +414,15 @@ class PythonTypeMapping:
         # the same ty ``--serve`` session. ty deduplicates descriptors across a
         # session, so a type first seen in an earlier file is omitted from later
         # files' responses; this table restores those descriptors as a fallback
-        # (see TyTypesClient.session_types and _build_index back-fill).
+        # (see TyTypesClient.session_types).
         self._session_types: Dict[int, Dict[str, Any]] = (
             ty_client.session_types if ty_client is not None
             and hasattr(ty_client, 'session_types') else {}
         )
+        session_class_literals = getattr(ty_client, 'session_class_literals', None)
+        self._type_registry = _WithFallback(self._session_types)
+        self._class_literal_index = _WithFallback(
+            session_class_literals if session_class_literals is not None else {})
 
         # Fetch all types in one batch call
         if ty_client is not None:
@@ -436,22 +482,11 @@ class PythonTypeMapping:
                 return None
 
     def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
-        """Convert AST (lineno, col_offset) to an absolute byte offset.
+        """Convert AST (lineno, col_offset) to the absolute byte offset ty-types uses.
 
-        Python's ast uses 1-based lineno and 0-based character col_offset (Python 3.8+).
-        ty-types uses absolute byte offsets (ruff convention).
-        Results are cached since the same position is often queried multiple times.
+        Python's ast counts lines from 1, and columns in UTF-8 bytes from 0.
         """
-        key = (lineno, col_offset)
-        cached = self._byte_offset_cache.get(key)
-        if cached is not None:
-            return cached
-        line_start = self._line_byte_offsets[lineno - 1]
-        line_text = self._source_lines[lineno - 1] if lineno <= len(self._source_lines) else ""
-        byte_col = len(line_text[:col_offset].encode('utf-8'))
-        result = line_start + byte_col
-        self._byte_offset_cache[key] = result
-        return result
+        return self._line_byte_offsets[lineno - 1] + col_offset
 
     def _build_index(self, result: Dict[str, Any]) -> None:
         """Build the byte-offset lookup index from a getTypes response."""
@@ -475,7 +510,10 @@ class PythonTypeMapping:
             if binding is not None:
                 self._binding_index[(node['start'], node['end'])] = binding
 
-        # Merge types into registry (keys are strings in JSON)
+        # Merge types into registry (keys are strings in JSON). Descriptors this
+        # file's response omitted because ty's shared --serve session already
+        # emitted them for an earlier file resolve through the registry's fallback
+        # to the session table; this file's own take precedence.
         for type_id_str, descriptor in result.get('types', {}).items():
             tid = int(type_id_str)
             self._type_registry[tid] = descriptor
@@ -484,19 +522,6 @@ class PythonTypeMapping:
                 cn = descriptor.get('className', '')
                 if cn:
                     self._class_literal_index[cn] = tid
-
-        # Back-fill descriptors that this file's response omitted because ty's
-        # shared --serve session already emitted them for an earlier file. The
-        # session table is keyed by ty's session-stable ids, so a referenced id
-        # absent from this file's registry resolves through the cumulative table.
-        # File-local descriptors take precedence (setdefault) — they are the
-        # authoritative, full descriptors for types this file is the first to see.
-        for tid, descriptor in self._session_types.items():
-            if self._type_registry.setdefault(tid, descriptor) is descriptor and \
-                    descriptor.get('kind') == 'classLiteral':
-                cn = descriptor.get('className', '')
-                if cn:
-                    self._class_literal_index.setdefault(cn, tid)
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset.
@@ -713,20 +738,23 @@ class PythonTypeMapping:
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
             # elements from `tuple` without being generic, so only `tuple` takes them.
+            # A homogeneous (`T, ...`) element is an array of `T`, as a Java varargs
+            # parameter is, which keeps `tuple[int, ...]` apart from `tuple[int]`.
             tuple_elements = (descriptor.get('tupleElements')
                               if class_name == 'tuple' and module_name == 'builtins'
                               else None)
             if isinstance(tuple_elements, list):
-                arg_ids = [element.get('typeId') for element in tuple_elements
-                           if isinstance(element, dict)]
+                args = [(element.get('typeId'), element.get('kind') == 'homogeneous')
+                        for element in tuple_elements if isinstance(element, dict)]
             else:
-                arg_ids = descriptor.get('typeArgs') or []
+                args = [(arg_id, False) for arg_id in descriptor.get('typeArgs') or []]
 
-            resolved_args = []
-            for arg_id in arg_ids:
+            resolved_args: List[JavaType] = []
+            for arg_id, homogeneous in args:
                 arg_type = self._resolve_type(arg_id) if arg_id is not None else None
                 if arg_type is not None:
-                    resolved_args.append(arg_type)
+                    resolved_args.append(JavaType.Array(_elem_type=arg_type)
+                                         if homogeneous else arg_type)
             if resolved_args:
                 param = JavaType.Parameterized()
                 param._type = base_class
@@ -745,23 +773,16 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'bytesLiteral':
-            return JavaType.Primitive.String
+            return self._class_reference({'className': 'bytes', 'moduleName': 'builtins'})
 
         elif kind == 'union':
-            # Resolve all non-None members into a Union type.
-            # For Optional[X] (= X | None) with a single real member, unwrap to just X.
+            # `None` is a member like any other, so a recipe can tell `X | None` from `X`.
             resolved_bounds = []
             for member_id in descriptor.get('members', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    member_kind = member.get('kind')
-                    # Skip None/NoneType members
-                    if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
-                        continue
-                    resolved = self._resolve_type(member_id)
-                    if resolved is not None:
-                        resolved_bounds.append(resolved)
-            if not resolved_bounds:
+                resolved = self._resolve_type(member_id)
+                if resolved is not None:
+                    resolved_bounds.append(resolved)
+            if all(b is JavaType.Primitive.Null for b in resolved_bounds):
                 return _UNKNOWN
             if len(resolved_bounds) == 1:
                 return resolved_bounds[0]
@@ -1055,6 +1076,80 @@ class PythonTypeMapping:
 
         return None
 
+    def declared_class_type(self, node: ast.ClassDef, decorators: Sequence[ast.expr],
+                            enclosing_scopes: Sequence[ast.ClassDef | ast.FunctionDef |
+                                                       ast.AsyncFunctionDef]) -> Optional[JavaType.Class]:
+        """The class constructed by ``node``, distinct from the value its decorators bind."""
+        type_id = self._lookup_type_id(node)
+        if type_id is None:
+            return None
+
+        module_name = self._source_module_name()
+        class_path = '.'.join(
+            scope.name if isinstance(scope, ast.ClassDef) else f"<locals of function '{scope.name}'>"
+            for scope in enclosing_scopes
+        )
+        fqn = f"{module_name}.{class_path}" if module_name else class_path
+        reported = self._resolve_type(type_id)
+        candidates = reported.bounds if isinstance(reported, JavaType.Union) else [reported]
+        declared = next((
+            candidate for candidate in candidates
+            if isinstance(candidate, JavaType.Class) and candidate.fully_qualified_name == fqn
+        ), None)
+        if declared is None:
+            declared = self._class_of_methods(node)
+        if declared is None:
+            cache_key = fqn if module_name else f"{self._file_path}#{class_path}"
+            declared = self._create_class_type(fqn, shallow=False, cache_key=cache_key)
+            if declared.supertype is None:
+                bases = [base_type for base_type in map(self.type, node.bases)
+                         if isinstance(base_type, JavaType.FullyQualified)
+                         and not isinstance(base_type, JavaType.Unknown)]
+                if bases:
+                    declared._supertype = bases[0]
+                    declared._interfaces = bases[1:] or None
+
+        annotations = []
+        for decorator in decorators:
+            decorator_type = self.decorator_type(decorator)
+            if isinstance(decorator_type, JavaType.FullyQualified):
+                annotations.append(JavaType.Annotation(_type=decorator_type))
+        declared._annotations = annotations or None
+        return declared
+
+    def _class_of_methods(self, node: ast.ClassDef) -> Optional[JavaType.Class]:
+        """The class ty declares the methods of ``node``'s body on.
+        ty sends a class's own type only where something else refers to it, as a method does."""
+        for statement in node.body:
+            if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            type_id = self._lookup_type_id(statement)
+            descriptor = self._type_registry.get(type_id) if type_id is not None else None
+            declaring_id = descriptor.get('declaringClassId') if descriptor else None
+            if declaring_id is not None:
+                declaring = self._resolve_type(declaring_id)
+                if isinstance(declaring, JavaType.Class):
+                    return declaring
+        return None
+
+    def _source_module_name(self) -> Optional[str]:
+        """The module that owns declarations in this source, when ty exposes one."""
+        if self._source_module_searched:
+            return self._source_module
+        self._source_module_searched = True
+        for type_id, node_kind in self._node_index.values():
+            declared_kind = _DECLARED_KINDS.get(node_kind)
+            if declared_kind is None:
+                continue
+            descriptor = self._type_registry.get(type_id)
+            if descriptor is None or descriptor.get('kind') != declared_kind:
+                continue
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                self._source_module = _ALIASED_MODULES.get(module_name, module_name)
+                break
+        return self._source_module
+
     def is_field_specifier_call(self, node: ast.expr) -> bool:
         """Whether ty typed ``node`` as a dataclass field-specifier call, which it
         models as its ``dataclasses.Field`` marker rather than the call's value."""
@@ -1074,7 +1169,7 @@ class PythonTypeMapping:
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
-        if isinstance(node.value, (str, bytes)):
+        if isinstance(node.value, str):
             return JavaType.Primitive.String
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
@@ -1087,7 +1182,7 @@ class PythonTypeMapping:
             return JavaType.Primitive.Long if -2 ** 63 <= node.value < 2 ** 63 else JavaType.Primitive.None_
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
-        elif isinstance(node.value, complex):
+        elif isinstance(node.value, (bytes, complex)):
             # A literal's type slot holds a JavaType.Primitive, and J.Literal#withType
             # drops a class type put there.
             return JavaType.Primitive.None_
@@ -1340,7 +1435,7 @@ class PythonTypeMapping:
                 ret_id = descriptor.get('returnType')
                 if params is not None or ret_id is not None:
                     return self._method_from_function_descriptor(
-                        descriptor, node.name)
+                        descriptor, node.name, self._is_static_declaration(node, descriptor))
 
         # Fallback: build from individual parameter/return annotation types
         param_names: List[str] = []
@@ -1369,7 +1464,7 @@ class PythonTypeMapping:
             return None
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_declaration(node, None) else 0,
             _declaring_type=None,
             _name=node.name,
             _return_type=return_type,
@@ -1378,8 +1473,16 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    @staticmethod
+    def _is_static_declaration(node: ast.FunctionDef, descriptor: Optional[Dict[str, Any]]) -> bool:
+        """A function declared outside a class is static, as is a static method or a classmethod."""
+        if descriptor is not None and _is_module_function(descriptor):
+            return True
+        return any(isinstance(d, ast.Name) and d.id in ('staticmethod', 'classmethod')
+                   for d in node.decorator_list)
+
     def _method_from_function_descriptor(
-            self, descriptor: Dict[str, Any], name: str
+            self, descriptor: Dict[str, Any], name: str, static: bool
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
         param_names, param_types = self._process_method_params(
@@ -1393,7 +1496,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if static else 0,
             _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
@@ -1529,7 +1632,7 @@ class PythonTypeMapping:
                 type_param_names = self._extract_type_param_names(func_desc)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_call(node) else 0,
             _declaring_type=declaring_type,
             _name=method_name,
             _return_type=return_type,
@@ -1537,6 +1640,27 @@ class PythonTypeMapping:
             _parameter_types=param_types if param_types else None,
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def _is_static_call(self, node: ast.Call) -> bool:
+        """Whether the call's receiver, if spelled, is a module or a class. ty types a module
+        function, a static method and a method looked up on its class as a plain ``function``.
+        A classmethod counts too, so a pattern on a class also matches calls on its subclasses.
+        Without a callee type, an import naming the receiver names a module.
+        """
+        callee = self._descriptor_of(node.func)
+        kind = callee.get('kind')
+        if kind == 'function':
+            return True
+        if kind == 'boundMethod':
+            params = callee.get('parameters') or [{}]
+            bound_id = params[0].get('typeId')
+            bound = self._type_registry.get(bound_id) if bound_id is not None else None
+            return bound is not None and bound.get('kind') == 'subclassOf'
+        if kind in (None, 'dynamic'):
+            if isinstance(node.func, ast.Attribute):
+                return self._import_binding_fqn(node.func.value) is not None
+            return self._bound_from_import_member(node.func) is not None
+        return False
 
     def _callee_declared_name(self, node: ast.Call) -> Optional[str]:
         """The name the callee carries where it is defined. Its owner is read off the
@@ -2031,7 +2155,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if _is_module_function(descriptor) else 0,
             _declaring_type=declaring_type,
             _name=name,
             _return_type=return_type,

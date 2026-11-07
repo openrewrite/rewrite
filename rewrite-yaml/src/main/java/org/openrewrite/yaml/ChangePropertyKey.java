@@ -337,14 +337,18 @@ public class ChangePropertyKey extends Recipe {
                                 if (!target.isScope(mapping)) {
                                     return merged;
                                 }
-                                // Keep the existing formatting behavior, including document-root spacing.
+                                // Format only the entries the merge added or changed, in the style the file had
+                                Cursor entriesCursor = new Cursor(formattingParent, merged);
                                 boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
-                                String firstPrefix = atDocumentRoot ? merged.getEntries().get(0).getPrefix() : null;
-                                merged = maybeAutoFormat(mapping, merged, p, formattingParent);
-                                if (atDocumentRoot && !merged.getEntries().isEmpty()) {
-                                    merged = merged.withEntries(ListUtils.mapFirst(merged.getEntries(), e -> e.withPrefix(firstPrefix)));
-                                }
-                                return merged;
+                                return merged.withEntries(ListUtils.map(merged.getEntries(), (i, e) -> {
+                                    for (Yaml.Mapping.Entry existing : mapping.getEntries()) {
+                                        if (existing == e) {
+                                            return e;
+                                        }
+                                    }
+                                    Yaml.Mapping.Entry formatted = (Yaml.Mapping.Entry) autoFormat(e, p, entriesCursor);
+                                    return atDocumentRoot && i == 0 ? formatted.withPrefix(e.getPrefix()) : formatted;
+                                }));
                             }
                         });
                     }

@@ -46,7 +46,8 @@ internal object JavaThrownExceptions {
      * Constructors are named `<init>`, as they are in bytecode.
      */
     fun of(declaringClass: JavaClass?, name: String, erasedParameterTypes: List<String?>): List<String>? {
-        if (declaringClass == null || erasedParameterTypes.any { it == null }) {
+        // An annotation's members cannot declare exceptions.
+        if (declaringClass == null || declaringClass.isAnnotationType || erasedParameterTypes.any { it == null }) {
             return null
         }
         val index = perClass.getOrPut(declaringClass) { index(declaringClass) }

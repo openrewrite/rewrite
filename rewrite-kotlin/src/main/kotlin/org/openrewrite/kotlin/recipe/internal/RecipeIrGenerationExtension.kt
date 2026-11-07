@@ -245,9 +245,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     )
 
     private fun buildIrGenContext(pluginContext: IrPluginContext): RecipeIrGenContext? {
+        // rewrite and the stdlib are the libraries this plugin requires, which is what the builtins finder is for.
+        val finder = pluginContext.finderForBuiltins()
         val recipeClassId = ClassId.topLevel(FqName("org.openrewrite.Recipe"))
-        val recipeClassSymbol = pluginContext.referenceClass(recipeClassId) ?: return null
-        val recipeNoArgCtor = pluginContext.referenceConstructors(recipeClassId)
+        val recipeClassSymbol = finder.findClass(recipeClassId) ?: return null
+        val recipeNoArgCtor = finder.findConstructors(recipeClassId)
             .singleOrNull { it.owner.valueParameters.isEmpty() } ?: return null
 
         val recipeMembers = recipeClassSymbol.owner.declarations.filterIsInstance<IrSimpleFunction>()
@@ -274,8 +276,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // composite `<Name>$KtRecipe.getRecipeList()` body can wrap the original
         // `recipes(...)` vararg in a `List<Recipe>`.
         val listOfFqn = FqName("kotlin.collections.listOf")
-        val listOfVarargSymbol = pluginContext
-            .referenceFunctions(org.jetbrains.kotlin.name.CallableId(
+        val listOfVarargSymbol = finder
+            .findFunctions(org.jetbrains.kotlin.name.CallableId(
                 packageName = listOfFqn.parent(),
                 callableName = listOfFqn.shortName(),
             ))
@@ -284,7 +286,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
 
         val supportClassId = ClassId.topLevel(FqName("org.openrewrite.kotlin.recipe.GeneratedRecipeSupport"))
-        val supportClassSymbol = pluginContext.referenceClass(supportClassId)
+        val supportClassSymbol = finder.findClass(supportClassId)
         // Resolve by name (each helper name is unique). Arity varies: the two
         // method-invocation helpers carry a 4th `strictArgCount` param; the
         // not-null / property helpers stay at 3.
@@ -303,10 +305,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }?.symbol
 
         // Top-level helper in `org.openrewrite.RecipeDslKt`. Resolved via
-        // `referenceFunctions` against the FqName of the standalone declaration.
+        // `findFunctions` against the FqName of the standalone declaration.
         val buildImperativeVisitorFqn = FqName("org.openrewrite.buildImperativeVisitor")
-        val buildImperativeVisitorSymbol = pluginContext
-            .referenceFunctions(org.jetbrains.kotlin.name.CallableId(
+        val buildImperativeVisitorSymbol = finder
+            .findFunctions(org.jetbrains.kotlin.name.CallableId(
                 packageName = buildImperativeVisitorFqn.parent(),
                 callableName = buildImperativeVisitorFqn.shortName(),
             ))
@@ -1219,7 +1221,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         for (cand in candidates) {
             val fq = FqName(cand)
             if (fq.isRoot) continue
-            if (pluginContext.referenceClass(ClassId.topLevel(fq)) != null) return cand
+            if (pluginContext.finderForBuiltins().findClass(ClassId.topLevel(fq)) != null) return cand
         }
         return null
     }
@@ -1513,7 +1515,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     }
                     if (outerArgIdx >= 0) outerSrc(outerArgIdx)
                     else if (isChain) {
-                        val inner = before.inner!!
+                        val inner = before.inner
                         if (beforeParamSym == inner.receiverParamSymbol) innerSrc(-1)
                         else {
                             val innerArgIdx = inner.argSignatures.indexOfFirst { sig ->
@@ -1534,7 +1536,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(outerSrc(idx), sig)
         }
         if (isChain) {
-            before.inner!!.argSignatures.forEachIndexed { idx, sig ->
+            before.inner.argSignatures.forEachIndexed { idx, sig ->
                 if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(innerSrc(idx), sig)
             }
         }

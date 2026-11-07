@@ -220,10 +220,11 @@ class PythonVisitor(JavaVisitor[P]):
         )
         comp = comp.replace(
             clauses=list_map(
-                lambda c: self.visit_comprehension_clause(c, p),
+                lambda c: cast('ComprehensionExpression.Clause', self.visit(c, p)),
                 comp.clauses
             )
         )
+        comp = comp.replace(suffix=self.visit_space(comp.suffix, p))
         if self._visits_types:
             comp = comp.replace(_type=self.visit_type(comp.type, p))
         return comp
@@ -242,7 +243,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         clause = clause.replace(
             conditions=list_map(
-                lambda c: self.visit_comprehension_condition(c, p),
+                lambda c: cast('ComprehensionExpression.Condition', self.visit(c, p)),
                 clause.conditions
             )
         )
@@ -446,7 +447,7 @@ class PythonVisitor(JavaVisitor[P]):
         case = temp_expr
         case = case.replace(markers=self.visit_markers(case.markers, p))
         case = case.replace(
-            pattern=self.visit_match_case_pattern(case.pattern, p)
+            pattern=cast('MatchCase.Pattern', self.visit(case.pattern, p))
         )
         if case.padding.guard is not None:
             case = case.padding.replace(

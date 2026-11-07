@@ -54,13 +54,14 @@ class InstalledEnvParserTest {
     }
 
     @Test
-    void linksTransitiveDependenciesDeeply(@TempDir Path env) throws IOException {
+    void linksRequiredDependenciesDeeplyButNotThoseOfExtras(@TempDir Path env) throws IOException {
         Path sitePackages = env.resolve("lib/python3.12/site-packages");
         writeDistInfo(sitePackages, "a", "1.0.0", """
           Metadata-Version: 2.4
           Name: a
           Version: 1.0.0
           Requires-Dist: b>=1.0
+          Requires-Dist: c>=1.0; extra == "socks"
           """);
         writeDistInfo(sitePackages, "b", "1.0.0", """
           Metadata-Version: 2.4
@@ -80,7 +81,7 @@ class InstalledEnvParserTest {
         ResolvedDependency a = resolved.get(0);
         ResolvedDependency b = resolved.get(1);
         ResolvedDependency c = resolved.get(2);
-        assertThat(a.getDependencies().get(0)).isSameAs(b);
+        assertThat(a.getDependencies()).containsExactly(b);
         assertThat(b.getDependencies().get(0)).isSameAs(c);
         assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);
         assertThat(c.getDependencies()).isNull();

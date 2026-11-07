@@ -93,6 +93,61 @@ class HasMinimumJavaVersionBuildScriptTest implements RewriteTest {
     }
 
     @Test
+    void buildScriptPassesWithMinimumAsOnlyPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.gradle.OnlyGatedOnJava17
+              description: Test.
+              preconditions:
+                - org.openrewrite.java.search.HasMinimumJavaVersion:
+                    version: 17
+              recipeList:
+                - org.openrewrite.gradle.AddDependency:
+                    groupId: org.junit.platform
+                    artifactId: junit-platform-launcher
+                    version: 1.x
+                    acceptTransitive: true
+                    configuration: testRuntimeOnly
+                    onlyIfUsing: org.junit.jupiter.api.Test
+              """,
+            "org.openrewrite.gradle.OnlyGatedOnJava17"
+          ),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  import org.junit.jupiter.api.Test;
+                  public class A {
+                      @Test
+                      void foo() {
+                      }
+                  }
+                  """,
+                spec -> spec.markers(javaVersion(17))
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              spec -> spec.after(buildGradle -> assertThat(buildGradle)
+                .contains("testRuntimeOnly \"org.junit.platform:junit-platform-launcher:")
+                .actual())
+            )
+          )
+        );
+    }
+
+    @Test
     void buildScriptBlockedWhenRepositoryBelowMinimum() {
         rewriteRun(
           mavenProject("project",

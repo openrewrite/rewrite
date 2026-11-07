@@ -29,12 +29,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.*;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.remote.AuthenticatingHttpSender.AUTHORIZATION;
+import static org.openrewrite.remote.AuthenticatingHttpSender.authenticatorFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -154,6 +157,35 @@ class RemoteArchiveTest {
             assertThat(cached.filter(Files::isRegularFile).count())
               .as("the same archive URI with different paths must produce distinct cache entries")
               .isEqualTo(2);
+        }
+    }
+
+    @Test
+    void authenticatedDownloadCachesExtractedFileNotEntireArchive(@TempDir Path cacheDir) throws Exception {
+        // given
+        URL zipUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("zipfile.zip"));
+        byte[] archive = Files.readAllBytes(Path.of(zipUrl.toURI()));
+        AuthenticatingHttpSender httpSender = new AuthenticatingHttpSender(archive);
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx)
+          .setArtifactCache(new LocalRemoteArtifactCache(cacheDir))
+          .addAuthenticator(authenticatorFor("https://repo.example/maven2/"));
+        HttpSenderExecutionContextView.view(ctx).setLargeFileHttpSender(httpSender);
+
+        // when
+        String content = Remote.builder(Path.of("content.txt"))
+          .charset(StandardCharsets.UTF_8)
+          .build(URI.create("https://repo.example/maven2/zipfile.zip"), "content.txt")
+          .printAll(ctx);
+
+        // then
+        assertThat(content).isEqualTo("this is a zipped file");
+        assertThat(httpSender.authorizations).containsExactly(null, AUTHORIZATION);
+        try (Stream<Path> cached = Files.list(cacheDir)) {
+            assertThat(cached.filter(Files::isRegularFile).mapToLong(p -> p.toFile().length()).sum())
+              .as("only the extracted entry should be cached, not the whole archive")
+              .isEqualTo(content.length())
+              .isLessThan(archive.length);
         }
     }
 

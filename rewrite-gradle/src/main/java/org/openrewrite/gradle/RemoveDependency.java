@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -71,6 +72,10 @@ public class RemoveDependency extends Recipe {
                     .configuration(configuration)
                     .groupId(groupId)
                     .artifactId(artifactId);
+            final GradleMultiDependency.Matcher gradleMultiDependencyMatcher = GradleMultiDependency.matcher()
+                    .configuration(configuration)
+                    .groupId(groupId)
+                    .artifactId(artifactId);
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
             GradleProject gradleProject;
@@ -115,12 +120,8 @@ public class RemoveDependency extends Recipe {
             @Override
             public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    return null;
-                }
-
-                return m;
+                Optional<GradleMultiDependency> multiDependency = gradleMultiDependencyMatcher.get(getCursor());
+                return multiDependency.isPresent() ? multiDependency.get().map(dependency -> null) : m;
             }
 
             private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {

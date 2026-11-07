@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -86,6 +87,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
             if (!(cu instanceof K.CompilationUnit)) {
                 return cu;
             }
+            FormattingListener.beforeFormat(cu, stopAfter, getCursor());
 
             tree = new ImportReorderingVisitor<>().visitNonNull(tree, p);
             tree = new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma()).visitNonNull(tree, p);

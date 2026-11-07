@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -25,14 +26,17 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 
 /**
- * Lets a host inject npm registries and credentials for native lock-file regeneration, and
- * shares a single {@link NpmRegistryClient} over the run's {@code HttpSender}. Modeled on
- * {@code MavenExecutionContextView}.
+ * Lets a host inject npm registries and credentials for native lock regeneration, and shares one
+ * {@link NpmRegistryClient} over the run's {@code HttpSender}, as {@code MavenExecutionContextView} does.
  */
 public class NodeExecutionContextView extends DelegatingExecutionContext {
     private static final String REGISTRIES = "org.openrewrite.javascript.registries";
     private static final String CREDENTIALS = "org.openrewrite.javascript.registryCredentials";
     private static final String REGISTRY_CLIENT = "org.openrewrite.javascript.registryClient";
+    private static final String NODE_VERSION = "org.openrewrite.javascript.nodeVersion";
+    private static final String OS = "org.openrewrite.javascript.os";
+    private static final String CPU = "org.openrewrite.javascript.cpu";
+    private static final String LIBC = "org.openrewrite.javascript.libc";
 
     public NodeExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -69,6 +73,42 @@ public class NodeExecutionContextView extends DelegatingExecutionContext {
 
     public List<NodeRegistryCredentials> getRegistryCredentials() {
         return getMessage(CREDENTIALS, emptyList());
+    }
+
+    /**
+     * The Node.js version the package manager runs under on the host ({@code process.version}, such as
+     * {@code v24.19.0}); unknown when unset, and engine checks then count as satisfied.
+     */
+    public NodeExecutionContextView setNodeVersion(@Nullable String nodeVersion) {
+        putMessage(NODE_VERSION, nodeVersion);
+        return this;
+    }
+
+    public @Nullable String getNodeVersion() {
+        return getMessage(NODE_VERSION);
+    }
+
+    /**
+     * The host's {@code process.platform}, {@code process.arch} and C library ({@code glibc}, {@code musl}, or null);
+     * unknown when unset, and platform checks then count as satisfied.
+     */
+    public NodeExecutionContextView setPlatform(@Nullable String os, @Nullable String cpu, @Nullable String libc) {
+        putMessage(OS, os);
+        putMessage(CPU, cpu);
+        putMessage(LIBC, libc);
+        return this;
+    }
+
+    public @Nullable String getOs() {
+        return getMessage(OS);
+    }
+
+    public @Nullable String getCpu() {
+        return getMessage(CPU);
+    }
+
+    public @Nullable String getLibc() {
+        return getMessage(LIBC);
     }
 
     /**

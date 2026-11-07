@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -35,7 +36,7 @@ public class SemanticallyEqual {
     protected SemanticallyEqual() {
     }
 
-    public static boolean areEqual(J firstElem, J secondElem) {
+    public static boolean areEqual(@Nullable J firstElem, @Nullable J secondElem) {
         SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(true);
         semanticallyEqualVisitor.visit(firstElem, secondElem);
         return semanticallyEqualVisitor.isEqual();
@@ -110,7 +111,28 @@ public class SemanticallyEqual {
 
         @Override
         public @Nullable J visit(@Nullable Tree tree, J j) {
-            return super.visit(unwrap(tree), unwrap(j));
+            J unwrapped = unwrap(tree);
+            J other = unwrap(j);
+            if (unwrapped == null || other == null) {
+                if (unwrapped != other) {
+                    isEqual.set(false);
+                }
+                return unwrapped;
+            }
+            if (unwrapped != other && !unwrapped.isAcceptable(this, other)) {
+                isEqual.set(false);
+                return unwrapped;
+            }
+            return super.visit(unwrapped, other);
+        }
+
+        /**
+         * Language-specific trees (e.g. Kotlin, C#) have no comparison logic here. Adapting to their visitor would run
+         * its default traversal, which compares each child against the whole other tree, so they are treated as unequal.
+         */
+        @Override
+        public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
+            return adaptTo.isAssignableFrom(getClass());
         }
 
         private static @Nullable J unwrap(@Nullable Tree tree) {
@@ -718,7 +740,8 @@ public class SemanticallyEqual {
                             isEqual.set(false);
                             return identifier;
                         }
-                        visit(identifier, field.getName());
+                        // compared in place, since the cursor already points to the identifier
+                        visitIdentifier(identifier, field.getName());
                         return identifier;
                     }
 
@@ -830,12 +853,19 @@ public class SemanticallyEqual {
                 }
 
                 J.InstanceOf compareTo = (J.InstanceOf) j;
-                if (!isOfType(instanceOf.getType(), compareTo.getType())) {
+                if (!isOfType(instanceOf.getType(), compareTo.getType()) ||
+                    nullMissMatch(instanceOf.getClazz(), compareTo.getClazz()) ||
+                    nullMissMatch(instanceOf.getPattern(), compareTo.getPattern())) {
                     isEqual.set(false);
                     return instanceOf;
                 }
                 visit(instanceOf.getClazz(), compareTo.getClazz());
                 visit(instanceOf.getExpression(), compareTo.getExpression());
+                if (instanceOf.getPattern() instanceof J.DeconstructionPattern) {
+                    variableScope.push(new HashMap<>());
+                    visit(instanceOf.getPattern(), compareTo.getPattern());
+                    variableScope.pop();
+                }
             }
             return instanceOf;
         }
@@ -1061,6 +1091,12 @@ public class SemanticallyEqual {
                         isEqual.set(false);
                         return method;
                     }
+                }
+                // Kotlin extension methods are static, but their synthetic receiver parameter is
+                // represented by the select rather than an argument in the source tree.
+                if (static_ && (method.getMethodType().getParameterNames().contains("$this$") ||
+                                compareTo.getMethodType().getParameterNames().contains("$this$"))) {
+                    visit(method.getSelect(), compareTo.getSelect());
                 }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {

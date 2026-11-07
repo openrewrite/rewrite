@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.trait.Comments.Placement;
 import org.openrewrite.xml.tree.Content;
@@ -44,7 +45,8 @@ import static org.openrewrite.Tree.randomId;
  *     has no parent tag (e.g. the document root), there is nowhere to host a preceding sibling and the
  *     element is returned unchanged.</li>
  *     <li>{@code FIRST_CHILD} — the first child of the tag at the cursor; the modified tag is
- *     returned. Useful for "comment inside this element" recipes.</li>
+ *     returned. Useful for "comment inside this element" recipes. Reading and removing at this
+ *     placement cover the run of comments that opens the tag's content.</li>
  * </ul>
  */
 @Incubating(since = "8.86.0")
@@ -63,6 +65,24 @@ public class XmlCommentService extends CommentService {
         }
         List<String> texts = new ArrayList<>();
         for (int i = runStart(content, idx); i < idx; i++) {
+            texts.add(((Xml.Comment) content.get(i)).getText());
+        }
+        return texts;
+    }
+
+    @Override
+    public List<String> getComments(Cursor cursor, Placement placement) {
+        if (placement != Placement.FIRST_CHILD) {
+            return getComments(cursor);
+        }
+        Object value = cursor.getValue();
+        List<? extends Content> content = value instanceof Xml.Tag ? ((Xml.Tag) value).getContent() : null;
+        if (content == null) {
+            return emptyList();
+        }
+        int end = leadingRunEnd(content);
+        List<String> texts = new ArrayList<>(end);
+        for (int i = 0; i < end; i++) {
             texts.add(((Xml.Comment) content.get(i)).getText());
         }
         return texts;
@@ -145,6 +165,25 @@ public class XmlCommentService extends CommentService {
     }
 
     @Override
+    public Tree removeComment(Cursor cursor, String text, Placement placement) {
+        if (placement != Placement.FIRST_CHILD) {
+            return removeComment(cursor, text);
+        }
+        Object value = cursor.getValue();
+        if (!(value instanceof Xml.Tag)) {
+            return (Tree) value;
+        }
+        Xml.Tag tag = (Xml.Tag) value;
+        List<? extends Content> content = tag.getContent();
+        if (content == null) {
+            return tag;
+        }
+        int end = leadingRunEnd(content);
+        return tag.withContent(ListUtils.map(content, (i, c) ->
+                i < end && text.equals(((Xml.Comment) c).getText()) ? null : c));
+    }
+
+    @Override
     public Tree replaceComment(Cursor cursor, String existingText, String newText) {
         Xml.Tag parent = parentTag(cursor);
         if (parent == null) {
@@ -193,6 +232,14 @@ public class XmlCommentService extends CommentService {
         int i = idx;
         while (i - 1 >= 0 && content.get(i - 1) instanceof Xml.Comment) {
             i--;
+        }
+        return i;
+    }
+
+    private static int leadingRunEnd(List<? extends Content> content) {
+        int i = 0;
+        while (i < content.size() && content.get(i) instanceof Xml.Comment) {
+            i++;
         }
         return i;
     }

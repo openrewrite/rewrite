@@ -108,8 +108,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
      * mirroring the Go-side AddImport's {@code ReferencedPackages}.
      */
     private boolean isReferenced(Go.CompilationUnit cu) {
-        AtomicBoolean referenced = new AtomicBoolean();
-        new GolangVisitor<AtomicBoolean>() {
+        return new GolangVisitor<AtomicBoolean>() {
             @Override
             public J visitImport(J.Import anImport, AtomicBoolean found) {
                 return anImport;
@@ -132,8 +131,7 @@ public class GolangAddImport<P> extends GolangVisitor<P> {
                 }
                 return super.visitMethodInvocation(method, found);
             }
-        }.visit(cu, referenced);
-        return referenced.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     /**

@@ -23,7 +23,7 @@ from rewrite.markers import Markers
 from rewrite.python.annotation_utils import annotation_names
 from rewrite.python.markers import Quoted
 from rewrite.python.tree import (ChainedAssignment, CollectionLiteral, ExpressionStatement,
-                                 StatementExpression, TypeHintedExpression)
+                                 MultiImport, StatementExpression, TypeHintedExpression)
 
 # List methods that reorder or read `__all__` without changing which names it holds.
 _MEMBERSHIP_PRESERVING_CALLS = frozenset({'sort', 'index', 'count', 'copy'})
@@ -175,6 +175,14 @@ def get_alias_name(imp: Import) -> Optional[str]:
     if isinstance(alias, Identifier):
         return alias.simple_name
     return None
+
+
+def bare_import(multi: MultiImport, imp: Import) -> Import:
+    """``imp``, the one name left of ``multi``'s ``import a, b``, as the bare Import a parse
+    of ``import a`` gives. The statement's prefix goes on the Import, and the space after
+    ``import`` on its qualid."""
+    return imp.replace(prefix=multi.prefix,
+                       qualid=imp.qualid.replace(prefix=multi.padding.names.before))
 
 
 def module_binding_name(module: str) -> str:

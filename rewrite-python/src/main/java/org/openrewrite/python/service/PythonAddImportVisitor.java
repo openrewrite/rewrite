@@ -144,8 +144,7 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
     private boolean isReferenced(Py.CompilationUnit cu) {
         String target = alias != null ? alias : name != null ? name : rootPackage(module);
         Pattern spelledIn = Pattern.compile("\\b" + Pattern.quote(target) + "\\b");
-        AtomicBoolean found = new AtomicBoolean();
-        new PythonVisitor<AtomicBoolean>() {
+        return new PythonVisitor<AtomicBoolean>() {
             // Identifiers inside an import are bindings rather than uses, so neither kind of
             // import statement is descended into (#8409).
             @Override
@@ -171,7 +170,6 @@ public class PythonAddImportVisitor<P> extends RpcImportVisitor<P> {
                 }
                 return identifier;
             }
-        }.visit(cu, found);
-        return found.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 }

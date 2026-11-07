@@ -22,7 +22,10 @@ import org.openrewrite.rpc.request.RpcRequest;
 /**
  * One dependency whose public API to enumerate, named by its pip coordinate. A {@code null}
  * version names a standard-library module instead (e.g. {@code os}), whose version-conditioned
- * API surface is selected by {@code pythonVersion} (e.g. {@code "3.12"}).
+ * API surface is selected by {@code pythonVersion} (e.g. {@code "3.12"}). {@code path} is a
+ * directory laid out like {@code site-packages} holding the distribution's files and
+ * {@code .dist-info} when the caller has one; otherwise the distribution is found in the
+ * dependency environment of the last parse.
  */
 @Value
 public class Dependency implements RpcRequest {
@@ -33,4 +36,7 @@ public class Dependency implements RpcRequest {
 
     @Nullable
     String pythonVersion;
+
+    @Nullable
+    String path;
 }

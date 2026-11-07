@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.*;
@@ -50,6 +49,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
               newTree instanceof J.Unary ||
               newTree instanceof J.Ternary ||
               newTree instanceof J.Assignment ||
+              newTree instanceof J.AssignmentOperation ||
               newTree instanceof J.InstanceOf ||
               newTree instanceof J.TypeCast ||
               newTree instanceof J.SwitchExpression)) {
@@ -84,82 +84,27 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         if (needsParentheses(b, parent.getValue())) {
             return parenthesize(b);
-        } else if (parent.getValue() instanceof J.InstanceOf) {
+        } else if (parent.getValue() instanceof J.InstanceOf || parent.getValue() instanceof J.TypeCast) {
             return parenthesize(b);
-        } else if (parent.getValue() instanceof J.Binary) {
-            J.Binary parentBinary = parent.getValue();
-
-            // Special handling for string concatenation cases
-            if (b.getOperator() == J.Binary.Type.Addition && parentBinary.getOperator() == J.Binary.Type.Addition) {
-                // Only apply string concatenation rules if we're actually dealing with strings
-                boolean isStringContext = isStringType(b.getType()) ||
-                                          isStringType(parentBinary.getType()) ||
-                                          isStringType(b.getLeft().getType()) ||
-                                          isStringType(b.getRight().getType()) ||
-                                          isStringType(parentBinary.getLeft().getType()) ||
-                                          isStringType(parentBinary.getRight().getType());
-
-                if (isStringContext) {
-                    return handleStringConcatenation(b, parentBinary);
-                }
-            }
-
-            // Normal precedence rules for non-string operations
-            if (needsParenthesesForPrecedence(b, parentBinary)) {
-                return parenthesize(b);
-            }
+        } else if (parent.getValue() instanceof J.Binary && needsParenthesesForPrecedence(b, parent.getValue())) {
+            return parenthesize(b);
         }
 
         return b;
     }
 
-    private J handleStringConcatenation(J.Binary inner, J.Binary outer) {
-        boolean outerLeftString = isStringType(outer.getLeft().getType());
-        boolean innerLeftString = isStringType(inner.getLeft().getType());
-        boolean innerRightString = isStringType(inner.getRight().getType());
-
-        // Case 1: "Value: " + (1 + 2) - We need parentheses
-        // When right operand is a numeric addition inside a string context
-        if (outerLeftString && !innerLeftString && !innerRightString && inner.isScope(outer.getRight())) {
-            return parenthesize(inner);
-        }
-
-        // Case 2: 1 + (2 + " is the result") - We need parentheses
-        // When inner contains a string but outer left is numeric
-        if (!outerLeftString && (innerLeftString || innerRightString) && inner.isScope(outer.getRight())) {
-            return parenthesize(inner);
-        }
-
-        // Case 3: 1 + 2 + " is the result" - NO parentheses needed
-        // This is a left-associative operation where inner is 1+2 and outer is (1+2)+" is the result"
-        boolean outerRightString = isStringType(outer.getRight().getType());
-        if (!innerLeftString && !innerRightString && outerRightString && inner.isScope(outer.getRight())) {
-            // Don't add parentheses in this case
-            return inner;
-        }
-
-        // For other string concatenation cases, follow normal precedence rules
-        if (needsParenthesesForPrecedence(inner, outer)) {
-            return parenthesize(inner);
-        }
-
-        return inner;
-    }
-
-    private boolean isStringType(@Nullable JavaType type) {
-        if (type == JavaType.Primitive.String) {
-            return true;
-        } else if (type == null || type instanceof JavaType.Primitive) {
-            return false;
-        }
-
-        return TypeUtils.isAssignableTo("java.lang.String", type);
-    }
-
     private boolean needsParentheses(Expression expr, Object parent) {
         return parent instanceof J.Unary ||
-               (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+               isSelectOrTarget(expr, parent) ||
                 (expr instanceof J.SwitchExpression);
+    }
+
+    // a method select, field access target, indexed array or method reference qualifier binds tighter than operators
+    private boolean isSelectOrTarget(Expression expr, Object parent) {
+        return (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+               (parent instanceof J.FieldAccess && expr.isScope(((J.FieldAccess) parent).getTarget())) ||
+               (parent instanceof J.ArrayAccess && expr.isScope(((J.ArrayAccess) parent).getIndexed())) ||
+               (parent instanceof J.MemberReference && expr.isScope(((J.MemberReference) parent).getContaining()));
     }
 
     private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
@@ -179,31 +124,14 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         // From here, we're dealing with equal precedence
 
+        // Every J.Binary operator is left-associative, so a bare right operand that binds equally would regroup
+        if (outer.getRight().isScope(inner)) {
+            return true;
+        }
+
         // For operations with the same precedence, check if they're in the same mathematical group
         boolean isAddSubGroup = isInAddSubGroup(inner.getOperator()) && isInAddSubGroup(outer.getOperator());
         boolean isMulDivGroup = isInMulDivGroup(inner.getOperator()) && isInMulDivGroup(outer.getOperator());
-
-        // If they're in the same group (like addition/subtraction), we need to consider associativity
-        if (isAddSubGroup || isMulDivGroup) {
-            // For associative operations with the same precedence level in the same group,
-            // we don't need parentheses
-            if (isAssociative(inner.getOperator()) && isAssociative(outer.getOperator())) {
-                return false;
-            }
-
-            // For non-associative operations (like subtraction/division), we need parentheses
-            // when the inner expression is on the right side of the outer expression
-            // OR when the operators are different (like a - (b + c) or a + (b - c))
-            if (!isAssociative(inner.getOperator()) || !isAssociative(outer.getOperator()) || inner.getOperator() != outer.getOperator()) {
-                // Check if inner is the right operand of outer
-                boolean innerIsRightOperandOfOuter = outer.getRight().isScope(inner);
-
-                // For non-associative operators like subtraction, we need parentheses when inner is on the right
-                if (innerIsRightOperandOfOuter) {
-                    return true;
-                }
-            }
-        }
 
         // For different operators with the same precedence level that aren't in the same group,
         // we need parentheses for clarity
@@ -244,6 +172,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             // no parens for `!!true` but for `-(-1)` and for `+(+1)`
             return u;
         } else if (needsParentheses(u, parent.getValue())) {
+            return parenthesize(u);
+        } else if (parent.getValue() instanceof J.TypeCast && isPrefixPlusOrMinus(u.getOperator()) &&
+                   !(((J.TypeCast) parent.getValue()).getClazz().getTree() instanceof J.Primitive)) {
+            // `(Integer) -i` reads as `Integer - i`, since only a primitive cast may precede `+`, `-`, `++` or `--`
             return parenthesize(u);
         } else if (parent.getValue() instanceof J.Unary) {
             J.Unary parentUnary = parent.getValue();
@@ -291,9 +223,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.InstanceOf i = (J.InstanceOf) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass) {
+        if (needsParentheses(i, parent.getValue()) || parent.getValue() instanceof J.TypeCast) {
             return parenthesize(i);
         }
 
@@ -304,9 +234,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             int parentPrecedence = getPrecedence(parentBinary.getOperator());
 
             if (parentPrecedence > instanceOfPrecedence) {
-                if (parentBinary.getRight().isScope(i)) {
-                    return parenthesize(i);
-                }
+                return parenthesize(i);
             }
         }
 
@@ -323,9 +251,33 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Assignment a = (J.Assignment) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.Ternary) {
+        if (needsParentheses(a, parent.getValue()) ||
+            parent.getValue() instanceof J.Binary ||
+            parent.getValue() instanceof J.Ternary ||
+            parent.getValue() instanceof J.TypeCast ||
+            parent.getValue() instanceof J.InstanceOf) {
+            return parenthesize(a);
+        }
+
+        return a;
+    }
+
+    @Override
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
+        J j = recursive ? super.visitAssignmentOperation(assignOp, p) : assignOp;
+        if (!(j instanceof J.AssignmentOperation)) {
+            return j;
+        }
+
+        J.AssignmentOperation a = (J.AssignmentOperation) j;
+
+        // a compound assignment binds as loosely as an assignment does
+        Cursor parent = getCursor().getParentTreeCursor();
+        if (needsParentheses(a, parent.getValue()) ||
+            parent.getValue() instanceof J.Binary ||
+            parent.getValue() instanceof J.Ternary ||
+            parent.getValue() instanceof J.TypeCast ||
+            parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(a);
         }
 
@@ -335,6 +287,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
         return parenthesize((Expression) super.visitSwitchExpression(switch_, p));
+    }
+
+    private boolean isPrefixPlusOrMinus(J.Unary.Type operator) {
+        return operator == J.Unary.Type.Positive || operator == J.Unary.Type.Negative ||
+               operator == J.Unary.Type.PreIncrement || operator == J.Unary.Type.PreDecrement;
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {
@@ -376,21 +333,6 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             case BitXor:
             default:
                 return 0;
-        }
-    }
-
-    private boolean isAssociative(J.Binary.Type operator) {
-        switch (operator) {
-            case Addition:
-            case Multiplication:
-            case BitAnd:
-            case BitOr:
-            case BitXor:
-            case And:
-            case Or:
-                return true;
-            default:
-                return false;
         }
     }
 

@@ -21,11 +21,13 @@ import os
 import textwrap
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from uuid import UUID
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.python.visitor import PythonVisitor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 from .capture import Capture
 from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
+from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
@@ -61,6 +64,21 @@ class TemplateOptions:
     context: Tuple[str, ...] = ()
     dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
+
+
+def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
+    """Whether the result goes where the tree declares a `Statement`."""
+    from rewrite.python import tree as py
+    target = coordinates.tree
+    if not isinstance(target, Statement):
+        return False
+    ambiguous = isinstance(target, Expression) and not isinstance(target, py.ExpressionStatement)
+    if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
+            or cursor is None or getattr(cursor.value, 'id', None) != target.id:
+        return True
+    # A node that is both, like a call, is a statement only where a statement list holds it.
+    from .precedence import enclosing_tree
+    return isinstance(enclosing_tree(cursor.parent), (j.Block, py.CompilationUnit))
 
 
 class TemplateEngine:
@@ -176,6 +194,22 @@ class TemplateEngine:
         # Replace placeholders with actual values
         visitor = PlaceholderReplacementVisitor(values)
         return visitor.visit(template_tree, None)
+
+    @classmethod
+    def retain_ids(cls, result: J, replaced: Optional[J]) -> J:
+        """Copy of ``result`` in which an id survives only at the first node carrying it, and only
+        if that id names a node of ``replaced``, the subtree the result takes the place of. Every
+        other node is minted a fresh id. The parsed template is shared by every application, and a
+        value spliced into two slots, or from somewhere that stays in the file, would otherwise put
+        one id in two places."""
+        retainable: Set[UUID] = set()
+        if replaced is not None:
+            collector = _TreeIds()
+            collector.visit(replaced, None)
+            retainable = collector.ids
+        retained = _RetainIds(retainable).visit(result, None)
+        assert retained is not None
+        return retained
 
     @classmethod
     def _make_cache_key(
@@ -422,18 +456,23 @@ class TemplateEngine:
                 # Replace the prefix to match original
                 result = result.replace(prefix=original.prefix)
 
-        # Check if we need to wrap expression in statement
-        # This happens when inserting an expression where a statement is expected
-        target = coordinates.tree
-        if isinstance(result, Expression) and isinstance(target, Statement):
-            # Wrap expression in ExpressionStatement
+        # As the parser does, wrap only an expression that is not itself a Statement.
+        if (isinstance(result, Expression) and not isinstance(result, Statement)
+                and _in_statement_slot(coordinates, cursor)):
             result = py.ExpressionStatement(
                 random_id(),
                 result,
             )
 
         if not format:
-            return result
+            return cls.unmark_substituted(result)
+
+        unformatted = _SubstitutedValues()
+        unformatted.visit(result, None)
+
+        # A replacement keeps the blank lines before the code it replaces and the indentation of the line
+        # that code starts, which may align to a bracket that formatting the result alone can't see.
+        keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
 
         # Auto-format the result
         try:
@@ -441,15 +480,85 @@ class TemplateEngine:
             original = coordinates.tree
             result = maybe_auto_format(
                 original, result, None, None,
-                cursor.parent if cursor.parent is not None else None
+                cursor.parent if cursor.parent is not None else None,
+                keep_indent=keep_indent
             )
         except (ValueError, AttributeError):
             # No CompilationUnit in cursor ancestry — skip formatting
             pass
 
+        if unformatted.values:
+            result = _SubstitutedLayout(unformatted.values).visit(result, None)
+            from ..format import minimally_format
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None,
+                                      keep_indent=keep_indent)
         return result
+
+    @classmethod
+    def unmark_substituted(cls, result: J) -> J:
+        unmarked = _SubstitutedLayout({}).visit(result, None)
+        assert unmarked is not None
+        return unmarked
 
     @classmethod
     def clear_cache(cls) -> None:
         """Clear the template cache."""
         cls._cache.clear()
+
+
+class _TreeIds(PythonVisitor[None]):
+    def __init__(self):
+        super().__init__()
+        self.ids: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        self.ids.add(tree.id)
+        return tree
+
+
+class _RetainIds(PythonVisitor[None]):
+    def __init__(self, retainable: Set[UUID]):
+        super().__init__()
+        self._retainable = retainable
+        self._seen: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        if tree.id in self._retainable and tree.id not in self._seen:
+            self._seen.add(tree.id)
+            return tree
+        return tree.replace(_id=random_id())
+
+
+class _SubstitutedValues(PythonVisitor[None]):
+    """Collects each substituted value by the id of the `SubstitutedValue` marking it."""
+
+    def __init__(self):
+        super().__init__()
+        self.values: Dict[UUID, J] = {}
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is not None:
+            self.values[marker.id] = tree
+            self.stop_after_pre_visit()
+        return tree
+
+
+class _SubstitutedLayout(PythonVisitor[None]):
+    """Puts each substituted value back as `unformatted` holds it, under the prefix the formatter gave
+    it, and drops its `SubstitutedValue` marker."""
+
+    def __init__(self, unformatted: Dict[UUID, J]):
+        super().__init__()
+        self._unformatted = unformatted
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is None:
+            return tree
+        self.stop_after_pre_visit()
+        before = self._unformatted.get(marker.id)
+        if before is not None:
+            tree = before.replace(prefix=tree.prefix)
+        return tree.replace(markers=tree.markers.replace(
+            markers=[m for m in tree.markers.markers if m != marker]))

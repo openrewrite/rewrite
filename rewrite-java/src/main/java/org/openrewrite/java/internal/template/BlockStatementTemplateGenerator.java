@@ -74,10 +74,13 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
+                    // at the end of a block or as an if's else, the template goes inside what the cursor points to
+                    Cursor scope = location == Space.Location.BLOCK_END || location == Space.Location.ELSE_PREFIX ?
+                            cursor : next(cursor);
                     if (contextSensitive) {
-                        contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                        contextTemplate(scope, cursor.getValue(), before, after, cursor.getValue(), mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after);
+                        contextFreeTemplate(scope, cursor.getValue(), typeVariables, before, after, location, mode);
                     }
 
                     return before.toString().trim() +
@@ -217,8 +220,15 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
+    /// Inserting before or after a statement makes the template a sibling statement, even when the anchor is
+    /// an expression statement like `list.add(x)` or `super(x)` whose value the stub would otherwise bind.
+    protected static boolean insertsBesideStatement(Space.Location location, JavaCoordinates.Mode mode) {
+        return location == Space.Location.STATEMENT_PREFIX && mode != REPLACEMENT;
+    }
+
     @SuppressWarnings("DataFlowIssue")
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
         if (j instanceof J.Lambda && "Object".equals(bindType)) {
@@ -231,6 +241,9 @@ public class BlockStatementTemplateGenerator {
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof Expression && insertsBesideStatement(location, mode)) {
+            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            after.append("\n}}");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
@@ -348,7 +361,7 @@ public class BlockStatementTemplateGenerator {
                 J parent = next(cursor).getValue();
                 if (parent instanceof J.ClassDeclaration) {
                     J.ClassDeclaration cd = (J.ClassDeclaration) parent;
-                    after.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
+                    after.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
                 } else if (parent instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parent;
                     after.append(md.withBody(null)
@@ -370,7 +383,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+                before.insert(0, n.withInitializer(null).printTrimmed(cursor.getParentOrThrow()) + "{\n");
                 after.append("\n}");
             } else {
                 // no initializer
@@ -443,7 +456,7 @@ public class BlockStatementTemplateGenerator {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
                         f.withBody(null).withPrefix(Space.EMPTY)
                                 .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
-                                .printTrimmed(cursor).trim()));
+                                .printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
@@ -457,7 +470,7 @@ public class BlockStatementTemplateGenerator {
             J.ForEachLoop f = (J.ForEachLoop) j;
             if (!referToSameElement(prior, f.getControl())) {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
-                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()));
+                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
@@ -702,7 +715,7 @@ public class BlockStatementTemplateGenerator {
         StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
         StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
 
-        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
+        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
 
         List<Statement> statements = cd.getBody().getStatements();
         for (Statement statement : statements) {

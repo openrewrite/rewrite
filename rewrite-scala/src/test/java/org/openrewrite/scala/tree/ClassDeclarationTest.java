@@ -618,4 +618,62 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void semicolonSeparatedMembers() {
+        rewriteRun(
+            scala(
+                """
+                class C { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedTraitMembers() {
+        rewriteRun(
+            scala(
+                """
+                trait T { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedEnumCases() {
+        rewriteRun(
+            scala(
+                """
+                enum Color { case Red; case Green; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                class C {
+                  val a = 1
+                  ; val b = 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementBetweenMembers() {
+        rewriteRun(
+            scala(
+                """
+                class C { val a = 1;; val b = 2 }
+                """
+            )
+        );
+    }
 }

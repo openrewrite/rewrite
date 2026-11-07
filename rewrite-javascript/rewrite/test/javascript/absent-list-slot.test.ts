@@ -37,7 +37,7 @@ test("a peer holding no modifiers list round-trips to an empty one", async () =>
     const stale = await new DropModifiers().visit(parsed, undefined) as JS.CompilationUnit;
 
     const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(stale, undefined);
-    const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch, undefined, false)
+    const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
         .receive<JS.CompilationUnit>(undefined);
 
     const modifiers: (J.Modifier[] | undefined)[] = [];

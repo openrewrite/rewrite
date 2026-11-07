@@ -36,6 +36,7 @@ import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -102,7 +103,8 @@ public class FindPlugins extends Recipe {
                 // Even if we couldn't find a declaration the metadata might show the plugin is in use
                 GradleProject gp = s.getMarkers().findFirst(GradleProject.class).orElse(null);
                 if (!found.get() && gp != null && gp.getPlugins().stream().anyMatch(plugin ->
-                        matchesGlob(plugin.getId(), pluginId) || matchesGlob(plugin.getFullyQualifiedClassName(), pluginClass))) {
+                        !isBlank(pluginId) && matchesGlob(plugin.getId(), pluginId) ||
+                        !isBlank(pluginClass) && matchesGlob(plugin.getFullyQualifiedClassName(), pluginClass))) {
                     s = SearchResult.found(s);
                 }
 
