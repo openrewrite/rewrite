@@ -231,24 +231,37 @@ public static class PreprocessorSourceTransformer
     /// <summary>
     /// Generates unique clean source permutations with deduplication.
     /// Returns list of (cleanSource, definedSymbols).
-    /// The primary branch (all symbols defined) is always first.
+    /// The primary branch is always first. With <paramref name="compiledSymbols"/> it is the source as a
+    /// compilation defining them sees it, the file's own <c>#define</c>s included, so that it matches the
+    /// semantic model the parser binds it with. Without them every symbol is defined.
     /// Uses targeted branch coverage: for each directive group, computes symbol sets
     /// that activate each specific branch, ensuring no branch content is lost even
     /// when the total number of symbols exceeds what brute-force enumeration can cover.
     /// </summary>
     public static List<(string CleanSource, HashSet<string> DefinedSymbols)> GenerateUniquePermutations(
         string source, HashSet<string> symbols,
-        Dictionary<int, int>? directiveLineToIndex = null)
+        Dictionary<int, int>? directiveLineToIndex = null,
+        IReadOnlyCollection<string>? compiledSymbols = null)
     {
         var symbolList = symbols.OrderBy(s => s).ToList();
         var seen = new Dictionary<string, int>();
         var result = new List<(string CleanSource, HashSet<string> DefinedSymbols)>();
 
-        // Generate "all defined" first (primary branch)
+        if (compiledSymbols != null)
+        {
+            var compiled = new HashSet<string>(compiledSymbols);
+            var compiledClean = Transform(source, compiled, directiveLineToIndex);
+            seen[compiledClean] = 0;
+            result.Add((compiledClean, new HashSet<string>(symbolList.Where(compiled.Contains))));
+        }
+
         var allDefined = new HashSet<string>(symbolList);
-        var primaryClean = Transform(source, allDefined, directiveLineToIndex, ignoreFileDefines: true);
-        seen[primaryClean] = 0;
-        result.Add((primaryClean, allDefined));
+        var allClean = Transform(source, allDefined, directiveLineToIndex, ignoreFileDefines: true);
+        if (!seen.ContainsKey(allClean))
+        {
+            seen[allClean] = result.Count;
+            result.Add((allClean, allDefined));
+        }
 
         // Add "none defined" (covers #else branches)
         var noneDefined = new HashSet<string>();

@@ -175,7 +175,7 @@ public class CSharpParser
             directiveLineToIndex[directiveLines[idx].LineNumber] = idx;
 
         var permutations = PreprocessorSourceTransformer.GenerateUniquePermutations(
-            source, symbols, directiveLineToIndex);
+            source, symbols, directiveLineToIndex, semanticModel?.SyntaxTree.Options.PreprocessorSymbolNames.ToList());
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
