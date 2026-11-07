@@ -814,6 +814,38 @@ public class CSharpTypeMappingTests : RewriteTest
             new IdentifierFinder("var").Collect(cu).Select(var => TypeUtils.GetFullyQualifiedName(var.Type)));
     }
 
+    [Fact]
+    public async Task DelegateCreationIsAttributedWithTheDelegateConstructor()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                void M()
+                {
+                    EventHandler explicitlyTyped = new EventHandler(OnChanged);
+                    EventHandler targetTyped = new(OnChanged);
+                }
+
+                void OnChanged(object? sender, EventArgs e) { }
+            }
+            """);
+
+        var creations = new List<NewClass>();
+        new NewClassCollector().Visit(cu, creations);
+        Assert.Equal(["System.EventHandler", "System.EventHandler"],
+            creations.Select(n => TypeUtils.GetFullyQualifiedName(n.ConstructorType?.DeclaringType)));
+    }
+
+    private sealed class NewClassCollector : CSharpVisitor<List<NewClass>>
+    {
+        public override J VisitNewClass(NewClass newClass, List<NewClass> found)
+        {
+            found.Add(newClass);
+            return base.VisitNewClass(newClass, found);
+        }
+    }
+
     private class IdentifierFinder(string name) : CSharpVisitor<int>
     {
         private readonly List<Identifier> _found = [];

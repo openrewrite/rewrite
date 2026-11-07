@@ -107,7 +107,11 @@ internal class CSharpTypeMapping
                     .SingleOrDefault(c => c.DeclaringSyntaxReferences.Any(r =>
                         r.SyntaxTree == declaration.SyntaxTree && r.Span == declaration.Span)),
             InvocationExpressionSyntax => _model.GetSymbolInfo(node).Symbol,
-            ObjectCreationExpressionSyntax => _model.GetSymbolInfo(node).Symbol,
+            // Roslyn binds a delegate creation to no constructor, while the compiled code calls the delegate's one.
+            BaseObjectCreationExpressionSyntax => _model.GetSymbolInfo(node).Symbol ??
+                (_model.GetTypeInfo(node).Type is INamedTypeSymbol { TypeKind: TypeKind.Delegate } delegateType
+                    ? delegateType.InstanceConstructors.FirstOrDefault()
+                    : null),
             _ => _model.GetSymbolInfo(node).Symbol
         };
 
