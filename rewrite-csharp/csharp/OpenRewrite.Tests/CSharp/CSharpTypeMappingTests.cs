@@ -1008,6 +1008,31 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task FunctionPointersHaveTheTypeOfTheirSignature()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            unsafe class C
+            {
+                static long Twice(int x) => 2L * x;
+                void M()
+                {
+                    delegate*<int, long> f = &Twice;
+                }
+            }
+            """);
+
+        var @int = JavaType.Primitive.Of(JavaType.PrimitiveKind.Int);
+        var @long = JavaType.Primitive.Of(JavaType.PrimitiveKind.Long);
+        var declaration = Assert.Single(Collect<VariableDeclarations>(cu), d => d.TypeExpression is FunctionPointerType);
+        foreach (var type in new[] { declaration.TypeExpression?.Type, declaration.Variables[0].Element.Name.Type })
+        {
+            var signature = Assert.IsType<JavaType.Method>(type);
+            Assert.Same(@long, signature.ReturnType);
+            Assert.Equal([@int], signature.ParameterTypes!);
+        }
+    }
+
+    [Fact]
     public async Task RangeVariableNamesCarryTheirVariable()
     {
         var cu = await ParseWithSemanticModelAsync("""

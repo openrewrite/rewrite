@@ -238,6 +238,7 @@ internal class CSharpTypeMapping
             INamedTypeSymbol namedType => MapNamedType(namedType),
             // The Java model has no pointers. A pointer is its element's type, as Cs.PointerType's type is.
             IPointerTypeSymbol pointer => MapType(pointer.PointedAtType),
+            IFunctionPointerTypeSymbol functionPointer => MapMethod(functionPointer.Signature),
             _ => JavaType.Unknown.Instance
         };
     }

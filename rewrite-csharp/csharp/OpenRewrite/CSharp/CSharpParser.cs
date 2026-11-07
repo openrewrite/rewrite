@@ -10231,7 +10231,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         return new FunctionPointerType(Tree.RandomId(), prefix, Markers.Empty,
             callingConvention, unmanagedConventionTypes,
-            new JContainer<TypeTree>(angleBracketSpace, paramTypes, Markers.Empty), null);
+            new JContainer<TypeTree>(angleBracketSpace, paramTypes, Markers.Empty), _typeMapping?.Type(node));
     }
 
     /// <summary>
