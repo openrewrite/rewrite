@@ -204,7 +204,7 @@ func TestCaptureTypeConstrainsABarePlaceholderPattern(t *testing.T) {
 	for name, want := range map[string]bool{
 		"err": true, "io.EOF": true, "ErrFoo": true, "MyErrValue": true,
 		"string": false, "int": false, "literal": false, "Plain": false,
-		"Outer": false, "Wrapped": false,
+		"Outer": true, "Wrapped": true,
 	} {
 		arg := takeArg(t, name).(*java.MethodInvocation).Arguments.Elements[0].Element
 		require.Equal(t, want, pat.Matches(arg, nil), name)
@@ -242,12 +242,13 @@ func TestCaptureTypeAcceptsEveryAttributedValueAsAny(t *testing.T) {
 	}
 }
 
-// Two limits the attributed model imposes, pinned so a model that grows past
-// them fails here. See doc/recipe-authoring.md: Typed captures.
-func TestCaptureTypeMissesAMethodPromotedFromAnEmbeddedField(t *testing.T) {
+// A type of the package under parse records the interfaces its whole method
+// set satisfies, promoted methods included. See doc/recipe-authoring.md:
+// Typed captures.
+func TestCaptureTypeMatchesAMethodPromotedFromAnEmbeddedField(t *testing.T) {
 	pat := takePattern("error")
-	require.False(t, pat.Matches(takeArg(t, "Outer"), nil), "Outer embeds Inner")
-	require.False(t, pat.Matches(takeArg(t, "Wrapped"), nil), "Wrapped embeds error itself")
+	require.True(t, pat.Matches(takeArg(t, "Outer"), nil), "Outer embeds Inner")
+	require.True(t, pat.Matches(takeArg(t, "Wrapped"), nil), "Wrapped embeds error itself")
 }
 
 func TestCaptureTypeReadsAPointerAsItsPointee(t *testing.T) {

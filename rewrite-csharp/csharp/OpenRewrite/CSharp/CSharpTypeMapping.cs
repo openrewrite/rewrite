@@ -94,7 +94,7 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
-    /// Gets the method type for a method/constructor declaration or invocation.
+    /// Gets the method type for a method, constructor, destructor or operator declaration, or for an invocation.
     /// A primary constructor is identified by its parameter list and exact declaring syntax.
     /// </summary>
     public JavaType.Method? MethodType(SyntaxNode node)

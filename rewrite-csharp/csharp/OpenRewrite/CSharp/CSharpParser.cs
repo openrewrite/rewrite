@@ -2148,7 +2148,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new ConversionOperatorDeclaration(Tree.RandomId(), prefix, Markers.Empty,
             modifiers, kindPadded, interfaceSpecifier, returnTypePadded,
             new JContainer<Statement>(paramsPrefix, parameters, Markers.Empty),
-            expressionBody, body);
+            expressionBody, body, _typeMapping?.MethodType(node));
     }
 
     public override J VisitPropertyDeclaration(PropertyDeclarationSyntax node)

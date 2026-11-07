@@ -199,6 +199,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
+        String marginLineEnd = null;
         boolean inFirstPrefix = true;
         boolean isPrefixAsterisk = true;
 
@@ -219,30 +220,32 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 }
             }
 
+            String lineEnd = null;
             if (c == '\r') {
-                continue;
+                if (i + 1 < source.length() && source.charAt(i + 1) == '\n') {
+                    continue;
+                }
+                lineEnd = "\r";
+            } else if (c == '\n') {
+                lineEnd = source.charAt(i - 1) == '\r' ? "\r\n" : "\n";
             }
 
-            if (c == '\n') {
-                char prev = source.charAt(i - 1);
+            if (lineEnd != null) {
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
-                    // Handle consecutive new lines.
-                    if ((prev == '\n' ||
-                            prev == '\r' && source.charAt(i - 2) == '\n')) {
-                        String prevLineLine = prev == '\n' ? "\n" : "\r\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
+                    if (marginBuilder != null && marginBuilder.length() == marginLineEnd.length()) {
+                        // Handle consecutive new lines.
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
-                        String newLine = prev == '\r' ? "\r\n" : "\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
-                        javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), marginLineEnd, Markers.EMPTY));
+                        javadocContent.append(marginBuilder.substring(marginLineEnd.length()));
                     }
-                    javadocContent.append(c);
+                    javadocContent.append('\n');
                 }
-                String newLine = prev == '\r' ? "\r\n" : "\n";
-                marginBuilder = new StringBuilder(newLine);
+                marginLineEnd = lineEnd;
+                marginBuilder = new StringBuilder(lineEnd);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
@@ -259,11 +262,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = marginBuilder.charAt(0) == '\r' ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
-                                    newLine, Markers.EMPTY));
-                            String margin = marginBuilder.toString();
-                            javadocContent.append(margin.substring(margin.indexOf("\n") + 1)).append(c);
+                                    marginLineEnd, Markers.EMPTY));
+                            javadocContent.append(marginBuilder.substring(marginLineEnd.length())).append(c);
                         }
                         marginBuilder = null;
                     }
@@ -1166,9 +1167,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 if (cursor < source.length()
                         && source.charAt(cursor) != c
                         && !Character.isWhitespace(c)
-                        && Character.isSpaceChar(source.charAt(cursor))
+                        && isInlineWhitespace(source.charAt(cursor))
                 ) {
-                    text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                    text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
                 }
                 text.append(c);
                 cursor++;
@@ -1176,7 +1177,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
             }
         }
 
@@ -1329,6 +1330,11 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private String whitespaceBeforeAsString() {
         return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    /// Mirrors what javac's `JavadocTokenizer.getIndent` strips as a Javadoc's common indentation.
+    private static boolean isInlineWhitespace(char c) {
+        return c != '\n' && c != '\r' && Character.isWhitespace(c);
     }
 
     private String whitespaceBeforeAsString(Predicate<Character> whitespace) {

@@ -18,9 +18,12 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.marker.GitProvenance;
 
+import java.net.URISyntaxException;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -48,10 +51,23 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
                 environment.apply("CI_JOB_URL"),
                 environment.apply("CI_SERVER_HOST"),
                 environment.apply("CI_BUILD_NAME"),
-                environment.apply("CI_REPOSITORY_URL"),
+                withoutPassword(environment.apply("CI_REPOSITORY_URL")),
                 environment.apply("CI_COMMIT_REF_NAME"),
                 environment.apply("CI_COMMIT_SHA")
         );
+    }
+
+    /// GitLab embeds the CI job token as the password in `CI_REPOSITORY_URL`;
+    /// `URIish#toString` omits passwords, so the token never reaches the marker.
+    private static @Nullable String withoutPassword(@Nullable String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            return new URIish(url).toString();
+        } catch (URISyntaxException e) {
+            return url;
+        }
     }
 
     @Override

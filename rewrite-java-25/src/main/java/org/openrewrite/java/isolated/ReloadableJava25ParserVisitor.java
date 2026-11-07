@@ -2647,7 +2647,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
                 // A blank line between two `///` blocks separates them into distinct
                 // doc comments per JEP 467; only merge when the suffix contains a single line break.
-                if (countOccurrences(c.getSuffix(), "\n") > 1) {
+                if (lineTerminatorCount(c.getSuffix()) > 1) {
                     break;
                 }
                 first = k;
@@ -2689,6 +2689,10 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             // skip k > firstIdx && k <= lastIdx (merged into the javadoc)
         }
         return fmt.withComments(newComments);
+    }
+
+    private static int lineTerminatorCount(String whitespace) {
+        return countOccurrences(whitespace, "\n") + countOccurrences(whitespace.replace("\r\n", ""), "\r");
     }
 
     private Space formatWithTraditionalJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {

@@ -27,10 +27,12 @@ public class DestructorAndOperatorAttributionTests
     public async Task DeclarationsCarryTheMethodsTheyDeclare()
     {
         const string source = """
+            class B { }
             class A
             {
                 ~A() { }
-                public static A operator +(A a, A b) => a;
+                public static A operator +(A a, B b) => a;
+                public static implicit operator A(B b) => new A();
             }
             """;
         var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
@@ -39,9 +41,29 @@ public class DestructorAndOperatorAttributionTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
         var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(syntax));
-        var members = Assert.IsType<ClassDeclaration>(cu.Members[0].Element).Body.Statements;
+        var b = Assert.IsType<ClassDeclaration>(cu.Members[0].Element).Type;
+        var a = Assert.IsType<ClassDeclaration>(cu.Members[1].Element);
+        var members = a.Body.Statements.Select(s => s.Element).ToList();
 
-        Assert.Equal("Finalize", Assert.IsType<MethodDeclaration>(members[0].Element).MethodType?.Name);
-        Assert.Equal("op_Addition", Assert.IsType<OperatorDeclaration>(members[1].Element).MethodType?.Name);
+        AssertDeclares(Assert.IsType<MethodDeclaration>(members[0]).MethodType,
+            "Finalize", a.Type, JavaType.Primitive.Of(JavaType.PrimitiveKind.Void));
+        AssertDeclares(Assert.IsType<OperatorDeclaration>(members[1]).MethodType,
+            "op_Addition", a.Type, a.Type, a.Type, b);
+        AssertDeclares(Assert.IsType<ConversionOperatorDeclaration>(members[2]).MethodType,
+            "op_Implicit", a.Type, a.Type, b);
+    }
+
+    private static void AssertDeclares(JavaType.Method? method, string name, JavaType? declaringType,
+        JavaType? returnType, params JavaType?[] parameterTypes)
+    {
+        Assert.NotNull(method);
+        Assert.Equal(name, method.Name);
+        Assert.NotNull(declaringType);
+        Assert.Same(declaringType, method.DeclaringType);
+        Assert.Same(returnType, method.ReturnType);
+        var actual = method.ParameterTypes ?? [];
+        Assert.Equal(parameterTypes.Length, actual.Count);
+        for (var i = 0; i < parameterTypes.Length; i++)
+            Assert.Same(parameterTypes[i], actual[i]);
     }
 }

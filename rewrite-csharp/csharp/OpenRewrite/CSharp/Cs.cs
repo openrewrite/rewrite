@@ -3447,7 +3447,8 @@ public sealed class ConversionOperatorDeclaration(
     JLeftPadded<TypeTree> returnType,
     JContainer<Statement> parameters,
     JLeftPadded<Expression>? expressionBody,
-    Block? body
+    Block? body,
+    JavaType.Method? methodType
 ) : Cs, Statement, IEquatable<ConversionOperatorDeclaration>
 {
     public Guid Id { get; } = id;
@@ -3461,27 +3462,30 @@ public sealed class ConversionOperatorDeclaration(
     public JContainer<Statement> Parameters { get; } = parameters;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
     public Block? Body { get; } = body;
+    public JavaType.Method? MethodType { get; } = methodType;
 
     public ConversionOperatorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithKind(JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
-        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithReturnType(JLeftPadded<TypeTree> returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body, MethodType);
+    public ConversionOperatorDeclaration WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, methodType);
 
     public enum ExplicitImplicit { Implicit, Explicit }
     Tree Tree.WithId(Guid id) => WithId(id);

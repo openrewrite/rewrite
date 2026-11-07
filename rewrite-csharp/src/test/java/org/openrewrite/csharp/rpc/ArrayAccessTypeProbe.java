@@ -21,7 +21,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
-/** Marks each element access with the type it arrived with, and retypes it {@code long} so that the reply carries a type. */
+/**
+ * Marks each element access with the type it arrived with.
+ * Retypes it {@code long} so that the reply carries a type.
+ */
 public class ArrayAccessTypeProbe extends CSharpVisitor<ExecutionContext> {
     @Override
     public J visitArrayAccess(J.ArrayAccess arrayAccess, ExecutionContext ctx) {
