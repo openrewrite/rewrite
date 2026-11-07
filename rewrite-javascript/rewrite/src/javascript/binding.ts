@@ -16,7 +16,9 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
+import {
+    compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf, valuesDeclaredAtTopLevel
+} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
@@ -396,7 +398,8 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
 
 /**
  * The name the moved binding takes, or undefined where a pinned alias cannot be bound verbatim,
- * since deconflicting it would leave the references the caller emits unbound. The rule is
+ * since deconflicting it would leave the references the caller emits unbound, or would split the
+ * binding from a value of the same name (`sharesNameWithValue`). The rule is
  * CLAUDE.md: Which name a rebind binds.
  */
 function rebindingName(
@@ -408,6 +411,9 @@ function rebindingName(
     const taken = (name: string) => nameTaken(name, noNames, visitor) ||
         (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
     const alias = options.to.alias;
+    if (sharesNameWithValue(cu, existing)) {
+        return alias === undefined || alias === existing.localName ? existing.localName : undefined;
+    }
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
     }
@@ -416,6 +422,14 @@ function rebindingName(
         return existing.localName;
     }
     return taken(member) ? existing.localName : member;
+}
+
+/**
+ * Whether a module-scope value shares the import's name, so the move keeps it as an alias:
+ * `import type {Old} from "m"; const Old = 1` becomes `import type {New as Old} from "m2"; const Old = 1`.
+ */
+function sharesNameWithValue(cu: JS.CompilationUnit, existing: ExistingImportBinding): boolean {
+    return !existing.viaRequire && valuesDeclaredAtTopLevel(cu).has(existing.localName);
 }
 
 const noNames: ReadonlySet<string> = new Set();

@@ -2123,6 +2123,9 @@ function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boole
         !sameModule(moduleNameOf(specifier as J.Literal), module)) {
         return false;
     }
+    if (clause.typeOnly && clause.name !== undefined) {
+        return false;
+    }
     return clause.namedBindings ? clause.namedBindings.kind === JS.Kind.NamedImports : clause.name !== undefined;
 }
 
@@ -2222,8 +2225,9 @@ function aliasing(local: J.Identifier, member: string): JS.Alias {
  * one entry of the named list, whichever `member` names — keeping everything else the clause
  * binds. `ElementRemovalFormatter` carries the dropped binding's prefix onto whatever prints
  * next, and a dropped last entry's trailing space onto the new last, as `RemoveImport` does.
+ * From `import {a, a as b}`, a `localName` of `b` drops only `a as b`.
  */
-function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Import {
+function removeBinding(jsImport: JS.Import, member: string | undefined, localName: string): JS.Import {
     const importClause = jsImport.importClause;
     if (!importClause) {
         return jsImport;
@@ -2261,10 +2265,14 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
         return jsImport;
     }
     const namedImports = importClause.namedBindings as JS.NamedImports;
+    const isMovedBinding = (specifier: JS.ImportSpecifier) => {
+        const binding = specifierBinding(specifier);
+        return binding?.member === key && binding.name === localName;
+    };
     const formatter = new ElementRemovalFormatter<JS.ImportSpecifier>();
     const kept: J.RightPadded<JS.ImportSpecifier>[] = [];
     for (const entry of namedImports.elements.elements) {
-        if (namedSpecifierImports(entry.element.specifier, key)) {
+        if (isMovedBinding(entry.element)) {
             formatter.markRemoved(entry.element);
         } else {
             kept.push({...entry, element: formatter.processKept(entry.element)});
@@ -2278,7 +2286,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
     // The space before `}` and any trailing comma belong to the last entry, so they move onto the
     // new last entry when the old one is dropped.
     const originalLast = namedImports.elements.elements[namedImports.elements.elements.length - 1];
-    if (namedSpecifierImports(originalLast.element.specifier, key)) {
+    if (isMovedBinding(originalLast.element)) {
         kept[kept.length - 1] = {...kept[kept.length - 1], after: originalLast.after, markers: originalLast.markers};
     }
     const updatedNamedImports: JS.NamedImports = {...namedImports, elements: {...namedImports.elements, elements: kept}};
@@ -2412,7 +2420,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         this.fromModule = importedModule(imp);
 
         if (!isOnlyMember(imp)) {
-            return removeBinding(imp, this.from.member);
+            return removeBinding(imp, this.from.member, this.localName);
         }
         if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
             this.dropped = imp.id;

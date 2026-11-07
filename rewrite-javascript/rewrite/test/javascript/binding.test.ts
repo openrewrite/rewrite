@@ -1224,6 +1224,25 @@ describe("maybeBind and type-only imports", () => {
         expect(names).toEqual(["vi_1", "vi_1"]);
     });
 
+    test("a type-only request beside a type-only default import gets an import of its own", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "react", member: "ReactElement", typeOnly: true}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type R from "react";
+                let a: R.ReactChild;
+            `,
+            `
+                import type R from "react";
+                import type {ReactElement} from "react";
+                let a: R.ReactChild;
+            `
+        ));
+        expect(bound.name).toBe("ReactElement");
+    });
+
     test("a namespace import answers a type-only request for the whole module", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -1840,6 +1859,159 @@ describe("maybeRebind", () => {
             function f() { interface Old {} return New.go(); }
             function g() { const Old = 1; let y: New; return {Old}; }`
         ));
+    });
+
+    test("a binding whose name a module-scope value shares keeps it, as an alias", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+
+                const Old = 1;
+                export const x = Old;
+                export type C = Old;
+                export { Old };
+            `,
+            `
+                import type { New as Old } from "m2";
+
+                const Old = 1;
+                export const x = Old;
+                export type C = Old;
+                export { Old };
+            `
+        ));
+        expect(bound.name).toBe("Old");
+    });
+
+    test("a call to a block's function stays on it when an import of that name moves", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+
+                if (c) { function Old() {} Old(); }
+                Old();
+            `,
+            `
+                import { New as Old } from "m2";
+
+                if (c) { function Old() {} Old(); }
+                Old();
+            `
+        ));
+    });
+
+    test("a pinned alias cannot split an import from its same-named exported value", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New", alias: "Renamed"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type {Old} from "m";
+                const Old = 1;
+                export {Old};
+                export type T = Old;
+            `
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("a value import of a type keeps its name beside a destructured value of that name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+
+                const { Old } = { Old: 1 };
+                export const x = Old;
+                export type C = Old<{}>;
+            `,
+            `
+                import { New as Old } from "m2";
+
+                const { Old } = { Old: 1 };
+                export const x = Old;
+                export type C = Old<{}>;
+            `
+        ));
+    });
+
+    test("a second specifier of the moved member stays as it stands", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old, Old as O } from "m";
+
+                let a: Old;
+                let b: O;
+            `,
+            `
+                import { New, Old as O } from "m";
+
+                let a: New;
+                let b: O;
+            `
+        ));
+        expect(bound.name).toBe("New");
+    });
+
+    test("a second specifier of the moved member stays as it stands when the move leaves the statement", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old as O, Old } from "m";
+
+                let a: Old;
+                let b: O;
+            `,
+            `
+                import { Old } from "m";
+                import { New as O } from "m2";
+
+                let a: Old;
+                let b: O;
+            `
+        ));
+        expect(bound.name).toBe("O");
+    });
+
+    test("a type-only binding moved beside a type-only default import of its target gets an import of its own", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "react", member: "ReactElement"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+                import type R from "react";
+
+                let a: Old;
+                let b: R.ReactChild;
+            `,
+            `
+                import type { ReactElement } from "react";
+                import type R from "react";
+
+                let a: ReactElement;
+                let b: R.ReactChild;
+            `
+        ));
+        expect(bound.name).toBe("ReactElement");
     });
 
     test("a type-only import is renamed where `typeof` reads it as a value", async () => {
