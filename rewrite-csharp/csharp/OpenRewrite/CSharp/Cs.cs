@@ -1093,7 +1093,7 @@ public sealed class PointerType(
     public PointerType WithElementType(JRightPadded<TypeTree> elementType) =>
         ReferenceEquals(elementType, ElementType) ? this : new(Id, Prefix, Markers, elementType);
 
-    public JavaType? Type => null;
+    public JavaType? Type => ElementType.Element.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
