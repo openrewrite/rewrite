@@ -81,6 +81,68 @@ public class CSharpTypeMappingTests : RewriteTest
         }
     }
 
+    [Theory]
+    [InlineData("custom")]
+    [InlineData("action")]
+    [InlineData("inferred")]
+    [InlineData("function")]
+    [InlineData("copy")]
+    [InlineData("fieldCopy")]
+    [InlineData("factoryCopy")]
+    [InlineData("anonymous")]
+    public void DelegateConstructionHasConstructorAndExpressionTypes(string variable)
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+            delegate void Work();
+            class C
+            {
+                static void Execute() { }
+                static Action stored = Execute;
+                static Action GetAction() => Execute;
+                void Run()
+                {
+                    Work custom = new Work(Execute);
+                    Action action = new Action(Execute);
+                    Action inferred = new(Execute);
+                    Func<int> function = new Func<int>(() => 42);
+                    Action copy = new Action(action);
+                    Action fieldCopy = new Action(stored);
+                    Action factoryCopy = new Action(GetAction());
+                    Action anonymous = new Action(delegate { });
+                }
+            }
+            """);
+        var declaration = Assert.IsType<VariableDeclarations>(FindVariableDeclaration(cu, variable));
+        var local = Assert.Single(declaration.Variables).Element;
+        var creation = Assert.IsType<NewClass>(local.Initializer!.Element);
+        Assert.NotNull(creation.ConstructorType);
+        Assert.Equal(".ctor", creation.ConstructorType.Name);
+        Assert.Same(Assert.IsType<JavaType.Variable>(local.Name.FieldType).Type, creation.Type);
+        Assert.Same(creation.Type, creation.ConstructorType.DeclaringType);
+        Assert.True(TypeUtils.IsAssignableTo(creation.Type, "System.MulticastDelegate"));
+    }
+
+    [Fact]
+    public void DelegateCreationWithoutSemanticModelRemainsUnattributed()
+    {
+        const string source = "using System; class C { void Run() { Action value = new Action(() => { }); } }";
+        var cu = new CSharpParser().Parse(source);
+        var local = Assert.Single(FindVariableDeclaration(cu, "value")!.Variables).Element;
+        Assert.Null(Assert.IsType<NewClass>(local.Initializer!.Element).ConstructorType);
+    }
+
+    [Theory]
+    [InlineData("Missing value = new Missing(Execute);")]
+    [InlineData("Action value = new Action(123);")]
+    [InlineData("Action value = new Action(MissingMethod);")]
+    public void InvalidDelegateCreationRemainsUnattributed(string declaration)
+    {
+        var cu = ParseWithSemanticModel("using System; class C { static void Execute() { } void Run() { " + declaration + " } }");
+        var local = Assert.Single(FindVariableDeclaration(cu, "value")!.Variables).Element;
+        Assert.Null(Assert.IsType<NewClass>(local.Initializer!.Element).ConstructorType);
+    }
+
     [Fact]
     public async Task GenericClassField_HasParameterizedTypeWithGenericTypeVariables()
     {
