@@ -117,6 +117,22 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public void LeavesCreationsOfATypeParameterUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A
+                {
+                    T M<T>() where T : new() => new T();
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void LeavesOperatorsWrittenAsCallsUnmarked()
     {
         RewriteRun(

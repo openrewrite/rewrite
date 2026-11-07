@@ -81,7 +81,10 @@ public class FindMissingTypes : Recipe
         public override J VisitNewClass(NewClass newClass, P p)
         {
             var visited = base.VisitNewClass(newClass, p);
-            return visited is NewClass { ConstructorType: null } n && !n.Arguments.Elements.Any(a => Unknown(a.Element))
+            // `new T()` of a type parameter T calls no constructor known before run time.
+            return visited is NewClass { ConstructorType: null } n &&
+                   n.Clazz is not Expression { Type: JavaType.GenericTypeVariable } &&
+                   !n.Arguments.Elements.Any(a => Unknown(a.Element))
                 ? missing(visited, "NewClass type is missing", p)
                 : visited;
         }
