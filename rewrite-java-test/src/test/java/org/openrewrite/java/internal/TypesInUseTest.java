@@ -17,14 +17,21 @@ package org.openrewrite.java.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -64,6 +71,30 @@ class TypesInUseTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void declarationEnteredBeforeTheNameDoesNotHideIt() {
+        List<SourceFile> parsed = JavaParser.fromJavaVersion().build()
+          .parse(
+            "package com.example; @SuppressWarnings(\"x\") class Declared { }",
+            "class X { Object o = new Object() { void inner() { } }; }"
+          )
+          .collect(toList());
+        J.CompilationUnit cu = (J.CompilationUnit) parsed.get(0);
+        J.VariableDeclarations field = (J.VariableDeclarations) ((J.CompilationUnit) parsed.get(1))
+          .getClasses().get(0).getBody().getStatements().get(0);
+        J.NewClass anonymous = (J.NewClass) requireNonNull(field.getVariables().get(0).getInitializer());
+
+        // Like a method in a TypeScript decorator's object literal, it is entered before the class name
+        J.ClassDeclaration declared = cu.getClasses().get(0);
+        J.Annotation annotation = declared.getLeadingAnnotations().get(0).withArguments(singletonList(anonymous));
+        cu = cu.withClasses(singletonList(declared.withLeadingAnnotations(singletonList(annotation))));
+
+        assertThat(cu.getTypesInUse().getTypesInUse().stream()
+          .filter(t -> t instanceof JavaType.FullyQualified)
+          .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName()))
+          .doesNotContain("com.example.Declared");
     }
 
     @Test

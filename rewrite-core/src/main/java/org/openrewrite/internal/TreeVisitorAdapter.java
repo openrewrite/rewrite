@@ -40,6 +40,9 @@ public class TreeVisitorAdapter {
     private static final Object classCreationLock = new Object();
     private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new ConcurrentHashMap<>();
 
+    private static final MethodDescriptor GET_CURSOR = MethodDescriptor.ofMethod(TreeVisitor.class, "getCursor", Cursor.class);
+    private static final MethodDescriptor SET_CURSOR = MethodDescriptor.ofMethod(TreeVisitor.class, "setCursor", void.class, Cursor.class);
+
     private TreeVisitorAdapter() {
     }
 
@@ -123,20 +126,6 @@ public class TreeVisitorAdapter {
                         );
                         setDelegate.returnValue(null);
 
-                        MethodCreator setCursor = creator.getMethodCreator("setCursor", void.class, Cursor.class);
-                        setCursor.setModifiers(Modifier.PUBLIC);
-                        setCursor.invokeSpecialMethod(
-                                MethodDescriptor.ofMethod(proxySuper, "setCursor", void.class, Cursor.class),
-                                setCursor.getThis(),
-                                setCursor.getMethodParam(0)
-                        );
-                        setCursor.invokeVirtualMethod(
-                                MethodDescriptor.ofMethod(delegateType, "setCursor", void.class, Cursor.class),
-                                setCursor.readInstanceField(delegateField.getFieldDescriptor(), setCursor.getThis()),
-                                setCursor.getMethodParam(0)
-                        );
-                        setCursor.returnValue(null);
-
                         // Collect the user's visit-like overrides from the leaf up to (but not into) the
                         // iso-visitor, so overrides declared on a shared superclass are forwarded too.
                         // Leaf-first, so the most-derived override wins.
@@ -183,13 +172,19 @@ public class TreeVisitorAdapter {
                                 args[i] = visitMethod.getMethodParam(i);
                             }
 
+                            // The delegate sees the proxy's cursor while its own code runs, the only time it can look
+                            ResultHandle delegateHandle = visitMethod.readInstanceField(delegateField.getFieldDescriptor(), visitMethod.getThis());
+                            ResultHandle delegateCursor = visitMethod.invokeVirtualMethod(GET_CURSOR, delegateHandle);
+                            visitMethod.invokeVirtualMethod(SET_CURSOR, delegateHandle,
+                                    visitMethod.invokeVirtualMethod(GET_CURSOR, visitMethod.getThis()));
                             ResultHandle delegateCall = visitMethod.invokeVirtualMethod(
                                     MethodDescriptor.ofMethod(delegateType, method.getName(),
                                             DescriptorUtils.classToStringRepresentation(method.getReturnType()),
                                             (Object[]) method.getParameterTypes()),
-                                    visitMethod.readInstanceField(delegateField.getFieldDescriptor(), visitMethod.getThis()),
+                                    delegateHandle,
                                     args
                             );
+                            visitMethod.invokeVirtualMethod(SET_CURSOR, delegateHandle, delegateCursor);
 
                             // preVisit/postVisit fan-out: after delegate, also fire the mixin's
                             // version via super (proxy.super == mixinClass).

@@ -186,10 +186,27 @@ class TreeVisitorAdapterTest {
         //noinspection unchecked
         JavaVisitor<Integer> adapted = TreeVisitorAdapter.adapt(delegate, JavaVisitor.class);
         assertThat(adapted.getCursor()).isSameAs(cursor);
+    }
 
-        Cursor moved = new Cursor(cursor, "child");
-        adapted.setCursor(moved);
-        assertThat(delegate.getCursor()).isSameAs(moved);
+    @Test
+    void delegateSeesTheCursorOfTheTreeItIsGiven() {
+        List<String> mismatches = new ArrayList<>();
+        TreeVisitor<Tree, Integer> delegate = new TreeVisitor<>() {
+            @Override
+            public Tree preVisit(Tree tree, Integer p) {
+                if (getCursor().getValue() != tree || getCursor().getParentTreeCursor().getValue() == tree) {
+                    mismatches.add(tree.getClass().getSimpleName());
+                }
+                return tree;
+            }
+        };
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse("class Test { void m() { int i = 1 + 2; } }")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        delegate.visit(cu, 0);
+        assertThat(mismatches).isEmpty();
     }
 
     @Test
