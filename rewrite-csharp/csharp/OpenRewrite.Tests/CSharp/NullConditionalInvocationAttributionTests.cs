@@ -53,7 +53,7 @@ public class NullConditionalInvocationAttributionTests
     }
 
     [Fact]
-    public async Task EachMemberInANullConditionalChainCarriesItsVariable()
+    public async Task EachMemberAccessInANullConditionalChainCarriesItsMember()
     {
         var cu = await ParseAsync("""
             class D
@@ -73,10 +73,12 @@ public class NullConditionalInvocationAttributionTests
             }
             """);
 
-        var members = new List<Identifier>();
-        new MemberNameCollector().Visit(cu, members);
+        var accesses = new List<FieldAccess>();
+        new MemberAccessCollector().Visit(cu, accesses);
         Assert.Equal(["Length", "Length", "Length", "Length", "Changed"],
-            members.Select(m => (m.FieldType as JavaType.Variable)?.Name ?? $"<none for {m.SimpleName}>"));
+            accesses.Select(fa => (fa.Name.Element.FieldType as JavaType.Variable)?.Name ?? $"<none for {fa.Name.Element.SimpleName}>"));
+        Assert.Equal(["int", "int", "int", "int", "System.EventHandler"],
+            accesses.Select(fa => TypeUtils.GetFullyQualifiedName(fa.Type) ?? $"<none for {fa.Name.Element.SimpleName}>"));
     }
 
     private static async Task<CompilationUnit> ParseAsync(string source)
@@ -89,13 +91,13 @@ public class NullConditionalInvocationAttributionTests
         return new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(syntax));
     }
 
-    private sealed class MemberNameCollector : CSharpVisitor<List<Identifier>>
+    private sealed class MemberAccessCollector : CSharpVisitor<List<FieldAccess>>
     {
-        public override J VisitIdentifier(Identifier identifier, List<Identifier> found)
+        public override J VisitFieldAccess(FieldAccess fieldAccess, List<FieldAccess> found)
         {
-            if (identifier.SimpleName is "Length" or "Changed" && Cursor.FirstEnclosing<MethodDeclaration>() != null)
-                found.Add(identifier);
-            return identifier;
+            if (fieldAccess.Name.Element.SimpleName is "Length" or "Changed")
+                found.Add(fieldAccess);
+            return base.VisitFieldAccess(fieldAccess, found);
         }
     }
 

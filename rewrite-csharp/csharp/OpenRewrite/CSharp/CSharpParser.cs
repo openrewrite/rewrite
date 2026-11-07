@@ -6517,7 +6517,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Build([nullSafe]),
                 targetExpr,
                 new JLeftPadded<Identifier>(operatorSpace, name),
-                null
+                name.Type
             );
         }
         else if (node.WhenNotNull is ElementBindingExpressionSyntax elementBinding)
@@ -6845,7 +6845,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Build([tbNullSafe]),
                 target,
                 new JLeftPadded<Identifier>(operatorSpace, name),
-                null
+                name.Type
             );
         }
         else if (whenNotNull is MemberAccessExpressionSyntax terminalMemberAccess)
@@ -6947,7 +6947,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 }
                 return new FieldAccess(
                     Tree.RandomId(), Space.Empty, Markers.Build([mbNs]),
-                    target, new JLeftPadded<Identifier>(operatorSpace, name), null);
+                    target, new JLeftPadded<Identifier>(operatorSpace, name), name.Type);
             }
 
             case MemberAccessExpressionSyntax memberAccess:
@@ -6972,7 +6972,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 }
                 return new FieldAccess(
                     Tree.RandomId(), Space.Empty, Markers.Empty,
-                    inner, new JLeftPadded<Identifier>(dotSpace, name), null);
+                    inner, new JLeftPadded<Identifier>(dotSpace, name), name.Type);
             }
 
             case InvocationExpressionSyntax invocation:
