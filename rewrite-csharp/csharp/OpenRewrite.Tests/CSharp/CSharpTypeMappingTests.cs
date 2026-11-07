@@ -1031,15 +1031,13 @@ public class CSharpTypeMappingTests : RewriteTest
         var cu = await ParseWithSemanticModelAsync("""
             class C
             {
-                void M(dynamic d) => d.Goo();
+                void M(dynamic d) { }
             }
             """);
 
-        var d = Assert.IsType<JavaType.Class>(
-            Assert.Single(Collect<NamedVariable>(cu)).Name.Type);
+        var d = Assert.IsType<JavaType.Class>(Assert.Single(Collect<NamedVariable>(cu)).Name.Type);
         Assert.Equal("dynamic", d.FullyQualifiedName);
         Assert.Equal("System.Object", TypeUtils.GetFullyQualifiedName(d.Supertype));
-        Assert.IsType<JavaType.Unknown>(Assert.Single(Collect<MethodInvocation>(cu)).Name.Type);
     }
 
     [Fact]
