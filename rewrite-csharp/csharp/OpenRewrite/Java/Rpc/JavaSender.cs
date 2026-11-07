@@ -124,6 +124,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(arrayAccess, a => a.Indexed, indexed => Visit(indexed, q));
         q.GetAndSend(arrayAccess, a => a.Dimension, dim => Visit(dim, q));
+        q.GetAndSend(arrayAccess, a => AsRef(a.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return arrayAccess;
     }
 

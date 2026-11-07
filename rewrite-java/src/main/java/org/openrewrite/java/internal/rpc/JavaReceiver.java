@@ -60,7 +60,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J visitArrayAccess(J.ArrayAccess arrayAccess, RpcReceiveQueue q) {
         return arrayAccess
                 .withIndexed(q.receive(arrayAccess.getIndexed(), i -> (Expression) visitNonNull(i, q)))
-                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)));
+                .withDimension(q.receive(arrayAccess.getDimension(), d -> (J.ArrayDimension) visitNonNull(d, q)))
+                .withType(q.receive(arrayAccess.getType(), t -> visitType(t, q)));
     }
 
     @Override
