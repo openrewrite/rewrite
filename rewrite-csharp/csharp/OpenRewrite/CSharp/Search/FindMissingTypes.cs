@@ -98,8 +98,9 @@ public class FindMissingTypes : Recipe
         }
 
         /// <summary>
-        /// Whether the identifier names what has no type, such as a namespace, label, preprocessor symbol, argument
-        /// name or discard. The name of a call, class, method or object creation is left to the check of that node.
+        /// Whether the identifier names what has no type, such as a namespace, label, attribute target, preprocessor
+        /// symbol, argument name or discard. The name of a call, class, method or object creation is left to the check
+        /// of that node.
         /// </summary>
         private bool NamesWhatHasNoType(Identifier id)
         {
@@ -109,8 +110,9 @@ public class FindMissingTypes : Recipe
             var parent = Cursor.ParentTree;
             return parent.Value switch
             {
-                NamespaceDeclaration or Label or GotoStatement => true,
-                FieldAccess => InNamespace(id, parent),
+                NamespaceDeclaration or Label or GotoStatement or DiscardVariableDesignation => true,
+                FieldAccess or AliasQualifiedName => InNamespace(id, parent),
+                AttributeList list => list.Target?.Element == id,
                 MethodInvocation mi => mi.Name == id,
                 ClassDeclaration cd => cd.Name == id,
                 MethodDeclaration md => md.Name == id,
@@ -133,32 +135,52 @@ public class FindMissingTypes : Recipe
         /// <c>System.Collections.Generic.List&lt;int&gt;</c>. The first type that the name goes on to qualify says
         /// what its namespace is.
         /// </summary>
-        private static bool InNamespace(Identifier id, Cursor parent)
+        private bool InNamespace(Identifier id, Cursor parent)
         {
             J name = id;
-            if (parent.Value is FieldAccess access && access.Name.Element == id)
+            if (parent.Value is AliasQualifiedName || parent.Value is FieldAccess access && access.Name.Element == id)
             {
-                name = access;
+                name = (J)parent.Value;
                 parent = parent.ParentTree;
             }
-            var qualified = QualifiedName(name);
+            if (QualifiedName(name) is not { } qualified)
+                return false;
             for (; parent.Value is FieldAccess outer && outer.Target == name; parent = parent.ParentTree)
             {
-                if (TypeUtils.AsClass(outer.Type) is { } type)
-                {
-                    var outermost = type.FullyQualifiedName.Split('$')[0];
-                    var ns = outermost.Contains('.') ? outermost[..outermost.LastIndexOf('.')] : "";
-                    return ns == qualified || ns.StartsWith(qualified + ".");
-                }
+                if (Namespace(outer.Type) is { } ns)
+                    return EnclosingNamespacePrefixes().Any(e => ns == e + qualified || ns.StartsWith(e + qualified + "."));
                 name = outer;
             }
             return parent.Value is NamespaceDeclaration;
         }
 
+        /// <summary>The namespaces a name is looked up in, each as a prefix that ends in a dot, the global one first.</summary>
+        private IEnumerable<string> EnclosingNamespacePrefixes()
+        {
+            var prefix = "";
+            yield return prefix;
+            foreach (var ns in Cursor.PathToRoot().Select(c => c.Value).OfType<NamespaceDeclaration>().Reverse())
+            foreach (var segment in QualifiedName(ns.Name.Element)?.Split('.') ?? [])
+                yield return prefix += segment + ".";
+        }
+
+        /// <summary>The namespace of a type. C#'s keyword types map to primitives, and are types of <c>System</c>.</summary>
+        private static string? Namespace(JavaType? type)
+        {
+            if (type is JavaType.Primitive)
+                return "System";
+            if (TypeUtils.AsClass(type) is not { } c)
+                return null;
+            var outermost = c.FullyQualifiedName.Split('$')[0];
+            return outermost.Contains('.') ? outermost[..outermost.LastIndexOf('.')] : "";
+        }
+
         private static string? QualifiedName(J name) => name switch
         {
-            Identifier i => i.SimpleName,
-            FieldAccess fa => $"{QualifiedName(fa.Target)}.{fa.Name.Element.SimpleName}",
+            // `global::System` is one identifier where the parser reads it as part of a type name.
+            Identifier i => i.SimpleName.Split("::")[^1],
+            AliasQualifiedName aliased => QualifiedName(aliased.Name),
+            FieldAccess fa => QualifiedName(fa.Target) is { } target ? $"{target}.{fa.Name.Element.SimpleName}" : null,
             _ => null
         };
 

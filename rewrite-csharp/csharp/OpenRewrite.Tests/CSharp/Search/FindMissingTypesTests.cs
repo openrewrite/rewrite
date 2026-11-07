@@ -98,6 +98,55 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public void LeavesNamespacesUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                namespace Outer.Inner
+                {
+                    class B { }
+
+                    class A
+                    {
+                        [global::System.Obsolete]
+                        void M()
+                        {
+                            global::System.Console.WriteLine();
+                            System.Int32 i = 0;
+                            Inner.B b = null;
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void LeavesAttributeTargetsAndDiscardsUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                [assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+                class A
+                {
+                    [return: System.Diagnostics.CodeAnalysis.NotNull]
+                    object M()
+                    {
+                        var (_, x) = (1, 2);
+                        return x;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void LeavesCallsBoundAtRunTimeUnmarked()
     {
         RewriteRun(
