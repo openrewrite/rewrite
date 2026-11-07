@@ -32,6 +32,25 @@ public class FindMissingTypes : Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
 
+    /// <summary>Each node of the source that the recipe would mark, as the reason and the node's first line.</summary>
+    public static List<string> Find(SourceFile source)
+    {
+        var found = new List<string>();
+        new Visitor<List<string>>((j, message, list) =>
+        {
+            list.Add($"{message}: {FirstLine(j)}");
+            return j;
+        }).Visit(source, found);
+        return found;
+    }
+
+    private static string FirstLine(J j)
+    {
+        var printed = new CSharpPrinter<object>().Print(J.SetPrefix(j, Space.Empty));
+        var end = printed.IndexOf('\n');
+        return end < 0 ? printed : printed[..end].TrimEnd() + " ...";
+    }
+
     private sealed class Visitor<P>(Func<J, string, P, J> missing) : CSharpVisitor<P>
     {
         /// <summary>The parser attributes types in the first branch only.</summary>

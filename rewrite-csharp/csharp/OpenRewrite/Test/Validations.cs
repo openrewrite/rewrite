@@ -45,6 +45,14 @@ public sealed class Validations
     public bool PrintIdempotence { get; init; } = true;
 
     /// <summary>
+    /// Whether each C# source that compiles without errors against the reference assemblies is validated to carry
+    /// the type attribution that <see cref="OpenRewrite.CSharp.Search.FindMissingTypes"/> looks for. Code with an
+    /// error can leave nodes that Roslyn binds to no symbol, so a source that does not compile is not checked.
+    /// Default: enabled.
+    /// </summary>
+    public bool TypeAttribution { get; init; } = true;
+
+    /// <summary>
     /// Whether the formatting reconciler validates structural compatibility between
     /// recipe output and Roslyn-formatted output. When enabled (default), the reconciler
     /// reports mismatches as test failures. When disabled, mismatches are silently
@@ -102,6 +110,7 @@ public sealed class Validations
         WhitespaceInSpaces = false,
         PrintEqualsInput = false,
         PrintIdempotence = false,
+        TypeAttribution = false,
         FormattingReconciliation = false
     };
 }

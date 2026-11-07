@@ -23,6 +23,7 @@ using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
 using OpenRewrite.CSharp.Rpc;
+using OpenRewrite.CSharp.Search;
 using OpenRewrite.Java;
 using OpenRewrite.Xml;
 using OpenRewrite.Xml.Rpc;
@@ -148,6 +149,16 @@ public abstract class RewriteTest
 
                 var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
                 source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
+
+                if (validations.TypeAttribution && semanticModel != null &&
+                    semanticModel.GetDiagnostics().All(d => d.Severity != DiagnosticSeverity.Error))
+                {
+                    var missing = FindMissingTypes.Find(source);
+                    Assert.True(missing.Count == 0,
+                        "The source compiles, and the parser left these nodes of it without type attribution:\n" +
+                        string.Join("\n", missing) + "\nFix the type mapping, or opt out with " +
+                        "spec.SetValidations(new Validations { TypeAttribution = false }).");
+                }
 
                 // Verify no non-whitespace content leaked into Space fields
                 if (validations.WhitespaceInSpaces)

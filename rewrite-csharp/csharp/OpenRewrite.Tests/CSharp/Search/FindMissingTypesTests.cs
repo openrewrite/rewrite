@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Search;
 using OpenRewrite.Test;
 
@@ -46,6 +47,25 @@ public class FindMissingTypesTests : RewriteTest
                 """
             )
         );
+    }
+
+    [Fact]
+    public void FindListsEachNodeItWouldMarkByItsFirstLine()
+    {
+        var cu = new CSharpParser().Parse(
+            """
+            class A
+            {
+                void M()
+                {
+                    M();
+                }
+            }
+            """);
+
+        Assert.Equal(
+            ["MethodInvocation type is missing: M()", "MethodDeclaration type is missing: void M() ..."],
+            FindMissingTypes.Find(cu));
     }
 
     [Fact]
