@@ -5515,8 +5515,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.OperatorToken.Span.End;
 
         // Parse the member name — resolve type/fieldType from the outer member access node
-        var memberType = _typeMapping?.Type(node);
-        var memberFieldType = _typeMapping?.FieldType(node);
+        var (memberType, memberFieldType) = _typeMapping?.TypeAndFieldType(node) ?? (null, null);
         Identifier name;
         JContainer<Expression>? typeArguments = null;
         if (node.Name is GenericNameSyntax genericName)

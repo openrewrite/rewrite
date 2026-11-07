@@ -867,6 +867,26 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal("System.Version", TypeUtils.GetFullyQualifiedName(name.Type));
     }
 
+    [Fact]
+    public async Task MethodGroupNamesCarryTheirMethod()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                void M()
+                {
+                    Action qualified = Console.WriteLine;
+                    Action simple = M;
+                }
+            }
+            """);
+
+        Assert.Equal(["WriteLine", "M"], Collect<NamedVariable>(cu).Select(v =>
+            ((v.Initializer?.Element as FieldAccess)?.Name.Element ?? v.Initializer?.Element as Identifier)?.Type
+            is JavaType.Method method ? method.Name : null));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();

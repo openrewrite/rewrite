@@ -165,6 +165,12 @@ internal class CSharpTypeMapping
         {
             type = MapType(namedType);
         }
+        // The name of a method group, such as `Console.WriteLine` in `Action a = Console.WriteLine;`, has no type of its
+        // own. It names the method that its conversion picks, as the name of a call does.
+        else if (type == null && symbolInfo.Symbol is IMethodSymbol method)
+        {
+            type = MapMethod(method);
+        }
 
         var fieldType = VariableFromSymbol(symbolInfo.Symbol);
         return (type, fieldType);
