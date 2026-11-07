@@ -22,7 +22,7 @@ namespace OpenRewrite.Tests.CSharp.Search;
 public class FindMissingTypesTests : RewriteTest
 {
     [Fact]
-    public void MarksMethodsParsedWithoutTypes()
+    public void MarksNodesParsedWithoutTypes()
     {
         RewriteRun(
             spec => spec.SetRecipe(new FindMissingTypes()).SetReferenceAssemblies(null),
@@ -37,7 +37,7 @@ public class FindMissingTypesTests : RewriteTest
                 }
                 """,
                 """
-                class A
+                /*~~(ClassDeclaration type is missing)~~>*/class A
                 {
                     /*~~(MethodDeclaration type is missing)~~>*/void M()
                     {
@@ -64,7 +64,8 @@ public class FindMissingTypesTests : RewriteTest
             """);
 
         Assert.Equal(
-            ["MethodInvocation type is missing: M()", "MethodDeclaration type is missing: void M() ..."],
+            ["MethodInvocation type is missing: M()", "MethodDeclaration type is missing: void M() ...",
+             "ClassDeclaration type is missing: class A ..."],
             FindMissingTypes.Find(cu));
     }
 

@@ -26,8 +26,8 @@ public class FindMissingTypes : Recipe
     public override string DisplayName => "Find missing type information on C# LSTs";
 
     public override string Description =>
-        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a method declaration or " +
-        "invocation without a method type.";
+        "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration without a " +
+        "type, or a method declaration or invocation without a method type.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
@@ -56,6 +56,12 @@ public class FindMissingTypes : Recipe
         /// <summary>The parser attributes types in the first branch only.</summary>
         public override J VisitConditionalDirective(ConditionalDirective directive, P p) =>
             directive.WithBranches(ListUtils.Map(directive.Branches, (i, b) => i == 0 ? VisitRightPadded(b, p) : b));
+
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, P p)
+        {
+            var cd = base.VisitClassDeclaration(classDecl, p);
+            return cd is ClassDeclaration { Type: null or JavaType.Unknown } ? missing(cd, "ClassDeclaration type is missing", p) : cd;
+        }
 
         public override J VisitMethodDeclaration(MethodDeclaration method, P p)
         {
