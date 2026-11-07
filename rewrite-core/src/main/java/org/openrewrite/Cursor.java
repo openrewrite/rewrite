@@ -57,6 +57,15 @@ public class Cursor implements Heavyweight {
         this.messages = messages;
     }
 
+    /**
+     * Applies the same checks as the constructor to a level that has no cursor yet.
+     */
+    static boolean isValidChild(Object parentValue, Object value) {
+        assert parentValue != value : sameElementMessage(value, true);
+        assert !sameId(parentValue, value) : sameElementMessage(value, false);
+        return true;
+    }
+
     private static boolean sameId(Object parentValue, Object value) {
         if (!(parentValue instanceof Tree) || !(value instanceof Tree)) {
             return false;

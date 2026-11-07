@@ -49,6 +49,7 @@ import static java.util.stream.Collectors.toList;
 @SuppressWarnings("unused")
 public interface J extends Tree {
 
+    // Each J class repeats this body, which gives its acceptJava call a single receiver class
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -149,6 +150,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
         }
@@ -225,6 +232,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotation(this, p);
         }
@@ -292,6 +305,12 @@ public interface J extends Tree {
         @With
         @Nullable
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -397,6 +416,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayType(this, p);
         }
@@ -433,6 +458,12 @@ public interface J extends Tree {
         @Nullable
         @With
         JLeftPadded<Expression> detail;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -497,6 +528,12 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -587,6 +624,12 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -708,6 +751,12 @@ public interface J extends Tree {
         @With
         @Nullable
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -840,6 +889,12 @@ public interface J extends Tree {
         @Getter
         @With
         Space end;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -978,6 +1033,12 @@ public interface J extends Tree {
 
         @With
         J.@Nullable Identifier label;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1140,6 +1201,12 @@ public interface J extends Tree {
             this.guard = guard;
             this.statements = statements;
             this.body = body;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -1388,6 +1455,12 @@ public interface J extends Tree {
             }
 
             return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) type);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -1673,6 +1746,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }
@@ -1771,6 +1850,12 @@ public interface J extends Tree {
         J.@Nullable Identifier label;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitContinue(this, p);
         }
@@ -1841,6 +1926,12 @@ public interface J extends Tree {
 
         public DoWhileLoop withWhileCondition(ControlParentheses<Expression> whileCondition) {
             return getPadding().withWhileCondition(this.whileCondition.withElement(whileCondition));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -1925,6 +2016,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEmpty(this, p);
         }
@@ -1970,6 +2067,12 @@ public interface J extends Tree {
         @With
         @Nullable
         NewClass initializer;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2029,6 +2132,12 @@ public interface J extends Tree {
         @With
         @Getter
         boolean terminatedWithSemicolon;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2118,6 +2227,12 @@ public interface J extends Tree {
         @Getter
         @Nullable
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2269,6 +2384,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForEachLoop(this, p);
         }
@@ -2322,6 +2443,12 @@ public interface J extends Tree {
 
             public Control withIterable(Expression iterable) {
                 return getPadding().withIterable(this.iterable.withElement(iterable));
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
             }
 
             @Override
@@ -2451,6 +2578,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForLoop(this, p);
         }
@@ -2511,6 +2644,12 @@ public interface J extends Tree {
 
             public Control withUpdate(List<Statement> update) {
                 return getPadding().withUpdate(JRightPadded.withElements(this.update, update));
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
             }
 
             @Override
@@ -2638,6 +2777,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParenthesizedTypeTree(this, p);
         }
@@ -2679,6 +2824,12 @@ public interface J extends Tree {
         JavaType type;
 
         JavaType.@Nullable Variable fieldType;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2757,6 +2908,12 @@ public interface J extends Tree {
         Else elsePart;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIf(this, p);
         }
@@ -2798,6 +2955,12 @@ public interface J extends Tree {
 
             public Else withBody(Statement body) {
                 return getPadding().withBody(this.body.withElement(body));
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
             }
 
             @Override
@@ -2930,6 +3093,12 @@ public interface J extends Tree {
                 return new J.Import(null, id, prefix, markers, statik, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -3165,6 +3334,12 @@ public interface J extends Tree {
         Modifier modifier;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
         }
@@ -3288,6 +3463,12 @@ public interface J extends Tree {
         JavaType type;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDeconstructionPattern(this, p);
         }
@@ -3371,6 +3552,12 @@ public interface J extends Tree {
 
         public IntersectionType withBounds(List<TypeTree> bounds) {
             return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -3476,6 +3663,12 @@ public interface J extends Tree {
         Statement statement;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLabel(this, p);
         }
@@ -3556,6 +3749,12 @@ public interface J extends Tree {
         JavaType type;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLambda(this, p);
         }
@@ -3601,6 +3800,12 @@ public interface J extends Tree {
 
             public Parameters withParameters(List<J> parameters) {
                 return getPadding().withParameters(JRightPadded.withElements(this.parameters, parameters));
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
             }
 
             @Override
@@ -3702,6 +3907,12 @@ public interface J extends Tree {
                 return new Literal(id, prefix, markers, value, valueSource, unicodeEscapes, (JavaType.Primitive) type);
             }
             return this;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -3857,6 +4068,12 @@ public interface J extends Tree {
         @With
         @Getter
         JavaType.@Nullable Variable variableType;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -4092,6 +4309,12 @@ public interface J extends Tree {
         @Override
         public MethodDeclaration withType(@Nullable JavaType type) {
             throw new UnsupportedOperationException("To change the return type of this method declaration, use withMethodType(..)");
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -4351,6 +4574,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMethodInvocation(this, p);
         }
@@ -4466,6 +4695,12 @@ public interface J extends Tree {
         List<Annotation> annotations;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitModifier(this, p);
         }
@@ -4534,6 +4769,12 @@ public interface J extends Tree {
 
         public MultiCatch withAlternatives(List<NameTree> alternatives) {
             return getPadding().withAlternatives(JRightPadded.withElements(this.alternatives, alternatives));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -4639,6 +4880,12 @@ public interface J extends Tree {
         JavaType type;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
         }
@@ -4708,6 +4955,12 @@ public interface J extends Tree {
 
         public ArrayDimension withIndex(Expression index) {
             return getPadding().withIndex(this.index.withElement(index));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -4858,6 +5111,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewClass(this, p);
         }
@@ -4962,6 +5221,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNullableType(this, p);
         }
@@ -5032,6 +5297,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPackage(this, p);
         }
@@ -5083,6 +5354,12 @@ public interface J extends Tree {
 
         public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
             return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -5160,6 +5437,12 @@ public interface J extends Tree {
 
         public Parentheses<J2> withTree(J2 tree) {
             return getPadding().withTree(this.tree.withElement(tree));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -5258,6 +5541,12 @@ public interface J extends Tree {
 
         public ControlParentheses<J2> withTree(J2 tree) {
             return getPadding().withTree(this.tree.withElement(tree));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -5371,6 +5660,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPrimitive(this, p);
         }
@@ -5404,6 +5699,12 @@ public interface J extends Tree {
         @With
         @Nullable
         Expression expression;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -5441,6 +5742,12 @@ public interface J extends Tree {
 
         @With
         Block cases;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -5481,6 +5788,12 @@ public interface J extends Tree {
         JavaType type;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitSwitchExpression(this, p);
         }
@@ -5511,6 +5824,12 @@ public interface J extends Tree {
 
         @With
         Block body;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -5574,6 +5893,12 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -5655,6 +5980,12 @@ public interface J extends Tree {
         Expression exception;
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitThrow(this, p);
         }
@@ -5729,6 +6060,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTry(this, p);
         }
@@ -5763,6 +6100,12 @@ public interface J extends Tree {
             boolean terminatedWithSemicolon;
 
             @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+            }
+
+            @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitTryResource(this, p);
             }
@@ -5787,6 +6130,12 @@ public interface J extends Tree {
 
             @With
             Block body;
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+            }
 
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -5868,6 +6217,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeCast(this, p);
         }
@@ -5944,6 +6299,12 @@ public interface J extends Tree {
                 updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
             }
             return getPadding().withBounds(updated);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
         }
 
         @Override
@@ -6030,6 +6391,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             // Visited as part of TypeParameter bounds traversal
             return this;
@@ -6063,6 +6430,12 @@ public interface J extends Tree {
         List<Annotation> annotations;
 
         List<JRightPadded<TypeParameter>> typeParameters;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -6151,6 +6524,12 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -6302,6 +6681,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitVariableDeclarations(this, p);
         }
@@ -6431,6 +6816,12 @@ public interface J extends Tree {
             }
 
             @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+            }
+
+            @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitVariable(this, p);
             }
@@ -6557,6 +6948,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWhileLoop(this, p);
         }
@@ -6646,6 +7043,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
         }
@@ -6713,6 +7116,12 @@ public interface J extends Tree {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
+
+        @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitYield(this, p);
         }
@@ -6734,6 +7143,12 @@ public interface J extends Tree {
         Space prefix;
         Markers markers;
         Source source;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -6775,6 +7190,12 @@ public interface J extends Tree {
             String text;
 
             @Override
+            @SuppressWarnings("unchecked")
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+            }
+
+            @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitUnknownSource(this, p);
             }
@@ -6801,6 +7222,12 @@ public interface J extends Tree {
 
         @With
         String text;
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) acceptJava(v.adapt(JavaVisitor.class), p);
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {

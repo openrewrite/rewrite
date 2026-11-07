@@ -42,6 +42,29 @@ class TreeVisitorTest {
     }
 
     @Test
+    void rootBuiltOnDemandKeepsItsMessages() {
+        TreeVisitor<Tree, Integer> visitor = new TreeVisitor<>() {
+        };
+        visitor.getCursor().putMessage("key", 1);
+        assertThat(visitor.getCursor().isRoot()).isTrue();
+        assertThat(visitor.getCursor().<Integer>getMessage("key")).isEqualTo(1);
+    }
+
+    @Test
+    void poppingPastTheRootFailsInTests() {
+        Quark quark = new Quark(Tree.randomId(), Path.of("quark"), Markers.EMPTY, null, null);
+        TreeVisitor<Tree, Integer> unbalanced = new TreeVisitor<>() {
+            @Override
+            public Tree preVisit(Tree tree, Integer p) {
+                popCursor();
+                popCursor();
+                return tree;
+            }
+        };
+        assertThatThrownBy(() -> unbalanced.visit(quark, 0)).hasStackTraceContaining("popped past the root cursor");
+    }
+
+    @Test
     void scheduleAfterOnVisitWithCursor() {
         Quark quark = new Quark(Tree.randomId(), Path.of("quark"), Markers.EMPTY, null, null);
         AtomicInteger visited = new AtomicInteger(0);
