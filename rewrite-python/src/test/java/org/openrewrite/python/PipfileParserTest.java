@@ -131,4 +131,19 @@ class PipfileParserTest {
         // No [[source]] blocks means no source indexes on the marker.
         assertThat(marker.getSourceIndexes()).isNull();
     }
+
+    @Test
+    void pythonFullVersionIsRequiresPythonWithoutPythonVersion() {
+        Toml.Document pipfile = (Toml.Document) new PipfileParser().parse("""
+          [packages]
+          requests = "*"
+
+          [requires]
+          python_full_version = "3.11.4"
+          """).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = PipfileParser.createMarker(pipfile);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getRequiresPython()).isEqualTo("3.11.4");
+    }
 }

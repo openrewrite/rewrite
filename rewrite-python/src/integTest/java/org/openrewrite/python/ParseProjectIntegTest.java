@@ -29,6 +29,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.internal.PackageManagerExecutor;
+import org.openrewrite.python.rpc.ParseProjectOptions;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
@@ -39,9 +41,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Integration test for ParseProject RPC functionality.
@@ -407,6 +411,105 @@ class ParseProjectIntegTest {
         assertThat(dev.getDependencies()).extracting(PythonResolutionResult.Dependency::getName).containsExactly("six");
         assertThat(dev.getResolvedDependency("sortedcontainers")).isNotNull()
                 .extracting(PythonResolutionResult.ResolvedDependency::getVersion).isEqualTo("2.4.0");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void requirementsMarkerCarriesPythonRequiresOfSetupPy() throws Exception {
+        // huggingface/peft
+        Path projectDir = tempDir.resolve("peft");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 119
+                """);
+        Files.writeString(projectDir.resolve("requirements.txt"), "six\n");
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import find_packages, setup
+
+                setup(
+                    name="peft",
+                    version="0.18.2.dev0",
+                    python_requires=">=3.11.0",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "requirements.txt").getRequiresPython()).isEqualTo(">=3.11.0");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void setupCfgMarkerCarriesPythonRequiresOfSetupPy() throws Exception {
+        // McGill-NLP/llm2vec
+        Path projectDir = tempDir.resolve("llm2vec");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("setup.cfg"), """
+                # Inside of setup.cfg
+                [metadata]
+                description-file = README.md
+                """);
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import setup, find_packages
+
+                setup(
+                    name="llm2vec",
+                    python_requires=">=3.8",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "setup.cfg").getRequiresPython()).isEqualTo(">=3.8");
+    }
+
+    @Test
+    @Timeout(value = 120, unit = TimeUnit.SECONDS)
+    void setupPyMarkerCarriesItsPythonRequires() throws Exception {
+        // huggingface/diffusers
+        Path projectDir = tempDir.resolve("diffusers");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [tool.ruff]
+                line-length = 119
+                """);
+        Files.writeString(projectDir.resolve("setup.py"), """
+                from setuptools import find_packages, setup
+
+                setup(
+                    name="diffusers",
+                    python_requires=">=3.11.0",
+                    install_requires=["six"],
+                )
+                """);
+
+        List<SourceFile> sources = parseWithEnvOf(projectDir, "six", "1.16.0");
+
+        assertThat(marker(sources, "setup.py").getRequiresPython()).isEqualTo(">=3.11.0");
+    }
+
+    /**
+     * Parses against a venv holding only the named distribution, so that the markers resolve without an install.
+     */
+    private List<SourceFile> parseWithEnvOf(Path projectDir, String name, String version) throws Exception {
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
+        Path env = tempDir.resolve("env");
+        Process venv = new ProcessBuilder(PackageManagerExecutor.UV.find(), "venv", "--python", "3.12", env.toString())
+                .redirectErrorStream(true).start();
+        assertThat(venv.waitFor()).isZero();
+        try (Stream<Path> libs = Files.list(env.resolve("lib"))) {
+            Path sitePackages = libs.findFirst().orElseThrow().resolve("site-packages");
+            Path distInfo = Files.createDirectories(sitePackages.resolve(name + "-" + version + ".dist-info"));
+            Files.writeString(distInfo.resolve("METADATA"),
+                    "Metadata-Version: 2.1\nName: " + name + "\nVersion: " + version + "\n");
+        }
+        return client()
+                .parseProject(projectDir, ParseProjectOptions.builder().dependencyPath(env).build(),
+                        new InMemoryExecutionContext())
+                .collect(toList());
     }
 
     private static PythonResolutionResult marker(List<SourceFile> sources, String fileName) {

@@ -166,6 +166,31 @@ class RequirementsTxtParserTest {
     }
 
     @Test
+    void requirementsFileAloneDeclaresNoPythonVersion(@TempDir Path tempDir) throws Exception {
+        // xusenlinzy/api-for-open-llm
+        Files.writeString(tempDir.resolve("requirements.txt"), """
+                fastapi
+                python-dotenv==1.0.0
+                """);
+        Path env = tempDir.resolve(".venv");
+        Path sitePackages = env.resolve("lib/python3.12/site-packages");
+        for (String dist : List.of("fastapi-0.115.0", "python_dotenv-1.0.0")) {
+            Path distInfo = Files.createDirectories(sitePackages.resolve(dist + ".dist-info"));
+            String[] nameVersion = dist.split("-");
+            Files.writeString(distInfo.resolve("METADATA"),
+                    "Metadata-Version: 2.1\nName: " + nameVersion[0] + "\nVersion: " + nameVersion[1] + "\n");
+        }
+
+        SourceFile parsed = new RequirementsTxtParser(env).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("requirements.txt"))), tempDir,
+                new InMemoryExecutionContext()).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        assertThat(marker.getDependencies()).isNotEmpty();
+        assertThat(marker.getRequiresPython()).isNull();
+    }
+
+    @Test
     void markerContainsDependenciesFromFreeze() {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 

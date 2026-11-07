@@ -16,6 +16,7 @@
 package org.openrewrite.python.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.poetrylock.PoetryConstraint;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
@@ -43,21 +44,29 @@ public class PythonDependencyParser {
      *
      * @param doc        the parsed pyproject.toml document
      * @param relativeTo the base path (used as the path field in the marker)
-     * @return the marker, or null if the document has no [project] section
+     * @return the marker, or null if the document has neither a [project] nor a [tool.poetry] section
      */
     public static @Nullable PythonResolutionResult createMarker(Toml.Document doc, @Nullable Path relativeTo) {
         Map<String, Toml.Table> tables = indexTables(doc);
 
+        // Detect package manager from tool sections
+        PythonResolutionResult.PackageManager packageManager = detectPackageManager(tables);
+
         Toml.Table projectTable = tables.get("project");
-        if (projectTable == null) {
+        if (projectTable == null && packageManager != PythonResolutionResult.PackageManager.Poetry) {
             return null;
         }
+        Toml.Table metadataTable = projectTable != null ? projectTable : tables.get("tool.poetry");
 
-        String name = getStringValue(projectTable, "name");
-        String version = getStringValue(projectTable, "version");
-        String description = getStringValue(projectTable, "description");
-        String license = getLicense(projectTable);
+        String name = getStringValue(metadataTable, "name");
+        String version = getStringValue(metadataTable, "version");
+        String description = getStringValue(metadataTable, "description");
+        String license = getLicense(metadataTable);
         String requiresPython = getStringValue(projectTable, "requires-python");
+        if (requiresPython == null) {
+            String poetryPython = getStringValue(tables.get("tool.poetry.dependencies"), "python");
+            requiresPython = poetryPython == null ? null : PoetryConstraint.toPep440(poetryPython);
+        }
 
         Toml.Table buildSystemTable = tables.get("build-system");
         String buildBackend = getStringValue(buildSystemTable, "build-backend");
@@ -76,9 +85,6 @@ public class PythonDependencyParser {
         if (!pdmOverrides.isEmpty()) {
             overrideDependencies = pdmOverrides;
         }
-
-        // Detect package manager from tool sections
-        PythonResolutionResult.PackageManager packageManager = detectPackageManager(tables);
 
         String path = doc.getSourcePath().toString();
 
