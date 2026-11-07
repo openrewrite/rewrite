@@ -1791,8 +1791,11 @@ public class GroovyParserVisitor {
                 } else if (binaryOp != null) {
                     return new J.Binary(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
-                            right, binaryType(binaryOp, operandType(binary.getLeftExpression(), left),
-                            operandType(binary.getRightExpression(), right), typeMapping.type(binary.getType())));
+                            right, binaryType(
+                                    binaryOp,
+                                    operandType(binary.getLeftExpression(), left),
+                                    operandType(binary.getRightExpression(), right),
+                                    typeMapping.type(binary.getType())));
                 } else if (gBinaryOp != null) {
                     Space after = EMPTY;
                     if (gBinaryOp == G.Binary.Type.Access) {
