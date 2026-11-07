@@ -20,6 +20,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
@@ -48,6 +49,127 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RegistryProxyTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"token", "base64", "username"})
+    void bunCannotForwardHostCredentialsWhenTheirOriginalAuthPathIsUnknown(String credential) {
+        AtomicInteger sent = new AtomicInteger();
+        NodeRegistry registry = new NodeRegistry("@proxy-control", "https://registry.invalid/private/",
+                "token".equals(credential) ? "synthetic-secret" : null,
+                "username".equals(credential) ? "synthetic-user" : null, null,
+                "base64".equals(credential) ? "c3ludGhldGljOnNlY3JldA==" : null, false, null, true, false);
+        NodeRegistries registries = new NodeRegistries(registry, Map.of("@proxy-control", registry), null, null, null);
+        BunRegistryManifests source = new BunRegistryManifests(registries, new NpmRegistryClient(r -> {
+            sent.incrementAndGet();
+            throw new IllegalStateException("synthetic sender boundary");
+        }));
+        assertThatThrownBy(() -> source.packument(registry.getUrl(), "@proxy-control/synthetic", false))
+                .isInstanceOf(CannotKnow.class).hasMessageContaining("credential path").hasMessageNotContaining("synthetic-secret");
+        assertThat(sent).hasValue(0);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"--proxy", "--https-proxy", "--network-timeout",
+            "--install.proxy", "--install.https-proxy", "--install.network-timeout"})
+    void commandStyleYarnRequestOptionsCannotDisappearBeforeTheLiveAdapter(String option) {
+        AtomicInteger sent = new AtomicInteger();
+        String value = option.endsWith("network-timeout") ? "1500" : "http://127.0.0.1:1";
+        Request request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"))
+                .packageManagerFile(Paths.get(".npmrc"), "registry=http://registry.invalid/\n")
+                .packageManagerFile(Paths.get(".yarnrc"), option + " \"" + value + "\"\n")
+                .lock("# yarn lockfile v1\n").build();
+        Environment environment = new Environment() {
+            public String getenv(String name) { return null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager(PackageManager.YarnClassic).packageManagerVersion("1.22.22").build();
+        Result result;
+        try {
+            result = YarnClassicInputs.PORT.regenerate(LockDirectory.of(request), host,
+                    new NpmRegistryClient(r -> {
+                        sent.incrementAndGet();
+                        throw new IllegalStateException("synthetic sender boundary");
+                    }));
+        } catch (NodeRegistryException e) {
+            result = Result.failure(LockOnlyInstall.failure(e));
+        }
+        assertThat(sent).hasValue(0);
+        assertThat(result.getErrorMessage()).contains("network policy");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"YARN_ENABLE_OFFLINE_MODE,false", "YARN_ENABLE_OFFLINE_MODE,0",
+            "YARN_ENABLE_NETWORK,true", "YARN_ENABLE_NETWORK,1",
+            "YARN_ENABLE_STRICT_SSL,true", "YARN_ENABLE_STRICT_SSL,1"})
+    void ordinaryYarnHostDefaultsDoNotRequireAnUnboundPolicy(String key, String value) {
+        AtomicInteger sent = new AtomicInteger();
+        Environment environment = new Environment() {
+            public String getenv(String name) { return key.equals(name) ? value : null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        Request request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"))
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: http://registry.invalid/\n")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n").build();
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager(PackageManager.YarnBerry).packageManagerVersion("4.17.0").build();
+        Result result;
+        try {
+            result = YarnBerryInputs.PORT.regenerate(LockDirectory.of(request), host,
+                    new NpmRegistryClient(r -> {
+                        sent.incrementAndGet();
+                        throw new IllegalStateException("synthetic sender boundary");
+                    }));
+        } catch (NodeRegistryException e) {
+            result = Result.failure(LockOnlyInstall.failure(e));
+        }
+        assertThat(sent).hasValue(1);
+        assertThat(result.getErrorMessage()).doesNotContain("network policy");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"yarn1", "yarn4", "bun"})
+    void anUnboundManagerPolicyCannotSendDirectRequests(String manager) {
+        AtomicInteger sent = new AtomicInteger();
+        String registry = "http://registry.invalid/";
+        String proxy = "http://synthetic-user:synthetic-password@127.0.0.1:1";
+        Request.RequestBuilder request = Request.builder()
+                .packageJson("{\"name\":\"proxy-control\",\"version\":\"1.0.0\",\"dependencies\":{\"@proxy-control/synthetic\":\"1.0.0\"}}")
+                .packageJsonPath(Paths.get("package.json"));
+        if ("yarn1".equals(manager)) {
+            request.lock("# yarn lockfile v1\n")
+                    .packageManagerFile(Paths.get(".npmrc"), "registry=" + registry + "\n")
+                    .packageManagerFile(Paths.get(".yarnrc"), "proxy \"" + proxy + "\"\n");
+        } else if ("yarn4".equals(manager)) {
+            request.lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n")
+                    .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: " + registry + "\nhttpProxy: " + proxy + "\nunsafeHttpWhitelist: [registry.invalid]\n");
+        } else {
+            request.lock("{\"lockfileVersion\":1,\"workspaces\":{\"\":{\"name\":\"proxy-control\"}},\"packages\":{}}")
+                    .packageManagerFile(Paths.get(".npmrc"), "registry=" + registry + "\n");
+        }
+        Environment environment = new Environment() {
+            public String getenv(String name) { return "bun".equals(manager) && "HTTP_PROXY".equals(name) ? proxy : null; }
+            public Path userHome() { return Paths.get("/nonexistent-registry-proxy-test"); }
+            public String osName() { return "Linux"; }
+        };
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(environment)
+                .packageManager("yarn4".equals(manager) ? PackageManager.YarnBerry : "yarn1".equals(manager) ? PackageManager.YarnClassic : PackageManager.Bun)
+                .packageManagerVersion("yarn4".equals(manager) ? "4.17.0" : "yarn1".equals(manager) ? "1.22.22" : "1.3.14").build();
+        Result result = ("yarn1".equals(manager) ? YarnClassicInputs.PORT : "yarn4".equals(manager) ? YarnBerryInputs.PORT : BunInputs.PORT).regenerate(
+                LockDirectory.of(request.build()), host, new NpmRegistryClient(r -> {
+                    sent.incrementAndGet();
+                    throw new IllegalStateException("a direct request escaped the configured proxy policy");
+                }));
+        assertThat(sent).hasValue(0);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("network policy").doesNotContain("synthetic-password");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"cafile", "strict-ssl"})
     void trustedHostTlsSettingsReachTheExistingRegistryGuard(String setting) {

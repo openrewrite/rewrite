@@ -90,7 +90,13 @@ final class YarnClassicInputs implements Port {
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new YarnClassicLockRegenerator(inputs, new HostRegistrySource(host.transport(), client)).regenerate();
+        return new YarnClassicLockRegenerator(inputs, new HostRegistrySource(host.transport(), client,
+                NetworkPolicy.environment(host.getSystem(),
+                        "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR",
+                        "npm_config_proxy", "npm_config_https_proxy", "NPM_CONFIG_PROXY", "NPM_CONFIG_HTTPS_PROXY",
+                        "YARN_PROXY", "yarn_proxy", "YARN_HTTPS_PROXY", "yarn_https_proxy",
+                        "npm_config_cafile", "NPM_CONFIG_CAFILE", "npm_config_ca", "NPM_CONFIG_CA",
+                        "npm_config_cert", "NPM_CONFIG_CERT", "npm_config_key", "NPM_CONFIG_KEY"))).regenerate();
     }
 
     /**
@@ -105,7 +111,7 @@ final class YarnClassicInputs implements Port {
                 .release(release(host.packageManagerVersion(PackageManager.YarnClassic)))
                 .host(host.getHost())
                 .env(host.getEnvironment().process())
-                .homeFile(".npmrc", host.userNpmrc(HostInputs.GLOBAL_AND_USER))
+                .homeFile(".npmrc", host.userNpmrcWithNetwork(HostInputs.GLOBAL_AND_USER))
                 .build();
     }
 

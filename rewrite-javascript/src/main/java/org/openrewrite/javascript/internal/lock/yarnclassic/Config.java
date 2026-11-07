@@ -722,6 +722,20 @@ final class Config {
         }
     }
 
+    Map<String, Object> networkSettings() {
+        Map<String, Object> settings = new LinkedHashMap<>();
+        for (String key : Arrays.asList("proxy", "https-proxy", "ca", "cafile", "cert", "key", "local-address")) {
+            settings.put(key, getOption(key));
+        }
+        if (Boolean.FALSE.equals(getOption("strict-ssl"))) {
+            settings.put("custom TLS", true);
+        }
+        if (offline) {
+            settings.put("offline registry cache", true);
+        }
+        return settings;
+    }
+
     /**
      * yarn-registry.js {@code getOption}: the yarn config's value, else the npm config's under npm's name for it,
      * else under the same name.

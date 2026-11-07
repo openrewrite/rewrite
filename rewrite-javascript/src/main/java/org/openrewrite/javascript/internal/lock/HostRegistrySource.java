@@ -21,6 +21,9 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.util.Collections;
+import java.util.Map;
+
 /**
  * A port's requests through the host's client, with the Authorization header the port computes and the host's
  * transport settings for the url.
@@ -32,10 +35,22 @@ final class HostRegistrySource implements RegistrySource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
+    private final Map<String, String> hostNetwork;
 
     HostRegistrySource(NodeRegistries registries, NpmRegistryClient client) {
+        this(registries, client, Collections.emptyMap());
+    }
+
+    HostRegistrySource(NodeRegistries registries, NpmRegistryClient client, Map<String, String> hostNetwork) {
         this.registries = registries;
         this.client = client;
+        this.hostNetwork = hostNetwork;
+    }
+
+    @Override
+    public RegistrySource withNetworkSettings(String manager, Map<String, ?> settings) {
+        NetworkPolicy.requireDirect(manager, settings);
+        return this;
     }
 
     @Override
@@ -64,6 +79,7 @@ final class HostRegistrySource implements RegistrySource {
     }
 
     private NodeRegistry request(String name, String url, @Nullable String authorization) {
+        NetworkPolicy.requireDirect("Yarn", hostNetwork);
         NodeRegistry host = registries.registryAt(name, url);
         String token = authorization != null && authorization.startsWith(BEARER) ?
                 authorization.substring(BEARER.length()) : null;

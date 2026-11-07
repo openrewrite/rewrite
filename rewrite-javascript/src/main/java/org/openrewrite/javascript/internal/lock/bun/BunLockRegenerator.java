@@ -538,6 +538,7 @@ public final class BunLockRegenerator {
                                  options.getSecurityScanner() + " bunfig.toml's install.security.scanner names, " +
                                  "a package's code it runs over the resolution");
         }
+        registry = registry.withNetworkSettings(options.getNetworkSettings());
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();
