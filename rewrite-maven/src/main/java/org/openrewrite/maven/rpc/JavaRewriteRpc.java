@@ -197,7 +197,7 @@ public class JavaRewriteRpc {
             handler = new TraceMessageHandler("server", handler);
         }
 
-        JsonRpc jsonRpc = new JsonRpc(handler);
+        JsonRpc jsonRpc = new JsonRpc(handler, new JsonMessageFormatter());
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);

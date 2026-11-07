@@ -131,7 +131,7 @@ class PythonResolutionResultRpcTest {
 
     private static RewriteRpc peer(InputStream in, OutputStream out) {
         JsonMessageFormatter formatter = new JsonMessageFormatter(new ParameterNamesModule());
-        return new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(formatter, in, out)), new RecipeMarketplace());
+        return new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(formatter, in, out), new JsonMessageFormatter()), new RecipeMarketplace());
     }
 
     private static PythonResolutionResult sendAndReceive(PythonResolutionResult marker) {
