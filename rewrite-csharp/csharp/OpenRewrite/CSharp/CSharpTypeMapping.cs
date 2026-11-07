@@ -166,8 +166,9 @@ internal class CSharpTypeMapping
             type = MapType(namedType);
         }
         // The name of a method group, such as `Console.WriteLine` in `Action a = Console.WriteLine;`, has no type of its
-        // own. It names the method that its conversion picks, as the name of a call does.
-        else if (type == null && symbolInfo.Symbol is IMethodSymbol method)
+        // own. It names the method that its conversion picks, as the name of a call does. A group that no conversion
+        // narrows, as in `nameof(M)` or an argument of type `Delegate`, names its method when it has only one.
+        else if (type == null && (symbolInfo.Symbol ?? SoleMember(node)) is IMethodSymbol method)
         {
             type = MapMethod(method);
         }
@@ -175,6 +176,8 @@ internal class CSharpTypeMapping
         var fieldType = VariableFromSymbol(symbolInfo.Symbol);
         return (type, fieldType);
     }
+
+    private ISymbol? SoleMember(SyntaxNode node) => _model.GetMemberGroup(node) is [var member] ? member : null;
 
     private JavaType.Variable? VariableFromSymbol(ISymbol? symbol)
     {

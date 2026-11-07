@@ -933,6 +933,28 @@ public class CSharpTypeMappingTests : RewriteTest
             .Select(v => TypeUtils.GetFullyQualifiedName((v.TypeExpression as FieldAccess)?.Target.Type)));
     }
 
+    [Fact]
+    public async Task MethodGroupArgumentNamesCarryTheirMethod()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                static void Take(Delegate d) { }
+                static int Handler(int x) => x;
+                void M()
+                {
+                    Take(Handler);
+                    var n = nameof(Handler);
+                }
+            }
+            """);
+
+        Assert.Equal(["Handler", "Handler"], Collect<Identifier>(cu)
+            .Where(i => i.SimpleName == "Handler" && Collect<MethodDeclaration>(cu).All(m => m.Name != i))
+            .Select(i => (i.Type as JavaType.Method)?.Name ?? "<none>"));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();
