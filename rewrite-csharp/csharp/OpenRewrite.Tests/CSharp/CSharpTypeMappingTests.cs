@@ -831,18 +831,38 @@ public class CSharpTypeMappingTests : RewriteTest
             }
             """);
 
-        var creations = new List<NewClass>();
-        new NewClassCollector().Visit(cu, creations);
         Assert.Equal(["System.EventHandler", "System.EventHandler"],
-            creations.Select(n => TypeUtils.GetFullyQualifiedName(n.ConstructorType?.DeclaringType)));
+            Collect<NewClass>(cu).Select(n => TypeUtils.GetFullyQualifiedName(n.ConstructorType?.DeclaringType)));
     }
 
-    private sealed class NewClassCollector : CSharpVisitor<List<NewClass>>
+    [Fact]
+    public async Task PropertyPatternNamesCarryTheirMember()
     {
-        public override J VisitNewClass(NewClass newClass, List<NewClass> found)
+        var cu = await ParseWithSemanticModelAsync("""
+            class C
+            {
+                bool M(string s, System.Exception e) => s is { Length: 3 } && e is { InnerException.Message: "" };
+            }
+            """);
+
+        var names = Collect<NamedExpression>(cu).Select(n => n.Name.Element).ToList();
+        Assert.Equal(["Length", "Message"], names.Select(n => (n.FieldType as JavaType.Variable)?.Name));
+        Assert.Equal(["int", "System.String"], names.Select(n => TypeUtils.GetFullyQualifiedName(n.Type)));
+    }
+
+    private static List<T> Collect<T>(J tree) where T : class
+    {
+        var found = new List<T>();
+        new Collector<T>().Visit(tree, found);
+        return found;
+    }
+
+    private sealed class Collector<T> : CSharpVisitor<List<T>> where T : class
+    {
+        public override J? PreVisit(J tree, List<T> found)
         {
-            found.Add(newClass);
-            return base.VisitNewClass(newClass, found);
+            if (tree is T t) found.Add(t);
+            return tree;
         }
     }
 

@@ -3322,14 +3322,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (node.NameColon != null)
         {
             _cursor = node.NameColon.Name.Identifier.Span.End;
+            var (_, fieldType) = _typeMapping?.TypeAndFieldType(node.NameColon.Name) ?? (null, null);
             var nameIdent = new Identifier(
                 Tree.RandomId(),
                 Space.Empty,
                 Markers.Empty,
                 [],
                 node.NameColon.Name.Identifier.Text,
-                null,
-                null
+                fieldType?.Type,
+                fieldType
             );
             var colonSpace = ExtractSpaceBefore(node.NameColon.ColonToken);
             _cursor = node.NameColon.ColonToken.Span.End;
@@ -3341,14 +3342,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // Model the dotted expression as a single identifier name for now
             var exprText = node.ExpressionColon.Expression.ToString();
             _cursor = node.ExpressionColon.Expression.Span.End;
+            var (_, fieldType) = _typeMapping?.TypeAndFieldType(node.ExpressionColon.Expression) ?? (null, null);
             var nameIdent = new Identifier(
                 Tree.RandomId(),
                 Space.Empty,
                 Markers.Empty,
                 [],
                 exprText,
-                null,
-                null
+                fieldType?.Type,
+                fieldType
             );
             var colonSpace = ExtractSpaceBefore(node.ExpressionColon.ColonToken);
             _cursor = node.ExpressionColon.ColonToken.Span.End;
