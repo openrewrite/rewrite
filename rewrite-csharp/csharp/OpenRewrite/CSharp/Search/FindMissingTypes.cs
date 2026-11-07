@@ -223,14 +223,16 @@ public class FindMissingTypes : Recipe
             mi.Name.SimpleName is "nameof" or "__makeref" or "__reftype" or "__refvalue";
 
         /// <summary>
-        /// <c>dynamic</c>, and a type that does not resolve, map to an unknown type. A call that invokes such a value,
-        /// or takes one as its receiver or an argument, has no method to attribute, and its own value is unknown too.
+        /// A value of type <c>dynamic</c>, or of a type that does not resolve, has members unknown before run time. A
+        /// call that invokes such a value, or takes one as its receiver or an argument, has no method to attribute, and
+        /// its own value is unknown too.
         /// </summary>
         private static bool OnUnknownValue(MethodInvocation mi) =>
             mi.Name.Type is JavaType.Unknown || Unknown(mi.Select?.Element) ||
             mi.Arguments.Elements.Any(a => Unknown(a.Element));
 
         private static bool Unknown(Expression? e) =>
-            e?.Type is JavaType.Unknown || e is MethodInvocation { MethodType: null } call && OnUnknownValue(call);
+            e?.Type is JavaType.Unknown or JavaType.Class { FullyQualifiedName: "dynamic" } ||
+            e is MethodInvocation { MethodType: null } call && OnUnknownValue(call);
     }
 }

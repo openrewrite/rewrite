@@ -239,8 +239,22 @@ internal class CSharpTypeMapping
             // The Java model has no pointers. A pointer is its element's type, as Cs.PointerType's type is.
             IPointerTypeSymbol pointer => MapType(pointer.PointedAtType),
             IFunctionPointerTypeSymbol functionPointer => MapMethod(functionPointer.Signature),
+            IDynamicTypeSymbol dynamicType => MapDynamic(dynamicType),
             _ => JavaType.Unknown.Instance
         };
+    }
+
+    /// <summary>
+    /// <c>dynamic</c> is an <c>object</c> whose members bind at run time. It keeps its own name, so that a recipe can
+    /// tell such a value from an <c>object</c> and from a type that does not resolve.
+    /// </summary>
+    private JavaType MapDynamic(IDynamicTypeSymbol symbol)
+    {
+        var dynamic = new JavaType.Class(0, JavaType.FullyQualified.FullyQualifiedKind.Class, "dynamic", null,
+            MapType(_model.Compilation.GetSpecialType(SpecialType.System_Object)) as JavaType.FullyQualified,
+            null, null, null, null, null);
+        _typeCache[symbol] = dynamic;
+        return dynamic;
     }
 
     private JavaType MapNamedType(INamedTypeSymbol symbol)
