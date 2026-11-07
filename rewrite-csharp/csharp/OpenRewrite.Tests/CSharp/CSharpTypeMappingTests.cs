@@ -956,6 +956,39 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task MethodGroupsHaveTheTypeOfTheDelegateTheyCreate()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                static void Take(Delegate d) { }
+                static int Handler(int x) => x;
+                event EventHandler Changed;
+                void OnChanged(object sender, EventArgs e) { }
+                void M()
+                {
+                    Action<string> converted = Console.WriteLine;
+                    Take(C.Handler);
+                    Changed += this.OnChanged;
+                    var n = nameof(C.Handler);
+                }
+            }
+            """);
+
+        Assert.Equal(["System.Action<System.String>", "System.Func<int, int>", "System.EventHandler", "<none>"],
+            Collect<FieldAccess>(cu).Where(f => f.Name.Element.Type is JavaType.Method).Select(f => Describe(f.Type)));
+
+        static string Describe(JavaType? type) => type switch
+        {
+            null => "<none>",
+            JavaType.Parameterized p => $"{TypeUtils.GetFullyQualifiedName(p.Type)}<{string.Join(", ", p.TypeParameters!.Select(Describe))}>",
+            JavaType.Primitive p => p.Keyword,
+            _ => TypeUtils.GetFullyQualifiedName(type)!
+        };
+    }
+
+    [Fact]
     public async Task RangeVariableNamesCarryTheirVariable()
     {
         var cu = await ParseWithSemanticModelAsync("""

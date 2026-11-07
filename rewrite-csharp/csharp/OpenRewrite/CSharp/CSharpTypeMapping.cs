@@ -62,6 +62,13 @@ internal class CSharpTypeMapping
             return MapType(namedType);
         }
 
+        // A method group has no type of its own. Its value is the delegate its conversion creates, such as the
+        // Func<int, int> that `Handler` becomes when passed as a `Delegate`.
+        if (_model.GetOperation(node) is IMethodReferenceOperation { Parent: IDelegateCreationOperation creation })
+        {
+            return MapType(creation.Type);
+        }
+
         return null;
     }
 
