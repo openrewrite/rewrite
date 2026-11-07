@@ -1791,7 +1791,8 @@ public class GroovyParserVisitor {
                 } else if (binaryOp != null) {
                     return new J.Binary(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
-                            right, typeMapping.type(binary.getType()));
+                            right, binaryType(binaryOp, operandType(binary.getLeftExpression(), left),
+                            operandType(binary.getRightExpression(), right), typeMapping.type(binary.getType())));
                 } else if (gBinaryOp != null) {
                     Space after = EMPTY;
                     if (gBinaryOp == G.Binary.Type.Access) {
@@ -3771,6 +3772,137 @@ public class GroovyParserVisitor {
             cursor = savedCursor;
         }
         return bodyVisitor.doVisit(value);
+    }
+
+    /// Groovy leaves a dynamic binary expression typed `Object` until static type checking, which
+    /// parsing never reaches, so derive the result type from the operands the way Groovy's
+    /// `NumberMath` and operator methods resolve them at runtime.
+    private @Nullable JavaType binaryType(J.Binary.Type op, @Nullable JavaType left, @Nullable JavaType right,
+                                          @Nullable JavaType groovyType) {
+        if (groovyType != null && !TypeUtils.isObject(groovyType)) {
+            return groovyType;
+        }
+        switch (op) {
+            case Equal:
+            case NotEqual:
+            case LessThan:
+            case LessThanOrEqual:
+            case GreaterThan:
+            case GreaterThanOrEqual:
+            case And:
+            case Or:
+                return JavaType.Primitive.Boolean;
+            case Addition:
+                if (TypeUtils.isString(left)) {
+                    return left;
+                }
+                if (TypeUtils.isString(right) && numberKind(left) != null) {
+                    return right;
+                }
+                break;
+            case BitAnd:
+            case BitOr:
+            case BitXor:
+                if (unboxed(left) == JavaType.Primitive.Boolean && unboxed(right) == JavaType.Primitive.Boolean) {
+                    return JavaType.Primitive.Boolean;
+                }
+                break;
+            default:
+                break;
+        }
+
+        NumberKind leftKind = numberKind(left);
+        NumberKind rightKind = numberKind(right);
+        if (leftKind == null || rightKind == null) {
+            return groovyType;
+        }
+        NumberKind widest = leftKind.compareTo(rightKind) >= 0 ? leftKind : rightKind;
+        switch (op) {
+            case Addition:
+            case Subtraction:
+            case Multiplication:
+                return numberType(widest);
+            case Division:
+                return numberType(widest == NumberKind.FLOATING ? NumberKind.FLOATING : NumberKind.BIG_DECIMAL);
+            case Modulo:
+            case BitAnd:
+            case BitOr:
+            case BitXor:
+                return widest.isIntegral() ? numberType(widest) : groovyType;
+            case LeftShift:
+            case RightShift:
+            case UnsignedRightShift:
+                return leftKind.isIntegral() && rightKind.isIntegral() ? numberType(leftKind) : groovyType;
+            default:
+                return groovyType;
+        }
+    }
+
+    /// Decimal literals are modeled as `double` literals, but Groovy evaluates an unsuffixed one as `BigDecimal`.
+    private @Nullable JavaType operandType(org.codehaus.groovy.ast.expr.Expression groovyOperand, Expression operand) {
+        return groovyOperand instanceof ConstantExpression && groovyOperand.getType() == ClassHelper.BigDecimal_TYPE ?
+                typeMapping.type(ClassHelper.BigDecimal_TYPE) : operand.getType();
+    }
+
+    private enum NumberKind {
+        INT, LONG, BIG_INTEGER, BIG_DECIMAL, FLOATING;
+
+        boolean isIntegral() {
+            return this == INT || this == LONG || this == BIG_INTEGER;
+        }
+    }
+
+    private static @Nullable NumberKind numberKind(@Nullable JavaType type) {
+        if (TypeUtils.isOfClassType(type, "java.math.BigInteger")) {
+            return NumberKind.BIG_INTEGER;
+        }
+        if (TypeUtils.isOfClassType(type, "java.math.BigDecimal")) {
+            return NumberKind.BIG_DECIMAL;
+        }
+        JavaType.Primitive primitive = unboxed(type);
+        if (primitive == null) {
+            return null;
+        }
+        switch (primitive) {
+            case Byte:
+            case Char:
+            case Short:
+            case Int:
+                return NumberKind.INT;
+            case Long:
+                return NumberKind.LONG;
+            case Float:
+            case Double:
+                return NumberKind.FLOATING;
+            default:
+                return null;
+        }
+    }
+
+    private static JavaType.@Nullable Primitive unboxed(@Nullable JavaType type) {
+        if (type instanceof JavaType.Primitive) {
+            return (JavaType.Primitive) type;
+        }
+        if (type instanceof JavaType.FullyQualified) {
+            JavaType.Primitive primitive = JavaType.Primitive.fromClassName(((JavaType.FullyQualified) type).getFullyQualifiedName());
+            return primitive == JavaType.Primitive.String ? null : primitive;
+        }
+        return null;
+    }
+
+    private JavaType numberType(NumberKind kind) {
+        switch (kind) {
+            case INT:
+                return JavaType.Primitive.Int;
+            case LONG:
+                return JavaType.Primitive.Long;
+            case BIG_INTEGER:
+                return typeMapping.type(ClassHelper.BigInteger_TYPE);
+            case BIG_DECIMAL:
+                return typeMapping.type(ClassHelper.BigDecimal_TYPE);
+            default:
+                return JavaType.Primitive.Double;
+        }
     }
 
     private static LineColumn pos(ASTNode node) {
