@@ -89,6 +89,28 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public void LeavesOperatorsWrittenAsCallsUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A
+                {
+                    void M(int x)
+                    {
+                        var n = nameof(x);
+                        System.TypedReference r = __makeref(x);
+                        System.Type t = __reftype(r);
+                        int v = __refvalue(r, int);
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void ChecksOnlyThePreprocessorBranchParsedWithTypes()
     {
         RewriteRun(

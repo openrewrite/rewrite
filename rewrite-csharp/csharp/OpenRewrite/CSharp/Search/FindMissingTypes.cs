@@ -47,10 +47,14 @@ public class FindMissingTypes : Recipe
         public override J VisitMethodInvocation(MethodInvocation mi, P p)
         {
             var visited = base.VisitMethodInvocation(mi, p);
-            return visited is MethodInvocation { MethodType: null } invocation && !BoundAtRunTime(invocation)
+            return visited is MethodInvocation { MethodType: null } invocation &&
+                   !BoundAtRunTime(invocation) && !OperatorWrittenAsCall(invocation)
                 ? missing(visited, "MethodInvocation type is missing", p)
                 : visited;
         }
+
+        private static bool OperatorWrittenAsCall(MethodInvocation mi) =>
+            mi.Name.SimpleName is "nameof" or "__makeref" or "__reftype" or "__refvalue";
 
         /// <summary>
         /// <c>dynamic</c> maps to an unknown type. A call with a dynamic receiver or argument picks its method at run
