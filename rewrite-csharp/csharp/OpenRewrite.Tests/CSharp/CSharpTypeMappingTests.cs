@@ -964,6 +964,7 @@ public class CSharpTypeMappingTests : RewriteTest
             {
                 object M(string[] words, int[] lengths) =>
                     from w in words
+                    from u in lengths
                     join l in lengths on w.Length equals l into ls
                     let n = w.Length
                     select w + n + ls.Count() into r
@@ -971,10 +972,10 @@ public class CSharpTypeMappingTests : RewriteTest
             }
             """);
 
-        var declared = Collect<Identifier>(cu).Where(i => i.SimpleName is "w" or "l" or "ls" or "n" or "r")
+        var declared = Collect<Identifier>(cu).Where(i => i.SimpleName is "w" or "u" or "l" or "ls" or "n" or "r")
             .GroupBy(i => i.SimpleName).Select(g => g.First()).ToList();
-        Assert.Equal(["w", "l", "ls", "n", "r"], declared.Select(i => (i.FieldType as JavaType.Variable)?.Name));
-        Assert.Equal(["System.String", "int", "System.Collections.Generic.IEnumerable", "int", "System.String"],
+        Assert.Equal(["w", "u", "l", "ls", "n", "r"], declared.Select(i => (i.FieldType as JavaType.Variable)?.Name));
+        Assert.Equal(["System.String", "int", "int", "System.Collections.Generic.IEnumerable", "int", "System.String"],
             declared.Select(i => TypeUtils.GetFullyQualifiedName(i.Type)));
     }
 

@@ -15,6 +15,7 @@
  */
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp;
@@ -141,17 +142,19 @@ internal class CSharpTypeMapping
 
     /// <summary>
     /// The variable that a query clause declares, such as <c>w</c> in <c>from w in words</c>. Roslyn gives a range
-    /// variable no type of its own, so it has the type of its uses in the query.
+    /// variable no type of its own. The query translates to method calls. There a <c>let</c> variable holds its
+    /// expression, and every other range variable is a lambda parameter declared where the variable is.
     /// </summary>
     public JavaType.Variable? RangeVariableType(SyntaxNode clause)
     {
         if (_model.GetDeclaredSymbol(clause) is not IRangeVariableSymbol variable)
             return null;
-        var type = clause.FirstAncestorOrSelf<QueryExpressionSyntax>()?.DescendantNodes().OfType<IdentifierNameSyntax>()
-            .Where(n => n.Identifier.ValueText == variable.Name &&
-                        SymbolEqualityComparer.Default.Equals(_model.GetSymbolInfo(n).Symbol, variable))
-            .Select(n => _model.GetTypeInfo(n).Type)
-            .FirstOrDefault(t => t != null);
+        var type = clause is LetClauseSyntax let
+            ? _model.GetTypeInfo(let.Expression).Type
+            : _model.GetOperation(clause.FirstAncestorOrSelf<QueryExpressionSyntax>()!)?.Descendants()
+                .OfType<IAnonymousFunctionOperation>()
+                .SelectMany(lambda => lambda.Symbol.Parameters)
+                .FirstOrDefault(parameter => parameter.Locations.SequenceEqual(variable.Locations))?.Type;
         return MapVariable(variable, variable.Name, null, MapType(type));
     }
 
