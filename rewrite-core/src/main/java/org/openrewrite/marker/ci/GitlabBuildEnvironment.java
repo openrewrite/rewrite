@@ -20,8 +20,10 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.jgit.transport.URIish;
 import org.openrewrite.marker.GitProvenance;
 
+import java.net.URISyntaxException;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -55,30 +57,17 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
         );
     }
 
-    /// GitLab embeds the CI job token as the password in `CI_REPOSITORY_URL`,
-    /// which would otherwise be persisted on every source file's marker.
+    /// GitLab embeds the CI job token as the password in `CI_REPOSITORY_URL`;
+    /// `URIish#toString` omits passwords, so the token never reaches the marker.
     private static @Nullable String withoutPassword(@Nullable String url) {
         if (url == null) {
             return null;
         }
-        int schemeEnd = url.indexOf("://");
-        if (schemeEnd < 0) {
+        try {
+            return new URIish(url).toString();
+        } catch (URISyntaxException e) {
             return url;
         }
-        int authorityStart = schemeEnd + 3;
-        int authorityEnd = url.indexOf('/', authorityStart);
-        if (authorityEnd < 0) {
-            authorityEnd = url.length();
-        }
-        int at = url.lastIndexOf('@', authorityEnd - 1);
-        if (at < authorityStart) {
-            return url;
-        }
-        int colon = url.indexOf(':', authorityStart);
-        if (colon < 0 || colon > at) {
-            return url;
-        }
-        return url.substring(0, colon) + url.substring(at);
     }
 
     @Override
