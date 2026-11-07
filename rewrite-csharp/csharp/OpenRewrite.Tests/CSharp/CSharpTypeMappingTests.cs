@@ -850,6 +850,23 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.Equal(["int", "System.String"], names.Select(n => TypeUtils.GetFullyQualifiedName(n.Type)));
     }
 
+    [Fact]
+    public async Task OutVariableNamesCarryTheirVariable()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            using System.Collections.Generic;
+            class C
+            {
+                void M(Dictionary<string, Version> versions) => versions.TryGetValue("k", out var version);
+            }
+            """);
+
+        var name = Assert.Single(Collect<SingleVariableDesignation>(cu)).Name;
+        Assert.Equal("version", (name.FieldType as JavaType.Variable)?.Name);
+        Assert.Equal("System.Version", TypeUtils.GetFullyQualifiedName(name.Type));
+    }
+
     private static List<T> Collect<T>(J tree) where T : class
     {
         var found = new List<T>();

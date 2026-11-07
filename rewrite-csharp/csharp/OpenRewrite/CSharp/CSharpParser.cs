@@ -7704,14 +7704,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var varPrefix = ExtractSpaceBefore(singleVar.Identifier);
             _cursor = singleVar.Identifier.Span.End;
 
+            var variable = _typeMapping?.VariableType(singleVar);
             var varName = new Identifier(
                 Tree.RandomId(),
                 Space.Empty,
                 Markers.Empty,
                 [],
                 singleVar.Identifier.Text,
-                null,
-                null
+                variable?.Type,
+                variable
             );
 
             return new SingleVariableDesignation(
