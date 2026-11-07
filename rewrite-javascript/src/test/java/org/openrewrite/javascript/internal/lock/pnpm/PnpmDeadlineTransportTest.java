@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.LockDirectory;
 import org.openrewrite.javascript.internal.lock.NativeLockEngine;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -32,6 +33,7 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -137,6 +139,37 @@ class PnpmDeadlineTransportTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void selectedHostDeadlineDoesNotEnterUnknownPlaceholderEnvironment() {
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(new Environment() {
+            public String getenv(String key) { return "pnpm_config_fetch_timeout".equals(key) ? "1500" : null; }
+            public Path userHome() { return Paths.get("/nonexistent-deadline-test"); }
+            public String osName() { return "Linux"; }
+        }).build();
+        assertThat(host.getEnvironment().process()).isNull();
+        assertThatThrownBy(() -> host.getEnvironment().reference("pnpm_config_fetch_timeout"))
+                .isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> PnpmOptions.load(null, null, null, null, null,
+                PnpmRelease.of("11.10.0")).transport(host.pnpmRequestEnvironment()))
+                .isInstanceOf(CannotKnow.class).hasMessageContaining("fetchTimeout");
+    }
+
+    @Test
+    void selectedHostDeadlineKeepsManagerPrecedenceAndIgnoredValues() {
+        assertThatCode(() -> PnpmOptions.load("fetchTimeout: null\n", null, null, null, null,
+                PnpmRelease.of("10.34.9")).transport(Map.of("npm_config_fetch_timeout", "1500")))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> PnpmOptions.load("fetchTimeout: null\n", null, null, null, null,
+                PnpmRelease.of("11.10.0")).transport(Map.of("PNPM_CONFIG_FETCH_TIMEOUT", "1500")))
+                .isInstanceOf(CannotKnow.class).hasMessageContaining("fetchTimeout");
+        assertThatCode(() -> PnpmOptions.load(null, null, null, null, null,
+                PnpmRelease.of("11.10.0")).transport(Map.of("npm_config_fetch_timeout", "1500",
+                "pnpm_config_fetch_timeout", "false"))).doesNotThrowAnyException();
+        assertThatCode(() -> PnpmOptions.load(null, null, null, null, null,
+                PnpmRelease.of("10.34.9")).transport(Map.of("pnpm_config_fetch_timeout", "1500")))
+                .doesNotThrowAnyException();
     }
 
     private static void accepts(String version, String workspace, String project, String user, Map<String, String> env) {
