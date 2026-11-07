@@ -1166,9 +1166,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 if (cursor < source.length()
                         && source.charAt(cursor) != c
                         && !Character.isWhitespace(c)
-                        && Character.isSpaceChar(source.charAt(cursor))
+                        && isInlineWhitespace(source.charAt(cursor))
                 ) {
-                    text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                    text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
                 }
                 text.append(c);
                 cursor++;
@@ -1176,7 +1176,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
             if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                text.append(whitespaceBeforeAsString(ReloadableJava25JavadocVisitor::isInlineWhitespace));
             }
         }
 
@@ -1329,6 +1329,15 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private String whitespaceBeforeAsString() {
         return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    /**
+     * Whitespace within a line: a space or a tab, not a line break. Java 25 strips a Javadoc's common indentation,
+     * tabs included, so a tab after the margin has to be put back as a space is ({@link Character#isSpaceChar} is
+     * false for a tab).
+     */
+    private static boolean isInlineWhitespace(char c) {
+        return c != '\n' && c != '\r' && (Character.isWhitespace(c) || Character.isSpaceChar(c));
     }
 
     private String whitespaceBeforeAsString(Predicate<Character> whitespace) {

@@ -2650,6 +2650,59 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9731")
+    @Test
+    void tabAfterMargin() {
+        rewriteRun(
+          java(
+            """
+              /**
+               *  a
+               * \tb
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9731")
+    @Test
+    void tabsAfterMarginAcrossLines() {
+        rewriteRun(
+          java(
+            """
+              /**
+               *  every link is connected to one of following entities: file, folder,
+               *  user or enterprise. Depending on the type of the entity, we use a different entity
+               * \tNote: 'file' and 'folder' are mapped via an aliased 'item' entity
+               * \trelationship. The enterprise entity is not sharded.
+               */
+              enum LinkType {
+                  FILE
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9731")
+    @Test
+    void tabMarginsAndTags() {
+        rewriteRun(
+          java(
+            """
+              /**
+               *\ta
+               *\t\tb
+               * \t@param x y
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {
