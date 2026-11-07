@@ -45,6 +45,11 @@ type typeMapper struct {
 	packages  map[string]*java.JavaTypeClass
 	methods   map[*types.Func]*java.JavaTypeMethod
 	variables map[variableKey]*java.JavaTypeVariable
+	// visible, while a package's files are mapped, holds the interfaces that package can see,
+	// for mapNamed to record which of them each of the package's own types satisfies.
+	visible *visibleInterfaces
+	// declaredInterfaces keeps each imported package's interfaces for the next package that imports it.
+	declaredInterfaces map[*types.Package][]*types.Named
 }
 
 type variableKey struct {
@@ -66,6 +71,8 @@ func newTypeMapper() *typeMapper {
 		packages:      make(map[string]*java.JavaTypeClass),
 		methods:       make(map[*types.Func]*java.JavaTypeMethod),
 		variables:     make(map[variableKey]*java.JavaTypeVariable),
+
+		declaredInterfaces: make(map[*types.Package][]*types.Named),
 	}
 }
 
@@ -285,11 +292,14 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 		cls.Methods = append(cls.Methods, mt)
 	}
 
-	// Map implemented interfaces
-	for i := 0; i < named.NumMethods(); i++ {
-		// Go uses structural interface satisfaction — we don't enumerate interfaces here.
-		// Interface relationships would require global analysis.
-		break
+	// Go satisfies an interface by method set alone, so a type of the package under parse
+	// names the interfaces it satisfies among those the package can see. Another package's
+	// type is mapped without them, as is a generic type, whose method set varies with its arguments.
+	if m.visible != nil && obj.Pkg() == m.visible.pkg && obj.Parent() == obj.Pkg().Scope() &&
+		(tparams == nil || tparams.Len() == 0) {
+		for _, iface := range m.visible.satisfiedBy(named) {
+			cls.Interfaces = append(cls.Interfaces, m.mapNamed(iface))
+		}
 	}
 
 	return cls
