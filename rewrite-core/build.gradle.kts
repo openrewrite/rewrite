@@ -42,6 +42,7 @@ dependencies {
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
+    testImplementation("com.google.jimfs:jimfs:latest.release")
     testImplementation(project(":rewrite-test"))
 }
 
