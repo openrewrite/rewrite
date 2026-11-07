@@ -510,6 +510,7 @@ public class SolutionParser
         }
 
         RecordUnevaluatedProjects(declaredProjects, solution, diags);
+        solution = WithDocumentsFoundIgnoringCase(solution);
 
         var projects = solution.Projects.ToList();
         var docCount = projects.Sum(p => p.Documents.Count());
@@ -528,6 +529,47 @@ public class SolutionParser
                     .Select(FailureReason).Distinct(), limit: 3));
 
         return solution;
+    }
+
+    /// <summary>
+    /// A project written on Windows can name a source file in another case than the disk has it, as
+    /// <c>Compile Include="HelperForm.designer.cs"</c> does for <c>HelperForm.Designer.cs</c>. A
+    /// case-sensitive file system finds no such file, so the document is pointed at the one that exists.
+    /// </summary>
+    private static Solution WithDocumentsFoundIgnoringCase(Solution solution)
+    {
+        foreach (var project in solution.Projects)
+        foreach (var document in project.Documents)
+        {
+            if (document.FilePath == null || File.Exists(document.FilePath) ||
+                FindFileIgnoringCase(document.FilePath) is not { } onDisk ||
+                project.Documents.Any(d => d.FilePath == onDisk))
+                continue;
+            solution = solution
+                .WithDocumentFilePath(document.Id, onDisk)
+                .WithDocumentTextLoader(document.Id, new FileTextLoader(onDisk, null), PreservationMode.PreserveValue);
+        }
+        return solution;
+    }
+
+    private static string? FindFileIgnoringCase(string path)
+    {
+        var current = Path.GetPathRoot(path);
+        if (string.IsNullOrEmpty(current))
+            return null;
+        foreach (var name in path[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var exact = Path.Combine(current, name);
+            current = Path.Exists(exact)
+                ? exact
+                : Directory.Exists(current)
+                    ? Directory.EnumerateFileSystemEntries(current)
+                        .FirstOrDefault(e => string.Equals(Path.GetFileName(e), name, StringComparison.OrdinalIgnoreCase))
+                    : null;
+            if (current == null)
+                return null;
+        }
+        return File.Exists(current) ? current : null;
     }
 
     private void ReportUnsupportedTargetFrameworks(

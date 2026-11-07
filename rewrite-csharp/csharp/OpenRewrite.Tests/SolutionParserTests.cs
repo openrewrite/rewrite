@@ -16,6 +16,7 @@
 using LibGit2Sharp;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
+using OpenRewrite.CSharp.Search;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -97,6 +98,32 @@ public class SolutionParserTests : IDisposable
             Path.Combine(_tempDir, "Multi.csproj"), _tempDir);
 
         Assert.Equal(2, results.Count);
+    }
+
+    [Fact]
+    public async Task CompileItemSpelledInAnotherCaseIsParsedFromTheFileOnDisk()
+    {
+        WriteFile("Forms.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include="Forms\Widget.cs" />
+                <Compile Include="forms\Widget.designer.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("Forms/Widget.cs", "partial class Widget { Widget() { InitializeComponent(); } }\n");
+        WriteFile("Forms/Widget.Designer.cs", "partial class Widget { void InitializeComponent() { } }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(Path.Combine(_tempDir, "Forms.csproj"));
+        var results = parser.ParseProject(solution, Path.Combine(_tempDir, "Forms.csproj"), _tempDir);
+
+        Assert.Equal(["Forms/Widget.Designer.cs", "Forms/Widget.cs"], results.Select(s => s.SourcePath).Order(StringComparer.Ordinal));
+        Assert.All(results, s => Assert.Empty(FindMissingTypes.Find(s)));
     }
 
     [Fact]
