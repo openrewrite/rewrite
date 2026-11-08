@@ -226,9 +226,10 @@ final class Rc {
                     case "cache-folder":
                         args.put(camelCase(arg), value);
                         break;
+                    case "no-bin-links":
                     case "no-lockfile":
                         if (Boolean.TRUE.equals(value)) {
-                            args.put("lockfile", false);
+                            args.put(camelCase(arg.substring(3)), false);
                         }
                         break;
                     case "cwd":
