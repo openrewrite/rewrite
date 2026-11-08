@@ -27,7 +27,9 @@ public class FindMissingTypes : Recipe
 
     public override string Description =>
         "A diagnostic recipe that marks where a C# LST lacks type attribution, such as a class declaration, " +
-        "identifier or field access without a type, or a method or operator declaration or an invocation without a method type.";
+        "identifier or field access without a type, or a method or operator declaration or an invocation without a method type. " +
+        "It also marks a type with a missing part, such as a method without a declaring type, and a type whose name " +
+        "differs from the name the source gives it.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
         new Visitor<ExecutionContext>((j, message, _) => SearchResult.Found(j, message));
@@ -60,46 +62,64 @@ public class FindMissingTypes : Recipe
         public override J VisitClassDeclaration(ClassDeclaration classDecl, P p)
         {
             var cd = base.VisitClassDeclaration(classDecl, p);
-            return cd is ClassDeclaration { Type: null or JavaType.Unknown } ? missing(cd, "ClassDeclaration type is missing", p) : cd;
+            return cd is ClassDeclaration declaration && Defect(declaration.Type) is { } defect
+                ? missing(cd, $"ClassDeclaration type is {defect}", p)
+                : cd;
         }
 
         public override J VisitMethodDeclaration(MethodDeclaration method, P p)
         {
             var md = base.VisitMethodDeclaration(method, p);
-            return md is MethodDeclaration { MethodType: null } ? missing(md, "MethodDeclaration type is missing", p) : md;
+            if (md is not MethodDeclaration declaration)
+                return md;
+            if (Defect(declaration.MethodType) is { } defect)
+                return missing(md, $"MethodDeclaration type is {defect}", p);
+            var name = declaration.MethodType!.Name;
+            return name != ValueText(declaration.Name) && !IsConstructorOrDestructor(declaration)
+                ? missing(md, $"MethodDeclaration type has a different name '{name}'", p)
+                : md;
         }
 
         public override J VisitOperatorDeclaration(OperatorDeclaration operatorDeclaration, P p)
         {
             var od = base.VisitOperatorDeclaration(operatorDeclaration, p);
-            return od is OperatorDeclaration { MethodType: null } ? missing(od, "OperatorDeclaration type is missing", p) : od;
+            return od is OperatorDeclaration declaration && Defect(declaration.MethodType) is { } defect
+                ? missing(od, $"OperatorDeclaration type is {defect}", p)
+                : od;
         }
 
         public override J VisitConversionOperatorDeclaration(ConversionOperatorDeclaration conversion, P p)
         {
             var cod = base.VisitConversionOperatorDeclaration(conversion, p);
-            return cod is ConversionOperatorDeclaration { MethodType: null }
-                ? missing(cod, "ConversionOperatorDeclaration type is missing", p)
+            return cod is ConversionOperatorDeclaration declaration && Defect(declaration.MethodType) is { } defect
+                ? missing(cod, $"ConversionOperatorDeclaration type is {defect}", p)
                 : cod;
         }
 
         public override J VisitMethodInvocation(MethodInvocation mi, P p)
         {
             var visited = base.VisitMethodInvocation(mi, p);
-            return visited is MethodInvocation { MethodType: null } invocation &&
-                   !OnUnknownValue(invocation) && !OperatorWrittenAsCall(invocation)
-                ? missing(visited, "MethodInvocation type is missing", p)
-                : visited;
+            if (visited is not MethodInvocation invocation)
+                return visited;
+            if (invocation.MethodType == null)
+                return !OnUnknownValue(invocation) && !OperatorWrittenAsCall(invocation)
+                    ? missing(visited, "MethodInvocation type is missing", p)
+                    : visited;
+            if (Defect(invocation.MethodType) is { } defect)
+                return missing(visited, $"MethodInvocation type is {defect}", p);
+            return ReferenceEquals(invocation.Name.Type, invocation.MethodType)
+                ? visited
+                : missing(visited, "MethodInvocation name type is not its method type", p);
         }
 
         public override J VisitNewClass(NewClass newClass, P p)
         {
             var visited = base.VisitNewClass(newClass, p);
             // `new T()` of a type parameter T calls no constructor known before run time.
-            return visited is NewClass { ConstructorType: null } n &&
-                   n.Clazz is not Expression { Type: JavaType.GenericTypeVariable } &&
-                   !n.Arguments.Elements.Any(a => Unknown(a.Element))
-                ? missing(visited, "NewClass type is missing", p)
+            return visited is NewClass n && Defect(n.ConstructorType) is { } defect &&
+                   (n.ConstructorType != null || n.Clazz is not Expression { Type: JavaType.GenericTypeVariable } &&
+                       !n.Arguments.Elements.Any(a => Unknown(a.Element)))
+                ? missing(visited, $"NewClass type is {defect}", p)
                 : visited;
         }
 
@@ -118,15 +138,60 @@ public class FindMissingTypes : Recipe
         public override J VisitIdentifier(Identifier identifier, P p)
         {
             var visited = base.VisitIdentifier(identifier, p);
-            return identifier.Type == null && !NamesWhatHasNoType(identifier)
-                ? missing(visited, "Identifier type is missing", p)
+            if (Defect(identifier.Type) is { } defect && !NamesWhatHasNoType(identifier))
+                return missing(visited, $"Identifier type is {defect}", p);
+            if (identifier.FieldType == null)
+                return visited;
+            if (Defect(identifier.FieldType) is { } fieldDefect)
+                return missing(visited, $"Identifier field type is {fieldDefect}", p);
+            return identifier.FieldType is JavaType.Variable variable && variable.Name != ValueText(identifier)
+                ? missing(visited, $"Identifier field type has a different name '{variable.Name}'", p)
                 : visited;
         }
 
         /// <summary>
+        /// The name without the <c>@</c> of a verbatim identifier such as <c>@base</c>, as Roslyn's <c>ValueText</c> has it.
+        /// </summary>
+        private static string ValueText(Identifier id) => id.SimpleName.StartsWith('@') ? id.SimpleName[1..] : id.SimpleName;
+
+        /// <summary>
+        /// A constructor's method is <c>.ctor</c>, or <c>.cctor</c> when static, and the method of a destructor <c>~A</c> is
+        /// <c>Finalize</c>.
+        /// </summary>
+        private static bool IsConstructorOrDestructor(MethodDeclaration md) =>
+            md.MethodType!.Name is ".ctor" or ".cctor" || md.Name.SimpleName.StartsWith('~');
+
+        /// <summary>
+        /// What is wrong with a type, as Java's <c>TypeUtils.isWellFormedType</c> finds it. A type is malformed when a type
+        /// it is made of is missing.
+        /// </summary>
+        private static string? Defect(JavaType? type) =>
+            type is null or JavaType.Unknown ? "missing" :
+            HasMissingPart(type, new HashSet<JavaType>(ReferenceEqualityComparer.Instance)) ? "malformed" : null;
+
+        private static bool HasMissingPart(JavaType type, HashSet<JavaType> seen) => seen.Add(type) && type switch
+        {
+            JavaType.Parameterized parameterized => Missing(parameterized.Type, seen) ||
+                                                    AnyMissing(parameterized.TypeParameters, seen),
+            JavaType.Array array => Missing(array.ElemType, seen),
+            JavaType.GenericTypeVariable variable => AnyMissing(variable.Bounds, seen),
+            JavaType.Variable variable => Missing(variable.Type, seen) || Missing(variable.Owner, seen),
+            JavaType.MultiCatch multiCatch => AnyMissing(multiCatch.ThrowableTypes, seen),
+            JavaType.Method method => Missing(method.ReturnType, seen) || Missing(method.DeclaringType, seen) ||
+                                      AnyMissing(method.ParameterTypes, seen),
+            _ => false
+        };
+
+        private static bool Missing(JavaType? type, HashSet<JavaType> seen) =>
+            type is null or JavaType.Unknown || HasMissingPart(type, seen);
+
+        private static bool AnyMissing(IList<JavaType>? types, HashSet<JavaType> seen) =>
+            types?.Any(t => Missing(t, seen)) == true;
+
+        /// <summary>
         /// Whether the identifier names what has no type, such as a namespace, label, attribute target, preprocessor
-        /// symbol, argument name or discard. The name of a call, class, method or object creation is left to the check
-        /// of that node.
+        /// symbol, argument name, discard or constraint keyword such as <c>notnull</c>. The name of a call, class, method
+        /// or object creation is left to the check of that node.
         /// </summary>
         private bool NamesWhatHasNoType(Identifier id)
         {
@@ -149,7 +214,8 @@ public class FindMissingTypes : Recipe
                 NewClass nc => nc.Clazz == id,
                 IndexerDeclaration indexer => indexer.Indexer == id,
                 TypeParameter tp => tp.Name == id,
-                ConstrainedTypeParameter ctp => ctp.Name == id || ctp.WhereConstraint?.Element == id,
+                ConstrainedTypeParameter ctp => ctp.Name == id || ctp.WhereConstraint?.Element == id ||
+                                                id.SimpleName is "notnull" or "unmanaged",
                 TupleElement te => te.Name == id,
                 Interpolation interpolation => interpolation.Format?.Element == id,
                 NamedExpression ne => ne.Name.Element == id && parent.ParentTree.Value is not PropertyPattern,

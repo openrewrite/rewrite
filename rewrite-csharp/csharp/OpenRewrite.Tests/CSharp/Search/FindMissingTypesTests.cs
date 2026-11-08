@@ -140,6 +140,142 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
+    public async Task MarksTypesWithAMissingPart()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            class A
+            {
+                int M(string s, List<int> xs)
+                {
+                    var n = int.Parse(s);
+                    return n + xs.Count;
+                }
+            }
+            """;
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
+
+        Assert.Empty(FindMissingTypes.Find(cu));
+        Assert.Equal(
+            ["MethodInvocation type is malformed: int.Parse(s)", "Identifier field type is malformed: n",
+             "Identifier type is malformed: xs"],
+            FindMissingTypes.Find((CompilationUnit)new PartRemover().Visit(cu, 0)!));
+    }
+
+    private sealed class PartRemover : CSharpVisitor<int>
+    {
+        public override J VisitMethodInvocation(MethodInvocation mi, int p)
+        {
+            var visited = (MethodInvocation)base.VisitMethodInvocation(mi, p);
+            if (visited.MethodType is not { Name: "Parse" } m)
+                return visited;
+            var undeclared = new JavaType.Method(null, m.Name, m.FlagsBitMap, m.ReturnType, m.ParameterNames,
+                m.ParameterTypes, m.ThrownExceptions, m.Annotations, m.DefaultValue, m.DeclaredFormalTypeNames);
+            return visited.WithMethodType(undeclared).WithName(visited.Name.WithType(undeclared));
+        }
+
+        public override J VisitIdentifier(Identifier identifier, int p) =>
+            Cursor.ParentTree.Value is NamedVariable ? identifier : identifier switch
+            {
+                { SimpleName: "n", FieldType: JavaType.Variable v } =>
+                    identifier.WithFieldType(new JavaType.Variable(v.Name, null, v.Type, null)),
+                { SimpleName: "xs", Type: JavaType.Parameterized list } =>
+                    identifier.WithType(new JavaType.Parameterized(list.Type, [JavaType.Unknown.Instance])),
+                _ => identifier
+            };
+    }
+
+    [Fact]
+    public async Task MarksTypesThatNameAnotherMember()
+    {
+        const string source = """
+            class A
+            {
+                int x;
+                void M()
+                {
+                    N();
+                    x = 1;
+                }
+                void N() { }
+            }
+            """;
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
+
+        Assert.Empty(FindMissingTypes.Find(cu));
+        Assert.Equal(
+            ["MethodInvocation name type is not its method type: N()", "Identifier field type has a different name 'y': x",
+             "MethodDeclaration type has a different name 'O': void M() ..."],
+            FindMissingTypes.Find((CompilationUnit)new MemberRenamer().Visit(cu, 0)!));
+    }
+
+    private sealed class MemberRenamer : CSharpVisitor<int>
+    {
+        public override J VisitMethodInvocation(MethodInvocation mi, int p)
+        {
+            var visited = (MethodInvocation)base.VisitMethodInvocation(mi, p);
+            return visited.WithName(visited.Name.WithType(null));
+        }
+
+        public override J VisitMethodDeclaration(MethodDeclaration method, int p)
+        {
+            var visited = (MethodDeclaration)base.VisitMethodDeclaration(method, p);
+            if (visited is not { Name.SimpleName: "M", MethodType: { } m })
+                return visited;
+            return visited.WithMethodType(new JavaType.Method(m.DeclaringType, "O", m.FlagsBitMap, m.ReturnType,
+                m.ParameterNames, m.ParameterTypes, m.ThrownExceptions, m.Annotations, m.DefaultValue,
+                m.DeclaredFormalTypeNames));
+        }
+
+        public override J VisitIdentifier(Identifier identifier, int p) =>
+            identifier is { SimpleName: "x", FieldType: JavaType.Variable v } && Cursor.ParentTree.Value is not NamedVariable
+                ? identifier.WithFieldType(new JavaType.Variable("y", v.Owner, v.Type, null))
+                : identifier;
+    }
+
+    [Fact]
+    public void LeavesNamesThatCSharpSpellsItsOwnWayUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A
+                {
+                    static A() { }
+                    A() { }
+                    ~A() { }
+                    int @base;
+                    void @event() => @base = 1;
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void LeavesConstraintKeywordsUnmarked()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindMissingTypes()),
+            CSharp(
+                """
+                class A<T> where T : notnull
+                {
+                    void M<U>() where U : unmanaged { }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void LeavesAttributedMethodsUnmarked()
     {
         RewriteRun(

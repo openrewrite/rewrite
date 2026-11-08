@@ -829,7 +829,9 @@ public class AutoFormatTests : RewriteTest
     public void AutoFormatSplicedMultiStatementTemplate()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ReplaceWithMultiStatementTemplateRecipe()),
+            // The template names `x` without capturing it, so `x` resolves to no variable there.
+            spec => spec.SetRecipe(new ReplaceWithMultiStatementTemplateRecipe())
+                .SetValidations(new Validations { OutputTypeAttribution = false }),
             CSharp(
                 """
                 class Test
