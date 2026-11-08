@@ -22,7 +22,11 @@ import {RewriteRpc, RpcObjectData} from "../../src/rpc";
 import {DEFAULT_BATCH_SIZE} from "../../src/rpc/rewrite-rpc";
 import {chunkedJsonDecoder} from "../../src/rpc/message-decoder";
 import {chunkedJsonEncoder} from "../../src/rpc/message-encoder";
-import {JS} from "../../src/javascript";
+import {ParseProject, ParseProjectResponseItem} from "../../src/rpc/request/parse-project";
+import {JavaScriptVisitor, JS} from "../../src/javascript";
+import {DependencyWorkspace} from "../../src/javascript/dependency-workspace";
+import {J} from "../../src/java";
+import {SourceFile} from "../../src/tree";
 
 const serverJs = path.resolve(__dirname, "../../dist/rpc/server.js");
 
@@ -36,8 +40,23 @@ describe.skipIf(!fs.existsSync(serverJs))("the server process", () => {
     let exited: Promise<number | null>;
 
     function start(...args: string[]): void {
-        server = spawn(process.execPath, [serverJs, ...args], {stdio: ["pipe", "pipe", "pipe"]});
+        startWith([], ...args);
+    }
+
+    function startWith(nodeArgs: string[], ...args: string[]): void {
+        server = spawn(process.execPath, [...nodeArgs, serverJs, ...args], {stdio: ["pipe", "pipe", "pipe"]});
         exited = new Promise(resolve => server.on("exit", resolve));
+    }
+
+    function connect(): rpc.MessageConnection {
+        return rpc.createMessageConnection(
+            new rpc.StreamMessageReader(server.stdout, {contentTypeDecoder: chunkedJsonDecoder}),
+            new rpc.StreamMessageWriter(server.stdin, {contentTypeEncoder: chunkedJsonEncoder})
+        );
+    }
+
+    function beforeExit<T>(response: Promise<T>): Promise<T> {
+        return Promise.race([response, exited.then(code => Promise.reject(new Error(`The server exited with ${code}`)))]);
     }
 
     afterEach(() => {
@@ -137,4 +156,63 @@ describe.skipIf(!fs.existsSync(serverJs))("the server process", () => {
         expect(pages).toBeGreaterThan(1);
         expect(targets).toEqual(["one.js"]);
     }, 60000);
+
+    test("parses a project file by file, so its trees together can outgrow the heap", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rpc-project-"));
+        onTestFinished(() => fs.rmSync(dir, {recursive: true, force: true}));
+        fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({name: "calls", version: "1.0.0"}));
+        let text = "const list = [];\n";
+        for (let i = 0; i < 3000; i++) {
+            text += `list.push(String(${i}).padStart(4, '0'));\n`;
+        }
+        for (let i = 0; i < 30; i++) {
+            fs.writeFileSync(path.join(dir, `calls${i}.js`), text);
+        }
+        // Room for the program and the trees of a file or two, not for those of all thirty
+        startWith(["--max-old-space-size=832"]);
+        const connection = connect();
+        const client = new RewriteRpc(connection, {batchSize: 1000});
+
+        const items = await beforeExit(connection.sendRequest(
+            new rpc.RequestType<ParseProject, ParseProjectResponseItem[], Error>("ParseProject"), new ParseProject(dir)));
+        const kinds: string[] = [];
+        for (const item of items) {
+            kinds.push((await beforeExit(client.getObject<SourceFile>(item.id, item.sourceFileType))).kind);
+            // As the Java client does with each tree it receives
+            await connection.sendNotification(new rpc.NotificationType<{ id: string }>("Evict"), {id: item.id});
+            client.localObjects.delete(item.id);
+            client.remoteObjects.delete(item.id);
+        }
+        expect(kinds.filter(kind => kind === JS.Kind.CompilationUnit)).toHaveLength(30);
+
+        server.stdin.end();
+        expect(await exited).toEqual(0);
+    }, 120000);
+
+    test("attributes a call whose signature TypeScript cannot print in bounded memory", async () => {
+        const workspace = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {typebox: "1.4.6"}});
+        startWith(["--max-old-space-size=512"]);
+        const client = new RewriteRpc(connect(), {batchSize: 1000});
+
+        // Printing the resolved signature of this Record call instantiates typebox's types until the heap runs out
+        const text = "import {type TSchema, IsRecord, Record, RecordKey, RecordValue} from 'typebox';\n" +
+            "export function probe<T extends TSchema>(type: T) {\n" +
+            "    return IsRecord(type) ? Record(RecordKey(type), RecordValue(type)) : type;\n" +
+            "}\n";
+        const [parsed] = await beforeExit(client.parse([{text, sourcePath: "probe.ts"}], JS.Kind.CompilationUnit, workspace));
+
+        const called: string[] = [];
+        await new class extends JavaScriptVisitor<void> {
+            protected override async visitMethodInvocation(method: J.MethodInvocation, p: void): Promise<J | undefined> {
+                if (method.methodType) {
+                    called.push(method.methodType.name);
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }().visit(parsed, undefined);
+        expect(called).toContain("Record");
+
+        server.stdin.end();
+        expect(await exited).toEqual(0);
+    }, 120000);
 });

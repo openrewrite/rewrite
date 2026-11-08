@@ -282,6 +282,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                                 "",
                                 null);
                     }
+                } finally {
+                    // A whole project's trees can outgrow the server's heap.
+                    // Neither peer keeps one once it is received.
+                    evict(item.getId());
                 }
                 action.accept(sourceFile);
                 return true;

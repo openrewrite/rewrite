@@ -421,6 +421,20 @@ public class RewriteRpc {
         remoteRefs.keySet().removeIf(ref -> ref > remoteRefsCheckpoint);
     }
 
+    /**
+     * Drop a tree the remote parsed from both peers once it has been received. The refs it
+     * introduced stay, since the trees received after it may use them.
+     */
+    public void evict(String id) {
+        // Why a remote went says more than the closed stream a notification to it would meet
+        checkLiveness();
+        jsonRpc.notify(new JsonRpcRequest(null, "Evict", RawJson.of(new Evict(id))));
+        getObject.cancelInProgress(() -> {
+            remoteObjects.remove(id);
+            localObjects.remove(id);
+        });
+    }
+
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
         return visit(sourceFile, visitorName, p, null);
     }
