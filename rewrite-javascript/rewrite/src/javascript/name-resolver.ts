@@ -523,9 +523,7 @@ export class JavaScriptNameResolver {
         if (value && ts.isClassExpression(unwrapped(value))) {
             return "class";
         }
-        // A package's property is the field the walk indexed it as, whatever it holds.
-        const external = this.placeOf(declaration.getSourceFile().fileName)?.external;
-        return !external && this.checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures().length > 0 ? "method" : "field";
+        return this.checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures().length > 0 ? "method" : "field";
     }
 
     private placeOf(fileName: string): Place | undefined {
