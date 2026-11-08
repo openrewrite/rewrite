@@ -261,10 +261,10 @@ public final class ForgeBoxPackages {
     }
 
     /**
-     * Where CommandBox installs a package: its {@code box.json}'s {@code directory}, else {@code modules} for a ColdBox
-     * module, else the project's root, then a directory named {@code packageDirectory}, else the slug its
-     * {@code box.json} gives, else the one asked for, unless {@code createPackageDirectory} is false. CommandBox takes
-     * an empty value as none, which its {@code box.json} template writes.
+     * Where CommandBox installs a package: its {@code box.json}'s {@code directory}, else the folder for its type, else
+     * the project's root, then a directory named {@code packageDirectory}, else the slug its {@code box.json} gives, else
+     * the one asked for, unless {@code createPackageDirectory} is false. CommandBox takes an empty value as none, which
+     * its {@code box.json} template writes.
      */
     private static String installPath(String slug, String type, Path directory) {
         JsonNode box = JSON.createObjectNode();
@@ -277,13 +277,49 @@ public final class ForgeBoxPackages {
             }
         }
         String installDirectory = box.path("directory").asText("");
-        String base = !installDirectory.isEmpty() ? trimSlashes(installDirectory) :
-                "modules".equals(box.path("type").asText(type)) ? "modules" : "";
+        String packageType = box.path("type").asText(type);
+        boolean createPackageDirectory = box.path("createPackageDirectory").asBoolean(true);
+        String base;
+        if (!installDirectory.isEmpty()) {
+            base = trimSlashes(installDirectory);
+        } else {
+            base = typeDirectory(packageType);
+            // CommandBox drops these into their type's folder whatever their box.json says
+            if ("contentbox-widgets".equals(packageType) || "plugins".equals(packageType) ||
+                "interceptors".equals(packageType)) {
+                createPackageDirectory = false;
+            }
+        }
         String packageDirectory = box.path("packageDirectory").asText("");
         String named = box.path("slug").asText("");
-        String name = box.path("createPackageDirectory").asBoolean(true) ?
+        String name = createPackageDirectory ?
                 trimSlashes(!packageDirectory.isEmpty() ? packageDirectory : !named.isEmpty() ? named : slug) : "";
         return base.isEmpty() ? name : name.isEmpty() ? base : base + "/" + name;
+    }
+
+    /**
+     * The folder CommandBox installs a type of package in within a project, or the project's root.
+     */
+    private static String typeDirectory(String type) {
+        switch (type) {
+            case "modules":
+                return "modules";
+            case "contentbox-modules":
+                return "modules/contentbox/modules_user";
+            case "contentbox-themes":
+            case "contentbox-layouts":
+                return "modules/contentbox/themes";
+            case "contentbox-widgets":
+                return "modules/contentbox/widgets";
+            case "plugins":
+                return "plugins";
+            case "interceptors":
+                return "interceptors";
+            case "jars":
+                return "lib";
+            default:
+                return "";
+        }
     }
 
     /**
