@@ -35,6 +35,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.UnaryOperator;
 
 @SuppressWarnings("JavadocLinkAsPlainText")
 public class OpenRewriteModelBuilder {
@@ -149,7 +150,7 @@ public class OpenRewriteModelBuilder {
             } else {
                 resolvedInitScript = initScript;
             }
-            Files.write(init, (resolvedInitScript + mirrorScriptSnippet()).getBytes(StandardCharsets.UTF_8));
+            Files.write(init, (resolvedInitScript + mirrorScriptSnippet(System::getenv)).getBytes(StandardCharsets.UTF_8));
             customModelBuilder.withArguments(arguments);
             try {
                 return OpenRewriteModel.from(customModelBuilder.get());
@@ -207,16 +208,23 @@ public class OpenRewriteModelBuilder {
      * repositories at that mirror instead, with its credentials, including the portal Gradle adds on
      * its own when a build names no plugin repository. Other repositories stay as the build files
      * declare them. If any var is missing, returns the empty string.
+     * <p>
+     * A mirror at the Code Genome Project's {@code /maven-public/} sends the portal to {@code /gradle-plugins/}
+     * beside it: {@code maven-public} serves a module's version list from the first repository that lists it,
+     * Central's ahead of the portal's, and Central lists fewer versions of some plugins' markers than the portal,
+     * as it lists Spring Boot's from 2.2.0 alone.
      */
-    private static String mirrorScriptSnippet() {
-        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
-        String user = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
-        String pass = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
+    static String mirrorScriptSnippet(UnaryOperator<String> env) {
+        String url = env.apply("MAVEN_CENTRAL_MIRROR_URL");
+        String user = env.apply("MAVEN_CENTRAL_MIRROR_USERNAME");
+        String pass = env.apply("MAVEN_CENTRAL_MIRROR_PASSWORD");
         if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
             return "";
         }
+        String portalUrl = url.replaceFirst("/maven-public/?$", "/gradle-plugins/");
         return "\n\n" +
                 "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
+                "def __rewritePortalMirrorUrl = '" + escapeGroovy(portalUrl) + "'\n" +
                 "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
                 "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
                 // configureEach also reaches the repositories the build files add after these hooks run
@@ -224,7 +232,7 @@ public class OpenRewriteModelBuilder {
                 "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
                 "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org',\n" +
                 "                'central.sonatype.com', 'oss.sonatype.org', 's01.oss.sonatype.org']) {\n" +
-                "            repo.url = __rewriteMirrorUrl\n" +
+                "            repo.url = repo.url.host == 'plugins.gradle.org' ? __rewritePortalMirrorUrl : __rewriteMirrorUrl\n" +
                 "            repo.credentials {\n" +
                 "                it.username = __rewriteMirrorUser\n" +
                 "                it.password = __rewriteMirrorPass\n" +

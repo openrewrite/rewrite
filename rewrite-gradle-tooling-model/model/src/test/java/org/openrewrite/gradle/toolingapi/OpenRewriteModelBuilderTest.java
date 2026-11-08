@@ -19,6 +19,8 @@ import org.gradle.tooling.GradleConnectionException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,5 +52,34 @@ class OpenRewriteModelBuilderTest {
           new RuntimeException("Could not compile build file 'build.gradle'."));
         assertThat(OpenRewriteModelBuilder.explainMissingPlugin(brokenBuildScript, "8.98.0-SNAPSHOT"))
           .isSameAs(brokenBuildScript);
+    }
+
+    @Test
+    void mirrorsThePluginPortalAtCodeGenomeProjectsGradlePluginsBesideMavenPublic() {
+        assertThat(OpenRewriteModelBuilder.mirrorScriptSnippet(mirror("https://artifacts.codegenomeproject.org/maven-public/")::get))
+          .contains("def __rewriteMirrorUrl = 'https://artifacts.codegenomeproject.org/maven-public/'")
+          .contains("def __rewritePortalMirrorUrl = 'https://artifacts.codegenomeproject.org/gradle-plugins/'")
+          .contains("repo.url = repo.url.host == 'plugins.gradle.org' ? __rewritePortalMirrorUrl : __rewriteMirrorUrl");
+    }
+
+    @Test
+    void mirrorsThePluginPortalAtAnyOtherMirrorItself() {
+        assertThat(OpenRewriteModelBuilder.mirrorScriptSnippet(mirror("https://mirror.example.com/maven")::get))
+          .contains("def __rewritePortalMirrorUrl = 'https://mirror.example.com/maven'");
+    }
+
+    @Test
+    void noMirrorWithoutCredentials() {
+        Map<String, String> env = mirror("https://artifacts.codegenomeproject.org/maven-public/");
+        env.remove("MAVEN_CENTRAL_MIRROR_PASSWORD");
+        assertThat(OpenRewriteModelBuilder.mirrorScriptSnippet(env::get)).isEmpty();
+    }
+
+    private static Map<String, String> mirror(String url) {
+        Map<String, String> env = new HashMap<>();
+        env.put("MAVEN_CENTRAL_MIRROR_URL", url);
+        env.put("MAVEN_CENTRAL_MIRROR_USERNAME", "user");
+        env.put("MAVEN_CENTRAL_MIRROR_PASSWORD", "password");
+        return env;
     }
 }
