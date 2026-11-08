@@ -1017,6 +1017,25 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task MembersOfKeywordTypesAreDeclaredByTheirStruct()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            class C
+            {
+                string M(string s) => int.Parse(s).ToString() + int.MaxValue;
+            }
+            """);
+
+        var parse = Assert.Single(Collect<MethodInvocation>(cu), mi => mi.Name.SimpleName == "Parse");
+        Assert.True(new MethodMatcher("System.Int32 Parse(string)").Matches(parse));
+        Assert.False(new MethodMatcher("System.Int64 Parse(string)").Matches(parse));
+        Assert.Same(JavaType.Primitive.Of(JavaType.PrimitiveKind.Int), parse.MethodType!.ReturnType);
+
+        var maxValue = Assert.Single(Collect<Identifier>(cu), i => i.SimpleName == "MaxValue");
+        Assert.Same(parse.MethodType.DeclaringType, ((JavaType.Variable)maxValue.FieldType!).Owner);
+    }
+
+    [Fact]
     public async Task PointersHaveTheTypeTheyPointAt()
     {
         var cu = await ParseWithSemanticModelAsync("""

@@ -211,7 +211,7 @@ internal class CSharpTypeMapping
     {
         IMethodSymbol method => MapMethod(method),
         IPropertySymbol indexer when (indexer.GetMethod ?? indexer.SetMethod) is { } accessor => MapMethod(accessor),
-        _ => MapType(variable.ContainingType)
+        _ => DeclaringType(variable.ContainingType)
     };
 
     private ISymbol? SoleMember(SyntaxNode node) => _model.GetMemberGroup(node) is [var member] ? member : null;
@@ -220,11 +220,11 @@ internal class CSharpTypeMapping
     {
         return symbol switch
         {
-            IFieldSymbol f => MapVariable(f, f.Name, MapType(f.ContainingType), MapType(f.Type)),
+            IFieldSymbol f => MapVariable(f, f.Name, DeclaringType(f.ContainingType), MapType(f.Type)),
             ILocalSymbol l => MapVariable(l, l.Name, Owner(l), MapType(l.Type)),
             IParameterSymbol p => MapVariable(p, p.Name, Owner(p), MapType(p.Type)),
-            IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
-            IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
+            IPropertySymbol prop => MapVariable(prop, prop.Name, DeclaringType(prop.ContainingType), MapType(prop.Type)),
+            IEventSymbol evt => MapVariable(evt, evt.Name, DeclaringType(evt.ContainingType), MapType(evt.Type)),
             _ => null
         };
     }
@@ -236,6 +236,7 @@ internal class CSharpTypeMapping
     {
         if (symbol == null) return null;
         if (symbol is IErrorTypeSymbol) return JavaType.Unknown.Instance;
+        if (symbol is INamedTypeSymbol named && MapPrimitive(named) is { } primitive) return primitive;
 
         // Check cache first
         if (_typeCache.TryGetValue(symbol, out var cached))
@@ -300,6 +301,21 @@ internal class CSharpTypeMapping
             }
         }
 
+        return MapClass(symbol);
+    }
+
+    /// <summary>
+    /// The type that declares a member. A keyword type such as <c>int</c> types its values as a primitive, but declares
+    /// its members as the struct it is, <c>System.Int32</c>. The type cache holds that struct under the keyword type's
+    /// symbol, and <see cref="MapType"/> answers the primitive before it reads the cache.
+    /// </summary>
+    private JavaType.FullyQualified? DeclaringType(INamedTypeSymbol? symbol) =>
+        symbol == null ? null :
+        MapPrimitive(symbol) == null ? MapType(symbol) as JavaType.FullyQualified :
+        _typeCache.TryGetValue(symbol, out var declaring) ? (JavaType.FullyQualified)declaring : MapClass(symbol);
+
+    private JavaType.Class MapClass(INamedTypeSymbol symbol)
+    {
         // Shell cache pattern: create empty shell, cache it, then populate
         var cls = new JavaType.Class();
         _typeCache[symbol] = cls;
@@ -445,9 +461,7 @@ internal class CSharpTypeMapping
         var method = new JavaType.Method();
         _typeCache[symbol] = method;
 
-        var declaringType = symbol.ContainingType != null
-            ? MapType(symbol.ContainingType) as JavaType.FullyQualified
-            : null;
+        var declaringType = DeclaringType(symbol.ContainingType);
         // In Roslyn, constructor ReturnType is void, but the Java model expects
         // the declaring type as the return type for constructors
         var returnType = symbol.MethodKind == MethodKind.Constructor && symbol.ContainingType != null
