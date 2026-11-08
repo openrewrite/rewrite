@@ -139,10 +139,7 @@ public class FindMissingTypes : Recipe
         public override J VisitIdentifier(Identifier identifier, P p)
         {
             var visited = base.VisitIdentifier(identifier, p);
-            // An Unknown name does not resolve in its code, as in a template that uses what it does not declare. As a
-            // part of another type, Unknown is malformed.
-            if (identifier.Type is not JavaType.Unknown && Defect(identifier.Type) is { } defect &&
-                !NamesWhatHasNoType(identifier))
+            if (ValueTypeDefect(identifier.Type) is { } defect && !NamesWhatHasNoType(identifier))
                 return missing(visited, $"Identifier type is {defect}", p);
             if (identifier.FieldType == null)
                 return visited;
@@ -175,13 +172,21 @@ public class FindMissingTypes : Recipe
             type is null or JavaType.Unknown ? "missing" :
             HasMissingPart(type, new HashSet<JavaType>(ReferenceEqualityComparer.Instance)) ? "malformed" : null;
 
+        /// <summary>
+        /// What is wrong with the type of a value. Unknown is the type of a value that does not resolve, as in a
+        /// template's code that uses what the template does not declare. It is missing only as a part of another type.
+        /// </summary>
+        private static string? ValueTypeDefect(JavaType? type) => type is JavaType.Unknown ? null : Defect(type);
+
         private static bool HasMissingPart(JavaType type, HashSet<JavaType> seen) => seen.Add(type) && type switch
         {
             JavaType.Parameterized parameterized => Missing(parameterized.Type, seen) ||
                                                     AnyMissing(parameterized.TypeParameters, seen),
             JavaType.Array array => Missing(array.ElemType, seen),
             JavaType.GenericTypeVariable variable => AnyMissing(variable.Bounds, seen),
-            JavaType.Variable variable => Missing(variable.Type, seen) || Missing(variable.Owner, seen),
+            // A variable's type is the type of its value, as ValueTypeDefect has it.
+            JavaType.Variable variable => variable.Type is not JavaType.Unknown && Missing(variable.Type, seen) ||
+                                          Missing(variable.Owner, seen),
             JavaType.MultiCatch multiCatch => AnyMissing(multiCatch.ThrowableTypes, seen),
             JavaType.Method method => Missing(method.ReturnType, seen) || Missing(method.DeclaringType, seen) ||
                                       AnyMissing(method.ParameterTypes, seen),

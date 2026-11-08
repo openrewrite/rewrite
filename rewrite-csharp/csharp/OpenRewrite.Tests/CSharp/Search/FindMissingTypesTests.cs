@@ -260,12 +260,13 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
-    public async Task LeavesNamesThatDoNotResolveUnmarked()
+    public async Task LeavesValuesWhoseTypeDoesNotResolveUnmarked()
     {
         const string source = """
             class A
             {
-                void M() => Undeclared = 1;
+                Missing m;
+                void M() => Undeclared = m;
             }
             """;
         var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
