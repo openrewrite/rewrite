@@ -75,3 +75,22 @@ def test_edited_comprehension_condition_round_trips():
 
     # then
     assert PythonPrinter().print(rebuilt) == "[x for x in xs  if x]\n"
+
+
+def test_legacy_nullable_comprehension_conditions():
+    # Historical JVM models encode an unfiltered clause with null conditions.
+    # Reproduced in RocketGod-git/Flipper_Zero at a58b8119aa59678204260ca1573007862ed71cae,
+    # badusb/BadUSB-FalsePhilosopher/BashBunny/payloads/library/credentials/
+    # SMBruteBunny/mmcbrute/mmcbrute.py.
+    cu = _parse("[x for x in xs]\n")
+
+    class LegacyConditions(PythonVisitor):
+        def visit_comprehension_clause(self, clause, p):
+            return clause.with_conditions(None)
+
+    legacy = LegacyConditions().visit(cu, 0)
+    assert PythonVisitor().visit(legacy, 0) is legacy
+    edited = _WidenClausePrefix().visit(legacy, 0)
+    assert PythonPrinter().print(edited) == "[x  for x in xs]\n"
+    rebuilt = _rpc_round_trip(legacy, edited)
+    assert PythonPrinter().print(rebuilt) == "[x  for x in xs]\n"
