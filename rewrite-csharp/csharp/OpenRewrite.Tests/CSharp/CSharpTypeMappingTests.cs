@@ -1054,6 +1054,27 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task AnExplicitImplementationHasTheNameOfWhatItImplements()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            using System.ComponentModel;
+            interface INamed { string Name { get; } }
+            class C : IDisposable, INamed, INotifyPropertyChanged
+            {
+                void IDisposable.Dispose() { }
+                string INamed.Name => "c";
+                event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged { add { } remove { } }
+            }
+            """);
+
+        var dispose = Assert.Single(Collect<MethodDeclaration>(cu));
+        Assert.True(new MethodMatcher("System.IDisposable Dispose()", matchOverrides: true).Matches(dispose));
+        var c = Assert.IsType<JavaType.Class>(Assert.Single(Collect<ClassDeclaration>(cu), cd => cd.Name.SimpleName == "C").Type);
+        Assert.Equal(["Name", "PropertyChanged"], c.Members!.Select(v => v.Name));
+    }
+
+    [Fact]
     public async Task PointersHaveTheTypeTheyPointAt()
     {
         var cu = await ParseWithSemanticModelAsync("""

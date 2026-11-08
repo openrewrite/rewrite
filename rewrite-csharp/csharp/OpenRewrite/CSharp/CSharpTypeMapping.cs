@@ -162,7 +162,7 @@ internal class CSharpTypeMapping
                 .OfType<IAnonymousFunctionOperation>()
                 .SelectMany(lambda => lambda.Symbol.Parameters)
                 .FirstOrDefault(parameter => parameter.Locations.SequenceEqual(variable.Locations))?.Type;
-        return MapVariable(variable, variable.Name, Owner(variable), MapType(type));
+        return MapVariable(variable, Owner(variable), MapType(type));
     }
 
     /// <summary>
@@ -220,11 +220,11 @@ internal class CSharpTypeMapping
     {
         return symbol switch
         {
-            IFieldSymbol f => MapVariable(f, f.Name, DeclaringType(f.ContainingType), MapType(f.Type)),
-            ILocalSymbol l => MapVariable(l, l.Name, Owner(l), MapType(l.Type)),
-            IParameterSymbol p => MapVariable(p, p.Name, Owner(p), MapType(p.Type)),
-            IPropertySymbol prop => MapVariable(prop, prop.Name, DeclaringType(prop.ContainingType), MapType(prop.Type)),
-            IEventSymbol evt => MapVariable(evt, evt.Name, DeclaringType(evt.ContainingType), MapType(evt.Type)),
+            IFieldSymbol f => MapVariable(f, DeclaringType(f.ContainingType), MapType(f.Type)),
+            ILocalSymbol l => MapVariable(l, Owner(l), MapType(l.Type)),
+            IParameterSymbol p => MapVariable(p, Owner(p), MapType(p.Type)),
+            IPropertySymbol prop => MapVariable(prop, DeclaringType(prop.ContainingType), MapType(prop.Type)),
+            IEventSymbol evt => MapVariable(evt, DeclaringType(evt.ContainingType), MapType(evt.Type)),
             _ => null
         };
     }
@@ -397,13 +397,13 @@ internal class CSharpTypeMapping
             switch (member)
             {
                 case IFieldSymbol field:
-                    (members ??= []).Add(MapVariable(field, field.Name, cls, MapType(field.Type)));
+                    (members ??= []).Add(MapVariable(field, cls, MapType(field.Type)));
                     break;
                 case IPropertySymbol property:
-                    (members ??= []).Add(MapVariable(property, property.Name, cls, MapType(property.Type)));
+                    (members ??= []).Add(MapVariable(property, cls, MapType(property.Type)));
                     break;
                 case IEventSymbol evt:
-                    (members ??= []).Add(MapVariable(evt, evt.Name, cls, MapType(evt.Type)));
+                    (members ??= []).Add(MapVariable(evt, cls, MapType(evt.Type)));
                     break;
                 case IMethodSymbol method:
                     (methods ??= []).Add(MapMethod(method));
@@ -479,7 +479,7 @@ internal class CSharpTypeMapping
             : null;
 
         method.UnsafeSet(
-            symbol.Name,
+            MemberName(symbol),
             MapFlags(symbol),
             declaringType,
             returnType,
@@ -498,12 +498,12 @@ internal class CSharpTypeMapping
         return method;
     }
 
-    private JavaType.Variable MapVariable(ISymbol symbol, string name, JavaType? owner, JavaType? type)
+    private JavaType.Variable MapVariable(ISymbol symbol, JavaType? owner, JavaType? type)
     {
         if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
             return v;
 
-        var variable = new JavaType.Variable(name, owner, type, null)
+        var variable = new JavaType.Variable(MemberName(symbol), owner, type, null)
         {
             FlagsBitMap = MapFlags(symbol)
         };
@@ -518,7 +518,20 @@ internal class CSharpTypeMapping
     /// every other reference to it does.
     /// </summary>
     private IList<JavaType.FullyQualified>? ListAnnotations(ISymbol symbol) =>
-        AttributeMapping.ListAnnotations(symbol, MapType, MapVariable, MapMethod);
+        AttributeMapping.ListAnnotations(symbol, MapType, (member, _, owner, type) => MapVariable(member, owner, type),
+            MapMethod);
+
+    /// <summary>
+    /// An explicit interface implementation, such as <c>void IDisposable.Dispose()</c>, has the name of the member it
+    /// implements. Roslyn names it after the interface too, as metadata does.
+    /// </summary>
+    private static string MemberName(ISymbol member) => member switch
+    {
+        IMethodSymbol { ExplicitInterfaceImplementations: [var implemented, ..] } => implemented.Name,
+        IPropertySymbol { ExplicitInterfaceImplementations: [var implemented, ..] } => implemented.Name,
+        IEventSymbol { ExplicitInterfaceImplementations: [var implemented, ..] } => implemented.Name,
+        _ => member.Name
+    };
 
     internal static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {
