@@ -986,6 +986,37 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task LocalsAndParametersBelongToTheMethodThatDeclaresThem()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            using System.Linq;
+            class C
+            {
+                int this[int i] => i;
+                int M(int[] xs)
+                {
+                    var total = (from y in xs select y).Sum();
+                    Func<int, int> f = a => { var b = a; return b; };
+                    return total;
+                }
+            }
+            """);
+
+        List<JavaType?> Owners(string name) => Collect<Identifier>(cu)
+            .Where(i => i.SimpleName == name && i.FieldType != null)
+            .Select(i => ((JavaType.Variable)i.FieldType!).Owner).Distinct().ToList();
+
+        var m = Assert.Single(Collect<MethodDeclaration>(cu), md => md.Name.SimpleName == "M").MethodType;
+        Assert.Same(m, Assert.Single(Owners("total")));
+        Assert.Same(m, Assert.Single(Owners("y")));
+        var lambda = Assert.IsType<JavaType.Method>(Assert.Single(Owners("a")));
+        Assert.NotSame(m, lambda);
+        Assert.Same(lambda, Assert.Single(Owners("b")));
+        Assert.IsType<JavaType.Method>(Assert.Single(Owners("i")));
+    }
+
+    [Fact]
     public async Task PointersHaveTheTypeTheyPointAt()
     {
         var cu = await ParseWithSemanticModelAsync("""

@@ -162,7 +162,7 @@ internal class CSharpTypeMapping
                 .OfType<IAnonymousFunctionOperation>()
                 .SelectMany(lambda => lambda.Symbol.Parameters)
                 .FirstOrDefault(parameter => parameter.Locations.SequenceEqual(variable.Locations))?.Type;
-        return MapVariable(variable, variable.Name, null, MapType(type));
+        return MapVariable(variable, variable.Name, Owner(variable), MapType(type));
     }
 
     /// <summary>
@@ -203,6 +203,17 @@ internal class CSharpTypeMapping
         return (type, fieldType);
     }
 
+    /// <summary>
+    /// The method that declares a local, parameter or range variable, a lambda or local function included. An indexer's
+    /// parameter belongs to its accessor, as its uses in the accessor's body do.
+    /// </summary>
+    private JavaType? Owner(ISymbol variable) => variable.ContainingSymbol switch
+    {
+        IMethodSymbol method => MapMethod(method),
+        IPropertySymbol indexer when (indexer.GetMethod ?? indexer.SetMethod) is { } accessor => MapMethod(accessor),
+        _ => MapType(variable.ContainingType)
+    };
+
     private ISymbol? SoleMember(SyntaxNode node) => _model.GetMemberGroup(node) is [var member] ? member : null;
 
     private JavaType.Variable? VariableFromSymbol(ISymbol? symbol)
@@ -210,9 +221,8 @@ internal class CSharpTypeMapping
         return symbol switch
         {
             IFieldSymbol f => MapVariable(f, f.Name, MapType(f.ContainingType), MapType(f.Type)),
-            ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
-            IParameterSymbol p => MapVariable(p, p.Name,
-                p.ContainingSymbol is IMethodSymbol method ? MapMethod(method) : null, MapType(p.Type)),
+            ILocalSymbol l => MapVariable(l, l.Name, Owner(l), MapType(l.Type)),
+            IParameterSymbol p => MapVariable(p, p.Name, Owner(p), MapType(p.Type)),
             IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
             IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
             _ => null
