@@ -1075,6 +1075,22 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task TheNameOfAnInvokedExpressionHasItsMethod()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            class C
+            {
+                bool M() => new Func<bool>(() => true)();
+            }
+            """);
+
+        var invoke = Assert.Single(Collect<MethodInvocation>(cu));
+        Assert.Equal("Invoke", invoke.MethodType!.Name);
+        Assert.Same(invoke.MethodType, invoke.Name.Type);
+    }
+
+    [Fact]
     public async Task PointersHaveTheTypeTheyPointAt()
     {
         var cu = await ParseWithSemanticModelAsync("""

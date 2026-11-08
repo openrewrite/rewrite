@@ -5737,7 +5737,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 prefix,
                 Markers.Build([DelegateInvocation.Instance]),
                 new JRightPadded<Expression>(targetExpr, Space.Empty, Markers.Empty),
-                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], "Invoke", null, null),
+                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], "Invoke", nameType, null),
                 null,
                 delegateArgs,
                 _typeMapping?.MethodType(node)
