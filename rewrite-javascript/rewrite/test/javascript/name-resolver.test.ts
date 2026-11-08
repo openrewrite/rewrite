@@ -116,6 +116,17 @@ function meets(reference: PackagedRow, declarations: PackagedRow[], files: strin
     }
 }
 
+/** The declarations of a package's own build, where its files are the repository. */
+async function ownDeclarations(source: Record<string, string>): Promise<PackagedRow[]> {
+    const code = Object.keys(source).filter(file => /\.[cm]?[jt]sx?$/.test(file));
+    const rows = (await Promise.all((await parseAll(source, code)).map(rowsOf))).flat();
+    return rows.filter(([, kind]) => DECLARATION_KINDS.includes(kind));
+}
+
+function installed(pkg: string, source: Record<string, string>): Record<string, string> {
+    return Object.fromEntries(Object.entries(source).map(([file, text]) => [`node_modules/${pkg}/${file}`, text]));
+}
+
 describe("the marker", () => {
     test("is absent unless the parse asks for it", async () => {
         expect(markerOf(await parse({"a.js": "const a = 1;"}, "a.js", {}))).toBeUndefined();
@@ -1518,7 +1529,7 @@ describe("a name in a package", () => {
         expect(names).toContainEqual(["value", "field-access", "index.ns.value", "held"]);
     });
 
-    test("of a property or a variable is a field, whatever it holds, as the walk indexed it", async () => {
+    test("of a property or a variable holding a function is a call, as a function is", async () => {
         const names = await packaged({
             "node_modules/held/package.json": JSON.stringify({name: "held", version: "1.0.0", types: "index.d.ts"}),
             "node_modules/held/index.d.ts": trimIndent(`
@@ -1537,10 +1548,93 @@ describe("a name in a package", () => {
             `)
         }, "use.ts");
         expect(names).toEqual(expect.arrayContaining([
-            ["read", "field-access", "index.Options.read", "held"],
+            ["read", "method-call", "index.Options.read", "held"],
             ["open", "method-call", "index.Options.open", "held"],
-            ["run", "field-access", "index.d.run", "held"],
+            ["run", "method-call", "index.d.run", "held"],
         ]));
+    });
+
+    test("of a global variable holding a function is the method its own build declares", async () => {
+        const source = {
+            "package.json": JSON.stringify({name: "@types/node", version: "22.10.0", types: "module.d.ts"}),
+            "module.d.ts": trimIndent(`
+                declare module "module" {
+                    global {
+                        namespace NodeJS {
+                            interface Require {
+                                (id: string): any;
+                            }
+                        }
+                        var require: NodeJS.Require;
+                    }
+                }
+            `),
+        };
+        const references = (await packaged({
+            ...installed("@types/node", source),
+            "lib.js": "exports.a = 1;",
+            "use.js": `require("./lib.js");`,
+        }, "use.js")).filter(([, , , pkg]) => pkg === "@types/node");
+        const declarations = await ownDeclarations(source);
+        expect(references).toEqual([["require", "method-call", "module.d.require", "@types/node"]]);
+        expect(references.filter(reference => !meets(reference, declarations, Object.keys(source)))).toEqual([]);
+    });
+
+    test("of a property whose type is callable is the method its own build declares", async () => {
+        const source = {
+            "package.json": JSON.stringify({name: "@types/router", version: "1.0.0", types: "index.d.ts"}),
+            "index.d.ts": trimIndent(`
+                export interface Handler {
+                    (request: unknown, next: () => void): void;
+                }
+                export interface Matcher<T> {
+                    (path: string, ...handlers: Handler[]): T;
+                }
+                export interface Router {
+                    get: Matcher<this>;
+                    use: Matcher<this> & ((...handlers: Handler[]) => this);
+                }
+            `),
+        };
+        const references = (await packaged({
+            ...installed("@types/router", source),
+            "use.ts": trimIndent(`
+                import type {Router} from "router";
+                declare const app: Router;
+                app.get("/", (request, next) => next()).use((request, next) => next());
+            `),
+        }, "use.ts")).filter(([, , , pkg]) => pkg === "@types/router");
+        const declarations = await ownDeclarations(source);
+        expect(references).toEqual(expect.arrayContaining([
+            ["get", "method-call", "index.Router.get", "@types/router"],
+            ["use", "method-call", "index.Router.use", "@types/router"],
+        ]));
+        expect(references.filter(reference => !meets(reference, declarations, Object.keys(source)))).toEqual([]);
+    });
+
+    test("of a callable value given to export = is the method its own build declares", async () => {
+        const source = {
+            "package.json": JSON.stringify({name: "@types/errors", version: "2.0.0", types: "index.d.ts"}),
+            "index.d.ts": trimIndent(`
+                export = createError;
+                declare const createError: createError.Create & {
+                    isError(value: unknown): boolean;
+                };
+                declare namespace createError {
+                    type Create = (status?: number) => Error;
+                }
+            `),
+        };
+        const references = (await packaged({
+            ...installed("@types/errors", source),
+            "use.js": trimIndent(`
+                const createError = require("errors");
+                createError(404);
+            `),
+        }, "use.js")).filter(([, , , pkg]) => pkg === "@types/errors");
+        const declarations = await ownDeclarations(source);
+        expect(references).toContainEqual(["createError", "method-call", "index.d.createError", "@types/errors"]);
+        expect(references.filter(reference => !meets(reference, declarations, Object.keys(source)))).toEqual([]);
     });
 
     test("keeps the scope of a scoped package", async () => {
@@ -1604,9 +1698,9 @@ describe("a name in a package", () => {
         ]);
     });
 
-    test("in the default library is a field where a property holds a function too", async () => {
+    test("in the default library is a call where a property holds a function too", async () => {
         expect(await packaged({"a.js": "document.onclick;"}, "a.js"))
-            .toContainEqual(["onclick", "field-access", "GlobalEventHandlers.onclick", null]);
+            .toContainEqual(["onclick", "method-call", "GlobalEventHandlers.onclick", null]);
     });
 
     test("of a namespace in the default library is its file", async () => {
