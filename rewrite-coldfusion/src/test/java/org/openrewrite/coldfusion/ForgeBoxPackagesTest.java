@@ -120,4 +120,46 @@ class ForgeBoxPackagesTest {
         ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("cfcouchbase@3.0.2");
         assertThat(installed.getDirectory().resolve("models/Couchbase.cfc")).isRegularFile();
     }
+
+    @Test
+    void aDownloadFromForgeBoxStorageIsNamedInAnyCase(@TempDir Path cache) throws IOException {
+        entry("cbsheets", "1.2.1", "ForgeboxStorage");
+        served.put(REGISTRY + "/storage/cbsheets/1.2.1",
+          "{\"error\": false, \"data\": \"https://downloads.example/cbsheets-1.2.1.zip\"}".getBytes(StandardCharsets.UTF_8));
+        served.put("https://downloads.example/cbsheets-1.2.1.zip", zip("models/Sheet.cfc", "component {}"));
+        ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("cbsheets@1.2.1");
+        assertThat(installed.getDirectory().resolve("models/Sheet.cfc")).isRegularFile();
+    }
+
+    @Test
+    void anEmptyDirectoryOrPackageDirectoryIsNone(@TempDir Path cache) throws IOException {
+        // CommandBox's box.json template writes both empty
+        entry("cbpager", "2.8.3", "https://downloads.example/cbpager-2.8.3.zip");
+        served.put("https://downloads.example/cbpager-2.8.3.zip", zip(
+          "box.json", "{\"slug\": \"cbpager\", \"type\": \"modules\", \"directory\": \"\", \"packageDirectory\": \"\"}",
+          "models/Pager.cfc", "component {}"));
+        ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("cbpager@2.8.3");
+        assertThat(installed.getInstallPath()).isEqualTo("modules/cbpager");
+    }
+
+    @Test
+    void aPackageInAFolderOfItsArchiveInstallsFromThatFolder(@TempDir Path cache) throws IOException {
+        entry("specs", "4.5.0+5", "https://downloads.example/specs-4.5.0.zip");
+        served.put("https://downloads.example/specs-4.5.0.zip", zip(
+          "specs/box.json", "{\"slug\": \"specs\", \"type\": \"testing\"}",
+          "specs/system/BaseSpec.cfc", "component {}"));
+        ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("specs@4.5.0");
+        assertThat(installed.getInstallPath()).isEqualTo("specs");
+        assertThat(installed.getDirectory().resolve("system/BaseSpec.cfc")).isRegularFile();
+    }
+
+    @Test
+    void aPackageInstallsInAFolderNamedForTheSlugItsBoxJsonGives(@TempDir Path cache) throws IOException {
+        entry("old-sheets", "3.0.0", "https://downloads.example/old-sheets-3.0.0.zip");
+        served.put("https://downloads.example/old-sheets-3.0.0.zip", zip(
+          "box.json", "{\"slug\": \"sheets\", \"type\": \"modules\"}",
+          "Sheet.cfc", "component {}"));
+        assertThat(new ForgeBoxPackages(http, REGISTRY, cache).install("old-sheets@3.0.0").getInstallPath())
+          .isEqualTo("modules/sheets");
+    }
 }

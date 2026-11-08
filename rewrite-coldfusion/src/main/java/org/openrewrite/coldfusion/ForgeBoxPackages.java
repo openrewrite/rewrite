@@ -127,7 +127,8 @@ public final class ForgeBoxPackages {
         Path directory = cache.resolve(slug).resolve(number);
         if (!Files.isDirectory(directory)) {
             String url = version.path("downloadURL").asText();
-            if ("forgeboxStorage".equals(url)) {
+            // ForgeBox spells it in several cases, and CommandBox compares it as CFML does, ignoring case
+            if ("forgeboxStorage".equalsIgnoreCase(url)) {
                 url = data(registry + "/storage/" + encode(slug) + "/" + encode(number)).asText();
             }
             String repository = gitHubRepository(url);
@@ -137,7 +138,8 @@ public final class ForgeBoxPackages {
                 throw new IllegalStateException("Downloading " + url + " answered 404");
             }
         }
-        return new Installed(slug, number, installPath(slug, entry.path("typeSlug").asText(""), directory), directory);
+        Path root = packageRoot(directory);
+        return new Installed(slug, number, installPath(slug, entry.path("typeSlug").asText(""), root), root);
     }
 
     /**
@@ -196,8 +198,25 @@ public final class ForgeBoxPackages {
         if (newest == null) {
             return null;
         }
-        Path directory = cache.resolve(slug).resolve(newest);
-        return new Installed(slug, newest, installPath(slug, "", directory), directory);
+        Path root = packageRoot(cache.resolve(slug).resolve(newest));
+        return new Installed(slug, newest, installPath(slug, "", root), root);
+    }
+
+    /**
+     * Where a package's files are: the directory it unpacked into, else the first folder in that, by name, holding a
+     * {@code box.json}, which is where CommandBox finds a package whose archive holds it in a folder.
+     */
+    private static Path packageRoot(Path directory) {
+        if (Files.isRegularFile(directory.resolve("box.json"))) {
+            return directory;
+        }
+        try (Stream<Path> children = Files.list(directory)) {
+            return children.filter(child -> Files.isRegularFile(child.resolve("box.json")))
+                    .min(Comparator.naturalOrder())
+                    .orElse(directory);
+        } catch (IOException | UncheckedIOException e) {
+            return directory;
+        }
     }
 
     private static VersionComparator comparator(String range) {
@@ -243,8 +262,9 @@ public final class ForgeBoxPackages {
 
     /**
      * Where CommandBox installs a package: its {@code box.json}'s {@code directory}, else {@code modules} for a ColdBox
-     * module, else the project's root, then a directory named {@code packageDirectory} or the slug, unless
-     * {@code createPackageDirectory} is false.
+     * module, else the project's root, then a directory named {@code packageDirectory}, else the slug its
+     * {@code box.json} gives, else the one asked for, unless {@code createPackageDirectory} is false. CommandBox takes
+     * an empty value as none, which its {@code box.json} template writes.
      */
     private static String installPath(String slug, String type, Path directory) {
         JsonNode box = JSON.createObjectNode();
@@ -256,10 +276,13 @@ public final class ForgeBoxPackages {
                 // a package whose box.json does not read installs where its type says
             }
         }
-        String base = box.hasNonNull("directory") ? trimSlashes(box.get("directory").asText()) :
+        String installDirectory = box.path("directory").asText("");
+        String base = !installDirectory.isEmpty() ? trimSlashes(installDirectory) :
                 "modules".equals(box.path("type").asText(type)) ? "modules" : "";
+        String packageDirectory = box.path("packageDirectory").asText("");
+        String named = box.path("slug").asText("");
         String name = box.path("createPackageDirectory").asBoolean(true) ?
-                trimSlashes(box.path("packageDirectory").asText(slug)) : "";
+                trimSlashes(!packageDirectory.isEmpty() ? packageDirectory : !named.isEmpty() ? named : slug) : "";
         return base.isEmpty() ? name : name.isEmpty() ? base : base + "/" + name;
     }
 
