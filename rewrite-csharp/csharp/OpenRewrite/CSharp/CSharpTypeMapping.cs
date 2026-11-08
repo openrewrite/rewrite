@@ -278,6 +278,10 @@ internal class CSharpTypeMapping
         if (_typeCache.TryGetValue(symbol, out var cached))
             return cached;
 
+        // `Dictionary<,>` in `typeof` names the definition. Its type arguments are error symbols.
+        if (symbol.IsUnboundGenericType)
+            return MapNamedType(symbol.OriginalDefinition);
+
         // Handle generic instantiations as Parameterized
         if (symbol.IsGenericType && !symbol.IsDefinition)
         {

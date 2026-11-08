@@ -1036,6 +1036,24 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public async Task AnUnboundGenericTypeIsItsDefinition()
+    {
+        var cu = await ParseWithSemanticModelAsync("""
+            using System;
+            using System.Collections.Generic;
+            class C
+            {
+                Type T = typeof(Dictionary<,>);
+            }
+            """);
+
+        var dictionary = Assert.IsType<JavaType.Class>(Assert.Single(Collect<ParameterizedType>(cu)).Type);
+        Assert.Equal("System.Collections.Generic.Dictionary", dictionary.FullyQualifiedName);
+        Assert.Equal(["TKey", "TValue"],
+            dictionary.TypeParameters!.Select(t => Assert.IsType<JavaType.GenericTypeVariable>(t).Name));
+    }
+
+    [Fact]
     public async Task PointersHaveTheTypeTheyPointAt()
     {
         var cu = await ParseWithSemanticModelAsync("""
