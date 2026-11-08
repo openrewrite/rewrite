@@ -25,11 +25,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * ForgeBox's packages served by a stand-in for ForgeBox and GitHub.
@@ -38,9 +40,15 @@ class ForgeBoxPackagesTest {
     private static final String REGISTRY = "https://forgebox.example/api/v1";
 
     private final Map<String, byte[]> served = new HashMap<>();
+    private final Map<String, String> redirects = new HashMap<>();
 
     private final HttpSender http = request -> {
-        byte[] body = served.get(request.getUrl().toString());
+        String url = request.getUrl().toString();
+        if (redirects.containsKey(url)) {
+            return new HttpSender.Response(301, null, Map.of("Location", List.of(redirects.get(url))), () -> {
+            });
+        }
+        byte[] body = served.get(url);
         return new HttpSender.Response(body == null ? 404 : 200, body == null ? null : new ByteArrayInputStream(body), () -> {
         });
     };
@@ -86,5 +94,30 @@ class ForgeBoxPackagesTest {
         served.put("https://github.com/someone/pkce/archive/main.zip", zip("pkce-main/models/Pkce.cfc", "component {}"));
         ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("pkce");
         assertThat(installed.getDirectory().resolve("models/Pkce.cfc")).isRegularFile();
+    }
+
+    @Test
+    void aVersionNoSemanticVersionRangeNamesInstallsByItsNumber(@TempDir Path cache) throws IOException {
+        entry("cbmongodb", "3.5.0.1+132", "https://downloads.example/cbmongodb-3.5.0.1.zip");
+        served.put("https://downloads.example/cbmongodb-3.5.0.1.zip", zip("models/Mongo.cfc", "component {}"));
+        ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("cbmongodb@3.5.0.1");
+        assertThat(installed.getVersion()).isEqualTo("3.5.0.1+132");
+        assertThat(installed.getDirectory().resolve("models/Mongo.cfc")).isRegularFile();
+    }
+
+    @Test
+    void aRangeCommandBoxCannotReadIsNoVersion(@TempDir Path cache) {
+        entry("cbauth", "6.0.0", "https://downloads.example/cbauth-6.0.0.zip");
+        assertThatThrownBy(() -> new ForgeBoxPackages(http, REGISTRY, cache).install("cbauth@1.4.8.0"))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aDownloadRedirectedFromHttpToHttpsIsFollowed(@TempDir Path cache) throws IOException {
+        entry("cfcouchbase", "3.0.2+47", "http://downloads.example/cfcouchbase-3.0.2.zip");
+        redirects.put("http://downloads.example/cfcouchbase-3.0.2.zip", "https://downloads.example/cfcouchbase-3.0.2.zip");
+        served.put("https://downloads.example/cfcouchbase-3.0.2.zip", zip("models/Couchbase.cfc", "component {}"));
+        ForgeBoxPackages.Installed installed = new ForgeBoxPackages(http, REGISTRY, cache).install("cfcouchbase@3.0.2");
+        assertThat(installed.getDirectory().resolve("models/Couchbase.cfc")).isRegularFile();
     }
 }
