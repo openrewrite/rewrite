@@ -586,12 +586,10 @@ public class RewriteRuleTests : RewriteTest
         var x = Capture.Expression();
 
         RewriteRun(
-            // A string has no `Count`, so the output names a member that does not resolve.
             spec => spec.SetRecipe(new RewriteRecipe(
-                    CSharpTemplate.Rewrite(
-                        CSharpPattern.Expression($"{x}.Length"),
-                        CSharpTemplate.Expression($"{x}.Count"))))
-                .SetValidations(new Validations { OutputTypeAttribution = false }),
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}.Length"),
+                    CSharpTemplate.Expression($"{x}.Count")))),
             CSharp(
                 """
                 class Test

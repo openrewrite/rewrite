@@ -251,8 +251,8 @@ public class FindMissingTypesTests : RewriteTest
                     static A() { }
                     A() { }
                     ~A() { }
-                    int @base;
-                    void @event() => @base = 1;
+                    int @base, \u0068ex;
+                    void @event() => @base = \u0068ex;
                 }
                 """
             )
@@ -260,19 +260,20 @@ public class FindMissingTypesTests : RewriteTest
     }
 
     [Fact]
-    public void LeavesConstraintKeywordsUnmarked()
+    public async Task LeavesNamesThatDoNotResolveUnmarked()
     {
-        RewriteRun(
-            spec => spec.SetRecipe(new FindMissingTypes()),
-            CSharp(
-                """
-                class A<T> where T : notnull
-                {
-                    void M<U>() where U : unmanaged { }
-                }
-                """
-            )
-        );
+        const string source = """
+            class A
+            {
+                void M() => Undeclared = 1;
+            }
+            """;
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        var tree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("A", [tree], refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var cu = new CSharpParser().Parse(source, semanticModel: compilation.GetSemanticModel(tree));
+
+        Assert.Empty(FindMissingTypes.Find(cu));
     }
 
     [Fact]

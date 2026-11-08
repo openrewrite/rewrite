@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.Core;
 using OpenRewrite.Java;
 using static OpenRewrite.CSharp.Recipes.Categories;
@@ -138,7 +139,10 @@ public class FindMissingTypes : Recipe
         public override J VisitIdentifier(Identifier identifier, P p)
         {
             var visited = base.VisitIdentifier(identifier, p);
-            if (Defect(identifier.Type) is { } defect && !NamesWhatHasNoType(identifier))
+            // An Unknown name does not resolve in its code, as in a template that uses what it does not declare. As a
+            // part of another type, Unknown is malformed.
+            if (identifier.Type is not JavaType.Unknown && Defect(identifier.Type) is { } defect &&
+                !NamesWhatHasNoType(identifier))
                 return missing(visited, $"Identifier type is {defect}", p);
             if (identifier.FieldType == null)
                 return visited;
@@ -150,9 +154,11 @@ public class FindMissingTypes : Recipe
         }
 
         /// <summary>
-        /// The name without the <c>@</c> of a verbatim identifier such as <c>@base</c>, as Roslyn's <c>ValueText</c> has it.
+        /// The name an identifier spells, such as <c>base</c> for <c>@base</c> and <c>hex</c> for <c>\u0068ex</c>.
         /// </summary>
-        private static string ValueText(Identifier id) => id.SimpleName.StartsWith('@') ? id.SimpleName[1..] : id.SimpleName;
+        private static string ValueText(Identifier id) => id.SimpleName.AsSpan().IndexOfAny('@', '\\') < 0
+            ? id.SimpleName
+            : SyntaxFactory.ParseToken(id.SimpleName).ValueText;
 
         /// <summary>
         /// A constructor's method is <c>.ctor</c>, or <c>.cctor</c> when static, and the method of a destructor <c>~A</c> is
@@ -190,8 +196,8 @@ public class FindMissingTypes : Recipe
 
         /// <summary>
         /// Whether the identifier names what has no type, such as a namespace, label, attribute target, preprocessor
-        /// symbol, argument name, discard or constraint keyword such as <c>notnull</c>. The name of a call, class, method
-        /// or object creation is left to the check of that node.
+        /// symbol, argument name or discard. The name of a call, class, method or object creation is left to the check
+        /// of that node.
         /// </summary>
         private bool NamesWhatHasNoType(Identifier id)
         {
@@ -214,8 +220,7 @@ public class FindMissingTypes : Recipe
                 NewClass nc => nc.Clazz == id,
                 IndexerDeclaration indexer => indexer.Indexer == id,
                 TypeParameter tp => tp.Name == id,
-                ConstrainedTypeParameter ctp => ctp.Name == id || ctp.WhereConstraint?.Element == id ||
-                                                id.SimpleName is "notnull" or "unmanaged",
+                ConstrainedTypeParameter ctp => ctp.Name == id || ctp.WhereConstraint?.Element == id,
                 TupleElement te => te.Name == id,
                 Interpolation interpolation => interpolation.Format?.Element == id,
                 NamedExpression ne => ne.Name.Element == id && parent.ParentTree.Value is not PropertyPattern,
