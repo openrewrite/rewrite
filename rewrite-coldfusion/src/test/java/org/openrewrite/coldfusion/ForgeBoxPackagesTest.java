@@ -154,6 +154,26 @@ class ForgeBoxPackagesTest {
     }
 
     @Test
+    void aContentBoxModuleInstallsAmongContentBoxsUserModules(@TempDir Path cache) throws IOException {
+        entry("cbgallery", "2.0.0", "https://downloads.example/cbgallery-2.0.0.zip");
+        served.put("https://downloads.example/cbgallery-2.0.0.zip", zip(
+          "box.json", "{\"slug\": \"cbgallery\", \"type\": \"contentbox-modules\"}",
+          "ModuleConfig.cfc", "component {}"));
+        assertThat(new ForgeBoxPackages(http, REGISTRY, cache).install("cbgallery@2.0.0").getInstallPath())
+          .isEqualTo("modules/contentbox/modules_user/cbgallery");
+    }
+
+    @Test
+    void aWidgetIsDroppedIntoContentBoxsWidgetsWithoutAFolderOfItsOwn(@TempDir Path cache) throws IOException {
+        entry("cbwidget-clock", "1.0.0", "https://downloads.example/cbwidget-clock-1.0.0.zip");
+        served.put("https://downloads.example/cbwidget-clock-1.0.0.zip", zip(
+          "box.json", "{\"slug\": \"cbwidget-clock\", \"type\": \"contentbox-widgets\", \"createPackageDirectory\": true}",
+          "Clock.cfc", "component {}"));
+        assertThat(new ForgeBoxPackages(http, REGISTRY, cache).install("cbwidget-clock@1.0.0").getInstallPath())
+          .isEqualTo("modules/contentbox/widgets");
+    }
+
+    @Test
     void aPackageInstallsInAFolderNamedForTheSlugItsBoxJsonGives(@TempDir Path cache) throws IOException {
         entry("old-sheets", "3.0.0", "https://downloads.example/old-sheets-3.0.0.zip");
         served.put("https://downloads.example/old-sheets-3.0.0.zip", zip(
