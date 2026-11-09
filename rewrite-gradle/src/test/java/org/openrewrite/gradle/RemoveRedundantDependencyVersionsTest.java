@@ -765,6 +765,77 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void keepsSameDependencyWithAnotherClassifier() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-x86_64"
+                  runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-aarch_64"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void neverRemovesDuplicateWithConfigurationBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testImplementation "org.mockito:mockito-core:5.24.0"
+                  testImplementation("org.mockito:mockito-core:5.24.0") {
+                      transitive = false
+                  }
+
+                  implementation("org.openrewrite:rewrite-core:8.55.0") {
+                      because "a reason"
+                  }
+                  implementation "org.openrewrite:rewrite-core:8.56.0"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testImplementation("org.mockito:mockito-core:5.24.0") {
+                      transitive = false
+                  }
+
+                  implementation("org.openrewrite:rewrite-core:8.55.0") {
+                      because "a reason"
+                  }
+                  implementation "org.openrewrite:rewrite-core:8.56.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsRepeatedDependencyOutsideGroupPattern() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions("org.springframework.boot", null, null)),

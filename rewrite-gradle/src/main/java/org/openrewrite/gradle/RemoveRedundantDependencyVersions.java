@@ -29,6 +29,7 @@ import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -203,34 +204,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                     if ("dependencies".equals(m.getSimpleName())) {
-                                        // Gradle tolerates multiple declarations of the same dependency in a configuration, but only the one with the newest version is used
-                                        // Filter out duplicates
-                                        Map<String, Map<GroupArtifact, List<GradleDependency>>> declarations = new HashMap<>();
-                                        new JavaIsoVisitor<ExecutionContext>() {
-                                            @Override
-                                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                                                J.MethodInvocation m1 = super.visitMethodInvocation(method, executionContext);
-                                                new GradleDependency.Matcher().groupId(groupPattern).artifactId(artifactPattern).get(getCursor()).ifPresent(it -> {
-                                                    if (it.getResolvedDependency().getRequested().getVersion() != null) {
-                                                        declarations.computeIfAbsent(it.getConfigurationName(), configuration -> new HashMap<>())
-                                                                .computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), groupArtifact -> new ArrayList<>())
-                                                                .add(it);
-                                                    }
-                                                });
-                                                return m1;
-                                            }
-                                        }.visit(m.getArguments().get(0), ctx, getCursor());
-
-                                        for (Map<GroupArtifact, List<GradleDependency>> configurationDeclarations : declarations.values()) {
-                                            for (List<GradleDependency> sameDependency : configurationDeclarations.values()) {
-                                                sameDependency.stream()
-                                                        .sorted((d1, d2) -> VERSION_COMPARATOR.compare(
-                                                                d2.getResolvedDependency().getRequested().getVersion(),
-                                                                d1.getResolvedDependency().getRequested().getVersion()))
-                                                        .skip(1)
-                                                        .forEach(redundant -> statementsToRemove.add(redundant.getTree()));
-                                            }
-                                        }
+                                        statementsToRemove.addAll(redundantDuplicates(m, getCursor(), ctx));
                                     } else if ("constraints".equals(m.getSimpleName())) {
                                         if (m.getArguments().isEmpty() ||
                                             !(m.getArguments().get(0) instanceof J.Lambda) ||
@@ -461,6 +435,74 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                 }
         );
+    }
+
+    /**
+     * Gradle uses only the newest of several declarations of a dependency in one configuration.
+     * A declaration with a configuration block is kept, and wins over a plain one of the same version.
+     */
+    private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor,
+                                                         ExecutionContext ctx) {
+        Map<List<@Nullable String>, List<GradleDependency>> declarations = new HashMap<>();
+        new JavaIsoVisitor<ExecutionContext>() {
+            final GradleDependency.Matcher matcher = new GradleDependency.Matcher()
+                    .groupId(groupPattern)
+                    .artifactId(artifactPattern);
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                matcher.get(getCursor()).ifPresent(declaration -> {
+                    if (requestedVersion(declaration) != null) {
+                        declarations.computeIfAbsent(duplicateKey(declaration), key -> new ArrayList<>())
+                                .add(declaration);
+                    }
+                });
+                return m;
+            }
+        }.visit(dependencies.getArguments().get(0), ctx, cursor);
+
+        Set<J.MethodInvocation> redundant = new HashSet<>();
+        for (List<GradleDependency> sameDependency : declarations.values()) {
+            sameDependency.stream()
+                    .sorted((d1, d2) -> {
+                        int newestFirst = VERSION_COMPARATOR.compare(requestedVersion(d2), requestedVersion(d1));
+                        return newestFirst != 0 ? newestFirst :
+                                Boolean.compare(hasConfigurationBlock(d2), hasConfigurationBlock(d1));
+                    })
+                    .skip(1)
+                    .filter(declaration -> !hasConfigurationBlock(declaration))
+                    .forEach(declaration -> redundant.add(declaration.getTree()));
+        }
+        return redundant;
+    }
+
+    /**
+     * The configuration and coordinates of a declaration, without its version.
+     * The Gradle model records no classifier or extension, so these come from string notation.
+     */
+    private static List<@Nullable String> duplicateKey(GradleDependency declaration) {
+        String classifier = null;
+        String extension = null;
+        Expression notation = declaration.getTree().getArguments().get(0);
+        if (notation instanceof J.Literal && ((J.Literal) notation).getValue() instanceof String) {
+            Dependency parsed = DependencyNotation.parse((String) ((J.Literal) notation).getValue());
+            if (parsed != null) {
+                classifier = parsed.getClassifier();
+                extension = parsed.getType();
+            }
+        }
+        return Arrays.asList(declaration.getConfigurationName(), declaration.getGroupId(),
+                declaration.getArtifactId(), classifier, extension);
+    }
+
+    private static @Nullable String requestedVersion(GradleDependency declaration) {
+        return declaration.getResolvedDependency().getRequested().getVersion();
+    }
+
+    private static boolean hasConfigurationBlock(GradleDependency declaration) {
+        List<Expression> arguments = declaration.getTree().getArguments();
+        return arguments.get(arguments.size() - 1) instanceof J.Lambda;
     }
 
     private Comparator determineComparator() {
