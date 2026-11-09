@@ -522,6 +522,247 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
+    void htmlBooleanAttributes() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <form>
+                <input type="checkbox" checked disabled>
+                <input  required   name="q" readonly/>
+              </form>
+              """,
+            spec -> spec.path("boolean.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlBooleanAttributeIsAnAttributeWithAnEmptyValue() {
+        Xml.Document doc = (Xml.Document) XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<input checked name=q>")), null,
+            new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow();
+        List<Xml.Attribute> attributes = doc.getRoot().getAttributes();
+        org.assertj.core.api.Assertions.assertThat(attributes.stream().map(Xml.Attribute::getKeyAsString)).containsExactly("checked", "name");
+        assertThat(attributes.get(0).getValueAsString()).isEmpty();
+        assertThat(attributes.get(1).getValueAsString()).isEqualTo("q");
+    }
+
+    @Test
+    void booleanAttributeIsStillAnErrorInXml() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("a.xml"), "<input checked/>")), null,
+            new InMemoryExecutionContext(t -> {
+            }))
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void htmlUnquotedAttributes() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <div class=main id=x-1 data-url=/a/b?c=d&e=f>
+                <a href=https://example.com/>link</a>
+                <p class = spaced >text</p>
+              </div>
+              """,
+            spec -> spec.path("unquoted.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlLessThanInInlineScript() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html>
+              <head>
+                <script>if (a < b && c) { x = "</p>"; }</script>
+                <script type="text/javascript">
+                  for (var i = 0; i < 10; i++) { if (i < 5 && i > 2) go(); }
+                </script>
+                <style>a > b { color: red }</style>
+              </head>
+              </html>
+              """,
+            spec -> spec.path("script.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlLessThanInAttributeValue() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <button onclick="if(a<b) go()" title='x < y'>go</button>
+              """,
+            spec -> spec.path("attr.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlLessThanInTextarea() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <form><textarea name="t">a < b && c</textarea></form>
+              """,
+            spec -> spec.path("textarea.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlLoneAmpersand() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <p>Tom & Jerry &amp; friends &#169; &copy 2024, a < b, 1 <2 & more</p>
+              <p>AT&T</p>
+              """,
+            spec -> spec.path("amp.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlClosingTagsLeftOff() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html>
+              <body>
+              <ul>
+                <li>one
+                <li>two
+                <li>three <b>bold</b>
+              </ul>
+              <p>a
+              <p>b
+              <div>c</div>
+              <table>
+                <tr><td>1<td>2
+                <tr><td>3<td>4
+              </table>
+              <dl><dt>t<dd>d<dt>u<dd>e</dl>
+              <select><option>a<option>b</select>
+            """,
+            spec -> spec.path("implied.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlImpliedCloseStructure() {
+        Xml.Document doc = (Xml.Document) XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<ul><li>one<li>two</ul><p>a<p>b")), null,
+            new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow();
+        assertThat(doc.getRoot().getName()).isEqualTo("ul");
+        List<? extends org.openrewrite.xml.tree.Content> items = doc.getRoot().getContent();
+        org.assertj.core.api.Assertions.assertThat(items).hasSize(2).allSatisfy(i -> {
+            assertThat(((Xml.Tag) i).getName()).isEqualTo("li");
+            assertThat(((Xml.Tag) i).getMarkers().findFirst(org.openrewrite.xml.marker.HtmlImpliedClose.class)).isPresent();
+            assertThat(((Xml.Tag) i).getClosing()).isNull();
+        });
+        assertThat(((Xml.Tag) items.get(0)).getValue()).contains("one");
+    }
+
+    @Test
+    void htmlMissingBodyAndHtmlEndTags() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html>
+              <head><title>t</title>
+              <body>
+              <p>hello
+              """,
+            spec -> spec.path("noend.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlFrameworkAttributeSyntax() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <div *ngIf="show" [title]="t" (click)="go($event)" @click="go" :prop="x" #ref [(ngModel)]="m"
+                   v-on:click.prevent="go" v-bind:foo="bar" x-data>
+                <my-comp [input]="a" (output)="b()"></my-comp>
+              </div>
+              """,
+            spec -> spec.path("framework.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlPageUsingEverything() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+              <html lang=en>
+              <head>
+                <meta charset=utf-8>
+                <title>Tom & Jerry</title>
+                <script>
+                  if (a < b && c) { document.write("<p>x</p>"); }
+                </script>
+              </head>
+              <body class=home>
+                <ul>
+                  <li>One
+                  <li *ngIf="x" (click)="go()">Two
+                </ul>
+                <input type=checkbox checked disabled>
+                <textarea>a < b</textarea>
+                <button onclick="if(a<b) go()">go</button>
+                <p>last
+              """,
+            spec -> spec.path("everything.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlStillRejectsGenuinelyBrokenMarkup() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<div><span></div>")), null,
+            new InMemoryExecutionContext(t -> {
+            }))
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void strictXmlIsUnaffectedByHtmlRules() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("a.xml"), "<a><li>x<li>y</a>")), null,
+            new InMemoryExecutionContext(t -> {
+            }))
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+    }
+
+    @Test
     void htmlClosingTagsMatchIgnoringCase() {
         rewriteRun(
           xml(
