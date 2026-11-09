@@ -646,7 +646,7 @@ attributeName
     ;
 
 // =============================================================================================
-// Expressions, lowest precedence first
+// Expressions
 // =============================================================================================
 
 expression
@@ -664,37 +664,26 @@ assignmentOperator
     ;
 
 ternaryExpression
-    : implicationExpression (ELVIS ternaryExpression | QUESTION ternaryExpression COLON ternaryExpression)?
+    : operation (ELVIS ternaryExpression | QUESTION ternaryExpression COLON ternaryExpression)?
     ;
 
-implicationExpression
-    : equivalenceExpression (IMP equivalenceExpression)*
-    ;
-
-equivalenceExpression
-    : xorExpression (EQV xorExpression)*
-    ;
-
-xorExpression
-    : orExpression (XOR orExpression)*
-    ;
-
-orExpression
-    : andExpression ((PIPEPIPE | OR) andExpression)*
-    ;
-
-andExpression
-    : notExpression ((AMPAMP | AND) notExpression)*
-    ;
-
-// NOT binds more loosely than comparison in CFML: NOT a EQ b is NOT (a EQ b).
-notExpression
-    : (BANG | NOT) notExpression
-    | comparisonExpression
-    ;
-
-comparisonExpression
-    : concatExpression (comparisonOperator concatExpression)*
+// The binary operators and the loose NOT, from the tightest binding to the loosest. NOT binds more loosely
+// than comparison in CFML, so NOT a EQ b is NOT (a EQ b).
+operation
+    : unaryExpression
+    | <assoc=right> operation CARET operation
+    | operation (STAR | SLASH) operation
+    | operation BACKSLASH operation
+    | operation (PERCENT | MOD) operation
+    | operation (PLUS | MINUS) operation
+    | operation AMP operation
+    | operation comparisonOperator operation
+    | (BANG | NOT) operation
+    | operation (AMPAMP | AND) operation
+    | operation (PIPEPIPE | OR) operation
+    | operation XOR operation
+    | operation EQV operation
+    | operation IMP operation
     ;
 
 comparisonOperator
@@ -725,30 +714,6 @@ comparisonOperator
     | LTE_SIGN
     | GT_SIGN
     | LT_SIGN
-    ;
-
-concatExpression
-    : additiveExpression (AMP additiveExpression)*
-    ;
-
-additiveExpression
-    : moduloExpression ((PLUS | MINUS) moduloExpression)*
-    ;
-
-moduloExpression
-    : integerDivisionExpression ((PERCENT | MOD) integerDivisionExpression)*
-    ;
-
-integerDivisionExpression
-    : multiplicativeExpression (BACKSLASH multiplicativeExpression)*
-    ;
-
-multiplicativeExpression
-    : powerExpression ((STAR | SLASH) powerExpression)*
-    ;
-
-powerExpression
-    : unaryExpression (CARET powerExpression)?
     ;
 
 unaryExpression

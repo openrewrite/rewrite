@@ -605,75 +605,15 @@ public interface CFMLParserListener extends ParseTreeListener {
 	 */
 	void exitTernaryExpression(CFMLParser.TernaryExpressionContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link CFMLParser#implicationExpression}.
+	 * Enter a parse tree produced by {@link CFMLParser#operation}.
 	 * @param ctx the parse tree
 	 */
-	void enterImplicationExpression(CFMLParser.ImplicationExpressionContext ctx);
+	void enterOperation(CFMLParser.OperationContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link CFMLParser#implicationExpression}.
+	 * Exit a parse tree produced by {@link CFMLParser#operation}.
 	 * @param ctx the parse tree
 	 */
-	void exitImplicationExpression(CFMLParser.ImplicationExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#equivalenceExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterEquivalenceExpression(CFMLParser.EquivalenceExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#equivalenceExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitEquivalenceExpression(CFMLParser.EquivalenceExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#xorExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterXorExpression(CFMLParser.XorExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#xorExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitXorExpression(CFMLParser.XorExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#orExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterOrExpression(CFMLParser.OrExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#orExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitOrExpression(CFMLParser.OrExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#andExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterAndExpression(CFMLParser.AndExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#andExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitAndExpression(CFMLParser.AndExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#notExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterNotExpression(CFMLParser.NotExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#notExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitNotExpression(CFMLParser.NotExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#comparisonExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterComparisonExpression(CFMLParser.ComparisonExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#comparisonExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitComparisonExpression(CFMLParser.ComparisonExpressionContext ctx);
+	void exitOperation(CFMLParser.OperationContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link CFMLParser#comparisonOperator}.
 	 * @param ctx the parse tree
@@ -684,66 +624,6 @@ public interface CFMLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitComparisonOperator(CFMLParser.ComparisonOperatorContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#concatExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterConcatExpression(CFMLParser.ConcatExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#concatExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitConcatExpression(CFMLParser.ConcatExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#additiveExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterAdditiveExpression(CFMLParser.AdditiveExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#additiveExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitAdditiveExpression(CFMLParser.AdditiveExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#moduloExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterModuloExpression(CFMLParser.ModuloExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#moduloExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitModuloExpression(CFMLParser.ModuloExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#integerDivisionExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterIntegerDivisionExpression(CFMLParser.IntegerDivisionExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#integerDivisionExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitIntegerDivisionExpression(CFMLParser.IntegerDivisionExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#multiplicativeExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterMultiplicativeExpression(CFMLParser.MultiplicativeExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#multiplicativeExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitMultiplicativeExpression(CFMLParser.MultiplicativeExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link CFMLParser#powerExpression}.
-	 * @param ctx the parse tree
-	 */
-	void enterPowerExpression(CFMLParser.PowerExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link CFMLParser#powerExpression}.
-	 * @param ctx the parse tree
-	 */
-	void exitPowerExpression(CFMLParser.PowerExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link CFMLParser#unaryExpression}.
 	 * @param ctx the parse tree

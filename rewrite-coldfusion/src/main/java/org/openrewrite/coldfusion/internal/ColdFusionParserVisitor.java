@@ -1432,20 +1432,8 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
             return assignment((ExpressionContext) ctx);
         } else if (ctx instanceof TernaryExpressionContext) {
             return ternary((TernaryExpressionContext) ctx);
-        } else if (ctx instanceof NotExpressionContext) {
-            NotExpressionContext not = (NotExpressionContext) ctx;
-            if (not.comparisonExpression() != null) {
-                return expression(not.comparisonExpression());
-            }
-            return unary(not.getStart(), not.notExpression());
-        } else if (ctx instanceof PowerExpressionContext) {
-            PowerExpressionContext power = (PowerExpressionContext) ctx;
-            Expression left = expression(power.unaryExpression());
-            if (power.CARET() == null) {
-                return left;
-            }
-            Space before = sourceBefore(power.CARET().getSymbol());
-            return cfBinary(left, before, Cf.Binary.Type.Power, null, expression(power.powerExpression()));
+        } else if (ctx instanceof OperationContext) {
+            return operation((OperationContext) ctx);
         } else if (ctx instanceof UnaryExpressionContext) {
             UnaryExpressionContext unary = (UnaryExpressionContext) ctx;
             if (unary.postfixExpression() != null) {
@@ -1455,16 +1443,30 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
         } else if (ctx instanceof PostfixExpressionContext) {
             return postfix((PostfixExpressionContext) ctx);
         }
-        // a left-associative chain of binary operators
-        Expression left = expression((ParserRuleContext) ctx.getChild(0));
-        for (int i = 1; i < ctx.getChildCount(); i += 2) {
-            ParseTree operator = ctx.getChild(i);
-            Token token = operator instanceof TerminalNode ? ((TerminalNode) operator).getSymbol() : ((ParserRuleContext) operator).getStart();
-            Space before = sourceBefore(token);
-            Expression right = expression((ParserRuleContext) ctx.getChild(i + 1));
-            left = binary(left, before, token, right);
+        throw error("an expression of an unknown kind", ctx.getStart());
+    }
+
+    // The binary nodes on the left spine are folded in a loop, up through the parents of the leftmost operand,
+    // since a run of left-associative operators nests to the left as deep as the run is long.
+    private Expression operation(OperationContext ctx) {
+        if (ctx.unaryExpression() != null) {
+            return expression(ctx.unaryExpression());
+        } else if (ctx.NOT() != null || ctx.BANG() != null) {
+            return unary(ctx.getStart(), ctx.operation(0));
         }
-        return left;
+        OperationContext left = ctx;
+        while (left.operation(1) != null) {
+            left = left.operation(0);
+        }
+        Expression result = operation(left);
+        while (left != ctx) {
+            left = (OperationContext) left.getParent();
+            ComparisonOperatorContext comparison = left.comparisonOperator();
+            Token operator = comparison != null ? comparison.getStart() : ((TerminalNode) left.getChild(1)).getSymbol();
+            Space before = sourceBefore(operator);
+            result = binary(result, before, operator, expression(left.operation(1)));
+        }
+        return result;
     }
 
     private Expression assignment(ExpressionContext ctx) {
@@ -1505,7 +1507,7 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
     }
 
     private Expression ternary(TernaryExpressionContext ctx) {
-        Expression condition = expression(ctx.implicationExpression());
+        Expression condition = expression(ctx.operation());
         if (ctx.ELVIS() != null) {
             Token elvis = ctx.ELVIS().getSymbol();
             Space before = sourceBefore(elvis);
@@ -1599,6 +1601,8 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
                 return binary(left, before, J.Binary.Type.Multiplication, null, right);
             case SLASH:
                 return binary(left, before, J.Binary.Type.Division, null, right);
+            case CARET:
+                return cfBinary(left, before, Cf.Binary.Type.Power, null, right);
             default:
                 throw error("an unknown operator", operator);
         }
