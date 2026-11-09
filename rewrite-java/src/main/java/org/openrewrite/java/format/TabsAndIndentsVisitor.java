@@ -357,6 +357,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
                     default:
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
@@ -399,6 +403,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    case FOREACH_VARIABLE:
+                        elem = visitForEachVariable(elem, indent, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
                         break;
                     default:
@@ -567,6 +575,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         return literal;
+    }
+
+    private J visitForEachVariable(J variable, int indent, P p) {
+        if (!variable.getPrefix().getLastWhitespace().contains("\n")) {
+            getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+        }
+        J v = visitAndCast(variable, p);
+        getCursor().putMessage("lastIndent", indent);
+        return v;
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {

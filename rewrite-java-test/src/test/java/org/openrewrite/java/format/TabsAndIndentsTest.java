@@ -1100,6 +1100,44 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void forEachLoopVariableWithModifierOrAnnotationOnOwnLine() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                  for (final
+                   String s : list) {
+                  }
+                  for (@SuppressWarnings("unused")
+                   String s
+                   : list) {
+                  }
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  public void test(List<String> list) {
+                      for (final
+                              String s : list) {
+                      }
+                      for (@SuppressWarnings("unused")
+                              String s
+                              : list) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodDeclaration() {
         rewriteRun(
           autoFormat(style -> style.withContinuationIndent(2)),
