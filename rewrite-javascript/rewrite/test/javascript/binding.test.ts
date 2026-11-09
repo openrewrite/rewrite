@@ -1887,6 +1887,63 @@ describe("maybeRebind", () => {
         ));
     });
 
+    // Fails for now: scope counts a function declared in a block as a module-scope value, so the import keeps its name
+    test.fails("a type-only import beside a block's function of that name takes the new name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+                if (c) { function Old() {} }
+                let x: Old;
+            `,
+            `
+                import type { New } from "m2";
+                if (c) { function Old() {} }
+                let x: New;
+            `
+        ));
+    });
+
+    // Fails for now: scope counts a `declare global` variable as a module-scope value, so the import keeps its name
+    test.fails("a type-only import beside a declare global variable of that name takes the new name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+                declare global { var Old: number }
+                let x: Old;
+            `,
+            `
+                import type { New } from "m2";
+                declare global { var Old: number }
+                let x: New;
+            `
+        ));
+    });
+
+    // Fails for now: scope counts a function declared in a block as a module-scope value, so the import keeps its name
+    test.fails("a value import beside a block's function of that name takes the new name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                if (c) { function Old() {} }
+                Old();
+            `,
+            `
+                import { New } from "m2";
+                if (c) { function Old() {} }
+                New();
+            `
+        ));
+    });
+
     test("a pinned alias cannot split an import from its same-named exported value", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
