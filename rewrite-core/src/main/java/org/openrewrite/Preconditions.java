@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.function.Supplier;
@@ -172,7 +173,11 @@ public class Preconditions {
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             // Preconditions expect to begin evaluating a tree at the root
-            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx)) != tree ?
+            if (!(tree instanceof SourceFile)) {
+                return v.visit(tree, ctx);
+            }
+            SourceFile unmarked = withoutSearchResults((SourceFile) tree);
+            return check.visit(unmarked, DataTableSuppressingExecutionContextView.view(ctx)) != unmarked ?
                     v.visit(tree, ctx) :
                     tree;
         }
@@ -181,9 +186,22 @@ public class Preconditions {
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
             // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
-            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx), parent) != tree ?
+            if (!(tree instanceof SourceFile)) {
+                return v.visit(tree, ctx, parent);
+            }
+            SourceFile unmarked = withoutSearchResults((SourceFile) tree);
+            return check.visit(unmarked, DataTableSuppressingExecutionContextView.view(ctx), parent) != unmarked ?
                     v.visit(tree, ctx, parent) :
                     tree;
+        }
+
+        /// A search that marks the source file itself returns the file unchanged when it already carries an equal
+        /// [SearchResult], which would read as no match, so the check sees the file without them.
+        private static SourceFile withoutSearchResults(SourceFile sourceFile) {
+            Markers markers = sourceFile.getMarkers();
+            return markers.findFirst(SearchResult.class).isPresent() ?
+                    sourceFile.withMarkers(markers.removeByType(SearchResult.class)) :
+                    sourceFile;
         }
     }
 

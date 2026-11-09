@@ -44,14 +44,13 @@ import static org.assertj.core.api.Assertions.fail;
 final class AddedMarkers {
 
     /**
-     * Markers that recipes in rewrite add on purpose: to apply a change only once, to steer the formatting of a
-     * merged YAML scalar, or to say which method a search matched.
+     * Markers that recipes in rewrite add on purpose: to apply a change only once, or to steer the formatting of a
+     * merged YAML scalar.
      */
     private static final Set<String> REWRITE_RECIPE_MARKERS = new HashSet<>(Arrays.asList(
             "org.openrewrite.marker.AlreadyReplaced",
             "org.openrewrite.maven.marker.AlreadyIncremented",
-            "org.openrewrite.yaml.MultilineScalarChanged",
-            "org.openrewrite.java.search.UsesMethod$MethodMatch"
+            "org.openrewrite.yaml.MultilineScalarChanged"
     ));
 
     private static final int SNIPPET_LENGTH = 60;

@@ -47,8 +47,7 @@ internal static class AddedMarkersCheck
     [
         "org.openrewrite.marker.AlreadyReplaced",
         "org.openrewrite.maven.marker.AlreadyIncremented",
-        "org.openrewrite.yaml.MultilineScalarChanged",
-        "org.openrewrite.java.search.UsesMethod$MethodMatch"
+        "org.openrewrite.yaml.MultilineScalarChanged"
     ];
 
     public static HashSet<Placement> Placements(IEnumerable<SourceFile> sources) =>

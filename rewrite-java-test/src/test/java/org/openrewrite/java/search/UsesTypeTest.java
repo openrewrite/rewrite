@@ -19,7 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Issue;
+import org.openrewrite.Preconditions;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -704,6 +710,37 @@ class UsesTypeTest implements RewriteTest {
               import java.util.List;
 
               class Test {
+                  List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preconditionMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindSourceFiles("**/*.java"),
+            toRecipe(() -> Preconditions.check(new UsesType<>("java.util.List", false), new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    return SearchResult.found(classDecl, "edited");
+                }
+            }))
+          ),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+
+              /*~~(edited)~~>*/class Test {
                   List<String> l;
               }
               """

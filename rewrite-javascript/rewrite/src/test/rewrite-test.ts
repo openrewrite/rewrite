@@ -765,7 +765,6 @@ const rewriteRecipeMarkerKinds = new Set<string>([
     "org.openrewrite.marker.AlreadyReplaced",
     "org.openrewrite.maven.marker.AlreadyIncremented",
     "org.openrewrite.yaml.MultilineScalarChanged",
-    "org.openrewrite.java.search.UsesMethod$MethodMatch",
 ]);
 
 function mayBeAdded({marker, element}: MarkerPlacement): boolean {

@@ -31,8 +31,6 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.UUID;
 
-import static org.openrewrite.Tree.randomId;
-
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
     /**
@@ -52,30 +50,23 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         }
     }
 
-    private final String methodPattern;
-
     @Getter
     private final MethodMatcher methodMatcher;
 
     public UsesMethod(String methodPattern) {
-        this(new MethodMatcher(methodPattern), methodPattern);
+        this(new MethodMatcher(methodPattern));
     }
 
     public UsesMethod(String methodPattern, boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, matchOverrides), methodPattern);
+        this(new MethodMatcher(methodPattern, matchOverrides));
     }
 
     public UsesMethod(String methodPattern, @Nullable Boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)), methodPattern);
+        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)));
     }
 
     public UsesMethod(MethodMatcher methodMatcher) {
-        this(methodMatcher, methodMatcher.toString());
-    }
-
-    private UsesMethod(MethodMatcher methodMatcher, String methodPattern) {
         this.methodMatcher = methodMatcher;
-        this.methodPattern = methodPattern;
     }
 
     @Override
@@ -86,7 +77,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
             if (TYPES_IN_USE_HAS_METHOD_USE
                     ? cu.getTypesInUse().hasMethodUse(methodMatcher)
                     : legacyHasMethodUse(cu)) {
-                return found(cu);
+                return SearchResult.found(cu);
             }
         }
         return tree;
@@ -101,12 +92,9 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         return false;
     }
 
-    private <J2 extends J> J2 found(J2 j) {
-        // also adding a `SearchResult` marker to get a visible diff
-        return SearchResult.found(j.withMarkers(j.getMarkers()
-                .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1)));
-    }
-
+    /// No longer added: preconditions now see a source file without its own [SearchResult] markers, so
+    /// `UsesMethod` no longer needs a marker of its own to show a match. Kept so older LSTs and recipes still load.
+    @Deprecated
     @Value
     @With
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
