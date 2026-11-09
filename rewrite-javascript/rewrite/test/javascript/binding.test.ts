@@ -190,6 +190,18 @@ describe("moduleBindings", () => {
 
         expect(seen.pathBinding).toBeUndefined();
     });
+
+    test("import X = require binds the module object, as a require does", async () => {
+        const spec = new RecipeSpec();
+        const seen: {module?: string, binding?: string} = {};
+        spec.recipe = fromVisitor(captureModuleBindings(bindings => {
+            seen.module = bindings.moduleOf("Elem");
+            seen.binding = bindings.bindingOf("sap/ui/core/Element");
+        }));
+        //language=typescript
+        await spec.rewriteRun(typescript(`import Elem = require("sap/ui/core/Element");`));
+        expect(seen).toEqual({module: "sap/ui/core/Element", binding: "Elem"});
+    });
 });
 
 describe("isAmdBlock", () => {
@@ -828,6 +840,7 @@ describe("maybeBind", () => {
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import Elem = require("sap/ui/core/Element");
@@ -3097,6 +3110,7 @@ describe("maybeRebind and the member's other spellings", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import * as NS from "m";
@@ -3122,6 +3136,7 @@ describe("maybeRebind and the member's other spellings", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import { Old } from "m";
@@ -3145,6 +3160,7 @@ describe("maybeRebind and the member's other spellings", () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
         await spec.rewriteRun(
+            //language=typescript
             typescript(
                 `
                     import NS = require("m");
@@ -3157,6 +3173,7 @@ describe("maybeRebind and the member's other spellings", () => {
                     let a: NS.New;
                 `
             ),
+            //language=javascript
             javascript(
                 `
                     const NS = require("m");
@@ -3175,6 +3192,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a member read through a module object is renamed as a JSX tag, and through an awaited import", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=tsx
         await spec.rewriteRun(tsx(
             `
                 import * as NS from "m";
@@ -3386,6 +3404,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import D from "m";
@@ -3402,6 +3421,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a move to another module leaves a namespace spelling alone, since the namespace still names the old module", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import * as NS from "m";
@@ -3414,6 +3434,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("an import() type follows the move, to another module too", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 let a: import("m").Old;
@@ -3435,6 +3456,7 @@ describe("maybeRebind and the member's other spellings", () => {
 
         const toOther = new RecipeSpec();
         toOther.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await toOther.rewriteRun(typescript(
             `
                 let a: import('m').Old;
@@ -3450,6 +3472,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export straight from the module keeps the name it publishes", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { Old } from "m";
@@ -3467,6 +3490,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export spelling the member as a string literal reads it by name", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { "Old" } from "m";
@@ -3482,6 +3506,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export moving to another module leaves what else its statement re-exports, and joins a re-export of the target", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { Old } from "m";
@@ -3497,6 +3522,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export with no re-export of the target to join takes a statement of its own after the one it left", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export {
@@ -3523,6 +3549,7 @@ describe("maybeRebind and the member's other spellings", () => {
             {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
             {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
         ]);
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { Validator, ValidationMap } from "react";
@@ -3539,6 +3566,7 @@ describe("maybeRebind and the member's other spellings", () => {
             {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
             {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
         ]);
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export type { Validator as V, ReactNode, ValidationMap } from "react";
@@ -3556,6 +3584,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export moving to another module under the member's own name keeps its specifier as written", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "Old"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { Old, Old as Renamed, "Old" as Quoted } from "m";
@@ -3569,6 +3598,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export a moved member empties goes, and the statement after it keeps its comment", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { Other } from "m2";
@@ -3587,6 +3617,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export split between two modules keeps each specifier's comment with it", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { /* keep */ Other, /* move */ Old } from "m";
@@ -3630,6 +3661,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export joining an empty re-export of the target takes the place of its empty entry", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export {Old} from "m";
@@ -3644,6 +3676,7 @@ describe("maybeRebind and the member's other spellings", () => {
     test("a re-export joining the target's keeps its own comment, not another specifier's", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 export { A, /* b */ B } from "m2";
@@ -3687,6 +3720,7 @@ describe("maybeRebind and the member's other spellings", () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = rebindTo({module: "m", member: "New", alias: "Taken"}, bound);
+        //language=typescript
         await spec.rewriteRun(typescript(
             `
                 import { Old } from "m";

@@ -350,11 +350,13 @@ describe("change-import", () => {
                         `
                         import * as NS from "lodash";
                         NS.extend({}, {});
-                        NS.flatten([[1]]);`,
+                        NS.flatten([[1]]);
+                        `,
                         `
                         import * as NS from "lodash";
                         NS.assign({}, {});
-                        NS.flatten([[1]]);`
+                        NS.flatten([[1]]);
+                        `
                     ),
                     afterRecipe: async (cu: any) => {
                         await new class extends JavaScriptVisitor<any> {
@@ -375,6 +377,7 @@ describe("change-import", () => {
         test("renames a member read through a namespace import", async () => {
             const spec = new RecipeSpec();
             spec.recipe = new ChangeImport({oldModule: "react", oldMember: "SFC", newModule: "react", newMember: "FC"});
+            //language=typescript
             await spec.rewriteRun(typescript(
                 `
                     import * as React from "react";
