@@ -22,6 +22,7 @@ import java.util.List;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("ResultOfMethodCallIgnored")
 class ExcludeFileFromGitignoreTest implements RewriteTest {
 
     @DocumentExample
@@ -608,6 +609,61 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               /gradle/wrapper/**
               !/gradle/wrapper/gradle-wrapper.properties
               !/gradle/wrapper/gradle-wrapper.jar
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wildcardedDirectoryRuleMatchedByPathWithoutTrailingSlash() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("app/log", "src/log", "other/log"))),
+          text(
+            """
+              */log/
+              **/log/
+              /*/log/
+              """,
+            """
+              */log/
+              **/log/
+              /*/log/
+              !/other/log/
+              !/src/log/
+              !/app/log/
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wildcardedDirectoryRuleWithNestedFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("app/log/file.txt"))),
+          text(
+            """
+              */log/
+              """,
+            """
+              */log/*
+              !/app/log/
+              /app/log/*
+              !/app/log/file.txt
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenWildcardedDirectoryRuleDoesNotMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("log/file.txt", "a/b/log/file.txt", "app/logs"))),
+          text(
+            """
+              */log/
               """,
             spec -> spec.path(".gitignore")
           )
