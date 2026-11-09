@@ -22,6 +22,7 @@ import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -222,6 +223,153 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       </dependencies>
                   </dependencyManagement>
               </project>"""
+          )
+        );
+    }
+
+    @Test
+    void keepExistingManagedDependencyWithHigherVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.core",
+            "jackson-databind",
+            "tools.jackson.core",
+            null,
+            "3.1.0"
+          )),
+          // The parent manages the renamed version, so the redundant-version pass drops both
+          // entries if it ever sees them side by side.
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>my-app</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <properties>
+                        <jackson3.version>3.2.4</jackson3.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>2.19.0</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>tools.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>${jackson3.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                    <properties>
+                        <jackson3.version>3.2.4</jackson3.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>tools.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>${jackson3.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void replaceExistingManagedDependencyWithLowerVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.core",
+            "jackson-databind",
+            "tools.jackson.core",
+            null,
+            "3.1.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
           )
         );
     }

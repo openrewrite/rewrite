@@ -136,11 +136,19 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             @Nullable
             private Collection<String> availableVersions;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
+            private List<Xml.Tag> supersededEntries = new ArrayList<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
-                return super.visitDocument(document, ctx);
+                supersededEntries = new ArrayList<>();
+                Xml.Document d = super.visitDocument(document, ctx);
+                // Removed before the model update and the redundant-version pass run, so that neither sees two
+                // managed entries for the same coordinates.
+                for (Xml.Tag superseded : supersededEntries) {
+                    d = (Xml.Document) new RemoveContentVisitor<>(superseded, true, true).visitNonNull(d, ctx);
+                }
+                return d;
             }
 
             @Override
@@ -160,6 +168,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newArtifactId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
+                    String renamedVersion = null;
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -174,6 +183,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, pom.getProperties()::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
+                                renamedVersion = resolvedNewVersion;
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
@@ -193,25 +203,37 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                         String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
                         String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
-                        if (checkIfNewDependencyPresent(effectiveGroupId, effectiveArtifactId, newVersion)) {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true, true));
-                            maybeUpdateModel();
+                        ResolvedManagedDependency existing = effectiveGroupId == null || effectiveArtifactId == null ? null :
+                                findManagedDependency(effectiveGroupId, effectiveArtifactId);
+                        if (existing != null) {
+                            if (isHigher(renamedVersion, existing.getVersion())) {
+                                for (Xml.Tag sibling : getCursor().getParentTreeCursor().<Xml.Tag>getValue().getChildren("dependency")) {
+                                    if (sibling != tag && declares(sibling, existing)) {
+                                        supersededEntries.add(sibling);
+                                    }
+                                }
+                            } else {
+                                supersededEntries.add(t);
+                            }
                         }
                     }
                 }
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
-                if ((groupId == null) || (artifactId == null)) {
-                    return false;
-                }
-                ResolvedManagedDependency managedDependency = findManagedDependency(groupId, artifactId);
-                if (managedDependency != null) {
-                    return compareVersions(version, managedDependency.getVersion());
-                } else {
-                    return false;
-                }
+            /**
+             * A renamed entry without a new version keeps the old artifact's version. That is not comparable to the
+             * new artifact's versions, so it never counts as higher.
+             */
+            private boolean isHigher(@Nullable String renamedVersion, @Nullable String existingVersion) {
+                return renamedVersion != null && existingVersion != null &&
+                       new Version(renamedVersion).compareTo(new Version(existingVersion)) > 0;
+            }
+
+            private boolean declares(Xml.Tag dependency, ResolvedManagedDependency managed) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                return managed.getGroupId().equals(pom.getValue(dependency.getChildValue("groupId").orElse(null))) &&
+                       managed.getArtifactId().equals(pom.getValue(dependency.getChildValue("artifactId").orElse(null)));
             }
 
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
@@ -227,17 +249,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, true);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, true);
                 return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, true, ctx);
-            }
-
-            private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
-                if (targetVersion == null) {
-                    return true;
-                }
-                if ((versionComparator != null) && (foundVersion != null)) {
-                    return versionComparator.isValid(foundVersion, foundVersion);
-                } else {
-                    return targetVersion.equals(foundVersion);
-                }
             }
 
             @SuppressWarnings("ConstantConditions")
