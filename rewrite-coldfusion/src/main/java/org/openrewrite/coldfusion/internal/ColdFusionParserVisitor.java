@@ -97,9 +97,10 @@ public class ColdFusionParserVisitor extends CFMLParserBaseVisitor<J> {
             charIndex[codePoints] = source.length();
         }
         for (Token token : tokens) {
-            String text = token.getText();
-            if (text != null && text.startsWith("<!---") && text.endsWith("--->") && text.length() >= 9) {
-                tagCommentEnds.put(start(token), charIndex(token.getStopIndex() + 1));
+            int start = start(token);
+            int end = charIndex(token.getStopIndex() + 1);
+            if (end - start >= 9 && source.startsWith("<!---", start) && source.startsWith("--->", end - 4)) {
+                tagCommentEnds.put(start, end);
             }
         }
     }

@@ -254,6 +254,16 @@ import java.util.Set;
         }
     }
 
+    // `#` interpolates only in the bodies of <cfoutput>, <cfquery> and <cfmail>. Elsewhere it is text.
+    private void templateHash() {
+        if (interpolating > 0) {
+            setType(HASH);
+            enter(POUNDS);
+        } else {
+            setType(TEXT);
+        }
+    }
+
     private void hash() {
         if (outsideBrackets(POUNDS)) {
             setType(HASH_CLOSE);
@@ -492,6 +502,9 @@ import java.util.Set;
     }
 }
 
+// A rule's semantic predicate comes after the token's first character, so that the lexer can cache its first
+// step. It caches no step into a state that reaches a predicate.
+
 // =============================================================================================
 // Script and expressions, in a script component, a <cfscript> body, a tag's expression and #...#
 // =============================================================================================
@@ -561,12 +574,14 @@ REQUIRED              : 'required' { keyword(followedByWord()); };
 
 IDENTIFIER            : IDENT_START IDENT_PART*;
 
-// After `.`, a name may start with a digit, as in `row.2FactorEnabled`.
-DIGIT_NAME            : DIGIT { afterMember() }? IDENT_PART* -> type(IDENTIFIER);
+// After `.`, a name may start with a digit, as in `row.2FactorEnabled` or `row.2`.
+DIGIT_NAME            : DIGIT+ (IDENT_START | NON_ASCII_DIGIT) { afterMember() }? IDENT_PART* -> type(IDENTIFIER);
 
 NUMBER
-    : DIGIT+ ('.' DIGIT+)? EXPONENT?
-    | '.' { !afterOperandEnd() }? DIGIT+ EXPONENT?
+    : DIGIT+ { if (afterMember()) setType(IDENTIFIER); }
+    | DIGIT+ '.' DIGIT+ EXPONENT?
+    | DIGIT+ EXPONENT
+    | '.' DIGIT { !afterOperandEnd() }? DIGIT* EXPONENT?
     ;
 
 DQ_OPEN               : '"' -> pushMode(DQ_STRING);
@@ -632,11 +647,9 @@ TEMPLATE_COMMENT      : NESTED_COMMENT;
 UNTERMINATED_COMMENT  : '<!---';
 START_TAG_OPEN        : '<cf' TAG_NAME_CHAR+ { startTag(); };
 END_TAG_OPEN          : '</cf' TAG_NAME_CHAR+ { endTag(); };
-// `#` interpolates only in the bodies of <cfoutput>, <cfquery> and <cfmail>.
-TEMPLATE_HASH         : '#' { interpolating > 0 }? { setType(HASH); enter(POUNDS); };
+TEMPLATE_HASH         : '#' { templateHash(); };
 TEXT                  : ~[<#]+;
 TEXT_HASHES           : '##' -> type(TEXT);
-TEXT_HASH             : '#' -> type(TEXT);
 TEXT_LT               : '<' -> type(TEXT);
 
 // =============================================================================================
@@ -700,6 +713,7 @@ SQ_CLOSE              : '\'' -> popMode;
 
 fragment WS_CHAR        : [ \t\r\n\f\u000B ﻿];
 fragment DIGIT          : [0-9];
+fragment NON_ASCII_DIGIT : ~[0-9\P{Nd}];
 fragment EXPONENT       : 'e' [+-]? DIGIT+;
 fragment IDENT_START    : [\p{L}_$];
 fragment IDENT_PART     : [\p{L}\p{Nd}_$];

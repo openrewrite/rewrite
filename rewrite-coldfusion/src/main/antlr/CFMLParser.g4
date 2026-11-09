@@ -2,9 +2,11 @@ parser grammar CFMLParser;
 
 options {
     tokenVocab = CFMLLexer;
+    contextSuperClass = CompactContext;
 }
 
 @parser::header {
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -15,6 +17,25 @@ import java.util.Set;
 }
 
 @parser::members {
+    // Most nodes have one child. Under the JVM's default compressed references, room for two takes no
+    // more memory than room for one.
+    public static class CompactContext extends ParserRuleContext {
+        public CompactContext() {
+        }
+
+        public CompactContext(ParserRuleContext parent, int invokingStateNumber) {
+            super(parent, invokingStateNumber);
+        }
+
+        @Override
+        public <T extends ParseTree> T addAnyChild(T t) {
+            if (children == null) {
+                children = new ArrayList<>(2);
+            }
+            return super.addAnyChild(t);
+        }
+    }
+
     // Tags written as script statements that take an expression rather than attributes.
     private static final Set<String> EXPRESSION_SCRIPT_TAGS = new HashSet<String>(Arrays.asList(
             "abort", "exit", "include", "param", "pageencoding", "rethrow", "retry", "flush"));
