@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -201,39 +202,51 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (t != tag) {
                         maybeUpdateModel();
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
-                        String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
-                        String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
-                        ResolvedManagedDependency existing = effectiveGroupId == null || effectiveArtifactId == null ? null :
-                                findManagedDependency(effectiveGroupId, effectiveArtifactId);
-                        if (existing != null) {
-                            if (isHigher(renamedVersion, existing.getVersion())) {
-                                for (Xml.Tag sibling : getCursor().getParentTreeCursor().<Xml.Tag>getValue().getChildren("dependency")) {
-                                    if (sibling != tag && declares(sibling, existing)) {
-                                        supersededEntries.add(sibling);
-                                    }
-                                }
-                            } else {
-                                supersededEntries.add(t);
+                        GroupArtifactClassifierType renamedKey = managementKey(t);
+                        Xml.Tag duplicate = null;
+                        for (Xml.Tag sibling : getCursor().getParentTreeCursor().<Xml.Tag>getValue().getChildren("dependency")) {
+                            if (sibling != tag && renamedKey.equals(managementKey(sibling))) {
+                                duplicate = sibling;
                             }
+                        }
+                        if (duplicate != null) {
+                            String duplicateVersion = getResolutionResult().getPom().getValue(duplicate.getChildValue("version").orElse(null));
+                            supersededEntries.add(isHigher(renamedVersion, duplicateVersion) ? duplicate : t);
+                        } else if (isManagedElsewhereAtNewVersion(renamedKey)) {
+                            supersededEntries.add(t);
                         }
                     }
                 }
                 return t;
             }
 
+            private GroupArtifactClassifierType managementKey(Xml.Tag dependency) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                return new GroupArtifactClassifierType(
+                        pom.getValue(dependency.getChildValue("groupId").orElse(null)),
+                        pom.getValue(dependency.getChildValue("artifactId").orElse(null)),
+                        pom.getValue(dependency.getChildValue("classifier").orElse(null)),
+                        pom.getValue(dependency.getChildValue("type").orElse("jar")));
+            }
+
             /**
-             * A renamed entry without a new version keeps the old artifact's version. That is not comparable to the
-             * new artifact's versions, so it never counts as higher.
+             * A renamed entry without a new version keeps the old artifact's version, and one whose selector matched
+             * no published version keeps the selector. Neither is comparable, so neither counts as higher.
              */
             private boolean isHigher(@Nullable String renamedVersion, @Nullable String existingVersion) {
                 return renamedVersion != null && existingVersion != null &&
+                       Semver.validate(renamedVersion, null).getValue() instanceof ExactVersion &&
                        new Version(renamedVersion).compareTo(new Version(existingVersion)) > 0;
             }
 
-            private boolean declares(Xml.Tag dependency, ResolvedManagedDependency managed) {
-                ResolvedPom pom = getResolutionResult().getPom();
-                return managed.getGroupId().equals(pom.getValue(dependency.getChildValue("groupId").orElse(null))) &&
-                       managed.getArtifactId().equals(pom.getValue(dependency.getChildValue("artifactId").orElse(null)));
+            private boolean isManagedElsewhereAtNewVersion(GroupArtifactClassifierType key) {
+                for (ResolvedManagedDependency managed : getResolutionResult().getPom().getDependencyManagement()) {
+                    if (key.equals(new GroupArtifactClassifierType(managed.getGroupId(), managed.getArtifactId(),
+                            managed.getClassifier(), managed.getType()))) {
+                        return compareVersions(newVersion, managed.getVersion());
+                    }
+                }
+                return false;
             }
 
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
@@ -249,6 +262,17 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, true);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, true);
                 return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, true, ctx);
+            }
+
+            private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
+                if (targetVersion == null) {
+                    return true;
+                }
+                if ((versionComparator != null) && (foundVersion != null)) {
+                    return versionComparator.isValid(foundVersion, foundVersion);
+                } else {
+                    return targetVersion.equals(foundVersion);
+                }
             }
 
             @SuppressWarnings("ConstantConditions")
