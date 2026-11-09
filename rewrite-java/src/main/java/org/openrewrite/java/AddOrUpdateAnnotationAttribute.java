@@ -204,10 +204,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (oldAttributeValue != null) {
                         return as;
                     }
-                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
-                        return as;
-                    }
-                    if (newAttributeValue.equals(exp.toString())) {
+                    if (alreadySetTo((J.FieldAccess) exp, newAttributeValue)) {
                         return as;
                     }
                     // If appendArray is true and attribute is an array, convert FieldAccess to array and append
@@ -250,10 +247,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newAttributeValue == null) {
                         return null;
                     }
-                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(fieldAccess.toString())) {
+                    if (alreadySetTo(fieldAccess, newAttributeValue)) {
                         return fieldAccess;
                     }
-                    if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
+                    if (!valueMatches(fieldAccess, oldAttributeValue)) {
                         return fieldAccess;
                     }
                     // If appendArray is true and attribute is an array, convert FieldAccess to array and append
@@ -371,6 +368,30 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                !attributeValue.contains(",") &&
                attributeValue.endsWith(".class") &&
                StringUtils.countOccurrences(attributeValue, ".") > 1;
+    }
+
+    private boolean alreadySetTo(J.FieldAccess fieldAccess, String newAttributeValue) {
+        String name = dottedName(fieldAccess);
+        if (isFullyQualifiedClass()) {
+            JavaType targetType = fieldAccess.getTarget().getType();
+            if ("class".equals(fieldAccess.getSimpleName()) &&
+                targetType instanceof JavaType.FullyQualified && !(targetType instanceof JavaType.Unknown)) {
+                return TypeUtils.isOfClassType(targetType, newAttributeValue.substring(0, newAttributeValue.length() - 6));
+            }
+            return getFullyQualifiedClass(newAttributeValue).equals(name) || newAttributeValue.equals(name);
+        }
+        return newAttributeValue.equals(name);
+    }
+
+    private static @Nullable String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        }
+        if (expression instanceof J.FieldAccess) {
+            String target = dottedName(((J.FieldAccess) expression).getTarget());
+            return target == null ? null : target + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        return null;
     }
 
     private static String getFullyQualifiedClass(String fqn) {
@@ -629,7 +650,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return values.contains(((J.Literal) e).getValue() + "");
         } else if (e instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) e;
-            String fullString = fa.toString();
+            String fullString = dottedName(fa);
+            if (fullString == null) {
+                return false;
+            }
             if (values.contains(fullString)) {
                 return true;
             }
