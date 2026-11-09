@@ -50,14 +50,16 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         super();
     }
 
+    /**
+     * Moves re-exports to another module on the whole file, since `export {Old, X} from "m"` can split in two.
+     * Renames the types only in a file this changed.
+     */
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p);
         if (visited?.kind !== JS.Kind.CompilationUnit) {
             return visited;
         }
-        // A re-export to another module can split or join statements, so it is moved on the whole file
         const moved = this.withinModule ? visited as JS.CompilationUnit : this.withReExportsMoved(visited as JS.CompilationUnit);
-        // Rename the types only in a file this visitor changed
         return moved === cu || !this.retypes ? moved : withMovedTypes(moved, this.from, this.to);
     }
 
@@ -65,9 +67,11 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return sameModule(this.from.module, this.to.module);
     }
 
-    /** Whether `qualifier.member` reads the moved member through a module object: `NS.Old`, `(NS).Old`. */
+    /**
+     * Whether `qualifier.member` reads the moved member through a module object: `NS.Old`, `(NS).Old`.
+     * For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`.
+     */
     private readsMovedMember(qualifier: J | undefined, member: string): boolean {
-        // `(NS).Old`: step into the parentheses, since `resolve` wants the cursor of the node holding `NS`
         let object = qualifier, cursor = this.cursor;
         while (object?.kind === J.Kind.Parentheses) {
             cursor = new Cursor(object, cursor);
@@ -184,6 +188,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      *     export {Old, X} from "m"    →  export {X} from "m"; export {New as Old} from "m2"
      *     export {Old} from "m";      →  export {Y, New as Old} from "m2"
      *     export {Y} from "m2"           (joins a re-export of the same kind, `export type` or not)
+     *
+     * A comment ending the line (`export {X} from "m"; // note`) stays on it, before the new statement.
      */
     private withReExportsMoved(cu: JS.CompilationUnit): JS.CompilationUnit {
         const statements = [...cu.statements];
@@ -202,7 +208,6 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
             const target = statements.findIndex((s, j) =>
                 j !== i && reExportFrom(s.element, this.to.module)?.typeOnly.element === declaration.typeOnly.element);
             if (target < 0 && staying.size === 0) {
-                // `export {Old} from "m"` with nothing to join: rewrite the statement in place
                 statements[i] = {...statements[i], element: this.respecified(withElements(declaration, elements.map(e => this.renamed(e))))};
                 continue;
             }
@@ -211,7 +216,6 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
                 const into = statements[target].element as JS.ExportDeclaration;
                 statements[target] = {...statements[target], element: withElements(into, appended(clauseOf(into).elements.elements, moved))};
             } else {
-                // `export {Old, X} from "m"; // note`: `// note` stays on this line, before the new statement
                 const next = statements[i + 1];
                 const split = splitAtLineEnd(next?.element.prefix ?? eof, next === undefined);
                 if (split !== undefined && next !== undefined) {
@@ -255,8 +259,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * The specifier reading the new member, still exporting the same name:
-     * `Old` → `New as Old`, `Old as X` → `New as X`. Unchanged where only the module moves.
+     * The specifier reading the new member, still exporting the same name: `Old` → `New as Old`,
+     * and `Old as X` or `"Old" as X` → `New as X`. Unchanged where only the module moves.
      */
     private renamed(element: J.RightPadded<Expression>): J.RightPadded<Expression> {
         if (this.to.member === this.from.member) {
@@ -265,7 +269,6 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return produce(element, draft => {
             const specifier = draft.element as Draft<JS.ExportSpecifier>;
             if (specifier.specifier.kind === JS.Kind.Alias) {
-                // `Old as X` → `New as X`, with a new identifier since `Old` may be a string literal (`"Old" as X`)
                 const name = (specifier.specifier as Draft<JS.Alias>).propertyName;
                 name.element = {...newIdentifier(this.to.member), prefix: name.element.prefix} as Draft<J.Identifier>;
             } else {
@@ -351,7 +354,6 @@ function appended<T extends J>(elements: J.RightPadded<T>[], added: J.RightPadde
     const plain = (markers: J.RightPadded<T>["markers"]) =>
         ({...markers, markers: markers.markers.filter(m => m.kind !== J.Markers.TrailingComma)});
     if (elements.length === 1 && last.element.kind === J.Kind.Empty) {
-        // `{}` holds one empty entry, which the added ones replace
         return added.map((e, i) => ({
             ...e,
             element: {...e.element, prefix: {...e.element.prefix, whitespace: i === 0 ? last.element.prefix.whitespace : " "}},

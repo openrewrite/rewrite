@@ -3074,7 +3074,6 @@ describe("maybeRebind and the member's other spellings", () => {
                 new NS.New();
             `
         ));
-        // Nothing binds `Old` by name, so no binding moved
         expect(bound.name).toBeUndefined();
     });
 
@@ -3308,7 +3307,6 @@ describe("maybeRebind and the member's other spellings", () => {
     });
 
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
-        // `D.Old` reads the default export, which is the module only with `export =`
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
         await spec.rewriteRun(typescript(

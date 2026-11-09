@@ -2789,7 +2789,6 @@ function movedTypesIn(
     return new MovedTypes(from, to, {
         module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
             requiresOfModule.some(d => !isOnlyRequired(d)),
-        // Same-named classes from two subpaths of one package share a name.
         className: member !== undefined && imports.filter(imp => {
             const module = importedModule(imp);
             return module !== undefined && packageOf(module) === fromPackage &&
