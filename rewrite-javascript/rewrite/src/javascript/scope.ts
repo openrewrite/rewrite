@@ -786,7 +786,7 @@ function enumMemberNames(body: J.Block): Bound[] {
     });
 }
 
-/** The root of a dotted name `A.B.C`, which is `A`: the rest are members of it. */
+/** The root of a dotted name: `A` in `A.B.C`. */
 export function rootName(name: J | undefined): J | undefined {
     return name?.kind === J.Kind.FieldAccess ? rootName((name as J.FieldAccess).target) : name;
 }

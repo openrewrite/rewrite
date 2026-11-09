@@ -2763,12 +2763,11 @@ function joinedRequire(
     return {...cu, statements: cu.statements.map(s => s.element === target ? {...s, element: joined} : s)};
 }
 
-/** Rewrites a file's attribution onto the module and member a binding moved to. */
 /**
- * The rewrite of the types in `cu` naming `from` to name `to`. A module object or a package-qualified
- * class name another binding in the file shares keeps its name, since it stands for that binding too.
- * `bindingMoves` says whether one of the file's bindings of `from` is the one that moves; where none
- * is, every binding of a same-named class from the package shares its name.
+ * The type rename for a move of `from` to `to` in `cu`. A name another binding still uses stays:
+ * the module on a whole-module move, with `import {X} from "m"` beside the moved `import * as NS from "m"`,
+ * or a class's package name, with `Button` imported from both `@acme/ui` and `@acme/ui/button`.
+ * `bindingMoves`: one of the bindings counted is the moving one, so it doesn't count as another.
  */
 function movedTypesIn(
     cu: JS.CompilationUnit,
@@ -2802,7 +2801,7 @@ function movedTypesIn(
     });
 }
 
-/** `cu` with every type naming `from` renamed to name `to`, for a move that no binding in `cu` made. */
+/** `cu` with its types renamed from `from` to `to`, for a move only spellings made (`NS.Old` → `NS.New`). */
 export async function withMovedTypes(
     cu: JS.CompilationUnit,
     from: {module: string; member?: string},
@@ -2816,6 +2815,7 @@ export async function withMovedTypes(
     }().visit(cu, undefined) as JS.CompilationUnit;
 }
 
+/** Rewrites a file's attribution onto the module and member a binding moved to. */
 class MovedTypes extends TypeVisitor<undefined> {
     private readonly onPath = new Set<Type>();
     private readonly answered = new Map<Type, Type | undefined>();

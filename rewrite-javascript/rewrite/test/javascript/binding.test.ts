@@ -1157,7 +1157,7 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
     });
 }
 
-/** Queues one `maybeRebind` per move from the compilation unit, as a recipe moving several members does. */
+/** Calls `maybeRebind` once per move, as a recipe moving several members does. */
 function rebindEach(moves: MaybeRebindOptions[]) {
     return fromVisitor(new class extends JavaScriptVisitor<any> {
         override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
@@ -3308,8 +3308,7 @@ describe("maybeRebind and the member's other spellings", () => {
     });
 
     test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
-        // `D.Old` reads the default export's property, which is the member only where the module's
-        // default is its namespace object, as `export =` typings make it
+        // `D.Old` reads the default export, which is the module only with `export =`
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
         await spec.rewriteRun(typescript(

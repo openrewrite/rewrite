@@ -149,7 +149,7 @@ interface ModuleObjectBinding {
     /** A type-only import erases, so the name it binds stands for no value at runtime. */
     typeOnly: boolean;
 
-    /** A variable that can be reassigned need not still name the module at each read. */
+    /** `let`/`var`: after `NS = other`, `NS.Old` no longer reads the module. */
     reassignable: boolean;
 }
 
@@ -352,11 +352,10 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
- * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
- * moving no binding, where nothing binds `from` or the move cannot be expressed safely. One call moves one binding.
- * A named member's spellings through its module rather than a binding of it — `NS.Old`,
- * `import("m").Old`, `export {Old} from "m"` — move with it, and also where nothing binds `from`,
- * which still answers `undefined`; see {@link RenameMemberSpellings}.
+ * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`
+ * where nothing binds `from` or the move isn't safe. One call moves one binding.
+ * Spellings through the module (`NS.Old`, `import("m").Old`, `export {Old} from "m"`) move too, also
+ * when nothing binds `from` and the answer is `undefined`; see {@link RenameMemberSpellings}.
  * Named members of one import moved to one module, a call each, end up in one import of it,
  * whether the calls share a visit or come from separate recipes.
  * On an ES import, every type in the file naming what moved is renamed the way a parse of the result names it.
@@ -391,7 +390,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     }
     const existing = existingImportBinding(cu, options.from.module, options.from.member);
     if (existing === undefined) {
-        // A binding that cannot move (a typed require or one with rest) is still a binding.
+        // `const {Old, ...rest} = require("m")` or a typed require binds `from` but can't move: change nothing
         const bound = moduleScopeBindings(cu).some(b => b.module !== undefined &&
             sameModule(b.module, options.from.module) && b.member === memberName(options.from.member));
         if (!bound) {
@@ -421,10 +420,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     return boundName;
 }
 
-/**
- * Queues the rename of a named member's spellings through its module, once for each move.
- * `retypes` where no `RebindImport` renames the file's types for the move.
- */
+/** Queues one {@link RenameMemberSpellings} per move of a named member. `retypes` where no `RebindImport` runs. */
 function renameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
     cu: JS.CompilationUnit,
@@ -438,7 +434,7 @@ function renameMemberSpellings(
             sameModule(v.from.module, options.from.module) && v.to.member === to && sameModule(v.to.module, options.to.module))) {
         return;
     }
-    // A default import is the module object only where its default is, as `export =` typings make it
+    // Not `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`
     const moduleObjects = new Set(moduleObjectBindings(cu)
         .filter(b => b.shape !== "default" && !b.reassignable && sameModule(b.module, options.from.module))
         .map(b => b.name));
