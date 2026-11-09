@@ -8880,7 +8880,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var commentStart = FindTrailingCommentStart(hashPos, contentEnd);
                 if (commentStart >= 0) contentEnd = commentStart;
-                while (contentEnd > hashPos && (_source[contentEnd - 1] == ' ' || _source[contentEnd - 1] == '\t'))
+                while (contentEnd > hashPos && char.IsWhiteSpace(_source[contentEnd - 1]))
                     contentEnd--;
             }
 
@@ -9111,6 +9111,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     {
                         var last = codes[^1];
                         codes[^1] = last.WithMarkers(last.Markers.Add(new TrailingComma(Tree.RandomId(), Space.Format(part))));
+                    }
+                    else
+                    {
+                        codes.Add(new JRightPadded<Expression>(new Empty(Tree.RandomId(), Space.Format(part), Markers.Empty),
+                            Space.Empty, Markers.Empty));
                     }
                     continue;
                 }

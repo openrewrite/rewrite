@@ -178,6 +178,18 @@ public class PragmaDirectiveTests : RewriteTest
         );
     }
 
+    [Theory]
+    [InlineData("class Foo\n{\n#pragma warning disable A,,B\n}\n")]
+    [InlineData("class Foo\n{\n#pragma warning disable , A\n}\n")]
+    [InlineData("class Foo\n{\n#pragma warning disable ,\n}\n")]
+    [InlineData("class Foo\n{\n#pragma warning restore\f\n}\n")]
+    public void PragmaWarningMalformedCodeList(string source)
+    {
+        RewriteRun(
+            CSharp(source)
+        );
+    }
+
     [Fact]
     public void PragmaWarningTrailingCommaIsMarker()
     {
