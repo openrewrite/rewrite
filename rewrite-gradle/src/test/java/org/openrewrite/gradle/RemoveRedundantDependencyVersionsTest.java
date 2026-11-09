@@ -764,6 +764,12 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
                   testRuntimeOnly "org.ow2.asm:asm:9.7"
                   testRuntimeOnly "org.ow2.asm:asm:9.7-dev"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest-core:1.1"
+                  testRuntimeOnly "org.hamcrest:hamcrest-core:1.01"
+
+                  testRuntimeOnly "org.ow2.asm:asm-util:9.7"
+                  testRuntimeOnly "org.ow2.asm:asm-util:9.123456789012345678901"
               }
               """
           )
@@ -817,11 +823,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               def osdetector = [classifier: "linux-x86_64"]
               dependencies {
-                  runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-x86_64"
-                  runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-aarch_64"
+                  runtimeOnly "org.lwjgl:lwjgl:3.3.4:natives-linux"
+                  runtimeOnly "org.lwjgl:lwjgl:3.3.4:natives-windows"
 
-                  runtimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-linux"
-                  runtimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-windows"
+                  testRuntimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-linux"
+                  testRuntimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-windows"
 
                   testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final"
                   testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final:${osdetector.classifier}"

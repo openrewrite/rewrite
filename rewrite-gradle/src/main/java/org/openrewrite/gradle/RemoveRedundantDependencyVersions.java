@@ -113,7 +113,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "testRuntime" // deprecated
     );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
-    private static final Pattern NUMERIC_VERSION = Pattern.compile("\\d+(\\.\\d+)*");
+    private static final Pattern NUMERIC_VERSION = Pattern.compile("(0|[1-9]\\d{0,17})(\\.(0|[1-9]\\d{0,17}))*");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -450,7 +450,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor) {
         Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
-        Expression block = dependencies.getArguments().isEmpty() ? null : dependencies.getArguments().get(0);
+        Expression block = dependencies.getArguments().get(0);
         if (block instanceof J.Lambda && ((J.Lambda) block).getBody() instanceof J.Block) {
             GradleDependency.Matcher matcher = new GradleDependency.Matcher()
                     .groupId(groupPattern)
@@ -494,7 +494,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     /**
      * The version of a declaration that names only a group, an artifact and a numeric version, as {@code "g:a:v"} or
      * as named arguments, possibly inside {@code platform(...)}. Anything more can change what is resolved, so it
-     * gives null. So does a qualifier such as {@code -dev}, which the version comparator here ranks unlike Gradle.
+     * gives null. The version comparator here ranks qualifiers such as {@code -dev} and parts with leading zeros
+     * unlike Gradle, and cannot parse parts longer than 18 digits, so those give null too.
      */
     private static @Nullable String simpleVersion(GradleDependency declaration) {
         List<Expression> arguments = declaration.getTree().getArguments();
