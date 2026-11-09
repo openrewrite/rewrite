@@ -769,7 +769,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   testRuntimeOnly "org.hamcrest:hamcrest-core:1.01"
 
                   testRuntimeOnly "org.ow2.asm:asm-util:9.7"
-                  testRuntimeOnly "org.ow2.asm:asm-util:9.123456789012345678901"
+                  testRuntimeOnly "org.ow2.asm:asm-util:9.9999999999999999999"
               }
               """
           )
