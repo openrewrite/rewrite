@@ -332,6 +332,7 @@ public class AddUsingTests : RewriteTest
             """
             using System;
 
+            // Diagnostics only where FEATURE_X is defined
             #if FEATURE_X
             using System.Diagnostics;
             #endif
@@ -349,6 +350,7 @@ public class AddUsingTests : RewriteTest
             using System;
             using System.Threading.Tasks;
 
+            // Diagnostics only where FEATURE_X is defined
             #if FEATURE_X
             using System.Diagnostics;
             #endif

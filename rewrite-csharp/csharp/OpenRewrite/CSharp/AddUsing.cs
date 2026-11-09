@@ -35,9 +35,9 @@ namespace OpenRewrite.CSharp;
 /// </para>
 /// <para>
 /// A file with <c>#if</c> blocks gets the using at the compilation unit level, above its first
-/// conditional directive. Every branch has the same text there and every configuration compiles
-/// it. Extern aliases and global usings must precede a plain using, so a file with a conditional
-/// directive before one of them is left alone.
+/// conditional directive. The text above that directive is the same in every branch, and every
+/// configuration compiles it. Extern aliases and global usings must precede a plain using, so a
+/// file with a conditional directive before one of them is left alone.
 /// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
@@ -170,16 +170,16 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         string newline)
     {
         var below = list[index];
-        var (above, from) = SplitAtDirectiveLine(below.Element.Prefix, newline);
-        if (index > 0 && above.Comments.Count == 0)
+        var result = new List<JRightPadded<Statement>>(list);
+        if (index > 0 && below.Element.Prefix.Whitespace.Contains('\n'))
         {
-            // A blank line above the directive stays above the directive.
-            (above, from) = (Space.Format(newline), from.WithWhitespace(above.Whitespace));
+            // The blank lines and comments above the directive stay with it.
+            result.Insert(index, JRightPadded<Statement>.Build(CreateUsing(Space.Format(newline))));
+            return result;
         }
-        var result = new List<JRightPadded<Statement>>(list)
-        {
-            [index] = below.WithElement(J.SetPrefix(below.Element, from)),
-        };
+
+        var (above, from) = SplitAtDirectiveLine(below.Element.Prefix, newline);
+        result[index] = below.WithElement(J.SetPrefix(below.Element, from));
         result.Insert(index, JRightPadded<Statement>.Build(CreateUsing(above)));
         return result;
     }
