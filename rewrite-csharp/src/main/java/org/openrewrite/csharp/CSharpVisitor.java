@@ -19,6 +19,8 @@ package org.openrewrite.csharp;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.marker.RecordClass;
+import org.openrewrite.csharp.marker.Struct;
 import org.openrewrite.csharp.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
@@ -1416,6 +1418,16 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
             TrailingComma tc = (TrailingComma) marker;
             //noinspection unchecked
             return (M) tc.withSuffix(visitSpace(tc.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (marker instanceof Struct) {
+            Struct struct = (Struct) marker;
+            //noinspection unchecked
+            return (M) struct.withPrefix(visitSpace(struct.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (marker instanceof RecordClass) {
+            RecordClass recordClass = (RecordClass) marker;
+            //noinspection unchecked
+            return (M) recordClass.withPrefix(visitSpace(recordClass.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         }
         return super.visitMarker(marker, p);
     }

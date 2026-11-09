@@ -15,8 +15,14 @@
  */
 package org.openrewrite.csharp.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -24,18 +30,48 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
 @With
 public class RecordClass implements Marker, RpcCodec<RecordClass> {
     UUID id;
 
+    /**
+     * The space between {@code record} and {@code class}.
+     */
+    @Nullable
+    Space prefix;
+
+    @JsonCreator
+    public RecordClass(@JsonProperty("id") UUID id, @JsonProperty("prefix") @Nullable Space prefix) {
+        this.id = id;
+        this.prefix = prefix;
+    }
+
+    public RecordClass(UUID id) {
+        this(id, Space.EMPTY);
+    }
+
+    public Space getPrefix() {
+        return prefix == null ? Space.EMPTY : prefix;
+    }
+
+    public RecordClass withPrefix(Space prefix) {
+        return getPrefix() == prefix ? this : new RecordClass(id, prefix);
+    }
+
     @Override
     public void rpcSend(RecordClass after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, x -> spaceRef(x.getPrefix()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override
     public RecordClass rpcReceive(RecordClass before, RpcReceiveQueue q) {
-        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }
