@@ -231,12 +231,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * The renamed entry wins only when it carries the new version and the duplicate has no version or a lower
-             * one. Only exact versions are compared, so a selector that matched nothing published, a range or an
-             * unresolved placeholder keeps the duplicate.
+             * The renamed entry wins only when a new version is set and the duplicate has no version or a lower exact
+             * one. An exact new version counts even when it is not published. A selector that matched nothing published
+             * keeps the duplicate, as does a duplicate version that is a range or an unresolved placeholder.
              */
             private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
-                if (!isExact(renamedVersion)) {
+                if (newVersion == null || !isExact(renamedVersion)) {
                     return false;
                 }
                 return duplicateVersion == null ||
