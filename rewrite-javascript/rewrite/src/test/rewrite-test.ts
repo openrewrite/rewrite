@@ -760,14 +760,9 @@ const reportingMarkerKinds = new Set<string>([
     MarkersKind.RecipesThatMadeChanges,
 ]);
 
-/** Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows. */
-const rewriteRecipeMarkerKinds = new Set<string>([
-    "org.openrewrite.java.search.UsesMethod$MethodMatch",
-]);
-
 function mayBeAdded({marker, element}: MarkerPlacement): boolean {
     // A recipe that formats with a style it was given passes the style on to later formatting
-    return reportingMarkerKinds.has(marker.kind) || rewriteRecipeMarkerKinds.has(marker.kind) ||
+    return reportingMarkerKinds.has(marker.kind) ||
         !element && isNamedStyles(marker);
 }
 
