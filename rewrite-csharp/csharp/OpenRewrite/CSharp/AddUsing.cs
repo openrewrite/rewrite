@@ -36,8 +36,9 @@ namespace OpenRewrite.CSharp;
 /// <para>
 /// A file with <c>#if</c> blocks gets the using at the compilation unit level, above its first
 /// conditional directive. The text above that directive is the same in every branch, and every
-/// configuration compiles it. Extern aliases and global usings must precede a plain using, so a
-/// file with a conditional directive before one of them is left alone.
+/// configuration compiles it. Extern aliases, global usings and <c>#define</c> or <c>#undef</c>
+/// lines must precede a plain using, so a file with a conditional directive before one of them is
+/// left alone.
 /// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
@@ -78,7 +79,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         // Each branch is the whole file as one set of symbols compiles it.
         if (cu.Members is [{ Element: ConditionalDirective directive } member])
         {
-            if (directive.Branches.Any(branch => HasDirectiveBeforeExternOrGlobalUsing(branch.Element)))
+            if (directive.Branches.Any(branch => HasDirectiveBeforeWhatMustPrecedeUsings(branch.Element)))
             {
                 return cu;
             }
@@ -136,13 +137,14 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         return InsertFirstUsing(cu, newline);
     }
 
-    private static bool HasDirectiveBeforeExternOrGlobalUsing(CompilationUnit branch)
+    private static bool HasDirectiveBeforeWhatMustPrecedeUsings(CompilationUnit branch)
     {
-        static bool IsGlobal(JRightPadded<Statement> u) => u.Element is UsingDirective { Global.Element: true };
+        static bool MustPrecede(JRightPadded<Statement> u) =>
+            u.Element is UsingDirective { Global.Element: true } or DefineDirective or UndefDirective;
         return IndexOfDirectiveLine(branch.Prefix) >= 0
-            ? branch.Externs.Count > 0 || branch.Usings.Any(IsGlobal)
+            ? branch.Externs.Count > 0 || branch.Usings.Any(MustPrecede)
             : branch.Externs.Any(e => IndexOfDirectiveLine(e.Element.Prefix) >= 0)
-              || branch.Usings.SkipWhile(u => IndexOfDirectiveLine(u.Element.Prefix) < 0).Any(IsGlobal);
+              || branch.Usings.SkipWhile(u => IndexOfDirectiveLine(u.Element.Prefix) < 0).Any(MustPrecede);
     }
 
     /// <summary>A branch whose prefix holds a conditional directive gets the using right above it,

@@ -363,7 +363,7 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
-    public void ConditionalDirectiveBeforeAnExternAliasOrGlobalUsingLeavesTheFileAlone()
+    public void ConditionalDirectiveBeforeWhatMustPrecedeUsingsLeavesTheFileAlone()
     {
         var cu = Parse(
             """
@@ -393,6 +393,20 @@ public class AddUsingTests : RewriteTest
 
         Assert.Same(globalUsing,
             new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(globalUsing, 0));
+
+        var define = Parse(
+            """
+            #if FEATURE_X
+            #define TRACE_ON
+            #endif
+            using System;
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(define, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(define, 0));
     }
 
     [Fact]
