@@ -401,7 +401,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         const bound = moduleScopeBindings(cu).some(b => b.module !== undefined &&
             sameModule(b.module, options.from.module) && b.member === memberName(options.from.member));
         if (!bound) {
-            queueRenameMemberSpellings(visitor, cu, options, {retypes: true});
+            queueRenameMemberSpellings(visitor, cu, options);
         }
         return undefined;
     }
@@ -423,19 +423,18 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         v.localName === existing.localName)) {
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
     }
-    queueRenameMemberSpellings(visitor, cu, options, {retypes: false});
+    queueRenameMemberSpellings(visitor, cu, options);
     return boundName;
 }
 
 /**
- * Queues one {@link RenameMemberSpellings} per move of a named member. `retypes` where no `RebindImport` runs.
+ * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
  * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
  */
 function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
     cu: JS.CompilationUnit,
-    options: MaybeRebindOptions,
-    {retypes}: {retypes: boolean}
+    options: MaybeRebindOptions
 ): void {
     const from = memberName(options.from.member);
     const to = memberName(options.to.member);
@@ -448,7 +447,7 @@ function queueRenameMemberSpellings(
         .filter(b => b.shape !== "default" && !b.reassignable && sameModule(b.module, options.from.module))
         .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
-        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects, retypes));
+        {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
 }
 
 /**

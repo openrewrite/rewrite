@@ -44,21 +44,20 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         readonly from: {module: string; member: string},
         readonly to: {module: string; member: string},
         /** The module objects of `from`'s module, like `NS` in `import * as NS from "m"`. */
-        readonly moduleObjects: ReadonlySet<string>,
-        /** Whether to rename the file's types too. False when a `RebindImport` already does. */
-        readonly retypes: boolean
+        readonly moduleObjects: ReadonlySet<string>
     ) {
         super();
     }
 
     /**
      * Moves re-exports to another module on the whole file, since `export {Old, X} from "m"` can split in two.
-     * Renames the types only in a file this changed.
+     * Renames the types only in a file this changed. Where a `RebindImport` of the same move ran first, it already
+     * renamed them, so nothing is left to rename.
      */
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         const moved = this.withinModule ? visited : this.withReExportsMoved(visited);
-        return moved === cu || !this.retypes ? moved : withMovedTypes(moved, this.from, this.to);
+        return moved === cu ? moved : withMovedTypes(moved, this.from, this.to);
     }
 
     private get withinModule(): boolean {
