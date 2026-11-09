@@ -737,6 +737,57 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void keepsSameDependencyInAnotherConfiguration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              configurations {
+                  mockitoAgent
+              }
+
+              dependencies {
+                  testImplementation "org.mockito:mockito-core:5.24.0"
+                  mockitoAgent("org.mockito:mockito-core:5.24.0") {
+                      transitive = false
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsRepeatedDependencyOutsideGroupPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions("org.springframework.boot", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void supportSpringBootDependenciesPlugin() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
