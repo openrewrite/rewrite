@@ -102,6 +102,59 @@ class AddKeyValueTest implements RewriteTest {
     }
 
     @Test
+    void shouldAppendToNestedObjectAddressedByItsKey() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.x.y", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": {
+                      "y": {}
+                  }
+              }
+              """,
+            """
+              {
+                  "x": {
+                      "y": {
+                          "key": "val"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingWildcardAppendsToTheObjectNotToItsChildren() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.x.*", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": {
+                      "a": {},
+                      "b": {}
+                  }
+              }
+              """,
+            """
+              {
+                  "x": {
+                      "a": {},
+                      "b": {},
+                      "key": "val"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldAppendToNestedObjectInArray() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$.x[1].y.*", "key", "\"val\"", false)),
