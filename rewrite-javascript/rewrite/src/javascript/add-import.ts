@@ -2294,7 +2294,7 @@ function removeBinding(jsImport: JS.Import, member: string | undefined, localNam
 }
 
 /** `cu` without the statement `id`, its prefix carried onto the next one so a file header survives. */
-function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
+export function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
     const formatter = new ElementRemovalFormatter<J>(true);
     const statements: J.RightPadded<Statement>[] = [];
     for (const stmt of cu.statements) {
@@ -2623,7 +2623,7 @@ function withRequire(declaration: J.VariableDeclarations, module: string, patter
  * A whole module binds as a name and a member as a destructured element.
  * An element keeps a default it has.
  */
-function movedBinding(
+export function movedBinding(
     pattern: J,
     index: number,
     member: string | undefined,

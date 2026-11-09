@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 import {create as produce, Draft} from "mutative";
-import {emptySpace, Expression, isIdentifier, J, singleSpace, Statement} from "../java";
-import {randomId} from "../uuid";
-import {JS, moduleExportName} from "./tree";
+import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, J, singleSpace, Statement} from "../java";
+import {randomId, UUID} from "../uuid";
+import {Cursor} from "../tree";
+import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {resolve, rootName} from "./scope";
-import {aliasing, moduleNameOf, newIdentifier, respecify, withMovedTypes} from "./add-import";
+import {aliasing, moduleNameOf, movedBinding, newIdentifier, respecify, withMovedTypes, withoutStatement} from "./add-import";
 import {sameModule, spelledLike} from "./package-name";
 
 /**
  * The spellings of a member that name it through its module rather than through a binding of it,
- * renamed when `maybeRebind` moves the member: `NS.Old` where `NS` is a module object the file binds
- * at module scope (`import * as NS`, `import NS = require`, `const NS = require`), `import("m").Old`,
- * and `export {Old} from "m"`, which keeps the name it publishes as `export {New as Old} from "m"`.
+ * renamed when `maybeRebind` moves the member: `NS.Old`, `NS["Old"]` and `const {Old} = NS` where `NS`
+ * is a module object the file binds at module scope (`import * as NS`, `import NS = require`,
+ * `const NS = require`), `import("m").Old`, and `export {Old} from "m"`, which keeps the name it
+ * publishes as `export {New as Old} from "m"`.
  *
  * A module object still names `from`'s module after the move, so `NS.Old` moves only within one module.
  * An `import()` type spells its module, which moves with it. So does a re-export: one that re-exports
@@ -60,16 +62,22 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         return sameModule(this.from.module, this.to.module);
     }
 
-    /** Whether `qualifier.name`, at the cursor, reads the moved member through one of the module objects. */
-    private readsMovedMember(qualifier: J | undefined, name: J.Identifier): boolean {
-        return this.withinModule && name.simpleName === this.from.member &&
-            qualifier !== undefined && isIdentifier(qualifier) && this.moduleObjects.has(qualifier.simpleName) &&
-            resolve(this.cursor, qualifier)?.kind === JS.Kind.CompilationUnit;
+    /** Whether `qualifier`'s `member`, at the cursor, reads the moved member through one of the module objects. */
+    private readsMovedMember(qualifier: J | undefined, member: string): boolean {
+        // `(NS).Old`: the cursor steps into the parentheses, since a name resolves from the node holding it
+        let object = qualifier, cursor = this.cursor;
+        while (object?.kind === J.Kind.Parentheses) {
+            cursor = new Cursor(object, cursor);
+            object = (object as J.Parentheses<J>).tree.element;
+        }
+        return this.withinModule && member === this.from.member &&
+            object !== undefined && isIdentifier(object) && this.moduleObjects.has(object.simpleName) &&
+            resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
     }
 
     override async visitFieldAccess(fieldAccess: J.FieldAccess, p: P): Promise<J | undefined> {
         const visited = await super.visitFieldAccess(fieldAccess, p);
-        if (visited?.kind !== J.Kind.FieldAccess || !this.readsMovedMember(fieldAccess.target, fieldAccess.name.element)) {
+        if (visited?.kind !== J.Kind.FieldAccess || !this.readsMovedMember(fieldAccess.target, fieldAccess.name.element.simpleName)) {
             return visited;
         }
         return produce(visited as J.FieldAccess, draft => {
@@ -79,7 +87,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
 
     override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
         const visited = await super.visitMethodInvocation(method, p);
-        if (visited?.kind !== J.Kind.MethodInvocation || !this.readsMovedMember(method.select?.element, method.name)) {
+        if (visited?.kind !== J.Kind.MethodInvocation || !this.readsMovedMember(method.select?.element, method.name.simpleName)) {
             return visited;
         }
         return produce(visited as J.MethodInvocation, draft => {
@@ -88,6 +96,43 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
                 draft.methodType = {...draft.methodType, name: this.to.member};
             }
         });
+    }
+
+    override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
+        const visited = await super.visitArrayAccess(arrayAccess, p);
+        const index = arrayAccess.dimension.index.element;
+        if (visited?.kind !== J.Kind.ArrayAccess || index.kind !== J.Kind.Literal || typeof (index as J.Literal).value !== "string" ||
+            !this.readsMovedMember(arrayAccess.indexed, (index as J.Literal).value as string)) {
+            return visited;
+        }
+        return produce(visited as J.ArrayAccess, draft => {
+            respecify(draft.dimension.index.element as Draft<J.Literal>, this.to.member);
+        });
+    }
+
+    /** `const {Old} = NS` becomes `const {New: Old} = NS`, binding the name it bound. */
+    override async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: P): Promise<J | undefined> {
+        const visited = await super.visitVariable(variable, p);
+        if (visited?.kind !== J.Kind.NamedVariable) {
+            return visited;
+        }
+        const named = visited as J.VariableDeclarations.NamedVariable;
+        const pattern = named.name;
+        if (!isObjectBindingPattern(pattern) || !this.readsMovedMember(variable.initializer?.element, this.from.member)) {
+            return visited;
+        }
+        const elements = pattern.bindings.elements.map((e, i) => {
+            const element = e.element as JS.BindingElement;
+            const read = element.kind === JS.Kind.BindingElement ? element.propertyName?.element ?? element.name : undefined;
+            return read !== undefined && isIdentifier(read) && read.simpleName === this.from.member && isIdentifier(element.name)
+                ? {...e, element: movedBinding(pattern, i, this.to.member, element.name.simpleName)} : e;
+        });
+        if (elements.every((e, i) => e === pattern.bindings.elements[i])) {
+            return visited;
+        }
+        const destructured: JS.ObjectBindingPattern = {...pattern, bindings: {...pattern.bindings, elements}};
+        const moved: J.VariableDeclarations.NamedVariable = {...named, name: destructured};
+        return moved;
     }
 
     override async visitImportType(importType: JS.ImportType, p: P): Promise<J | undefined> {
@@ -131,6 +176,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      */
     private withReExportsMoved(cu: JS.CompilationUnit): JS.CompilationUnit {
         const statements = [...cu.statements];
+        const emptied: UUID[] = [];
+        let eof = cu.eof;
         let changed = false;
         for (let i = 0; i < statements.length; i++) {
             const declaration = reExportFrom(statements[i].element, this.from.module);
@@ -153,31 +200,38 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
                 const into = statements[target].element as JS.ExportDeclaration;
                 statements[target] = {...statements[target], element: withElements(into, appended(clauseOf(into).elements.elements, moved))};
             } else {
-                statements.splice(i + 1, 0, this.ownStatement(statements[i], declaration, moved));
+                // A comment on the line the statement ends on stays there, ahead of the statement inserted after it
+                const next = statements[i + 1];
+                const split = splitAtLineEnd(next?.element.prefix ?? eof, next === undefined);
+                if (split !== undefined && next !== undefined) {
+                    statements[i + 1] = {...next, element: {...next.element, prefix: split.rest}};
+                } else if (split !== undefined) {
+                    eof = split.rest;
+                }
+                statements.splice(i + 1, 0, this.ownStatement(statements[i], declaration, moved, split?.line));
             }
             if (staying.size > 0) {
                 statements[i] = {...statements[i], element: withElements(declaration, without(elements, moving))};
             } else {
-                // The statement after takes the place, and the layout, of the one that goes
-                const next = statements[i + 1];
-                if (next !== undefined) {
-                    statements[i + 1] = {...next, element: {...next.element, prefix: declaration.prefix}};
-                }
-                statements.splice(i--, 1);
+                emptied.push(declaration.id);
             }
         }
-        return changed ? {...cu, statements} : cu;
+        return changed ? emptied.reduce((left, id) => withoutStatement(left, id), {...cu, statements, eof}) : cu;
     }
 
-    /** A statement re-exporting `moved` from `to`, laid out on the line after the one it came from. */
+    /**
+     * A statement re-exporting `moved` from `to`, laid out on the line after the one it came from,
+     * after `line`, the comments ending that line.
+     */
     private ownStatement(stmt: J.RightPadded<Statement>, declaration: JS.ExportDeclaration,
-                         moved: J.RightPadded<Expression>[]): J.RightPadded<Statement> {
+                         moved: J.RightPadded<Expression>[], line: J.Space | undefined): J.RightPadded<Statement> {
         const indent = declaration.prefix.whitespace.slice(declaration.prefix.whitespace.lastIndexOf("\n") + 1);
         const clause = clauseOf(declaration);
         const own = this.respecified({
             ...declaration,
             id: randomId(),
-            prefix: {...declaration.prefix, comments: [], whitespace: "\n" + indent},
+            prefix: line === undefined ? {...declaration.prefix, comments: [], whitespace: "\n" + indent} :
+                {...line, comments: line.comments.map((c, k) => k < line.comments.length - 1 ? c : {...c, suffix: "\n" + indent})},
             exportClause: {...clause, id: randomId(), elements: {...clause.elements, elements: moved}} as JS.NamedExports
         });
         return {...stmt, element: own, markers: {...stmt.markers, id: randomId()}};
@@ -236,6 +290,25 @@ function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclar
         ? declaration : undefined;
 }
 
+/**
+ * `space`, which follows a statement, split after the comments on that statement's line: `line`, those
+ * comments and the space before them, and `rest`, which starts the next line. At the end of the file
+ * every comment on the last line is on that line, a newline after it or not.
+ */
+function splitAtLineEnd(space: J.Space, endsFile: boolean): {line: J.Space, rest: J.Space} | undefined {
+    if (space.whitespace.includes("\n") || space.comments.length === 0) {
+        return undefined;
+    }
+    const end = space.comments.findIndex(c => c.suffix.includes("\n"));
+    if (end < 0) {
+        return endsFile ? {line: space, rest: {...space, whitespace: "", comments: []}} : undefined;
+    }
+    return {
+        line: {...space, comments: space.comments.slice(0, end + 1)},
+        rest: {...space, whitespace: space.comments[end].suffix, comments: space.comments.slice(end + 1)}
+    };
+}
+
 function clauseOf(declaration: JS.ExportDeclaration): JS.NamedExports {
     return declaration.exportClause as JS.NamedExports;
 }
@@ -245,29 +318,49 @@ function withElements(declaration: JS.ExportDeclaration, elements: J.RightPadded
     return {...declaration, exportClause: {...clause, elements: {...clause.elements, elements}} as JS.NamedExports};
 }
 
-/** `elements` without `dropped`, keeping the space after `{`, and the space and any trailing comma before `}`. */
+/**
+ * `elements` without `dropped`, each kept entry with its own comments: the space after `{` goes to the
+ * new first entry, and the space and any trailing comma before `}` to the new last.
+ */
 function without<T extends J>(elements: J.RightPadded<T>[], dropped: ReadonlySet<J.RightPadded<T>>): J.RightPadded<T>[] {
-    const kept = elements.filter(e => !dropped.has(e));
-    const first = elements[0], last = elements[elements.length - 1];
-    return kept.map((e, i) => ({
-        ...e,
-        element: i === 0 ? {...e.element, prefix: first.element.prefix} : e.element,
-        ...(i === kept.length - 1 ? {after: last.after, markers: last.markers} : {})
-    }));
+    const formatter = new ElementRemovalFormatter<T>();
+    const kept: J.RightPadded<T>[] = [];
+    for (const e of elements) {
+        if (dropped.has(e)) {
+            formatter.markRemoved(e.element);
+        } else {
+            kept.push({...e, element: formatter.processKept(e.element)});
+        }
+    }
+    const last = elements[elements.length - 1];
+    kept[kept.length - 1] = {...kept[kept.length - 1], after: last.after, markers: last.markers};
+    return kept;
 }
 
-/** `elements` with `added` at the end, separated as `elements` are, the trailing comma and space before `}` moving last. */
+/**
+ * `elements` with `added` at the end, separated as `elements` are, each added entry keeping its own
+ * comments, and the trailing comma and space before `}` moving last. An empty `{}` takes `added` in its place.
+ */
 function appended<T extends J>(elements: J.RightPadded<T>[], added: J.RightPadded<T>[]): J.RightPadded<T>[] {
     const last = elements[elements.length - 1];
-    const separator = elements[1]?.element.prefix ??
-        (elements[0].element.prefix.whitespace.includes("\n") ? elements[0].element.prefix : singleSpace);
     const plain = (markers: J.RightPadded<T>["markers"]) =>
         ({...markers, markers: markers.markers.filter(m => m.kind !== J.Markers.TrailingComma)});
+    if (elements.length === 1 && last.element.kind === J.Kind.Empty) {
+        // `export {} from "m"` holds one empty entry, which the added ones take the place of
+        return added.map((e, i) => ({
+            ...e,
+            element: {...e.element, prefix: {...e.element.prefix, whitespace: i === 0 ? last.element.prefix.whitespace : " "}},
+            ...(i === added.length - 1 ? {after: last.after, markers: last.markers} : {after: emptySpace, markers: plain(e.markers)})
+        }));
+    }
+    const separator = (elements[1]?.element.prefix ??
+        (elements[0].element.prefix.whitespace.includes("\n") ? elements[0].element.prefix : singleSpace)).whitespace;
+    const separated = (e: J.RightPadded<T>) => ({...e.element, prefix: {...e.element.prefix, whitespace: separator}});
     return [
         ...elements.slice(0, -1),
         {...last, after: emptySpace, markers: plain(last.markers)},
         ...added.map((e, i) => i === added.length - 1
-            ? {...e, element: {...e.element, prefix: separator}, after: last.after, markers: last.markers}
-            : {...e, element: {...e.element, prefix: separator}, after: emptySpace, markers: plain(e.markers)})
+            ? {...e, element: separated(e), after: last.after, markers: last.markers}
+            : {...e, element: separated(e), after: emptySpace, markers: plain(e.markers)})
     ];
 }

@@ -3219,6 +3219,78 @@ describe("maybeRebind and the member's other spellings", () => {
         expect(rebound).toEqual(parsed);
     }, 60000);
 
+    test("a member read through its module object by a string-literal index moves too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const key = "Old";
+                NS["Old"]();
+                const v = NS['Old'];
+                NS[key]();
+                other["Old"]();
+            `,
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const key = "Old";
+                NS["New"]();
+                const v = NS['New'];
+                NS[key]();
+                other["Old"]();
+            `
+        ));
+    });
+
+    test("a parenthesized module object reads the member too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                (NS).Old();
+                const v = ((NS)).Old;
+            `,
+            `
+                import * as NS from "m";
+                (NS).New();
+                const v = ((NS)).New;
+            `
+        ));
+    });
+
+    test("a destructuring of the module object reads the member, keeping the name it binds", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const {Old} = NS;
+                const {Old: X, Other} = NS;
+                const {Old: New} = NS;
+                let {Old: Y = X} = (NS);
+                const {Old: Z} = other;
+                Old(); X(); New(); Y(); Z(); Other();
+            `,
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const {New: Old} = NS;
+                const {New: X, Other} = NS;
+                const {New} = NS;
+                let {New: Y = X} = (NS);
+                const {Old: Z} = other;
+                Old(); X(); New(); Y(); Z(); Other();
+            `
+        ));
+    });
+
     test("a module object stays constant in a declaration list", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
@@ -3416,6 +3488,96 @@ describe("maybeRebind and the member's other spellings", () => {
             `,
             `
                 export { Old, Old as Renamed, "Old" as Quoted } from "m2";
+            `
+        ));
+    });
+
+    test("a re-export a moved member empties goes, and the statement after it keeps its comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { Other } from "m2";
+                export { Old } from "m";
+                // Important docs
+                export const x = 1;
+            `,
+            `
+                export { Other, New as Old } from "m2";
+                // Important docs
+                export const x = 1;
+            `
+        ));
+    });
+
+    test("a re-export split between two modules keeps each specifier's comment with it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { /* keep */ Other, /* move */ Old } from "m";
+            `,
+            `
+                export { /* keep */ Other } from "m";
+                export { /* move */ New as Old } from "m2";
+            `
+        ));
+    });
+
+    test.each([
+        [
+            "before another statement",
+            `
+                export { A, Old } from "m"; // note
+                export const x = 1;
+            `,
+            `
+                export { A } from "m"; // note
+                export { New as Old } from "m2";
+                export const x = 1;
+            `
+        ],
+        [
+            "at the end of the file",
+            `
+                export { A, Old } from "m"; // note
+            `,
+            `
+                export { A } from "m"; // note
+                export { New as Old } from "m2";
+            `
+        ]
+    ])("a comment trailing the re-export a moved member leaves stays on its line, %s", async (_, before, after) => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(before, after));
+    });
+
+    test("a re-export joining an empty re-export of the target takes the place of its empty entry", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export {Old} from "m";
+                export {} from "m2";
+            `,
+            `
+                export {New as Old} from "m2";
+            `
+        ));
+    });
+
+    test("a re-export joining the target's keeps its own comment, not another specifier's", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(typescript(
+            `
+                export { A, /* b */ B } from "m2";
+                export { /* move */ Old, Other } from "m";
+            `,
+            `
+                export { A, /* b */ B, /* move */ New as Old } from "m2";
+                export { Other } from "m";
             `
         ));
     });
