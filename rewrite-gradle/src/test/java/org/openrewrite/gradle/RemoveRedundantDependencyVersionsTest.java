@@ -715,7 +715,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
-                  implementation("org.openrewrite:rewrite-core:8.55.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0@jar")
                   implementation("org.openrewrite:rewrite-core:8.56.0")
               }
               """,
@@ -765,7 +765,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void keepsSameDependencyWithAnotherClassifier() {
+    void keepsSameModuleWithAnotherClassifierOrAsPlatform() {
         rewriteRun(
           buildGradle(
             """
@@ -777,9 +777,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   mavenCentral()
               }
 
+              def nettyVersion = "4.1.115.Final"
               dependencies {
                   runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-x86_64"
                   runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-aarch_64"
+
+                  testRuntimeOnly "io.netty:netty-transport-native-epoll:${nettyVersion}:linux-x86_64"
+                  testRuntimeOnly "io.netty:netty-transport-native-epoll:${nettyVersion}:linux-aarch_64"
+
+                  implementation platform("org.junit:junit-bom:5.10.1")
+                  implementation "org.junit:junit-bom:5.10.0"
               }
               """
           )
@@ -787,7 +794,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void neverRemovesDuplicateWithConfigurationBlock() {
+    void neverRemovesDuplicateWithBlockOrRichVersion() {
         rewriteRun(
           buildGradle(
             """
@@ -809,6 +816,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       because "a reason"
                   }
                   implementation "org.openrewrite:rewrite-core:8.56.0"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
+                  testRuntimeOnly "org.hamcrest:hamcrest:[2.0,3.0)"
               }
               """,
             """
@@ -829,6 +840,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       because "a reason"
                   }
                   implementation "org.openrewrite:rewrite-core:8.56.0"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
+                  testRuntimeOnly "org.hamcrest:hamcrest:[2.0,3.0)"
               }
               """
           )

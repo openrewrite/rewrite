@@ -46,6 +46,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -110,6 +111,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "testRuntime" // deprecated
     );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
+    private static final Pattern STRICT_OR_RANGE = Pattern.compile("!!|[\\[\\]()]");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -438,12 +440,14 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * Gradle uses only the newest of several declarations of a dependency in one configuration.
-     * A declaration with a configuration block is kept, and wins over a plain one of the same version.
+     * The older declarations of a dependency declared more than once in one configuration, where Gradle resolves the
+     * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
+     * Java agent. A declaration with a configuration block, a strict version or a range is never removed, and a block
+     * wins over a plain declaration of the same version.
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor,
                                                          ExecutionContext ctx) {
-        Map<List<@Nullable String>, List<GradleDependency>> declarations = new HashMap<>();
+        Map<List<@Nullable Object>, List<GradleDependency>> declarations = new HashMap<>();
         new JavaIsoVisitor<ExecutionContext>() {
             final GradleDependency.Matcher matcher = new GradleDependency.Matcher()
                     .groupId(groupPattern)
@@ -453,7 +457,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 matcher.get(getCursor()).ifPresent(declaration -> {
-                    if (requestedVersion(declaration) != null) {
+                    String version = requestedVersion(declaration);
+                    if (version != null && !STRICT_OR_RANGE.matcher(version).find()) {
                         declarations.computeIfAbsent(duplicateKey(declaration), key -> new ArrayList<>())
                                 .add(declaration);
                     }
@@ -478,10 +483,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * The configuration and coordinates of a declaration, without its version.
+     * The configuration, platform flag and coordinates of a declaration, without its version.
      * The Gradle model records no classifier or extension, so these come from string notation.
      */
-    private static List<@Nullable String> duplicateKey(GradleDependency declaration) {
+    private static List<@Nullable Object> duplicateKey(GradleDependency declaration) {
         String classifier = null;
         String extension = null;
         Expression notation = declaration.getTree().getArguments().get(0);
@@ -492,8 +497,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 extension = parsed.getType();
             }
         }
-        return Arrays.asList(declaration.getConfigurationName(), declaration.getGroupId(),
-                declaration.getArtifactId(), classifier, extension);
+        return Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(), declaration.getGroupId(),
+                declaration.getArtifactId(), classifier, extension == null ? "jar" : extension);
     }
 
     private static @Nullable String requestedVersion(GradleDependency declaration) {
