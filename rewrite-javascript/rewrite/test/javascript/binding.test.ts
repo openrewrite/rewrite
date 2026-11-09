@@ -4640,6 +4640,32 @@ describe("maybeBind on a CommonJS file", () => {
         )).toBe("rm");
     });
 
+    test("a comment ending the line of the last require or a directive stays on it", async () => {
+        expect(await bindWith({module: "b", member: "b"},
+            //language=javascript
+            `
+            const {a} = require("a"); // note
+            target();`,
+            //language=javascript
+            `
+            const {a} = require("a"); // note
+            const {b} = require("b");
+            b.target();`
+        )).toBe("b");
+        expect(await bindWith({module: "path"},
+            //language=javascript
+            `
+            'use strict'; // note
+            module.exports = target();`,
+            //language=javascript
+            `
+            'use strict'; // note
+            const path = require('path');
+
+            module.exports = path.target();`
+        )).toBe("path");
+    });
+
     test("a member joins a const destructuring require of its module that has no rest element", async () => {
         expect(await bindWith({module: "fs/promises", member: "rm"},
             //language=javascript
