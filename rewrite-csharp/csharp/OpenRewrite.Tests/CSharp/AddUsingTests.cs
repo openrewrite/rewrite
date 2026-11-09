@@ -331,6 +331,7 @@ public class AddUsingTests : RewriteTest
         var after = ApplyAddUsing(
             """
             using System;
+
             #if FEATURE_X
             using System.Diagnostics;
             #endif
@@ -347,6 +348,7 @@ public class AddUsingTests : RewriteTest
             """
             using System;
             using System.Threading.Tasks;
+
             #if FEATURE_X
             using System.Diagnostics;
             #endif
@@ -359,7 +361,7 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
-    public void ConditionalDirectiveBeforeAnExternAliasLeavesTheFileAlone()
+    public void ConditionalDirectiveBeforeAnExternAliasOrGlobalUsingLeavesTheFileAlone()
     {
         var cu = Parse(
             """
@@ -374,6 +376,21 @@ public class AddUsingTests : RewriteTest
             """);
 
         Assert.Same(cu, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0));
+
+        var globalUsing = Parse(
+            """
+            global using System;
+            #if FEATURE_X
+            global using System.Diagnostics;
+            #endif
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(globalUsing,
+            new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(globalUsing, 0));
     }
 
     [Fact]

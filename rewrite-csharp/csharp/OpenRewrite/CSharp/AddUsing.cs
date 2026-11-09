@@ -36,8 +36,8 @@ namespace OpenRewrite.CSharp;
 /// <para>
 /// A file with <c>#if</c> blocks gets the using at the compilation unit level, above its first
 /// conditional directive. Every branch has the same text there and every configuration compiles
-/// it. Extern aliases must precede every using, so a file with a conditional directive before an
-/// extern alias is left alone.
+/// it. Extern aliases and global usings must precede a plain using, so a file with a conditional
+/// directive before one of them is left alone.
 /// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
@@ -78,9 +78,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         // Each branch is the whole file as one set of symbols compiles it.
         if (cu.Members is [{ Element: ConditionalDirective directive } member])
         {
-            if (directive.Branches.Any(branch => branch.Element.Externs.Count > 0
-                    && (IndexOfDirectiveLine(branch.Element.Prefix) >= 0
-                        || branch.Element.Externs.Any(e => IndexOfDirectiveLine(e.Element.Prefix) >= 0))))
+            if (directive.Branches.Any(branch => HasDirectiveBeforeExternOrGlobalUsing(branch.Element)))
             {
                 return cu;
             }
@@ -138,6 +136,15 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         return InsertFirstUsing(cu, newline);
     }
 
+    private static bool HasDirectiveBeforeExternOrGlobalUsing(CompilationUnit branch)
+    {
+        static bool IsGlobal(JRightPadded<Statement> u) => u.Element is UsingDirective { Global.Element: true };
+        return IndexOfDirectiveLine(branch.Prefix) >= 0
+            ? branch.Externs.Count > 0 || branch.Usings.Any(IsGlobal)
+            : branch.Externs.Any(e => IndexOfDirectiveLine(e.Element.Prefix) >= 0)
+              || branch.Usings.SkipWhile(u => IndexOfDirectiveLine(u.Element.Prefix) < 0).Any(IsGlobal);
+    }
+
     /// <summary>A branch whose prefix holds a conditional directive gets the using right above it,
     /// after any file header.</summary>
     private CompilationUnit? InsertAboveOpeningDirective(CompilationUnit cu, string newline)
@@ -164,6 +171,11 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     {
         var below = list[index];
         var (above, from) = SplitAtDirectiveLine(below.Element.Prefix, newline);
+        if (index > 0 && above.Comments.Count == 0)
+        {
+            // A blank line above the directive stays above the directive.
+            (above, from) = (Space.Format(newline), from.WithWhitespace(above.Whitespace));
+        }
         var result = new List<JRightPadded<Statement>>(list)
         {
             [index] = below.WithElement(J.SetPrefix(below.Element, from)),
