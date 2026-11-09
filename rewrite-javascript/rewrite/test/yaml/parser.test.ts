@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
-import {findMarker, printer} from "../../src";
-import {dedent, RecipeSpec} from "../../src/test";
+import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser, YamlVisitor} from "../../src/yaml";
+import {ExecutionContext, findMarker, printer, randomId} from "../../src";
+import {dedent, fromVisitor, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -666,5 +666,73 @@ describe('Text after the last document', () => {
             yaml(`
                 # only a comment
             `)
+        ));
+});
+
+describe('Comment after the last entry of a block sequence', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new class extends YamlVisitor<ExecutionContext> {
+        protected async visitSequence(sequence: Yaml.Sequence, p: ExecutionContext): Promise<Yaml | undefined> {
+            const first = sequence.entries[0];
+            if ((sequence.entries[sequence.entries.length - 1].block as Yaml.Scalar).value === 'c') {
+                return sequence;
+            }
+            const appended: Yaml.Sequence = {
+                ...sequence,
+                entries: [...sequence.entries, {...first, id: randomId(), block: {...first.block as Yaml.Scalar, id: randomId(), value: 'c'}}]
+            };
+            return appended;
+        }
+    });
+
+    test('an appended entry goes before the comment', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                `
+            )
+        ));
+
+    test('comment at the sequence indent before the next key', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                other: d
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                other: d
+                `
+            )
+        ));
+
+    test('an empty last entry stays an entry', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  -`,
+                `
+                steps:
+                  - a
+                  -
+                  - c`
+            )
         ));
 });
