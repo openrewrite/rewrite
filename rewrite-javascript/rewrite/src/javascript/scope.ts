@@ -248,9 +248,12 @@ export function namesReferencedAsTypesWithin(node: unknown): ReadonlySet<string>
     return names;
 }
 
-/** The values a file's own top-level declarations bind, leaving out what its imports bind. */
-export function valuesDeclaredAtTopLevel(cu: JS.CompilationUnit): ReadonlySet<string> {
-    const statements = cu.statements.filter(s => s.element?.kind !== JS.Kind.Import);
+/**
+ * The values a file's own top-level declarations bind, or an ambient module declaration's in its body,
+ * leaving out what its imports bind.
+ */
+export function valuesDeclaredAtTopLevel(container: JS.CompilationUnit | J.Block): ReadonlySet<string> {
+    const statements = container.statements.filter(s => s.element?.kind !== JS.Kind.Import);
     return new Set([...declaredNames(statements), ...hoistedNames(statements)]
         .filter(declaration => declaration.meanings.includes('value'))
         .map(declaration => declaration.identifier.simpleName));

@@ -336,8 +336,40 @@ is initialised. A member joins a `const` destructuring `require` of its module t
 rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
 `const name = require('mod')`. A file with no leading requires takes it first.
 
+### Imports inside `declare module`
+
+A script, a file without a top-level import or export, declares a module with `declare module "m" {…}`,
+and the declaration's body binds imports of its own, for that body alone. The cursor picks the body as
+it picks a lane: standing in it, or on its declaration, all three calls work on the body's imports.
+
+```ts
+declare module "my-widget" {
+    import type {Label} from "lib";
+    export function label(value: Label): string;
+}
+```
+
+The same import at the top of the file would make it a module, which turns each such declaration into
+an augmentation of `m`, and `m` then vanishes for every file importing it. In a module,
+`declare module "m" {…}` is that augmentation already and takes no import of its own (TS2667), so the
+file's imports serve it as before. A `.mts` or `.cts` source is a module whatever it holds, and a
+declaration file is a script or a module by its syntax.
+
+- `maybeBind` reuses a binding the body has, under the name it gives it, or adds an import to the body:
+  after its imports, or ahead of its first statement, which moves down a line. The body's imports decide
+  the quotes, brace spacing and semicolon, and the formatter the indentation.
+- `maybeUnbind` removes an import from a body nothing in that body uses, in every body of the file
+  whatever the cursor, as it does at the top. A body never gains an `export {}`.
+- `maybeRebind` moves the binding the body holds and renames the references in the body that resolve
+  to it, naming it as "Which name a rebind binds" says, with the body in place of the file.
+  `ChangeImport` rebinds the file's binding and each body's.
+- Two bodies share no scope, so neither reuses nor avoids what the other binds. A new binding avoids
+  what the file's top level declares, which the body reads.
+- `declare global {…}` and `namespace N {…}` are no such bodies: an import from either goes at the top.
+
 ### When `maybeBind` returns `undefined`
 
+- a relative module requested from inside a `declare module` body, which cannot import one (TS2439)
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
 - a `typeOnly` request that `require` would bind, since a `require` binds values only. That is one
@@ -352,6 +384,7 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 The four above that still apply, plus these:
 
+- `to.module` is relative and `from` is bound in a `declare module` body
 - nothing binds `from`
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name

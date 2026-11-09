@@ -8,7 +8,11 @@ import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
+import {
+    bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isFree, namesDeclaredIn, namesDeclaredWithin,
+    resolve, scopeOf, walk
+} from "./scope";
+import {Cursor} from "../tree";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -92,16 +96,23 @@ export function bindImport(
     const module = moduleNameOf(options.module);
     const sideEffectOnly = options.sideEffectOnly ?? false;
     const typeOnly = options.typeOnly ?? false;
+    const cursor = cursorOf(visitor);
+    const cu = cursor && compilationUnitOf(cursor);
+    const container = cursor && importContainerOf(cursor);
+    const within = container && containerId(container);
+    if (container !== undefined && !canImport(container, module)) {
+        return undefined;
+    }
 
     // A queued import binds the module as much as one already in the file, so it answers a later
     // request the same way; a name a merged request never emits would be referenced but not bound.
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof RebindImport && !sideEffectOnly && sameModule(v.to.module, module) &&
+        if (v instanceof RebindImport && v.container === within && !sideEffectOnly && sameModule(v.to.module, module) &&
             memberName(v.to.member) === memberName(options.member) &&
             (options.alias === undefined || options.alias === v.boundName)) {
             return v.boundName;
         }
-        if (!(v instanceof AddImport) || !sameModule(v.module, module) ||
+        if (!(v instanceof AddImport) || v.container !== within || !sameModule(v.module, module) ||
             v.sideEffectOnly !== sideEffectOnly || !answersTypeOnly(v.typeOnly, typeOnly)) {
             continue;
         }
@@ -119,7 +130,7 @@ export function bindImport(
         if (refuseCreate) {
             return undefined;
         }
-        visitor.afterVisit.push(new AddImport(options));
+        visitor.afterVisit.push(new AddImport(options, undefined, within));
         return undefined;
     }
 
@@ -128,14 +139,12 @@ export function bindImport(
         if (refuseCreate) {
             return undefined;
         }
-        visitor.afterVisit.push(new AddImport(options, options.alias));
+        visitor.afterVisit.push(new AddImport(options, options.alias, within));
         return options.alias;
     }
 
     const derived = derivedName(options);
-    const cursor = cursorOf(visitor);
-    const cu = cursor && compilationUnitOf(cursor);
-    if (!cu) {
+    if (!cu || !container) {
         if (refuseCreate) {
             return undefined;
         }
@@ -147,12 +156,12 @@ export function bindImport(
     // only a pinned alias, returned above, asks for a binding of its own. Queuing a second import
     // would, on the next cycle, derive a suffixed name from the binding this call just added.
     const scope = scopeOf(cursor);
-    for (const binding of moduleScopeBindings(cu)) {
+    for (const binding of moduleScopeBindings(container)) {
         if (binding.module !== undefined && sameModule(binding.module, module) && binding.member === memberName(options.member) &&
-            scope.declaringScope(binding.name) === cu) {
+            scope.declaringScope(binding.name) === container) {
             if (!answersTypeOnly(binding.typeOnly ?? false, typeOnly)) {
                 // The queued request finds this binding and drops its `type`, so the name stays
-                visitor.afterVisit.push(new AddImport(options, binding.name));
+                visitor.afterVisit.push(new AddImport(options, binding.name, within));
             }
             return binding.name;
         }
@@ -162,12 +171,15 @@ export function bindImport(
         return undefined;
     }
 
-    // Only the module scope answers for a name, but any scope in the file occupies one. The queue
+    // Only the container's scope answers for a name, but any scope in it occupies one. The queue
     // gives every later request for this module the name chosen here, so it has to clear the scopes
-    // those references will sit in, which are not known yet.
-    const taken = takenNames(namesDeclaredIn(cu), visitor);
+    // those references will sit in, which are not known yet. An ambient module's body also reads what
+    // the file around it declares, though not what a sibling's body does.
+    const declared = container === cu ? namesDeclaredIn(cu)
+        : new Set([...namesDeclaredWithin(container), ...scopeOf(new Cursor(cu)).names()]);
+    const taken = takenNames(declared, visitor, within);
     const name = deconflict(derived, candidate => taken.has(candidate));
-    visitor.afterVisit.push(new AddImport(options, name));
+    visitor.afterVisit.push(new AddImport(options, name, within));
     return name;
 }
 
@@ -231,8 +243,11 @@ export interface ModuleScopeBinding {
     typeOnly?: boolean;
 }
 
-/** What the file's imports and `require`s bind at module scope, and the module each name comes from. */
-export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[] {
+/**
+ * What the file's imports and `require`s bind at module scope, and the module each name comes from, or
+ * an ambient module declaration's imports in its body.
+ */
+export function moduleScopeBindings(container: ImportContainer): ModuleScopeBinding[] {
     const bindings: ModuleScopeBinding[] = [];
 
     const declaredByVariables = (varDecl: J.VariableDeclarations): void => {
@@ -244,7 +259,7 @@ export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[
         }
     };
 
-    for (const stmt of cu.statements) {
+    for (const stmt of container.statements) {
         const statement = stmt.element;
         if (statement?.kind === JS.Kind.Import) {
             bindings.push(...importBindings(statement as JS.Import));
@@ -285,6 +300,94 @@ export function isCommonJs(cu: JS.CompilationUnit): boolean {
         return false;
     }
     return moduleSyntax(cu) === "commonjs";
+}
+
+/**
+ * Whether a binding added to `container` is a `require`: where `style` asks for one, or else where the
+ * file is CommonJS. An ambient module declaration's body binds with imports, whatever the file holds.
+ */
+export function bindsWithRequire(container: ImportContainer, style?: ImportStyle): boolean {
+    return container.kind === JS.Kind.CompilationUnit &&
+        (style === undefined ? isCommonJs(container) : style === ImportStyle.CommonJS);
+}
+
+/**
+ * The statements an import is placed among and read from: the file's, or the body of an ambient module
+ * declaration in a script, whose imports bind for that body alone.
+ *
+ * ```ts
+ * declare module "my-widget" {
+ *     import type {Label} from "lib";
+ *     export function label(value: Label): string;
+ * }
+ * ```
+ *
+ * The same import at the top of the file would make it a module, which turns the declaration into an
+ * augmentation of `my-widget`, and `my-widget` vanishes for every file importing it. In a module,
+ * `declare module` is that augmentation already and takes no import of its own (TS2667), so imports for
+ * it sit at the top of the file.
+ */
+export type ImportContainer = JS.CompilationUnit | J.Block;
+
+type AmbientModule = JS.NamespaceDeclaration & {readonly body: J.Block};
+
+/**
+ * The import container the cursor stands in. Standing on an ambient module declaration is standing in
+ * its body, so a visitor reaches it from `visitNamespaceDeclaration`.
+ */
+export function importContainerOf(from: Cursor | JavaScriptVisitor<any>): ImportContainer | undefined {
+    const cu = compilationUnitOf(from);
+    if (cu === undefined) {
+        return undefined;
+    }
+    const path = (from instanceof Cursor ? from : cursorOf(from)!).asArray();
+    return ambientModules(cu).find(declaration => path.includes(declaration))?.body ?? cu;
+}
+
+/** The container a queued edit names by `id`, an ambient module declaration's body, or the file where `id` is unset. */
+export function importContainer(cu: JS.CompilationUnit, id: UUID | undefined): ImportContainer | undefined {
+    return id === undefined ? cu : ambientModules(cu).find(declaration => declaration.body.id === id)?.body;
+}
+
+/** How a queued edit names `container`: an ambient module declaration's body by its id, the file by none. */
+export function containerId(container: ImportContainer): UUID | undefined {
+    return container.kind === JS.Kind.CompilationUnit ? undefined : container.id;
+}
+
+/** Whether `container` can import `module`: an ambient module declaration cannot by a relative name (TS2439). */
+export function canImport(container: ImportContainer, module: string): boolean {
+    return container.kind === JS.Kind.CompilationUnit || !ts.isExternalModuleNameRelative(module);
+}
+
+/** The file's statements once `container`, the file itself or an ambient module declaration's body, holds `statements`. */
+function statementsWith(
+    cu: JS.CompilationUnit,
+    container: ImportContainer,
+    statements: J.RightPadded<Statement>[]
+): J.RightPadded<Statement>[] {
+    return container === cu ? statements : cu.statements.map(s => isAmbientModule(s.element) && s.element.body === container
+        ? {...s, element: {...s.element, body: {...container, statements}}}
+        : s);
+}
+
+/** A script's ambient module declarations, which TypeScript allows at its top level only (TS2435). */
+export function ambientModules(cu: JS.CompilationUnit): AmbientModule[] {
+    return isScript(cu) ? cu.statements.map(s => s.element).filter(isAmbientModule) : [];
+}
+
+/** `declare module "m" {…}`, the one declaration a string literal names. */
+function isAmbientModule(statement: J | undefined): statement is AmbientModule {
+    return statement?.kind === JS.Kind.NamespaceDeclaration &&
+        (statement as JS.NamespaceDeclaration).name.element.kind === J.Kind.Literal &&
+        (statement as JS.NamespaceDeclaration).body !== undefined;
+}
+
+/**
+ * Whether TypeScript reads `cu` as a script, where `declare module "m" {…}` declares `m` rather than
+ * augmenting it. A `.mts` or `.cts` source is a module whatever it holds, a declaration file by its syntax.
+ */
+function isScript(cu: JS.CompilationUnit): boolean {
+    return !hasEsmSyntax(cu) && !/(?<!\.d)\.[cm]ts$/.test(cu.sourcePath);
 }
 
 /** A tree is immutable, so an edited file is a new compilation unit and is read afresh. */
@@ -573,14 +676,14 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
 
 /**
  * `names`, plus those pending `AddImport`s and `RebindImport`s on the `afterVisit` queue have
- * claimed. A queued `RemoveImport` does not free one: it removes only what the file leaves unused,
- * and binding a name it keeps is an error, where an unnecessary suffix merely reads oddly.
+ * claimed in `container`. A queued `RemoveImport` does not free one: it removes only what the file
+ * leaves unused, and binding a name it keeps is an error, where an unnecessary suffix merely reads oddly.
  */
-export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): Set<string> {
+export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>, container?: UUID): Set<string> {
     const taken = new Set<string>(names);
 
     for (const v of visitor.afterVisit || []) {
-        const claimed = claimedName(v);
+        const claimed = claimedName(v, container);
         if (claimed) {
             taken.add(claimed);
         }
@@ -590,12 +693,17 @@ export function takenNames(names: ReadonlySet<string>, visitor: JavaScriptVisito
 }
 
 /** As {@link takenNames}, for a caller asking about one name rather than probing repeatedly. */
-export function nameTaken(name: string, names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>): boolean {
-    return names.has(name) || (visitor.afterVisit || []).some(v => claimedName(v) === name);
+export function nameTaken(name: string, names: ReadonlySet<string>, visitor: JavaScriptVisitor<any>, container?: UUID): boolean {
+    return names.has(name) || (visitor.afterVisit || []).some(v => claimedName(v, container) === name);
 }
 
-function claimedName(v: unknown): string | undefined {
-    return v instanceof AddImport ? v.bindingName : v instanceof RebindImport ? v.boundName : undefined;
+/** What `v` binds where `container` sees it: the bodies of two ambient module declarations share no scope. */
+function claimedName(v: unknown, container: UUID | undefined): string | undefined {
+    if (!(v instanceof AddImport || v instanceof RebindImport) ||
+        v.container !== undefined && container !== undefined && v.container !== container) {
+        return undefined;
+    }
+    return v instanceof AddImport ? v.bindingName : v.boundName;
 }
 
 /**
@@ -660,11 +768,11 @@ function prettierOption<T>(cu: JS.CompilationUnit, option: string, fallback: T):
 }
 
 /**
- * Pick the quote character for a module specifier being added to `cu`, so that it agrees
- * with the file it lands in. A Prettier configuration settles it; short of one, the caller's
+ * Pick the quote character for a module specifier being added to `container` in `cu`, so that it
+ * agrees with the file it lands in. A Prettier configuration settles it; short of one, the caller's
  * `requested` quote, then an existing specifier as the most direct precedent.
  */
-async function detectQuote(cu: JS.CompilationUnit, requested?: QuoteChar): Promise<QuoteChar> {
+async function detectQuote(cu: JS.CompilationUnit, requested?: QuoteChar, container: ImportContainer = cu): Promise<QuoteChar> {
     const singleQuote = prettierOption(cu, 'singleQuote', false);
     if (singleQuote !== undefined) {
         return singleQuote ? "'" : '"';
@@ -673,8 +781,8 @@ async function detectQuote(cu: JS.CompilationUnit, requested?: QuoteChar): Promi
         return requested;
     }
 
-    // Static imports are top-level, so the highest-ranked signal needs no traversal to find.
-    for (const statement of cu.statements) {
+    // Static imports sit among the container's statements, so the highest-ranked signal needs no traversal to find.
+    for (const statement of container.statements) {
         const element = statement.element;
         const topLevelQuote = element?.kind === JS.Kind.Import
             ? quoteOf((element as JS.Import).moduleSpecifier?.element)
@@ -743,40 +851,40 @@ const semicolonTerminated = new Set<string>([
 ]);
 
 /**
- * Whether an import statement added to `cu` should end in `;`. A Prettier configuration settles
- * it; short of one, the file's imports, then its other statements that would take one.
+ * Whether an import statement added to `container` in `cu` should end in `;`. A Prettier configuration
+ * settles it; short of one, the container's imports, then its other statements that would take one.
  */
-function detectSemi(cu: JS.CompilationUnit): boolean {
+function detectSemi(cu: JS.CompilationUnit, container: ImportContainer = cu): boolean {
     const semi = prettierOption(cu, 'semi', true);
     if (semi !== undefined) {
         return semi;
     }
     const tally = (kinds: (kind: string) => boolean): number => {
         let score = 0;
-        for (const statement of cu.statements) {
+        for (const statement of container.statements) {
             if (statement.element && kinds(statement.element.kind)) {
                 score += findMarker(statement, J.Markers.Semicolon) ? 1 : -1;
             }
         }
         return score;
     };
-    const score = cu.statements.some(s => s.element?.kind === JS.Kind.Import)
+    const score = container.statements.some(s => s.element?.kind === JS.Kind.Import)
         ? tally(kind => kind === JS.Kind.Import)
         : tally(kind => semicolonTerminated.has(kind));
     return score >= 0;
 }
 
 /**
- * Whether a brace list added to `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
- * settles it. Short of one, the file's own single-line import and `require` lists decide, then the style in force.
+ * Whether a brace list added to `container` in `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
+ * settles it. Short of one, the container's own single-line import and `require` lists decide, then the style in force.
  */
-function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
+function detectBraceSpacing(cu: JS.CompilationUnit, container: ImportContainer = cu): boolean {
     const bracketSpacing = prettierOption(cu, 'bracketSpacing', true);
     if (bracketSpacing !== undefined) {
         return bracketSpacing;
     }
     let score = 0;
-    for (const statement of cu.statements) {
+    for (const statement of container.statements) {
         const namedBindings = statement.element?.kind === JS.Kind.Import
             ? (statement.element as JS.Import).importClause?.namedBindings
             : undefined;
@@ -853,8 +961,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * that module answers it.
      */
     readonly anyNameAnswers: boolean;
+    /** The ambient module declaration's body the import goes in, by id; the file's top level where unset. */
+    readonly container?: UUID;
 
-    constructor(options: AddImportOptions, bindingName?: string) {
+    constructor(options: AddImportOptions, bindingName?: string, container?: UUID) {
         super();
 
         validate(options);
@@ -871,6 +981,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         this.quoteStyle = options.quoteStyle;
         this.bindingName = this.sideEffectOnly ? undefined : bindingName ?? derivedName(options);
         this.anyNameAnswers = anyNameAnswers(options);
+        this.container = container;
     }
 
     /**
@@ -885,8 +996,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
 
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
+        const container = importContainer(compilationUnit, this.container);
+        if (container === undefined) {
+            return compilationUnit;
+        }
+
         // First, check if the import already exists
-        const hasImport = await this.checkImportExists(compilationUnit);
+        const hasImport = await this.checkImportExists(container);
         if (hasImport) {
             return compilationUnit;
         }
@@ -894,22 +1010,22 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // A type-only binding of the member would leave a value use unbound, and a second binding
         // of the same name would not compile, so the binding the file has loses its `type`
         if (!this.typeOnly && !this.sideEffectOnly) {
-            const statements = compilationUnit.statements.map(stmt => {
+            const statements = container.statements.map(stmt => {
                 const element = stmt.element;
                 return element?.kind === JS.Kind.Import &&
                     importBindings(element as JS.Import).some(b => b.typeOnly && this.bindsSameName(b))
                     ? {...stmt, element: asValueImport(element as JS.Import, memberName(this.member))}
                     : stmt;
             });
-            if (statements.some((stmt, i) => stmt !== compilationUnit.statements[i])) {
-                return {...compilationUnit, statements} as JS.CompilationUnit;
+            if (statements.some((stmt, i) => stmt !== container.statements[i])) {
+                return {...compilationUnit, statements: statementsWith(compilationUnit, container, statements)} as JS.CompilationUnit;
             }
         }
 
         // If onlyIfReferenced is true, check if the identifier is actually used
         // Skip this check for side-effect imports
         if (!this.sideEffectOnly && this.onlyIfReferenced) {
-            const isReferenced = await this.checkIdentifierReferenced(compilationUnit);
+            const isReferenced = await this.checkIdentifierReferenced(compilationUnit, container);
             if (!isReferenced) {
                 return compilationUnit;
             }
@@ -918,7 +1034,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // An `import` would make a file that binds its modules with `require` an ES module and change
         // how everything in it loads. An explicit `style` overrides, which is how a caller converting
         // the file to ESM asks for an import.
-        if (this.style === undefined ? isCommonJs(compilationUnit) : this.style === ImportStyle.CommonJS) {
+        if (bindsWithRequire(container, this.style)) {
             // A `require` binds values only.
             return this.typeOnly ? compilationUnit : this.addRequire(compilationUnit);
         }
@@ -929,7 +1045,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // - Case 2: Default import without named bindings - add named bindings
         // Don't try to merge default imports (member === 'default'), side-effect imports, or namespace imports (member === '*')
         if (!this.sideEffectOnly && this.member !== undefined && this.member !== 'default' && this.member !== '*') {
-            const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, p);
+            const mergedCu = await this.tryMergeIntoExistingImport(compilationUnit, container, p);
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
             }
@@ -937,33 +1053,33 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
         // Find the position to insert the import
-        const insertionIndex = this.findImportInsertionIndex(compilationUnit);
-        const newImport = await this.createImportStatement(compilationUnit, insertionIndex, p);
+        const insertionIndex = this.findImportInsertionIndex(container);
+        const newImport = await this.createImportStatement(compilationUnit, container, insertionIndex, p);
 
         const withImport = await this.produceJavaScript(compilationUnit, p, async draft => {
             // Insert the import at the appropriate position
-            const semicolonMarkers = detectSemi(compilationUnit)
+            const semicolonMarkers = detectSemi(compilationUnit, container)
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
-            if (insertionIndex === prologueLength(compilationUnit)) {
+            if (insertionIndex === prologueLength(container)) {
                 // The `after` space should be empty since any semicolon is printed after it
-                const next = compilationUnit.statements[insertionIndex];
-                draft.statements = [
-                    ...compilationUnit.statements.slice(0, insertionIndex),
+                const next = container.statements[insertionIndex];
+                draft.statements = statementsWith(compilationUnit, container, [
+                    ...container.statements.slice(0, insertionIndex),
                     rightPadded(newImport, emptySpace, semicolonMarkers),
                     ...(next ? [{
                         ...next,
                         element: next.element
-                            ? {...next.element, prefix: splitAtBodyStart(next.element.prefix).behind}
+                            ? {...next.element, prefix: prefixBehindImport(next.element.prefix, container === compilationUnit)}
                             : undefined
                     } as J.RightPadded<Statement>] : []),
-                    ...compilationUnit.statements.slice(insertionIndex + 1)
-                ];
+                    ...container.statements.slice(insertionIndex + 1)
+                ]);
             } else {
                 // Insert after existing imports
-                const before = compilationUnit.statements.slice(0, insertionIndex);
-                const after = compilationUnit.statements.slice(insertionIndex);
+                const before = container.statements.slice(0, insertionIndex);
+                const after = container.statements.slice(insertionIndex);
 
                 //The `after` space is empty, spacing comes from next statement's prefix
                 // Ensure the next statement has at least one newline in its prefix
@@ -976,31 +1092,35 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         element: {...after[0].element, prefix: space("\n" + currentPrefix.whitespace)}
                     } : after[0];
 
-                    draft.statements = [
+                    draft.statements = statementsWith(compilationUnit, container, [
                         ...before,
                         rightPadded(newImport, emptySpace, semicolonMarkers),
                         updatedNextStatement,
                         ...after.slice(1)
-                    ];
+                    ]);
                 } else {
-                    draft.statements = [
+                    draft.statements = statementsWith(compilationUnit, container, [
                         ...before,
                         rightPadded(newImport, emptySpace, semicolonMarkers),
                         ...after
-                    ];
+                    ]);
                 }
             }
         });
 
-        return formatImport(withoutModuleMarker(withImport), newImport.id, p, detectBraceSpacing(compilationUnit));
+        return formatImport(withoutModuleMarker(withImport), newImport.id, p, detectBraceSpacing(compilationUnit, container));
     }
 
     /**
      * Try to merge the new member into an existing import from the same module
      */
-    private async tryMergeIntoExistingImport(compilationUnit: JS.CompilationUnit, p: P): Promise<JS.CompilationUnit> {
-        for (let i = 0; i < compilationUnit.statements.length; i++) {
-            const stmt = compilationUnit.statements[i];
+    private async tryMergeIntoExistingImport(
+        compilationUnit: JS.CompilationUnit,
+        container: ImportContainer,
+        p: P
+    ): Promise<JS.CompilationUnit> {
+        for (let i = 0; i < container.statements.length; i++) {
+            const stmt = container.statements[i];
             const statement = stmt.element;
 
             if (statement?.kind === JS.Kind.Import) {
@@ -1048,7 +1168,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 const newSpecifier = this.createImportSpecifier();
 
                                 if (existingElements.every(elem => isEmptyPlaceholder(elem.element))) {
-                                    const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
+                                    const braceSpace = detectBraceSpacing(compilationUnit, container) ? singleSpace : emptySpace;
                                     namedDraft.elements = {
                                         ...namedImports.elements,
                                         elements: [rightPadded({...newSpecifier, prefix: braceSpace}, braceSpace)]
@@ -1113,9 +1233,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         );
 
                         // Replace the statement in the compilation unit
-                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                        draft.statements = statementsWith(compilationUnit, container, container.statements.map((s, idx) =>
                             idx === i ? {...s, element: updatedImport} : s
-                        );
+                        ));
                     }), jsImport.id, p);
                 }
 
@@ -1168,9 +1288,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         );
 
                         // Replace the statement in the compilation unit
-                        draft.statements = compilationUnit.statements.map((s, idx) =>
+                        draft.statements = statementsWith(compilationUnit, container, container.statements.map((s, idx) =>
                             idx === i ? {...s, element: updatedImport} : s
-                        );
+                        ));
                     }), jsImport.id, p);
                 }
             }
@@ -1180,10 +1300,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Check if the import already exists in the compilation unit
+     * Check if the import already exists in the container
      */
-    private async checkImportExists(compilationUnit: JS.CompilationUnit): Promise<boolean> {
-        for (const stmt of compilationUnit.statements) {
+    private async checkImportExists(container: ImportContainer): Promise<boolean> {
+        for (const stmt of container.statements) {
             const statement = stmt.element;
 
             // Any top-level require of the module loads it, which is all a side-effect request asks.
@@ -1319,9 +1439,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
     /**
-     * Check if the identifier is actually referenced in the file
+     * Check if the identifier is actually referenced in the container
      */
-    private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit): Promise<boolean> {
+    private async checkIdentifierReferenced(compilationUnit: JS.CompilationUnit, container: ImportContainer): Promise<boolean> {
         // For namespace imports, we cannot use type attribution to detect usage
         // because the namespace itself is used as an identifier, not individual members.
         // For simplicity, we skip the onlyIfReferenced check for namespace imports.
@@ -1333,7 +1453,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Step 1: Find the expected declaring type by examining existing imports from the same module
         let expectedDeclaringType: string | undefined;
 
-        for (const stmt of compilationUnit.statements) {
+        for (const stmt of container.statements) {
             const statement = stmt.element;
 
             if (statement?.kind === JS.Kind.Import) {
@@ -1395,7 +1515,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
         const collector = new class extends JavaScriptVisitor<void> {
             override async visitIdentifier(identifier: J.Identifier, p: void): Promise<J | undefined> {
-                if (!found && identifier.simpleName === targetName && isFree(this.cursor, identifier)) {
+                if (!found && identifier.simpleName === targetName && isFree(this.cursor, identifier) &&
+                    (container === compilationUnit || this.cursor.firstEnclosing((v): v is J.Block => v === container))) {
                     const type = identifier.type;
                     const fieldType = identifier.fieldType;
                     if (expectedDeclaringType) {
@@ -1477,14 +1598,19 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Create a new import statement
      */
-    private async createImportStatement(compilationUnit: JS.CompilationUnit, insertionIndex: number, p: P): Promise<JS.Import> {
+    private async createImportStatement(
+        compilationUnit: JS.CompilationUnit,
+        container: ImportContainer,
+        insertionIndex: number,
+        p: P
+    ): Promise<JS.Import> {
         // Determine the appropriate prefix (spacing before the import)
-        const prefix = this.determineImportPrefix(compilationUnit, insertionIndex);
+        const prefix = this.determineImportPrefix(container, insertionIndex);
 
         // Whitespace throughout follows the parser's placement, so that formatting the result is a
         // no-op where the file's style already agrees with it.
         // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
-        const moduleSpecifier = {...await this.moduleSpecifier(compilationUnit), prefix: singleSpace};
+        const moduleSpecifier = {...await this.moduleSpecifier(compilationUnit, container), prefix: singleSpace};
 
         let importClause: JS.ImportClause | undefined;
 
@@ -1561,7 +1687,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         } else {
             // Named import: import { member } from 'module'
 
-            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
+            const braceSpace = detectBraceSpacing(compilationUnit, container) ? singleSpace : emptySpace;
 
             const importSpec = this.createImportSpecifier();
             // Apply brace spacing: the space after { is in the specifier's prefix,
@@ -1615,10 +1741,10 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
     /** The module specifier, printed as the caller supplied it or quoted to match the file. */
-    private async moduleSpecifier(compilationUnit: JS.CompilationUnit): Promise<J.Literal> {
+    private async moduleSpecifier(compilationUnit: JS.CompilationUnit, container: ImportContainer = compilationUnit): Promise<J.Literal> {
         let valueSource = this.moduleValueSource;
         if (valueSource === undefined) {
-            const quote = await detectQuote(compilationUnit, this.quoteStyle);
+            const quote = await detectQuote(compilationUnit, this.quoteStyle, container);
             valueSource = `${quote}${this.module}${quote}`;
         }
         return {
@@ -1764,9 +1890,9 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Determine the appropriate spacing before the import statement
      */
-    private determineImportPrefix(compilationUnit: JS.CompilationUnit, insertionIndex: number): J.Space {
-        if (insertionIndex === prologueLength(compilationUnit) && insertionIndex < compilationUnit.statements.length) {
-            const nextPrefix = compilationUnit.statements[insertionIndex].element?.prefix;
+    private determineImportPrefix(container: ImportContainer, insertionIndex: number): J.Space {
+        if (insertionIndex === prologueLength(container) && insertionIndex < container.statements.length) {
+            const nextPrefix = container.statements[insertionIndex].element?.prefix;
             return nextPrefix ? splitAtBodyStart(nextPrefix).ahead : emptySpace;
         }
 
@@ -1778,11 +1904,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     /**
      * Find the index where the new import should be inserted
      */
-    private findImportInsertionIndex(compilationUnit: JS.CompilationUnit): number {
+    private findImportInsertionIndex(container: ImportContainer): number {
         let lastImportIndex = -1;
 
-        for (let i = 0; i < compilationUnit.statements.length; i++) {
-            const statement = compilationUnit.statements[i].element;
+        for (let i = 0; i < container.statements.length; i++) {
+            const statement = container.statements[i].element;
             if (statement?.kind === JS.Kind.Import) {
                 lastImportIndex = i;
             } else if (lastImportIndex >= 0) {
@@ -1796,7 +1922,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return lastImportIndex + 1;
         }
 
-        return prologueLength(compilationUnit);
+        return prologueLength(container);
     }
 
 
@@ -1866,6 +1992,17 @@ export function prologueLength(container: JS.CompilationUnit | J.Block): number 
         length++;
     }
     return length;
+}
+
+/**
+ * The prefix of the statement an import is placed in front of. A file's imports stand apart from its
+ * code, where an ambient module declaration's body stays as compact as it was, its first statement
+ * moving down a line at its own indentation.
+ */
+function prefixBehindImport(prefix: J.Space, inFile: boolean): J.Space {
+    const behind = splitAtBodyStart(prefix).behind;
+    const indentation = prefix.whitespace.slice(prefix.whitespace.lastIndexOf("\n") + 1);
+    return inFile ? behind : {...behind, whitespace: "\n" + indentation};
 }
 
 // Keep comments through the last triple-slash directive ahead of the import.
@@ -1968,9 +2105,9 @@ export function requireBinds(
  * Where the file's leading requires start, after a shebang and any directives, and end. Every
  * top-level statement after them runs once they are initialised, so a binding placed there is read after it.
  */
-function leadingRequires(cu: JS.CompilationUnit): {start: number; end: number} {
-    const statements = cu.statements;
-    const start = prologueLength(cu);
+function leadingRequires(container: ImportContainer): {start: number; end: number} {
+    const statements = container.statements;
+    const start = prologueLength(container);
     let end = start;
     while (end < statements.length && isRequireStatement(statements[end].element)) {
         end++;
@@ -1979,9 +2116,9 @@ function leadingRequires(cu: JS.CompilationUnit): {start: number; end: number} {
 }
 
 /** The require a new member of `module` joins. It is a destructuring one among the file's leading requires. */
-export function requireJoinTarget(cu: JS.CompilationUnit, module: string): J.VariableDeclarations | undefined {
-    const {start, end} = leadingRequires(cu);
-    return cu.statements.slice(start, end)
+export function requireJoinTarget(container: ImportContainer, module: string): J.VariableDeclarations | undefined {
+    const {start, end} = leadingRequires(container);
+    return container.statements.slice(start, end)
         .map(s => requireDeclarationOf(s.element))
         .find(declaration => declaration !== undefined && joins(declaration, module));
 }
@@ -2150,15 +2287,15 @@ export interface ExistingImportBinding {
 }
 
 /**
- * The existing binding for `member` of `module`, read from `cu`'s own import statements and
- * top-level `require` declarations — what `maybeRebind` reads before committing to a `RebindImport` edit.
+ * The existing binding for `member` of `module`, read from `container`'s own import statements and
+ * `require` declarations — what `maybeRebind` reads before committing to a `RebindImport` edit.
  */
 export function existingImportBinding(
-    cu: JS.CompilationUnit,
+    container: ImportContainer,
     module: string,
     member: string | undefined
 ): ExistingImportBinding | undefined {
-    for (const stmt of cu.statements) {
+    for (const stmt of container.statements) {
         const element = stmt.element;
         const declaration = requireDeclarationOf(element);
         const required = declaration && requireBinds(declaration, module, member);
@@ -2285,11 +2422,11 @@ function removeBinding(jsImport: JS.Import, member: string | undefined): JS.Impo
     return {...jsImport, importClause: {...importClause, namedBindings: updatedNamedImports}};
 }
 
-/** `cu` without the statement `id`, its prefix carried onto the next one so a file header survives. */
-function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit {
+/** `container` without the statement `id`, its prefix carried onto the next one so a file header survives. */
+function withoutStatement<C extends ImportContainer>(container: C, id: UUID): C {
     const formatter = new ElementRemovalFormatter<J>(true);
     const statements: J.RightPadded<Statement>[] = [];
-    for (const stmt of cu.statements) {
+    for (const stmt of container.statements) {
         if (stmt.element?.id === id) {
             formatter.markRemoved(stmt.element);
         } else {
@@ -2297,7 +2434,7 @@ function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit 
             statements.push(kept === stmt.element ? stmt : {...stmt, element: kept!});
         }
     }
-    return {...cu, statements};
+    return {...container, statements};
 }
 
 /**
@@ -2305,14 +2442,14 @@ function withoutStatement(cu: JS.CompilationUnit, id: UUID): JS.CompilationUnit 
  * it in place. A different shape needs a different clause, and another import of `to` takes it in.
  */
 function replacesStatement(
-    cu: JS.CompilationUnit,
+    container: ImportContainer,
     jsImport: JS.Import,
     from: {member?: string},
     to: {module: string; member?: string},
     typeOnly: boolean
 ): boolean {
     const shape = bindingShape(to.member);
-    return shape !== bindingShape(from.member) || (shape === "named" && cu.statements.some(s =>
+    return shape !== bindingShape(from.member) || (shape === "named" && container.statements.some(s =>
         s.element !== jsImport && s.element?.kind === JS.Kind.Import &&
         acceptsNamedMember(s.element as JS.Import, to.module, typeOnly)));
 }
@@ -2332,7 +2469,9 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly from: {module: string; member?: string},
         readonly to: {module: string; member?: string},
         readonly localName: string,
-        readonly boundName: string
+        readonly boundName: string,
+        /** The ambient module declaration's body the binding sits in, by id; the file's top level where unset. */
+        readonly container?: UUID
     ) {
         super();
     }
@@ -2340,6 +2479,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private transformedInPlace = false;
     private typeOnly = false;
     private cu?: JS.CompilationUnit;
+    private within?: ImportContainer;
     private dropped?: UUID;
     private droppedQuote?: QuoteChar;
     private fromModule?: string;
@@ -2353,10 +2493,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         this.cu = cu;
-        const imports = cu.statements
+        const within = this.within = importContainer(cu, this.container);
+        if (within === undefined) {
+            return cu;
+        }
+        const imports = within.statements
             .filter(s => s.element?.kind === JS.Kind.Import)
             .map(s => s.element as JS.Import);
-        const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
+        const requires = within.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
         const ofModule = imports.filter(imp => {
             const module = importedModule(imp);
             return module !== undefined && sameModule(module, this.from.module);
@@ -2377,7 +2521,29 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
             }).length > 1
         });
-        let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        if (within === cu) {
+            return this.rebound(await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit);
+        }
+        // Nothing outside an ambient module declaration reads what its body binds.
+        return {
+            ...cu,
+            statements: await mapAsync(cu.statements, async s => isAmbientModule(s.element) && s.element.body === within
+                ? {...s, element: await this.visit(s.element, p) as Statement}
+                : s)
+        } as JS.CompilationUnit;
+    }
+
+    override async visitBlock(block: J.Block, p: P): Promise<J | undefined> {
+        const visited = await super.visitBlock(block, p);
+        return block === this.within ? this.rebound(visited as J.Block) : visited;
+    }
+
+    /**
+     * The binding's container once the binding has left it, without a statement the move emptied, and
+     * the replacement queued where the move did not rewrite its statement in place. The cursor stands on
+     * the container, so the replacement lands there.
+     */
+    private rebound<C extends ImportContainer>(visited: C): C {
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
         }
@@ -2400,10 +2566,10 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const imp = await super.visitImportDeclaration(jsImport, p) as JS.Import;
 
         const key = memberName(this.from.member);
-        // One call moves one module-scope binding, and no two of those share a local name, so the
-        // name read from the matched statement is what picks it back out of the file.
-        const cu = this.cu;
-        if (!cu?.statements.some(s => s.element === jsImport) ||
+        // One call moves one binding of its container, and no two of those share a local name, so the
+        // name read from the matched statement is what picks it back out of the container.
+        const within = this.within;
+        if (!within?.statements.some(s => s.element === jsImport) ||
             importBinds(imp, this.from.module, this.from.member) !== this.localName) {
             return imp;
         }
@@ -2414,7 +2580,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member);
         }
-        if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
+        if (replacesStatement(within, jsImport, this.from, this.to, this.typeOnly)) {
             this.dropped = imp.id;
             this.droppedQuote = quoteOf(imp.moduleSpecifier?.element);
             return imp;
@@ -2441,7 +2607,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const visited = await super.visitVariableDeclarations(declaration, p);
         if (requireDeclarationOf(declaration) === undefined ||
             requireBinds(declaration, this.from.module, this.from.member) !== this.localName ||
-            !this.cu?.statements.some(s => s.element === declaration) ||
+            !this.within?.statements.some(s => s.element === declaration) ||
             visited?.kind !== J.Kind.VariableDeclarations) {
             return visited;
         }
@@ -2548,7 +2714,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     private readsModuleBinding(identifier: J.Identifier): boolean {
-        return resolve(this.cursor, identifier)?.kind === JS.Kind.CompilationUnit;
+        return resolve(this.cursor, identifier) === this.within;
     }
 
     /**
