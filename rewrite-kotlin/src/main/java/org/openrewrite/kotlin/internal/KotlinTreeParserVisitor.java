@@ -3585,12 +3585,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private JRightPadded<Statement> buildIfThenPart(KtIfExpression expression) {
         if (expression.getThen() == null) {
             PsiElement thenContainer = requireNonNull(expression.getNode().findChildByType(KtNodeTypes.THEN)).getPsi();
-            J.Empty empty = new J.Empty(randomId(), prefix(thenContainer), Markers.EMPTY);
-            PsiElement maybeSemicolon = findLastNotSpaceChild(thenContainer);
-            if (isSemicolon(maybeSemicolon)) {
-                return new JRightPadded<>(empty, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
-            }
-            return padRight(empty, Space.EMPTY);
+            return maybeTrailingSemicolonInternal(new J.Empty(randomId(), prefix(thenContainer), Markers.EMPTY), thenContainer);
         }
         Statement then = convertToStatement(expression.getThen().accept(this, executionContext))
                 .withPrefix(prefix(expression.getThen().getParent()));
@@ -3901,7 +3896,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     // Handle trailing semicolon inside the input `element` only.
-    private <J2 extends J> JRightPadded<J2> maybeTrailingSemicolonInternal(J2 j, KtElement element) {
+    private <J2 extends J> JRightPadded<J2> maybeTrailingSemicolonInternal(J2 j, PsiElement element) {
         PsiElement maybeSemicolon = findLastNotSpaceChild(element);
         if (isSemicolon(maybeSemicolon)) {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
@@ -3928,9 +3923,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private List<JRightPadded<Statement>> addStraySemicolons(PsiElement container, List<? extends PsiElement> sources,
                                                              List<JRightPadded<Statement>> statements) {
-        Set<PsiElement> consumed = new HashSet<>(sources);
+        boolean hasSemicolon = false;
+        for (PsiElement child = container.getFirstChild(); child != null && !hasSemicolon; child = child.getNextSibling()) {
+            hasSemicolon = isSemicolon(child);
+        }
+        if (!hasSemicolon) {
+            return statements;
+        }
+
+        Set<PsiElement> consumed = new HashSet<>();
         for (PsiElement source : sources) {
-            if (!isSemicolon(source) && !isSemicolon(findLastNotSpaceChild(source))) {
+            if (isSemicolon(source)) {
+                consumed.add(source);
+            } else if (!isSemicolon(findLastNotSpaceChild(source))) {
                 consumed.add(PsiTreeUtil.skipWhitespacesAndCommentsForward(source));
             }
         }
