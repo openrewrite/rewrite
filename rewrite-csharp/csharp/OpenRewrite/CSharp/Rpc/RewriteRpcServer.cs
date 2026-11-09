@@ -62,7 +62,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, string> _recipeOrigin = new();
 
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
-    private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    private readonly ConcurrentDictionary<string, (object Accumulator, bool EditedSinceScan)> _recipeAccumulators = new();
     // Visitor names (edit:<id>, scan:<id>) whose Check precondition the host evaluates, as hoisted by PrepareRecipe
     private readonly ConcurrentDictionary<string, bool> _hoistedVisitors = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
@@ -1410,7 +1410,7 @@ public class RewriteRpcServer
         if (recipe is IScanningRecipe scanning)
         {
             var ctx = GetOrCreateExecutionContext(request.P);
-            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx);
+            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx, CyclePhase.Generate);
 
             var generated = scanning.Generate(acc, ctx);
 
@@ -1833,8 +1833,9 @@ public class RewriteRpcServer
         ITreeVisitor<ExecutionContext> visitor;
         if (recipe is IScanningRecipe scanning)
         {
-            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
-            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
+            visitor = phase == "scan"
+                ? scanning.Scanner(GetOrCreateAccumulator(recipeId, scanning, ctx, CyclePhase.Scan))
+                : scanning.Editor(GetOrCreateAccumulator(recipeId, scanning, ctx, CyclePhase.Edit));
         }
         else
         {
@@ -2232,18 +2233,22 @@ public class RewriteRpcServer
         }
     }
 
+    private enum CyclePhase { Scan, Generate, Edit }
+
     /// <summary>
-    /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
+    /// A recipe's first scan after it edited starts a new cycle with a fresh accumulator, because the host scans
+    /// before it edits in every cycle. A cycle whose scan never reaches this server keeps the previous accumulator.
     /// </summary>
-    private object? GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx)
-    {
-        if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
-            return acc;
-        
-        acc = recipe.InitialValue(ctx);
-        _recipeAccumulators[recipeId] = acc;
-        return acc;
-    }
+    private object GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx,
+        CyclePhase phase) =>
+        _recipeAccumulators.AddOrUpdate(recipeId,
+            _ => (recipe.InitialValue(ctx), phase == CyclePhase.Edit),
+            (_, latest) => phase switch
+            {
+                CyclePhase.Scan when latest.EditedSinceScan => (recipe.InitialValue(ctx), false),
+                CyclePhase.Edit => (latest.Accumulator, true),
+                _ => latest
+            }).Accumulator;
 
     private class TreeCodec : IRpcCodec
     {
