@@ -3232,7 +3232,53 @@ describe("maybeRebind and the member's other spellings", () => {
                 let NS = await import("m");
                 NS = {Old: () => 1};
                 NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                let NS = require("m");
+                function reset() { NS = {Old: () => 1}; }
+                NS.Old();
             `)
+        );
+    });
+
+    test("a let or var module object the file never assigns to reads the member too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `
+                    let NS = require("m");
+                    NS.Old();
+                `,
+                `
+                    let NS = require("m");
+                    NS.New();
+                `
+            ),
+            //language=javascript
+            javascript(
+                `
+                    var NS = require("m");
+                    NS.Old();
+                `,
+                `
+                    var NS = require("m");
+                    NS.New();
+                `
+            ),
+            //language=javascript
+            javascript(
+                `
+                    let NS = await import("m");
+                    NS.Old();
+                `,
+                `
+                    let NS = await import("m");
+                    NS.New();
+                `
+            )
         );
     });
 

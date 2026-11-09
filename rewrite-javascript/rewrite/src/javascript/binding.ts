@@ -17,7 +17,8 @@ import {isStringLiteral, J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {
-    compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf, valuesDeclaredAtTopLevel
+    compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, referencesOf, scopeOf,
+    valuesDeclaredAtTopLevel
 } from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
@@ -149,7 +150,7 @@ interface ModuleObjectBinding {
     /** A type-only import erases, so the name it binds stands for no value at runtime. */
     typeOnly: boolean;
 
-    /** `let`/`var`: after `NS = other`, `NS.Old` no longer reads the module. An import never is. */
+    /** A `let`/`var` the file assigns to: after `NS = other`, `NS.Old` may not read the module. Never an import. */
     reassignable?: boolean;
 }
 
@@ -192,13 +193,16 @@ function wholeModuleBindingsVia(
     shape: ModuleObjectBinding["shape"]
 ): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
+    const root = new Cursor(cu);
     for (const stmt of cu.statements) {
         for (const declaration of declarationsOf(stmt.element)) {
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
-                bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false,
-                    reassignable: !declaresConst(stmt.element)});
+                const simpleName = (name as J.Identifier).simpleName;
+                bindings.push({name: simpleName, module, shape, typeOnly: false,
+                    reassignable: !declaresConst(stmt.element) &&
+                        referencesOf(root, simpleName).some(r => r.writes)});
             }
         }
     }
