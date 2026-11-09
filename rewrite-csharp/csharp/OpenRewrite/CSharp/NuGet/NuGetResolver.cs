@@ -545,6 +545,45 @@ public static class NuGetResolver
         }
     }
 
+    /// <summary>The evaluated value of an MSBuild property and the full path of the file that set it.</summary>
+    /// <param name="Value">The evaluated value.</param>
+    /// <param name="DefinedIn">The file holding the property's final definition, or null when it was not set by a file.</param>
+    public sealed record EvaluatedProperty(string Value, string? DefinedIn);
+
+    /// <summary>
+    /// Evaluates <paramref name="projectPath"/> and returns those of <paramref name="names"/> that have a value,
+    /// or an empty dictionary when the project cannot be evaluated.
+    /// </summary>
+    public static IReadOnlyDictionary<string, EvaluatedProperty> EvaluateProperties(
+        string projectPath,
+        IEnumerable<string> names)
+    {
+        MSBuildEnvironment.Ensure();
+        var globalProps = DesignTimeProperties(null, null);
+        var properties = new Dictionary<string, EvaluatedProperty>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using (MSBuildEnvironment.EnterOperatingEnvironment())
+            {
+                using var projectCollection = new ProjectCollection(globalProps);
+                var project = new Project(projectPath, globalProps, null, projectCollection);
+                foreach (var name in names)
+                {
+                    var property = project.GetProperty(name);
+                    if (property == null || property.EvaluatedValue.Length == 0)
+                        continue;
+                    properties[name] = new EvaluatedProperty(property.EvaluatedValue,
+                        property.Xml?.ContainingProject.FullPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("NuGetResolver: could not evaluate properties of {Project}: {Error}", projectPath, ex.Message);
+        }
+        return properties;
+    }
+
     /// <summary>A target framework newer than the installed .NET SDK can build.</summary>
     /// <param name="TargetFramework">The target framework alias.</param>
     /// <param name="SdkVersion">The installed .NET SDK version.</param>
