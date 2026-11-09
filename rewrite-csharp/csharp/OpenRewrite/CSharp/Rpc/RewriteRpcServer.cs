@@ -121,13 +121,13 @@ public class RewriteRpcServer
     internal int DependencyTypesBatchSize = 1000;
 
     /// <summary>
-    /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
-    /// to wire up an RPC connection to a Java process.
+    /// Connects this server to a remote JSON-RPC peer and starts listening. Pass a
+    /// <see cref="StringErrorDataJsonRpc"/>, which also runs each notification in arrival order.
     /// </summary>
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
-        jsonRpc.SynchronizationContext = null;
+        jsonRpc.SynchronizationContext = new StringErrorDataJsonRpc.ReaderOrPool();
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -2015,14 +2015,8 @@ public class RewriteRpcServer
         }
 
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
-        server._jsonRpc = jsonRpc;
         _current = server;
-        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
-        // Without this, the default NonConcurrentSynchronizationContext serializes
-        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
-        jsonRpc.SynchronizationContext = null;
-        jsonRpc.AddLocalRpcTarget(server);
-        jsonRpc.StartListening();
+        server.Connect(jsonRpc);
 
         try
         {
@@ -2403,14 +2397,58 @@ internal sealed class MetricsMessageHandler : IJsonRpcMessageHandler, IJsonRpcMe
 }
 
 /// <summary>
-/// A JsonRpc subclass that ensures error.data is always a string,
+/// The connection to the Java peer. It ensures error.data is always a string,
 /// for compatibility with the Java io.moderne:jsonrpc library which
 /// expects error.detail.data to be a string, not a structured object.
+/// It also dispatches messages the way <see cref="DispatchRequestAsync"/> describes.
 /// </summary>
 internal class StringErrorDataJsonRpc : StreamJsonRpc.JsonRpc
 {
     public StringErrorDataJsonRpc(StreamJsonRpc.IJsonRpcMessageHandler handler) : base(handler)
     {
+    }
+
+    /// <summary>
+    /// Called on the thread that reads messages, in the order they arrive. A request runs on the
+    /// thread pool, so one that calls back into Java does not block reading the response. A
+    /// notification runs here, before the next message is read, because Java does not wait for it.
+    /// Java rolls back its own refs as it sends Evict and goes straight on to the next request.
+    /// A notification handler therefore must be synchronous and must not wait on Java.
+    /// </summary>
+    protected override ValueTask<JsonRpcMessage> DispatchRequestAsync(JsonRpcRequest request,
+        TargetMethod targetMethod, CancellationToken cancellationToken)
+    {
+        ReaderOrPool.OnReader = !request.IsResponseExpected;
+        try
+        {
+            return base.DispatchRequestAsync(request, targetMethod, cancellationToken);
+        }
+        finally
+        {
+            ReaderOrPool.OnReader = false;
+        }
+    }
+
+    /// <summary>
+    /// The context <see cref="RewriteRpcServer.Connect"/> installs. It runs a handler on the thread
+    /// pool, except for the one <see cref="DispatchRequestAsync"/> marks to run in place.
+    /// </summary>
+    internal sealed class ReaderOrPool : SynchronizationContext
+    {
+        [ThreadStatic] internal static bool OnReader;
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            if (OnReader)
+            {
+                OnReader = false;
+                d(state);
+            }
+            else
+            {
+                base.Post(d, state);
+            }
+        }
     }
 
     protected override StreamJsonRpc.Protocol.JsonRpcError.ErrorDetail CreateErrorDetails(
