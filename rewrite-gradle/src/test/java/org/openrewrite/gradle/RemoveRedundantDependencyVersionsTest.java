@@ -719,6 +719,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
                   testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
                   testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.1"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
               }
               """,
             """
@@ -733,6 +737,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
                   testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
+                  testRuntimeOnly "org.objenesis:objenesis"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm"
               }
               """
           )
@@ -764,6 +770,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
                   testRuntimeOnly "org.ow2.asm:asm:9.7"
                   testRuntimeOnly "org.ow2.asm:asm:9.7-dev"
+
+                  testRuntimeOnly "org.ow2.asm:asm-tree"
+                  testRuntimeOnly "org.ow2.asm:asm-tree:9.7"
 
                   testRuntimeOnly "org.hamcrest:hamcrest-core:1.1"
                   testRuntimeOnly "org.hamcrest:hamcrest-core:1.01"

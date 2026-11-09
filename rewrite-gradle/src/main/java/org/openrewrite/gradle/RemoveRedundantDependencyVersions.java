@@ -360,6 +360,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
                             }.visitNonNull(tree, ctx);
 
+                            // Duplicates are compared after managed versions are removed, as removing a version can
+                            // make two declarations identical
                             J visited = super.visit(tree, ctx);
                             return visited == null ? null : withoutDuplicates(visited, ctx);
                         }
@@ -442,9 +444,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         );
     }
 
-    /**
-     * Runs after managed versions are removed, so that declarations which that leaves identical go in the same cycle.
-     */
     private J withoutDuplicates(J sourceFile, ExecutionContext ctx) {
         return new JavaVisitor<ExecutionContext>() {
             @Override
