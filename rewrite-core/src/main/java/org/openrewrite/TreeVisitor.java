@@ -399,16 +399,22 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> implements Heavyw
      */
     private @Nullable T finishTopLevel(@Nullable T t, P p) {
         if (t != null && afterVisit != null) {
-            for (TreeVisitor<?, P> v : afterVisit) {
-                v.setCursor(getCursor());
-                //noinspection unchecked
-                t = (T) v.visit(t, p);
-            }
+            t = applyAfterVisitors(t, p);
         }
         afterVisit = null;
         visitCount = 0;
         materializedFrames = 0;
         eagerCursor = overridesSetCursor;
+        return t;
+    }
+
+    // RewriteTest recognizes formatting done by an after-visitor by this method's name on the stack
+    private @Nullable T applyAfterVisitors(@Nullable T t, P p) {
+        for (TreeVisitor<?, P> v : afterVisit) {
+            v.setCursor(getCursor());
+            //noinspection unchecked
+            t = (T) v.visit(t, p);
+        }
         return t;
     }
 
