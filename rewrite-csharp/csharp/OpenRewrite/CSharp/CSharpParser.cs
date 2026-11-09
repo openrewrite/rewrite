@@ -903,8 +903,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var kindPrefix = ExtractSpaceBefore(node.Keyword);
         _cursor = node.Keyword.Span.End;
 
-        // For "record class" and "record struct", the class/struct keyword is kept as a marker
-        // (KindType is already Record)
         Marker? recordKeywordMarker = null;
         if (node is RecordDeclarationSyntax recordDecl &&
             !recordDecl.ClassOrStructKeyword.IsKind(SyntaxKind.None))
