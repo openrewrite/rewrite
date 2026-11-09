@@ -955,6 +955,44 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void upgradeExistingDependencyThatIsTheOnlyMemberOfItsFamily() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("org.apache.commons", "commons-lang3", "3.12.0",
+            null, null, false, null, null, null, null, "org.apache.commons*", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.10</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void useRequestedVersionInUseByOtherMembersOfTheFamily() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
