@@ -169,7 +169,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newArtifactId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
-                    String renamedVersion = null;
+                    String renamedVersion = getResolutionResult().getPom().getValue(tag.getChildValue("version").orElse(null));
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -232,8 +232,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
             /**
              * The renamed entry wins when its version is higher than the duplicate's, or when the duplicate has none.
-             * Only exact versions are compared. Without a new version, or when its selector matched nothing published,
-             * the renamed entry has no exact version, and the duplicate stays.
+             * Only exact versions are compared, so a selector that matched nothing published, a range or an unresolved
+             * placeholder keeps the duplicate.
              */
             private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
                 if (!isExact(renamedVersion)) {
