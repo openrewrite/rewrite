@@ -80,6 +80,24 @@ export function spaceContainsNewline(space: J.Space | undefined): boolean {
 }
 
 /**
+ * The space after a statement, split where its line ends: ` // note\n// next` → `line` ` // note`, `rest` `\n// next`.
+ * At the end of the file all of it is `line`. `undefined` where no comment follows on the same line.
+ */
+export function splitAtLineEnd(space: J.Space, endsFile: boolean): {line: J.Space, rest: J.Space} | undefined {
+    if (space.whitespace.includes("\n") || space.comments.length === 0) {
+        return undefined;
+    }
+    const end = space.comments.findIndex(c => c.suffix.includes("\n"));
+    if (end < 0) {
+        return endsFile ? {line: space, rest: {...space, whitespace: "", comments: []}} : undefined;
+    }
+    return {
+        line: {...space, comments: space.comments.slice(0, end + 1)},
+        rest: {...space, whitespace: space.comments[end].suffix, comments: space.comments.slice(end + 1)}
+    };
+}
+
+/**
  * Re-indents a line's leading whitespace when the enclosing construct moves from `oldMargin` to
  * `newMargin`, preserving whatever indentation the line adds beyond the margin.
  */
