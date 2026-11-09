@@ -759,7 +759,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   }
 
                   testRuntimeOnly "org.objenesis:objenesis:3.3"
+                  testRuntimeOnly "org.objenesis:objenesis:3.3"
                   testRuntimeOnly "org.objenesis:objenesis:3.3.0"
+
+                  testRuntimeOnly "org.ow2.asm:asm:9.7"
+                  testRuntimeOnly "org.ow2.asm:asm:9.7-dev"
               }
               """
           )

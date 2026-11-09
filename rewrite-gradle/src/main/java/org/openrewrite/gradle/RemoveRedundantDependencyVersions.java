@@ -47,11 +47,12 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.RemoveRedundantDependencyVersions.Comparator.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -112,6 +113,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "testRuntime" // deprecated
     );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
+    private static final Pattern NUMERIC_VERSION = Pattern.compile("\\d+(\\.\\d+)*");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -444,11 +446,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
      * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
      * Java agent. Only the statements of the {@code dependencies} block itself are compared, as a declaration nested
      * in a condition may not apply. A dependency is left alone unless every one of its declarations in the
-     * configuration is simple and its newest version is written one way only.
+     * configuration is simple, and no two of its versions are written differently but rank the same.
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor) {
         Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
-        Expression block = dependencies.getArguments().get(0);
+        Expression block = dependencies.getArguments().isEmpty() ? null : dependencies.getArguments().get(0);
         if (block instanceof J.Lambda && ((J.Lambda) block).getBody() instanceof J.Block) {
             GradleDependency.Matcher matcher = new GradleDependency.Matcher()
                     .groupId(groupPattern)
@@ -470,20 +472,19 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
         Set<J.MethodInvocation> redundant = new HashSet<>();
         for (List<GradleDependency> sameDependency : declarations.values()) {
-            if (sameDependency.stream().anyMatch(declaration -> simpleVersion(declaration) == null)) {
+            Set<@Nullable String> versions = sameDependency.stream()
+                    .map(RemoveRedundantDependencyVersions::simpleVersion)
+                    .collect(toSet());
+            if (versions.contains(null)) {
                 continue;
             }
-            List<GradleDependency> newestFirst = sameDependency.stream()
-                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(simpleVersion(d2), simpleVersion(d1)))
-                    .collect(toList());
-            if (newestFirst.size() > 1) {
-                String newest = simpleVersion(newestFirst.get(0));
-                String next = simpleVersion(newestFirst.get(1));
-                if (VERSION_COMPARATOR.compare(newest, next) == 0 && !newest.equals(next)) {
-                    continue;
-                }
+            Set<String> ranks = new TreeSet<>(VERSION_COMPARATOR);
+            ranks.addAll(versions);
+            if (ranks.size() < versions.size()) {
+                continue;
             }
-            newestFirst.stream()
+            sameDependency.stream()
+                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(simpleVersion(d2), simpleVersion(d1)))
                     .skip(1)
                     .forEach(declaration -> redundant.add(declaration.getTree()));
         }
@@ -491,9 +492,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * The version of a declaration that names only a group, an artifact and a plain version, as {@code "g:a:v"} or
+     * The version of a declaration that names only a group, an artifact and a numeric version, as {@code "g:a:v"} or
      * as named arguments, possibly inside {@code platform(...)}. Anything more can change what is resolved, so it
-     * gives null.
+     * gives null. So does a qualifier such as {@code -dev}, which the version comparator here ranks unlike Gradle.
      */
     private static @Nullable String simpleVersion(GradleDependency declaration) {
         List<Expression> arguments = declaration.getTree().getArguments();
@@ -518,11 +519,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 version = named.get("version");
             }
         }
-        if (version == null || version.isEmpty() || version.contains("!!") ||
-                version.startsWith("[") || version.startsWith("]") || version.startsWith("(")) {
-            return null;
-        }
-        return version;
+        return version != null && NUMERIC_VERSION.matcher(version).matches() ? version : null;
     }
 
     private static @Nullable Map<String, String> namedLiterals(List<Expression> arguments) {
