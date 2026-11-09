@@ -486,6 +486,8 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "9.x");
         Recipe toJackson3 = new ChangeManagedDependencyGroupIdAndArtifactId(
           "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.1.0");
+        Recipe toJakartaWithoutVersion = new ChangeManagedDependencyGroupIdAndArtifactId(
+          "javax.activation", "javax.activation-api", "jakarta.activation", "jakarta.activation-api", null);
 
         rewriteRun(
           spec -> spec.recipe(toUnpublishedSelector),
@@ -614,6 +616,51 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>tools.jackson.core</groupId>
                               <artifactId>jackson-databind</artifactId>
                               <version>${jackson3.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toJakartaWithoutVersion),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.1.0</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
