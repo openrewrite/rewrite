@@ -602,7 +602,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     selectedVersion = selectCatalogVersion(versionSelector, newCoordinates,
                             coordinatesChanged ? null : currentVersion, ctx);
                 } catch (MavenDownloadingException e) {
+                    // Without the new artifact's metadata, the old version may not exist under the new coordinates
                     failures.add(e);
+                    continue;
                 }
             }
             if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {

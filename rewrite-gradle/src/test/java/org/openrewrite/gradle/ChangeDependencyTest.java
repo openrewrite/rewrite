@@ -286,6 +286,49 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void keepsTomlVersionCatalogLibraryWhenNewVersionCannotBeDownloaded() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.acme",
+            "widget-a",
+            null,
+            "widget-b",
+            "2.x",
+            null,
+            null,
+            true
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          ),
+          toml(
+            """
+              [versions]
+              widget = "1.0"
+
+              [libraries]
+              widget = { module = "com.acme:widget-a", version.ref = "widget" }
+              """,
+            // which repositories were tried, and so the rest of the warning, varies by environment
+            spec -> spec.path("gradle/libs.versions.toml").after(actual -> {
+                assertThat(actual)
+                  .startsWith("~~(com.acme:widget-b failed. Unable to download metadata.")
+                  .endsWith("widget = { module = \"com.acme:widget-a\", version.ref = \"widget\" }");
+                return actual;
+            })
+          )
+        );
+    }
+
+    @Test
     void relocatesAndDetachesSharedTomlVersionReference() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
