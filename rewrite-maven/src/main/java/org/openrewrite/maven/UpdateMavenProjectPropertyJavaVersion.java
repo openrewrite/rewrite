@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -73,7 +74,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                " * `maven.compiler.release`\n" +
                " * `release.version`\n\n" +
                "Properties of any other name are updated too when the `maven-compiler-plugin` `source`, `target` or `release` " +
-               "configuration of this pom, or of a pom it inherits from, resolves to them.\n\n" +
+               "configuration of this pom, or of a pom it inherits from, resolves to them. A property whose value is only a reference to another property, " +
+               "such as `<maven.compiler.release>${custom.release}</maven.compiler.release>`, has the referenced property updated instead.\n\n" +
                "If none of these properties are in use and the maven compiler plugin is not otherwise configured, adds the `maven.compiler.release` property.";
 
     @Override
@@ -169,6 +171,17 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 ResolvedPom pom = getResolutionResult().getPom();
                 addCompilerLevelProperties(pom.getPlugins(), properties);
                 addCompilerLevelProperties(pom.getPluginManagement(), properties);
+
+                // A property that only references another one, such as `maven.compiler.release` set to
+                // `${custom.release}` by a parent, takes its value from that one, possibly over several levels
+                Map<String, String> pomProperties = pom.getProperties();
+                Deque<String> toFollow = new ArrayDeque<>(properties);
+                while (!toFollow.isEmpty()) {
+                    String referenced = referencedProperty(pomProperties.get(toFollow.poll()));
+                    if (referenced != null && properties.add(referenced)) {
+                        toFollow.add(referenced);
+                    }
+                }
                 return properties;
             }
 
@@ -187,10 +200,19 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             }
 
             private void addCompilerLevelProperty(String compilerLevel, Set<String> properties) {
-                Matcher propertyReference = PROPERTY_REFERENCE.matcher(compilerLevel.trim());
-                if (propertyReference.matches()) {
-                    properties.add(propertyReference.group(1));
+                String referenced = referencedProperty(compilerLevel);
+                if (referenced != null) {
+                    properties.add(referenced);
                 }
+            }
+
+            // The name of the property a value consists of, if the value is nothing but a reference to it
+            private @Nullable String referencedProperty(@Nullable String value) {
+                if (value == null) {
+                    return null;
+                }
+                Matcher propertyReference = PROPERTY_REFERENCE.matcher(value.trim());
+                return propertyReference.matches() ? propertyReference.group(1) : null;
             }
         };
     }
