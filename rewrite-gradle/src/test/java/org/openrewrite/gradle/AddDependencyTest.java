@@ -23,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
@@ -1624,6 +1625,117 @@ class AddDependencyTest implements RewriteTest {
                 dependencyManagement {
                     imports {
                         mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenSpringDependencyManagementManagesItOnLstWithoutPluginState() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"))
+            .beforeRecipe(sources -> sources.replaceAll(source -> source.getMarkers().findFirst(GradleProject.class)
+              .<SourceFile>map(gp -> source.withMarkers(source.getMarkers().setByType(gp.withSpringDependencyManagementPlugin(null))))
+              .orElse(source))),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencyManagement {
+                    imports {
+                        mavenBom 'com.google.guava:guava-bom:29.0-jre'
+                    }
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWhenSpringDependencyManagementManagesItThroughAVariable() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '30.0-jre'
+                }
+
+                dependencyManagement {
+                    dependencies {
+                        dependency "com.google.guava:guava:${guavaVersion}"
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                    id 'io.spring.dependency-management' version '1.1.7'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                ext {
+                    guavaVersion = '30.0-jre'
+                }
+
+                dependencyManagement {
+                    dependencies {
+                        dependency "com.google.guava:guava:${guavaVersion}"
                     }
                 }
 

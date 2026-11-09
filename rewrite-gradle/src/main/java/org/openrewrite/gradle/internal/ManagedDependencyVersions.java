@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleDependencyConstraint;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.SpringDependencyManagementPlugin;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -43,26 +44,40 @@ import static java.util.Collections.emptyList;
  */
 public class ManagedDependencyVersions {
     private final GradleProject gradleProject;
+    private final JavaSourceFile buildScript;
+    private final ExecutionContext ctx;
 
     // Platforms by the configuration declaring them
     @Getter
     private final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
 
-    @Getter
     private final Map<GroupArtifact, @Nullable String> springPluginManaged = new HashMap<>();
+    private boolean springPluginManagedCollected;
 
     @Getter
     private @Nullable MavenDownloadingException platformFailure;
 
-    private ManagedDependencyVersions(GradleProject gradleProject) {
+    private ManagedDependencyVersions(GradleProject gradleProject, JavaSourceFile buildScript, ExecutionContext ctx) {
         this.gradleProject = gradleProject;
+        this.buildScript = buildScript;
+        this.ctx = ctx;
     }
 
     public static ManagedDependencyVersions of(JavaSourceFile buildScript, GradleProject gradleProject, ExecutionContext ctx) {
-        ManagedDependencyVersions managed = new ManagedDependencyVersions(gradleProject);
-        managed.collectSpringPluginManaged(buildScript, ctx);
+        ManagedDependencyVersions managed = new ManagedDependencyVersions(gradleProject, buildScript, ctx);
         managed.collectPlatforms(buildScript, ctx);
         return managed;
+    }
+
+    /**
+     * Versions the Spring dependency management plugin manages, as read from the build script.
+     */
+    public Map<GroupArtifact, @Nullable String> getSpringPluginManaged() {
+        if (!springPluginManagedCollected) {
+            springPluginManagedCollected = true;
+            collectSpringPluginManaged(buildScript, ctx);
+        }
+        return springPluginManaged;
     }
 
     /**
@@ -70,7 +85,11 @@ public class ManagedDependencyVersions {
      * in the configurations it extends from.
      */
     public @Nullable String getManagedVersion(String configuration, String groupId, String artifactId, @Nullable String classifier) {
-        String springManaged = springPluginManaged.get(new GroupArtifact(groupId, artifactId));
+        // The plugin's own state, on LSTs that record it, has placeholders resolved and includes programmatic BOM imports
+        SpringDependencyManagementPlugin plugin = gradleProject.getSpringDependencyManagementPlugin();
+        String springManaged = plugin != null ?
+                plugin.getManagedVersions().get(groupId + ":" + artifactId) :
+                getSpringPluginManaged().get(new GroupArtifact(groupId, artifactId));
         if (springManaged != null) {
             return springManaged;
         }
