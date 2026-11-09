@@ -33,6 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.joining;
 
@@ -73,12 +74,12 @@ public class RemoveDuplicateDependencies extends Recipe {
                     return t;
                 }
                 if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
-                    return removeDuplicates(t, managedDeclarationToKeep());
+                    return removeDuplicates(t, this::managedDeclarationToKeep);
                 }
                 if (DEPENDENCIES_MATCHER.matches(getCursor()) ||
                     PROFILE_DEPENDENCIES_MATCHER.matches(getCursor()) ||
                     PROFILE_MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
-                    return removeDuplicates(t, this::last);
+                    return removeDuplicates(t, () -> this::last);
                 }
                 return t;
             }
@@ -161,7 +162,8 @@ public class RemoveDuplicateDependencies extends Recipe {
                 return result;
             }
 
-            private Xml.Tag removeDuplicates(Xml.Tag dependencies, Function<List<Xml.Tag>, Xml.Tag> declarationToKeep) {
+            private Xml.Tag removeDuplicates(Xml.Tag dependencies,
+                                             Supplier<Function<List<Xml.Tag>, Xml.Tag>> declarationToKeepSupplier) {
                 Map<String, List<Xml.Tag>> declarations = new HashMap<>();
                 for (Xml.Tag dependency : dependencies.getChildren("dependency")) {
                     String key = managementKey(dependency);
@@ -173,6 +175,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                     return dependencies;
                 }
 
+                Function<List<Xml.Tag>, Xml.Tag> declarationToKeep = declarationToKeepSupplier.get();
                 List<Content> content = new ArrayList<>();
                 for (Content c : dependencies.getContent()) {
                     String key = c instanceof Xml.Tag && "dependency".equals(((Xml.Tag) c).getName()) ?
