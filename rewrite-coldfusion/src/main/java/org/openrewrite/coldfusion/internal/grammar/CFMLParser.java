@@ -16,6 +16,7 @@
 // Generated from rewrite-coldfusion/src/main/antlr/CFMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.coldfusion.internal.grammar;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -216,6 +217,25 @@ public class CFMLParser extends Parser {
 	@Override
 	public ATN getATN() { return _ATN; }
 
+
+	    // Most nodes have one child. Under the JVM's default compressed references, room for two takes no
+	    // more memory than room for one.
+	    public static class CompactContext extends ParserRuleContext {
+	        public CompactContext() {
+	        }
+
+	        public CompactContext(ParserRuleContext parent, int invokingStateNumber) {
+	            super(parent, invokingStateNumber);
+	        }
+
+	        @Override
+	        public <T extends ParseTree> T addAnyChild(T t) {
+	            if (children == null) {
+	                children = new ArrayList<>(2);
+	            }
+	            return super.addAnyChild(t);
+	        }
+	    }
 
 	    // Tags written as script statements that take an expression rather than attributes.
 	    private static final Set<String> EXPRESSION_SCRIPT_TAGS = new HashSet<String>(Arrays.asList(
@@ -578,7 +598,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TemplateContext extends ParserRuleContext {
+	public static class TemplateContext extends CompactContext {
 		public TerminalNode EOF() { return getToken(CFMLParser.EOF, 0); }
 		public List<TemplateElementContext> templateElement() {
 			return getRuleContexts(TemplateElementContext.class);
@@ -642,7 +662,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ScriptComponentContext extends ParserRuleContext {
+	public static class ScriptComponentContext extends CompactContext {
 		public TerminalNode EOF() { return getToken(CFMLParser.EOF, 0); }
 		public List<PaddedStatementContext> paddedStatement() {
 			return getRuleContexts(PaddedStatementContext.class);
@@ -706,7 +726,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TemplateElementContext extends ParserRuleContext {
+	public static class TemplateElementContext extends CompactContext {
 		public TemplateElementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -906,7 +926,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StartTagContext extends ParserRuleContext {
+	public static class StartTagContext extends CompactContext {
 		public TerminalNode START_TAG_OPEN() { return getToken(CFMLParser.START_TAG_OPEN, 0); }
 		public TerminalNode TAG_CLOSE() { return getToken(CFMLParser.TAG_CLOSE, 0); }
 		public TerminalNode TAG_SELF_CLOSE() { return getToken(CFMLParser.TAG_SELF_CLOSE, 0); }
@@ -1021,7 +1041,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CfscriptTagContext extends ParserRuleContext {
+	public static class CfscriptTagContext extends CompactContext {
 		public TerminalNode CFSCRIPT_OPEN() { return getToken(CFMLParser.CFSCRIPT_OPEN, 0); }
 		public TerminalNode TAG_SELF_CLOSE() { return getToken(CFMLParser.TAG_SELF_CLOSE, 0); }
 		public TerminalNode TAG_CLOSE() { return getToken(CFMLParser.TAG_CLOSE, 0); }
@@ -1131,7 +1151,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class EndTagContext extends ParserRuleContext {
+	public static class EndTagContext extends CompactContext {
 		public TerminalNode END_TAG_OPEN() { return getToken(CFMLParser.END_TAG_OPEN, 0); }
 		public TerminalNode END_TAG_CLOSE() { return getToken(CFMLParser.END_TAG_CLOSE, 0); }
 		public EndTagContext(ParserRuleContext parent, int invokingState) {
@@ -1177,7 +1197,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TagAttributeContext extends ParserRuleContext {
+	public static class TagAttributeContext extends CompactContext {
 		public TerminalNode ATTRIBUTE_NAME() { return getToken(CFMLParser.ATTRIBUTE_NAME, 0); }
 		public TerminalNode TAG_EQUALS() { return getToken(CFMLParser.TAG_EQUALS, 0); }
 		public AttributeValueContext attributeValue() {
@@ -1237,7 +1257,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AttributeValueContext extends ParserRuleContext {
+	public static class AttributeValueContext extends CompactContext {
 		public StringLiteralContext stringLiteral() {
 			return getRuleContext(StringLiteralContext.class,0);
 		}
@@ -1336,7 +1356,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class InterpolationContext extends ParserRuleContext {
+	public static class InterpolationContext extends CompactContext {
 		public TerminalNode HASH() { return getToken(CFMLParser.HASH, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
@@ -1387,7 +1407,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PaddedStatementContext extends ParserRuleContext {
+	public static class PaddedStatementContext extends CompactContext {
 		public FunctionDeclarationContext functionDeclaration() {
 			return getRuleContext(FunctionDeclarationContext.class,0);
 		}
@@ -1467,7 +1487,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StatementContext extends ParserRuleContext {
+	public static class StatementContext extends CompactContext {
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -1688,7 +1708,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class BlockContext extends ParserRuleContext {
+	public static class BlockContext extends CompactContext {
 		public TerminalNode RBRACE() { return getToken(CFMLParser.RBRACE, 0); }
 		public TerminalNode LBRACE() { return getToken(CFMLParser.LBRACE, 0); }
 		public TerminalNode BLOCK_LBRACE() { return getToken(CFMLParser.BLOCK_LBRACE, 0); }
@@ -1764,7 +1784,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class BodyBlockContext extends ParserRuleContext {
+	public static class BodyBlockContext extends CompactContext {
 		public TerminalNode BODY_LBRACE() { return getToken(CFMLParser.BODY_LBRACE, 0); }
 		public TerminalNode RBRACE() { return getToken(CFMLParser.RBRACE, 0); }
 		public List<PaddedStatementContext> paddedStatement() {
@@ -1831,7 +1851,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class IfStatementContext extends ParserRuleContext {
+	public static class IfStatementContext extends CompactContext {
 		public TerminalNode IF() { return getToken(CFMLParser.IF, 0); }
 		public IfTailContext ifTail() {
 			return getRuleContext(IfTailContext.class,0);
@@ -1879,7 +1899,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class IfTailContext extends ParserRuleContext {
+	public static class IfTailContext extends CompactContext {
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
@@ -1948,7 +1968,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ElseClauseContext extends ParserRuleContext {
+	public static class ElseClauseContext extends CompactContext {
 		public TerminalNode ELSE() { return getToken(CFMLParser.ELSE, 0); }
 		public PaddedStatementContext paddedStatement() {
 			return getRuleContext(PaddedStatementContext.class,0);
@@ -2017,7 +2037,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ForInStatementContext extends ParserRuleContext {
+	public static class ForInStatementContext extends CompactContext {
 		public TerminalNode FOR() { return getToken(CFMLParser.FOR, 0); }
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public ForInVariableContext forInVariable() {
@@ -2084,7 +2104,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ForInVariableContext extends ParserRuleContext {
+	public static class ForInVariableContext extends CompactContext {
 		public TerminalNode VAR() { return getToken(CFMLParser.VAR, 0); }
 		public List<AnyWordContext> anyWord() {
 			return getRuleContexts(AnyWordContext.class);
@@ -2169,7 +2189,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ForStatementContext extends ParserRuleContext {
+	public static class ForStatementContext extends CompactContext {
 		public TerminalNode FOR() { return getToken(CFMLParser.FOR, 0); }
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public List<ForClausesContext> forClauses() {
@@ -2255,7 +2275,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ForClausesContext extends ParserRuleContext {
+	public static class ForClausesContext extends CompactContext {
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
 		}
@@ -2340,7 +2360,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class WhileStatementContext extends ParserRuleContext {
+	public static class WhileStatementContext extends CompactContext {
 		public TerminalNode WHILE() { return getToken(CFMLParser.WHILE, 0); }
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public ExpressionContext expression() {
@@ -2399,7 +2419,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class DoWhileStatementContext extends ParserRuleContext {
+	public static class DoWhileStatementContext extends CompactContext {
 		public TerminalNode DO() { return getToken(CFMLParser.DO, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
@@ -2473,7 +2493,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class SwitchStatementContext extends ParserRuleContext {
+	public static class SwitchStatementContext extends CompactContext {
 		public TerminalNode SWITCH() { return getToken(CFMLParser.SWITCH, 0); }
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public ExpressionContext expression() {
@@ -2554,7 +2574,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CaseClauseContext extends ParserRuleContext {
+	public static class CaseClauseContext extends CompactContext {
 		public TerminalNode COLON() { return getToken(CFMLParser.COLON, 0); }
 		public TerminalNode CASE() { return getToken(CFMLParser.CASE, 0); }
 		public TernaryExpressionContext ternaryExpression() {
@@ -2645,7 +2665,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TryStatementContext extends ParserRuleContext {
+	public static class TryStatementContext extends CompactContext {
 		public TerminalNode TRY() { return getToken(CFMLParser.TRY, 0); }
 		public List<BlockContext> block() {
 			return getRuleContexts(BlockContext.class);
@@ -2732,7 +2752,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CatchClauseContext extends ParserRuleContext {
+	public static class CatchClauseContext extends CompactContext {
 		public TerminalNode CATCH() { return getToken(CFMLParser.CATCH, 0); }
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public CatchParameterContext catchParameter() {
@@ -2791,7 +2811,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CatchParameterContext extends ParserRuleContext {
+	public static class CatchParameterContext extends CompactContext {
 		public TerminalNode VAR() { return getToken(CFMLParser.VAR, 0); }
 		public AnyWordContext anyWord() {
 			return getRuleContext(AnyWordContext.class,0);
@@ -2875,7 +2895,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class CatchTypeContext extends ParserRuleContext {
+	public static class CatchTypeContext extends CompactContext {
 		public StringLiteralContext stringLiteral() {
 			return getRuleContext(StringLiteralContext.class,0);
 		}
@@ -3021,7 +3041,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ReturnStatementContext extends ParserRuleContext {
+	public static class ReturnStatementContext extends CompactContext {
 		public TerminalNode RETURN() { return getToken(CFMLParser.RETURN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
@@ -3085,7 +3105,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class BreakStatementContext extends ParserRuleContext {
+	public static class BreakStatementContext extends CompactContext {
 		public TerminalNode BREAK() { return getToken(CFMLParser.BREAK, 0); }
 		public TerminalNode IDENTIFIER() { return getToken(CFMLParser.IDENTIFIER, 0); }
 		public BreakStatementContext(ParserRuleContext parent, int invokingState) {
@@ -3141,7 +3161,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ContinueStatementContext extends ParserRuleContext {
+	public static class ContinueStatementContext extends CompactContext {
 		public TerminalNode CONTINUE() { return getToken(CFMLParser.CONTINUE, 0); }
 		public TerminalNode IDENTIFIER() { return getToken(CFMLParser.IDENTIFIER, 0); }
 		public ContinueStatementContext(ParserRuleContext parent, int invokingState) {
@@ -3197,7 +3217,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ThrowStatementContext extends ParserRuleContext {
+	public static class ThrowStatementContext extends CompactContext {
 		public TerminalNode THROW() { return getToken(CFMLParser.THROW, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
@@ -3245,7 +3265,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ComponentDeclarationContext extends ParserRuleContext {
+	public static class ComponentDeclarationContext extends CompactContext {
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -3353,7 +3373,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PropertyDeclarationContext extends ParserRuleContext {
+	public static class PropertyDeclarationContext extends CompactContext {
 		public TerminalNode PROPERTY() { return getToken(CFMLParser.PROPERTY, 0); }
 		public DottedNameContext dottedName() {
 			return getRuleContext(DottedNameContext.class,0);
@@ -3451,7 +3471,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ImportStatementContext extends ParserRuleContext {
+	public static class ImportStatementContext extends CompactContext {
 		public TerminalNode IMPORT() { return getToken(CFMLParser.IMPORT, 0); }
 		public List<AnyWordContext> anyWord() {
 			return getRuleContexts(AnyWordContext.class);
@@ -3601,7 +3621,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StaticInitializerContext extends ParserRuleContext {
+	public static class StaticInitializerContext extends CompactContext {
 		public TerminalNode STATIC() { return getToken(CFMLParser.STATIC, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
@@ -3649,7 +3669,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ScriptTagContext extends ParserRuleContext {
+	public static class ScriptTagContext extends CompactContext {
 		public TerminalNode SCRIPT_TAG_NAME() { return getToken(CFMLParser.SCRIPT_TAG_NAME, 0); }
 		public List<StatementAttributeContext> statementAttribute() {
 			return getRuleContexts(StatementAttributeContext.class);
@@ -3796,7 +3816,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ExpressionStatementContext extends ParserRuleContext {
+	public static class ExpressionStatementContext extends CompactContext {
 		public ExpressionContext expression;
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
@@ -3857,7 +3877,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class FunctionDeclarationContext extends ParserRuleContext {
+	public static class FunctionDeclarationContext extends CompactContext {
 		public TerminalNode FUNCTION() { return getToken(CFMLParser.FUNCTION, 0); }
 		public AnyWordContext anyWord() {
 			return getRuleContext(AnyWordContext.class,0);
@@ -4037,7 +4057,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class FunctionModifierContext extends ParserRuleContext {
+	public static class FunctionModifierContext extends CompactContext {
 		public TerminalNode PUBLIC() { return getToken(CFMLParser.PUBLIC, 0); }
 		public TerminalNode PRIVATE() { return getToken(CFMLParser.PRIVATE, 0); }
 		public TerminalNode PACKAGE() { return getToken(CFMLParser.PACKAGE, 0); }
@@ -4095,7 +4115,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ReturnTypeContext extends ParserRuleContext {
+	public static class ReturnTypeContext extends CompactContext {
 		public TerminalNode TYPE_WORD() { return getToken(CFMLParser.TYPE_WORD, 0); }
 		public List<AnyWordContext> anyWord() {
 			return getRuleContexts(AnyWordContext.class);
@@ -4191,7 +4211,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ParameterListContext extends ParserRuleContext {
+	public static class ParameterListContext extends CompactContext {
 		public TerminalNode LPAREN() { return getToken(CFMLParser.LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(CFMLParser.RPAREN, 0); }
 		public ParametersContext parameters() {
@@ -4251,7 +4271,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ParametersContext extends ParserRuleContext {
+	public static class ParametersContext extends CompactContext {
 		public List<ParameterContext> parameter() {
 			return getRuleContexts(ParameterContext.class);
 		}
@@ -4341,7 +4361,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ParameterContext extends ParserRuleContext {
+	public static class ParameterContext extends CompactContext {
 		public AnyWordContext anyWord() {
 			return getRuleContext(AnyWordContext.class,0);
 		}
@@ -4451,7 +4471,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ParameterTypeContext extends ParserRuleContext {
+	public static class ParameterTypeContext extends CompactContext {
 		public DottedNameContext dottedName() {
 			return getRuleContext(DottedNameContext.class,0);
 		}
@@ -4520,7 +4540,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class HeaderAttributeContext extends ParserRuleContext {
+	public static class HeaderAttributeContext extends CompactContext {
 		public AttributeNameContext attributeName() {
 			return getRuleContext(AttributeNameContext.class,0);
 		}
@@ -4582,7 +4602,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StatementAttributeContext extends ParserRuleContext {
+	public static class StatementAttributeContext extends CompactContext {
 		public TerminalNode ATTRIBUTE_WORD() { return getToken(CFMLParser.ATTRIBUTE_WORD, 0); }
 		public TerminalNode ASSIGN() { return getToken(CFMLParser.ASSIGN, 0); }
 		public TernaryExpressionContext ternaryExpression() {
@@ -4763,7 +4783,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class NamedAttributeContext extends ParserRuleContext {
+	public static class NamedAttributeContext extends CompactContext {
 		public AttributeNameContext attributeName() {
 			return getRuleContext(AttributeNameContext.class,0);
 		}
@@ -4816,7 +4836,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AttributeNameContext extends ParserRuleContext {
+	public static class AttributeNameContext extends CompactContext {
 		public List<AnyWordContext> anyWord() {
 			return getRuleContexts(AnyWordContext.class);
 		}
@@ -4980,7 +5000,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ExpressionContext extends ParserRuleContext {
+	public static class ExpressionContext extends CompactContext {
 		public TernaryExpressionContext ternaryExpression() {
 			return getRuleContext(TernaryExpressionContext.class,0);
 		}
@@ -5043,7 +5063,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AssignmentOperatorContext extends ParserRuleContext {
+	public static class AssignmentOperatorContext extends CompactContext {
 		public TerminalNode ASSIGN() { return getToken(CFMLParser.ASSIGN, 0); }
 		public TerminalNode PLUS_ASSIGN() { return getToken(CFMLParser.PLUS_ASSIGN, 0); }
 		public TerminalNode MINUS_ASSIGN() { return getToken(CFMLParser.MINUS_ASSIGN, 0); }
@@ -5101,7 +5121,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TernaryExpressionContext extends ParserRuleContext {
+	public static class TernaryExpressionContext extends CompactContext {
 		public ImplicationExpressionContext implicationExpression() {
 			return getRuleContext(ImplicationExpressionContext.class,0);
 		}
@@ -5179,7 +5199,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ImplicationExpressionContext extends ParserRuleContext {
+	public static class ImplicationExpressionContext extends CompactContext {
 		public List<EquivalenceExpressionContext> equivalenceExpression() {
 			return getRuleContexts(EquivalenceExpressionContext.class);
 		}
@@ -5250,7 +5270,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class EquivalenceExpressionContext extends ParserRuleContext {
+	public static class EquivalenceExpressionContext extends CompactContext {
 		public List<XorExpressionContext> xorExpression() {
 			return getRuleContexts(XorExpressionContext.class);
 		}
@@ -5321,7 +5341,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class XorExpressionContext extends ParserRuleContext {
+	public static class XorExpressionContext extends CompactContext {
 		public List<OrExpressionContext> orExpression() {
 			return getRuleContexts(OrExpressionContext.class);
 		}
@@ -5392,7 +5412,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class OrExpressionContext extends ParserRuleContext {
+	public static class OrExpressionContext extends CompactContext {
 		public List<AndExpressionContext> andExpression() {
 			return getRuleContexts(AndExpressionContext.class);
 		}
@@ -5476,7 +5496,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AndExpressionContext extends ParserRuleContext {
+	public static class AndExpressionContext extends CompactContext {
 		public List<NotExpressionContext> notExpression() {
 			return getRuleContexts(NotExpressionContext.class);
 		}
@@ -5560,7 +5580,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class NotExpressionContext extends ParserRuleContext {
+	public static class NotExpressionContext extends CompactContext {
 		public NotExpressionContext notExpression() {
 			return getRuleContext(NotExpressionContext.class,0);
 		}
@@ -5634,7 +5654,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ComparisonExpressionContext extends ParserRuleContext {
+	public static class ComparisonExpressionContext extends CompactContext {
 		public List<ConcatExpressionContext> concatExpression() {
 			return getRuleContexts(ConcatExpressionContext.class);
 		}
@@ -5707,7 +5727,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ComparisonOperatorContext extends ParserRuleContext {
+	public static class ComparisonOperatorContext extends CompactContext {
 		public TerminalNode GREATER_THAN_OR_EQUAL_TO() { return getToken(CFMLParser.GREATER_THAN_OR_EQUAL_TO, 0); }
 		public TerminalNode LESS_THAN_OR_EQUAL_TO() { return getToken(CFMLParser.LESS_THAN_OR_EQUAL_TO, 0); }
 		public TerminalNode GREATER_THAN() { return getToken(CFMLParser.GREATER_THAN, 0); }
@@ -5785,7 +5805,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ConcatExpressionContext extends ParserRuleContext {
+	public static class ConcatExpressionContext extends CompactContext {
 		public List<AdditiveExpressionContext> additiveExpression() {
 			return getRuleContexts(AdditiveExpressionContext.class);
 		}
@@ -5856,7 +5876,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AdditiveExpressionContext extends ParserRuleContext {
+	public static class AdditiveExpressionContext extends CompactContext {
 		public List<ModuloExpressionContext> moduloExpression() {
 			return getRuleContexts(ModuloExpressionContext.class);
 		}
@@ -5940,7 +5960,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ModuloExpressionContext extends ParserRuleContext {
+	public static class ModuloExpressionContext extends CompactContext {
 		public List<IntegerDivisionExpressionContext> integerDivisionExpression() {
 			return getRuleContexts(IntegerDivisionExpressionContext.class);
 		}
@@ -6024,7 +6044,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class IntegerDivisionExpressionContext extends ParserRuleContext {
+	public static class IntegerDivisionExpressionContext extends CompactContext {
 		public List<MultiplicativeExpressionContext> multiplicativeExpression() {
 			return getRuleContexts(MultiplicativeExpressionContext.class);
 		}
@@ -6095,7 +6115,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class MultiplicativeExpressionContext extends ParserRuleContext {
+	public static class MultiplicativeExpressionContext extends CompactContext {
 		public List<PowerExpressionContext> powerExpression() {
 			return getRuleContexts(PowerExpressionContext.class);
 		}
@@ -6179,7 +6199,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PowerExpressionContext extends ParserRuleContext {
+	public static class PowerExpressionContext extends CompactContext {
 		public UnaryExpressionContext unaryExpression() {
 			return getRuleContext(UnaryExpressionContext.class,0);
 		}
@@ -6240,7 +6260,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class UnaryExpressionContext extends ParserRuleContext {
+	public static class UnaryExpressionContext extends CompactContext {
 		public UnaryExpressionContext unaryExpression() {
 			return getRuleContext(UnaryExpressionContext.class,0);
 		}
@@ -6390,7 +6410,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PostfixExpressionContext extends ParserRuleContext {
+	public static class PostfixExpressionContext extends CompactContext {
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
 		}
@@ -6458,7 +6478,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PostfixOperatorContext extends ParserRuleContext {
+	public static class PostfixOperatorContext extends CompactContext {
 		public MemberNameContext memberName() {
 			return getRuleContext(MemberNameContext.class,0);
 		}
@@ -6568,7 +6588,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class MemberNameContext extends ParserRuleContext {
+	public static class MemberNameContext extends CompactContext {
 		public TerminalNode IDENTIFIER() { return getToken(CFMLParser.IDENTIFIER, 0); }
 		public TerminalNode NUMBER() { return getToken(CFMLParser.NUMBER, 0); }
 		public MemberNameContext(ParserRuleContext parent, int invokingState) {
@@ -6621,7 +6641,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ArgumentsContext extends ParserRuleContext {
+	public static class ArgumentsContext extends CompactContext {
 		public TerminalNode CALL_LPAREN() { return getToken(CFMLParser.CALL_LPAREN, 0); }
 		public TerminalNode RPAREN() { return getToken(CFMLParser.RPAREN, 0); }
 		public ArgumentListContext argumentList() {
@@ -6681,7 +6701,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ArgumentListContext extends ParserRuleContext {
+	public static class ArgumentListContext extends CompactContext {
 		public List<ArgumentContext> argument() {
 			return getRuleContexts(ArgumentContext.class);
 		}
@@ -6777,7 +6797,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ArgumentContext extends ParserRuleContext {
+	public static class ArgumentContext extends CompactContext {
 		public ArgumentContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6962,7 +6982,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class PrimaryContext extends ParserRuleContext {
+	public static class PrimaryContext extends CompactContext {
 		public PrimaryContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -7605,7 +7625,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StructEntryContext extends ParserRuleContext {
+	public static class StructEntryContext extends CompactContext {
 		public StructKeyContext structKey() {
 			return getRuleContext(StructKeyContext.class,0);
 		}
@@ -7668,7 +7688,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StructKeyContext extends ParserRuleContext {
+	public static class StructKeyContext extends CompactContext {
 		public StringLiteralContext stringLiteral() {
 			return getRuleContext(StringLiteralContext.class,0);
 		}
@@ -7890,7 +7910,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ClosureContext extends ParserRuleContext {
+	public static class ClosureContext extends CompactContext {
 		public TerminalNode FUNCTION() { return getToken(CFMLParser.FUNCTION, 0); }
 		public ParameterListContext parameterList() {
 			return getRuleContext(ParameterListContext.class,0);
@@ -7964,7 +7984,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ArrowFunctionContext extends ParserRuleContext {
+	public static class ArrowFunctionContext extends CompactContext {
 		public ParameterListContext parameterList() {
 			return getRuleContext(ParameterListContext.class,0);
 		}
@@ -8099,7 +8119,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class ArrowBodyContext extends ParserRuleContext {
+	public static class ArrowBodyContext extends CompactContext {
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -8178,7 +8198,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class TypeNameContext extends ParserRuleContext {
+	public static class TypeNameContext extends CompactContext {
 		public StringLiteralContext stringLiteral() {
 			return getRuleContext(StringLiteralContext.class,0);
 		}
@@ -8300,7 +8320,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class DottedNameContext extends ParserRuleContext {
+	public static class DottedNameContext extends CompactContext {
 		public List<AnyWordContext> anyWord() {
 			return getRuleContexts(AnyWordContext.class);
 		}
@@ -8371,7 +8391,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class StringLiteralContext extends ParserRuleContext {
+	public static class StringLiteralContext extends CompactContext {
 		public TerminalNode DQ_OPEN() { return getToken(CFMLParser.DQ_OPEN, 0); }
 		public TerminalNode DQ_CLOSE() { return getToken(CFMLParser.DQ_CLOSE, 0); }
 		public List<TerminalNode> DQ_TEXT() { return getTokens(CFMLParser.DQ_TEXT); }
@@ -8507,7 +8527,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class IdentifierContext extends ParserRuleContext {
+	public static class IdentifierContext extends CompactContext {
 		public TerminalNode IDENTIFIER() { return getToken(CFMLParser.IDENTIFIER, 0); }
 		public IdentifierContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -8550,7 +8570,7 @@ public class CFMLParser extends Parser {
 	}
 
 	@SuppressWarnings("CheckReturnValue")
-	public static class AnyWordContext extends ParserRuleContext {
+	public static class AnyWordContext extends CompactContext {
 		public TerminalNode IDENTIFIER() { return getToken(CFMLParser.IDENTIFIER, 0); }
 		public TerminalNode TYPE_WORD() { return getToken(CFMLParser.TYPE_WORD, 0); }
 		public TerminalNode SCRIPT_TAG_NAME() { return getToken(CFMLParser.SCRIPT_TAG_NAME, 0); }
