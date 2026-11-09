@@ -207,9 +207,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if ("dependencies".equals(m.getSimpleName())) {
-                                        statementsToRemove.addAll(redundantDuplicates(m, getCursor()));
-                                    } else if ("constraints".equals(m.getSimpleName())) {
+                                    if ("constraints".equals(m.getSimpleName())) {
                                         if (m.getArguments().isEmpty() ||
                                             !(m.getArguments().get(0) instanceof J.Lambda) ||
                                             !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
@@ -361,6 +359,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             .orElse(m);
                                 }
                             }.visitNonNull(tree, ctx);
+
+                            J visited = super.visit(tree, ctx);
+                            return visited == null ? null : withoutDuplicates(visited, ctx);
                         }
                         return super.visit(tree, ctx);
                     }
@@ -442,11 +443,32 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * The older declarations of a dependency declared more than once in one configuration, where Gradle resolves the
-     * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
-     * Java agent. Only the statements of the {@code dependencies} block itself are compared, as a declaration nested
-     * in a condition may not apply. A dependency is left alone unless every one of its declarations in the
-     * configuration is simple, and no two of its versions are written differently but rank the same.
+     * Runs after managed versions are removed, so that declarations which that leaves identical go in the same cycle.
+     */
+    private J withoutDuplicates(J sourceFile, ExecutionContext ctx) {
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (!"dependencies".equals(m.getSimpleName())) {
+                    return m;
+                }
+                Cursor cursor = new Cursor(getCursor().getParentOrThrow(), m);
+                Set<J.MethodInvocation> duplicates = redundantDuplicates(m, cursor);
+                return duplicates.isEmpty() ? m : new GradleDependencies.Matcher().get(cursor)
+                        .map(dependencies -> dependencies.filterStatements(s -> !duplicates.contains(s)))
+                        .map(Trait::getTree)
+                        .orElse(m);
+            }
+        }.visitNonNull(sourceFile, ctx);
+    }
+
+    /**
+     * The redundant declarations of a dependency declared more than once in one configuration, all of them simple.
+     * Identical ones repeat the first. Otherwise older numeric versions are redundant, as Gradle resolves the newest,
+     * unless two versions are written differently but rank the same. Declarations in other configurations are not
+     * compared, as they can serve another purpose, such as a Java agent. Only the statements of the
+     * {@code dependencies} block itself are compared, as a declaration nested in a condition may not apply.
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor) {
         Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
@@ -472,8 +494,20 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
         Set<J.MethodInvocation> redundant = new HashSet<>();
         for (List<GradleDependency> sameDependency : declarations.values()) {
+            Set<@Nullable List<@Nullable String>> notations = sameDependency.stream()
+                    .map(RemoveRedundantDependencyVersions::simpleNotation)
+                    .collect(toSet());
+            if (notations.contains(null)) {
+                continue;
+            }
+            if (notations.size() == 1) {
+                sameDependency.stream()
+                        .skip(1)
+                        .forEach(declaration -> redundant.add(declaration.getTree()));
+                continue;
+            }
             Set<@Nullable String> versions = sameDependency.stream()
-                    .map(RemoveRedundantDependencyVersions::simpleVersion)
+                    .map(RemoveRedundantDependencyVersions::numericVersion)
                     .collect(toSet());
             if (versions.contains(null)) {
                 continue;
@@ -484,7 +518,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 continue;
             }
             sameDependency.stream()
-                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(simpleVersion(d2), simpleVersion(d1)))
+                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(numericVersion(d2), numericVersion(d1)))
                     .skip(1)
                     .forEach(declaration -> redundant.add(declaration.getTree()));
         }
@@ -492,12 +526,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * The version of a declaration that names only a group, an artifact and a numeric version, as {@code "g:a:v"} or
-     * as named arguments, possibly inside {@code platform(...)}. Anything more can change what is resolved, so it
-     * gives null. The version comparator here ranks qualifiers such as {@code -dev} and parts with leading zeros
-     * unlike Gradle, so those give null too. A part has at most 18 digits, which keeps it within a {@code long}.
+     * The group, artifact and version, if any, of a declaration that names nothing else, as {@code "g:a"},
+     * {@code "g:a:v"} or named arguments, possibly inside {@code platform(...)}. Anything more can change what is
+     * resolved, so it gives null.
      */
-    private static @Nullable String simpleVersion(GradleDependency declaration) {
+    private static @Nullable List<@Nullable String> simpleNotation(GradleDependency declaration) {
         List<Expression> arguments = declaration.getTree().getArguments();
         if (declaration.isPlatform()) {
             if (arguments.size() != 1 || !(arguments.get(0) instanceof J.MethodInvocation)) {
@@ -505,21 +538,36 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
             arguments = ((J.MethodInvocation) arguments.get(0)).getArguments();
         }
-        String version = null;
         if (arguments.size() == 1 && arguments.get(0) instanceof J.Literal) {
             Object notation = ((J.Literal) arguments.get(0)).getValue();
-            if (notation instanceof String && !((String) notation).contains("@")) {
-                String[] parts = ((String) notation).split(":", -1);
-                if (parts.length == 3 && !parts[0].isEmpty() && !parts[1].isEmpty()) {
-                    version = parts[2];
-                }
+            if (!(notation instanceof String) || ((String) notation).contains("@")) {
+                return null;
             }
-        } else {
-            Map<String, String> named = namedLiterals(arguments);
-            if (named != null && named.keySet().equals(new HashSet<>(Arrays.asList("group", "name", "version")))) {
-                version = named.get("version");
+            List<@Nullable String> parts = new ArrayList<>(Arrays.asList(((String) notation).split(":", -1)));
+            if (parts.size() < 2 || parts.size() > 3 || parts.contains("")) {
+                return null;
             }
+            if (parts.size() == 2) {
+                parts.add(null);
+            }
+            return parts;
         }
+        Map<String, String> named = namedLiterals(arguments);
+        if (named == null || !named.containsKey("group") || !named.containsKey("name") ||
+                named.size() != (named.containsKey("version") ? 3 : 2)) {
+            return null;
+        }
+        return Arrays.asList(named.get("group"), named.get("name"), named.get("version"));
+    }
+
+    /**
+     * The version of a simple declaration when it is numeric. The version comparator here ranks qualifiers such as
+     * {@code -dev} and parts with leading zeros unlike Gradle, so those give null. A part has at most 18 digits,
+     * which keeps it within a {@code long}.
+     */
+    private static @Nullable String numericVersion(GradleDependency declaration) {
+        List<@Nullable String> notation = simpleNotation(declaration);
+        String version = notation == null ? null : notation.get(2);
         return version != null && NUMERIC_VERSION.matcher(version).matches() ? version : null;
     }
 
