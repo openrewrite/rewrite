@@ -276,7 +276,7 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
-    public void UsingGoesAfterAConditionalBlockOfUsings()
+    public void FileOpeningWithAConditionalBlockGetsTheUsingAboveIt()
     {
         var after = ApplyAddUsing(
             """
@@ -293,21 +293,17 @@ public class AddUsingTests : RewriteTest
 
         Assert.Equal(
             """
+            using System.Threading.Tasks;
             #if FEATURE_X
             using System.Diagnostics;
             #endif
-            using System.Threading.Tasks;
 
             public class C
             {
             }
             """, after);
-    }
 
-    [Fact]
-    public void ConfigurationThatCompilesNoDeclarationGetsNoUsing()
-    {
-        var after = ApplyAddUsing(
+        var wholeFile = ApplyAddUsing(
             """
             #if !FEATURE_X
             public class C
@@ -320,18 +316,50 @@ public class AddUsingTests : RewriteTest
 
         Assert.Equal(
             """
-            #if !FEATURE_X
             using System.Threading.Tasks;
-
+            #if !FEATURE_X
             public class C
             {
             }
             #endif
+            """, wholeFile);
+    }
+
+    [Fact]
+    public void UsingStaysAboveAConditionalBlockAmongTheUsings()
+    {
+        var after = ApplyAddUsing(
+            """
+            using System;
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+            using Xunit;
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System;
+            using System.Threading.Tasks;
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+            using Xunit;
+
+            public class C
+            {
+            }
             """, after);
     }
 
     [Fact]
-    public void UsingAlreadyPresentInAFileWithConditionalDirectivesIsANoOp()
+    public void UsingPresentInEveryConfigurationThatDeclaresSomethingIsANoOp()
     {
         var cu = Parse(
             """
@@ -345,9 +373,49 @@ public class AddUsingTests : RewriteTest
             }
             """);
 
-        var result = new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0);
+        Assert.Same(cu, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0));
 
-        Assert.Same(cu, result);
+        var wholeFile = Parse(
+            """
+            #if !FEATURE_X
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            }
+            #endif
+            """);
+
+        Assert.Same(wholeFile, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(wholeFile, 0));
+    }
+
+    [Fact]
+    public void UsingPresentInOnlySomeConfigurationsIsAddedForAll()
+    {
+        var after = ApplyAddUsing(
+            """
+            #if FEATURE_X
+            using System.Threading.Tasks;
+            #endif
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            #if FEATURE_X
+            using System.Threading.Tasks;
+            #endif
+
+            public class C
+            {
+            }
+            """, after);
     }
 
     [Fact]
