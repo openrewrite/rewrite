@@ -21,6 +21,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+/// Kept only so that older recipes and LSTs still load. A recipe whose edit must not be applied
+/// twice in one run should return `1` from [org.openrewrite.Recipe#maxCycles()] instead.
+@Deprecated
 @Value
 @With
 public class AlreadyIncremented implements Marker {

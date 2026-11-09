@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.test.RewriteTest;
@@ -49,8 +48,7 @@ class PlainTextParserConversionTest implements RewriteTest {
               spec.afterRecipe(run -> {
                   SourceFile result = run.getChangeset().getAllResults().getFirst().getAfter();
                   assertThat(result).isInstanceOf(PlainText.class);
-                  assertThat(result.getMarkers().getMarkers()).hasSize(3);
-                  assertThat(result.getMarkers().findAll(AlreadyReplaced.class)).isNotEmpty();
+                  assertThat(result.getMarkers().getMarkers()).hasSize(2);
                   assertThat(result.getMarkers().findAll(Markup.class)).isNotEmpty();
                   assertThat(result.getMarkers().findFirst(RecipesThatMadeChanges.class).get().getRecipes()).hasSize(2);
               });

@@ -19,14 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.marker.AlreadyReplaced;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -66,6 +63,11 @@ public class ChangeTagValue extends Recipe {
         //noinspection ConstantValue
         return super.validate(ctx).and(Validated.test("regex", "Regex usage requires an `oldValue`", regex,
                 value -> value == null || oldValue != null && !oldValue.equals(newValue)));
+    }
+
+    @Override
+    public int maxCycles() {
+        return Boolean.TRUE.equals(regex) ? 1 : super.maxCycles();
     }
 
     @Override
@@ -117,15 +119,7 @@ public class ChangeTagValue extends Recipe {
         private Xml.Tag updateUsingRegex(Xml.Tag t, Xml.CharData content) {
             String text = content.getText();
             if (Pattern.compile(oldValue).matcher(text).find()) {
-                Markers oldMarkers = content.getMarkers();
-                if (oldMarkers
-                        .findAll(AlreadyReplaced.class)
-                        .stream()
-                        .noneMatch(m -> oldValue.equals(m.getFind()) && newValue.equals(m.getReplace()))) {
-                    return t.withContent(singletonList(content
-                            .withText(text.replaceAll(oldValue, newValue))
-                            .withMarkers(oldMarkers.add(new AlreadyReplaced(randomId(), oldValue, newValue)))));
-                }
+                return t.withContent(singletonList(content.withText(text.replaceAll(oldValue, newValue))));
             }
             return t;
         }
