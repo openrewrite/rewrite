@@ -6472,6 +6472,13 @@ public interface Cs extends J {
         @Nullable
         Block body;
 
+        /**
+         * The method this operator declares. Its name is the compiled one, such as {@code op_Implicit}.
+         */
+        @With
+        @Getter
+        JavaType.@Nullable Method methodType;
+
         public enum ExplicitImplicit {
             Implicit,
             Explicit
@@ -6529,7 +6536,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withKind(JLeftPadded<ExplicitImplicit> kind) {
                 return t.kind == kind ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, kind, t.interfaceSpecifier, t.returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public @Nullable JRightPadded<TypeTree> getInterfaceSpecifier() {
@@ -6539,7 +6546,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable JRightPadded<TypeTree> interfaceSpecifier) {
                 return t.interfaceSpecifier == interfaceSpecifier ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, interfaceSpecifier, t.returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public JLeftPadded<TypeTree> getReturnType() {
@@ -6549,7 +6556,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
                 return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, returnType, t.parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public JContainer<Statement> getParameters() {
@@ -6559,7 +6566,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, parameters,
-                        t.expressionBody, t.body);
+                        t.expressionBody, t.body, t.methodType);
             }
 
             public @Nullable JLeftPadded<Expression> getExpressionBody() {
@@ -6569,7 +6576,7 @@ public interface Cs extends J {
             public ConversionOperatorDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
                 return t.expressionBody == expressionBody ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
                         t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, t.parameters,
-                        expressionBody, t.body);
+                        expressionBody, t.body, t.methodType);
             }
         }
     }

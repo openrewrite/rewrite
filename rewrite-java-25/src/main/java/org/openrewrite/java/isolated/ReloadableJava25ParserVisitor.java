@@ -2171,13 +2171,15 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                JCTree first = (JCTree) treeGroup.get(0);
+                String prefix = source.substring(cursor, max(first.getStartPosition(), cursor));
                 cursor += prefix.length();
 
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup,
+                        formatWithCommentTree(prefix, first, docCommentTable.getCommentTree(first)));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);
@@ -2645,7 +2647,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
                 // A blank line between two `///` blocks separates them into distinct
                 // doc comments per JEP 467; only merge when the suffix contains a single line break.
-                if (countOccurrences(c.getSuffix(), "\n") > 1) {
+                if (lineTerminatorCount(c.getSuffix()) > 1) {
                     break;
                 }
                 first = k;
@@ -2687,6 +2689,10 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             // skip k > firstIdx && k <= lastIdx (merged into the javadoc)
         }
         return fmt.withComments(newComments);
+    }
+
+    private static int lineTerminatorCount(String whitespace) {
+        return countOccurrences(whitespace, "\n") + countOccurrences(whitespace.replace("\r\n", ""), "\r");
     }
 
     private Space formatWithTraditionalJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {

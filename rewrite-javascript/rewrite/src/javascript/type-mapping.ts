@@ -52,6 +52,24 @@ function isGlobalAugmentation(declaration: ts.Declaration): boolean {
     return ts.isModuleDeclaration(declaration) && (declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
 }
 
+/**
+ * A module as a class with no body, which is what a call on it is declared by: `lodash` in `lodash.map`.
+ */
+export function moduleClass(fullyQualifiedName: string): Type.Class {
+    return {
+        kind: Type.Kind.Class,
+        flags: 0,
+        classKind: Type.Class.Kind.Class,
+        fullyQualifiedName,
+        typeParameters: [],
+        annotations: [],
+        interfaces: [],
+        members: [],
+        methods: [],
+        toJSON: typeSignatureToJSON
+    } as Type.Class;
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -70,9 +88,15 @@ export class JavaScriptTypeMapping {
     private readonly functionTypesInProgress = new Set<ts.Symbol>();
 
 
+    /**
+     * @param sourceRoot What a parsed file's module is named relative to.
+     * @param sourceIsPackage Whether the source root is itself a package, whose files are named as
+     * if it had been parsed on its own, and not after the package that installed them.
+     */
     constructor(
         private readonly checker: ts.TypeChecker,
-        private readonly sourceRoot?: string
+        private readonly sourceRoot?: string,
+        private readonly sourceIsPackage: boolean = false
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -114,6 +138,11 @@ export class JavaScriptTypeMapping {
                 return variableType;
             }
             // Fall through to regular type checking if not a variable
+        }
+
+        // The checker asserts when asked for the type of the `import.defer` in `import.defer(...)`
+        if (this.isImportDefer(node)) {
+            return undefined;
         }
 
         // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
@@ -707,11 +736,16 @@ export class JavaScriptTypeMapping {
         node = this.unparenthesized(node);
         if (ts.isAwaitExpression(node)) {
             const call = this.unparenthesized(node.expression);
-            return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword ?
+            return ts.isCallExpression(call) &&
+                (call.expression.kind === ts.SyntaxKind.ImportKeyword || this.isImportDefer(call.expression)) ?
                 this.moduleSpecifierArgument(call) : undefined;
         }
         return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require' ?
             this.moduleSpecifierArgument(node) : undefined;
+    }
+
+    private isImportDefer(node: ts.Node): boolean {
+        return ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword && node.name.text === 'defer';
     }
 
     private unparenthesized(node: ts.Expression): ts.Expression {
@@ -873,7 +907,7 @@ export class JavaScriptTypeMapping {
         if (ts.isFunctionDeclaration(declaration)) {
             return ts.isSourceFile(declaration.parent) || ts.isModuleBlock(declaration.parent);
         }
-        return ts.isMethodDeclaration(declaration) &&
+        return (ts.isMethodDeclaration(declaration) || ts.isAccessor(declaration)) &&
             !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
     }
 
@@ -897,7 +931,7 @@ export class JavaScriptTypeMapping {
      * @returns The module name, or undefined if not from node_modules
      */
     private extractModuleNameFromPath(fileName: string): string | undefined {
-        if (!fileName.includes('node_modules/')) {
+        if (!this.isInstalled(fileName)) {
             return undefined;
         }
 
@@ -922,7 +956,7 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.AccessorDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
@@ -1047,6 +1081,10 @@ export class JavaScriptTypeMapping {
         let methodName: string;
         let declaringType: Type.FullyQualified;
         let declaredFormalTypeNames: string[] = [];
+
+        if (ts.isCallExpression(node) && this.isImportDefer(node.expression)) {
+            return undefined;
+        }
 
         // Handle different kinds of nodes that represent methods or method invocations
         if (ts.isCallOrNewExpression(node)) {
@@ -1309,6 +1347,19 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isAccessor(node)) {
+            const symbol = this.checker.getSymbolAtLocation(node.name);
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!symbol || !signature) {
+                return undefined;
+            }
+
+            methodName = escapeLoneSurrogates(symbol.getName());
+
+            const parent = node.parent;
+            declaringType = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent) ?
+                this.declaringType(this.checker.getTypeAtLocation(parent)) :
+                Type.unknownType as Type.FullyQualified;
         } else if (ts.isConstructorDeclaration(node)) {
             // For constructor declarations
             signature = this.checker.getSignatureFromDeclaration(node);
@@ -1391,7 +1442,7 @@ export class JavaScriptTypeMapping {
 
         if (sourceModule) {
             cleanedName = `${sourceModule}.${cleanedName}`;
-        } else if (cleanedName.includes('node_modules/')) {
+        } else if (this.isInstalled(cleanedName)) {
             // Check if this is a file path from node_modules (happens with some packages)
             // TypeScript sometimes returns full paths instead of module names
             // Extract the module name from the path
@@ -1486,8 +1537,23 @@ export class JavaScriptTypeMapping {
         }
         const sourceFile = declaration.parent;
         const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
-        return isModule && !sourceFile.isDeclarationFile && !sourceFile.fileName.includes('node_modules/') ?
+        return isModule && !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName) ?
             this.sourceModuleName(sourceFile) : undefined;
+    }
+
+    /** Whether a path is in a package installed under the source, where a package's own files are not. */
+    private isInstalled(fileName: string): boolean {
+        return (this.sourceIsPackage ? fileName.substring(this.sourceRoot!.length) : fileName).includes('node_modules/');
+    }
+
+    /** What the parser names a symbol's type, or names it after: `lodash.Foo`, `node:fs.Dirent`, `Array`. */
+    fullyQualifiedName(symbol: ts.Symbol): string {
+        return this.getFullyQualifiedNameFromSymbol(symbol);
+    }
+
+    /** What the parser names the owner of a function: the namespace around it, or else its file's module. */
+    functionOwnerName(declaration: ts.FunctionDeclaration): string {
+        return Type.FullyQualified.getFullyQualifiedName(this.functionOwner(declaration));
     }
 
     /** The declaration of the symbol a qualified name starts from, such as a class's namespace. */

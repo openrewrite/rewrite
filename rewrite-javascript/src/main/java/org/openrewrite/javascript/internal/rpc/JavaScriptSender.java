@@ -160,6 +160,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitImportClause(JS.ImportClause importClause, RpcSendQueue q) {
         q.getAndSend(importClause, JS.ImportClause::isTypeOnly);
+        q.getAndSend(importClause, JS.ImportClause::isDeferred);
         q.getAndSend(importClause, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
         q.getAndSend(importClause, JS.ImportClause::getNamedBindings, el -> visit(el, q));
         return importClause;

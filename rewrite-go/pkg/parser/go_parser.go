@@ -161,6 +161,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	}
 	// Reasons the package lost part of its type attribution.
 	var partial []string
+	var checked *types.Package
 	if !gp.ParseOnly && len(primaryAsts) > 0 {
 		// types.Config reads a nil Importer as resolving nothing. Wrapping one
 		// would hand it an interface holding a nil pointer, which reads as set.
@@ -183,7 +184,8 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		if primaryAsts[0].Name != nil {
 			pkgName = primaryAsts[0].Name.Name
 		}
-		recovered := checkTypes(&conf, pkgName, fset, primaryAsts, typeInfo)
+		var recovered any
+		checked, recovered = checkTypes(&conf, pkgName, fset, primaryAsts, typeInfo)
 		if resilient != nil {
 			partial = append(partial, resilient.failures...)
 		}
@@ -206,6 +208,10 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		gp.mapper = newTypeMapper()
 	}
 	mapper := gp.mapper
+	if checked != nil {
+		mapper.visible = mapper.interfacesVisibleFrom(checked, gp.inModule)
+		defer func() { mapper.visible = nil }()
+	}
 	cus := make([]*golang.CompilationUnit, 0, len(files))
 	for i, f := range files {
 		ctx := &parseContext{
@@ -329,15 +335,23 @@ func (r *resilientImporter) guard(path string, imp func() (*types.Package, error
 	return imp()
 }
 
-// checkTypes populates typeInfo as far as the type checker gets, returning what
-// ended the check early, or nil if it ran to completion. Some
-// malformed-but-parseable inputs — a type cycle routed through an alias,
-// for one — make go/types panic rather than report an error, and the LST
-// does not depend on type information being complete.
-func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) (recovered any) {
+// inModule reports whether an import path is of the module whose packages the parser's importer reads from source.
+func (gp *GoParser) inModule(path string) bool {
+	pi, ok := gp.Importer.(*ProjectImporter)
+	return ok && pi.modulePath != "" && (path == pi.modulePath || strings.HasPrefix(path, pi.modulePath+"/"))
+}
+
+// checkTypes populates typeInfo as far as the type checker gets, returning the
+// package it checked and what ended the check early, or nil if it ran to
+// completion. Some malformed-but-parseable inputs — a type cycle routed through
+// an alias, for one — make go/types panic rather than report an error, and the
+// LST does not depend on type information being complete.
+func checkTypes(conf *types.Config, pkgName string, fset *token.FileSet, asts []*ast.File, typeInfo *types.Info) (pkg *types.Package, recovered any) {
+	// What conf.Check does, with the package made first so that a panic leaves it to the caller.
+	pkg = types.NewPackage(pkgName, "")
 	defer func() { recovered = recover() }()
-	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
-	return nil
+	_ = types.NewChecker(conf, fset, pkg, typeInfo).Files(asts)
+	return pkg, nil
 }
 
 // PackageNameOf returns the package clause name of a Go source file, or ""

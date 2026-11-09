@@ -115,16 +115,16 @@ class NpmRegistryClientTest {
     }
 
     @Test
-    void authNotSentOverHttp() {
+    void httpCredentialsCannotSilentlyFallBackToAnonymous() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
         NpmRegistryClient client = new NpmRegistryClient(sender);
         NodeRegistry authed = new NodeRegistry(null, "http://registry.test/", "tok123", null, null, null,
                 true, null, true, false);
 
-        client.getPackumentText(authed, "lodash", false);
-
-        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
+        assertThatThrownBy(() -> client.getPackumentText(authed, "lodash", false))
+                .isInstanceOf(NodeRegistryException.class).hasMessageContaining("credentials require HTTPS");
+        assertThat(sender.requests).isEmpty();
     }
 
     @Test
@@ -288,6 +288,20 @@ class NpmRegistryClientTest {
                     assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE);
                     assertThat(e.getMessage()).contains("custom CA");
                 });
+    }
+
+    @Test
+    void anAuthenticatedResponseCannotSatisfyAnAnonymousRequest() {
+        StubHttpSender sender = new StubHttpSender();
+        sender.enqueueJson(200, "{\"versions\":{}}");
+        sender.enqueueStatus(401);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry endpoint = registry().withUrl("https://registry.test/");
+        client.getPackumentText(endpoint.withAuthToken("synthetic-user"), "private-package", false);
+        assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Bearer synthetic-user");
+        assertThatThrownBy(() -> client.getPackumentText(endpoint, "private-package", false))
+          .isInstanceOfSatisfying(NodeRegistryException.class, e -> assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED));
+        assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
     }
 
     static final class StubHttpSender implements HttpSender {

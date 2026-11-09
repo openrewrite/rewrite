@@ -895,6 +895,70 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void staticStarImportNextToImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      new A1().foo();
+                      stat();
+                  }
+              }
+              """,
+            """
+              import a.A2;
+
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      new A2().foo();
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticStarImportNextToUnusedImportOfTheType() {
+        rewriteRun(
+          java(a1),
+          java(a2),
+          java(
+            """
+              import a.A1;
+
+              import static a.A1.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """,
+            """
+              import static a.A2.*;
+
+              public class B {
+                  public void test() {
+                      stat();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void staticImports2() {
         rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
           java(
@@ -3042,6 +3106,186 @@ class ChangeTypeTest implements RewriteTest {
                     return classDecl.withType(null);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveOuterClassTypeArgumentsWhenChangingInnerType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "com.example.OldOuter.Registry",
+            "com.example.NewOuter.Registry2",
+            true
+          )),
+          java(
+            """
+              package com.example;
+
+              public class OldOuter<T> {
+                  public class Registry {
+                      public T get() {
+                          return null;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              public class NewOuter<T> {
+                  public class Registry2 {
+                      public T get() {
+                          return null;
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+
+              class SecurityConfig {
+                  void configure(OldOuter<String>.Registry r) {
+                      String s = r.get().trim();
+                  }
+              }
+              """,
+            """
+              package com.example;
+
+              class SecurityConfig {
+                  void configure(NewOuter<String>.Registry2 r) {
+                      String s = r.get().trim();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveOuterClassTypeArgumentsAcrossPackages() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer$ExpressionInterceptUrlRegistry",
+            "org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer$AuthorizationManagerRequestMatcherRegistry",
+            true
+          )),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.builders;
+
+              public class HttpSecurity {
+              }
+              """
+          ),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.configurers;
+
+              public class ExpressionUrlAuthorizationConfigurer<H> {
+                  public class ExpressionInterceptUrlRegistry {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package org.springframework.security.config.annotation.web.configurers;
+
+              public class AuthorizeHttpRequestsConfigurer<H> {
+                  public class AuthorizationManagerRequestMatcherRegistry {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.macro.mall.tiny.security.config;
+
+              import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+              import org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer;
+
+              public class SecurityConfig {
+                  void configure(ExpressionUrlAuthorizationConfigurer<HttpSecurity>.ExpressionInterceptUrlRegistry registry) {
+                  }
+              }
+              """,
+            """
+              package com.macro.mall.tiny.security.config;
+
+              import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+              import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
+
+              public class SecurityConfig {
+                  void configure(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9291")
+    @Test
+    void preserveMultiLevelOuterClassTypeArgumentsWhenChangingInnerType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "com.example.oldpkg.OldOuter$Middle$Registry",
+            "com.example.newpkg.NewOuter$NewMiddle$Registry2",
+            true
+          )),
+          java(
+            """
+              package com.example.oldpkg;
+
+              public class OldOuter<T> {
+                  public class Middle<U> {
+                      public class Registry {
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.newpkg;
+
+              public class NewOuter<T> {
+                  public class NewMiddle<U> {
+                      public class Registry2 {
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.app;
+
+              import com.example.oldpkg.OldOuter;
+
+              class Config {
+                  void configure(OldOuter<String>.Middle<Integer>.Registry r) {
+                  }
+              }
+              """,
+            """
+              package com.example.app;
+
+              import com.example.newpkg.NewOuter;
+
+              class Config {
+                  void configure(NewOuter<String>.NewMiddle<Integer>.Registry2 r) {
+                  }
+              }
+              """
           )
         );
     }

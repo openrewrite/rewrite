@@ -1212,13 +1212,16 @@ public static class NuGetResolver
     /// <summary>
     /// Resolves the LockFile for a single project on disk: packages.config projects go through
     /// the synthesized-spec path; everything else through in-process restore-graph generation.
-    /// Returns null when no graph could be produced.
+    /// Returns null when no graph could be produced. A project reached through a symbolic link
+    /// is restored from its real location, because MSBuild resolves referenced projects there
+    /// and NuGet drops references whose paths do not match the entry project's.
     /// </summary>
     public static async Task<LockFile?> ResolveProjectLockFileAsync(
         string projectPath,
         IDictionary<string, string>? extraGlobalProperties,
         CancellationToken ct)
     {
+        projectPath = WithoutSymbolicLinks(projectPath);
         var projectDir = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
         using var sourceFailures = NuGetSourceFailures.Begin(
             Path.GetFileName(projectPath), EnabledSourceUrls(projectDir));
@@ -1234,6 +1237,32 @@ public static class NuGetResolver
             return null;
         var lockFiles = await RestoreAsync(dgSpec, commit: false, ct);
         return lockFiles.TryGetValue(Path.GetFullPath(projectPath), out var lockFile) ? lockFile : null;
+    }
+
+    private static string WithoutSymbolicLinks(string path, int depth = 0)
+    {
+        var full = Path.GetFullPath(path);
+        var root = Path.GetPathRoot(full);
+        if (string.IsNullOrEmpty(root) || depth > 32)
+            return full;
+        var resolved = root;
+        var segments = full[root.Length..].Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < segments.Length; i++)
+        {
+            resolved = Path.Combine(resolved, segments[i]);
+            try
+            {
+                if (new FileInfo(resolved).ResolveLinkTarget(returnFinalTarget: true) is { } target)
+                    return WithoutSymbolicLinks(Path.Combine([target.FullName, ..segments[(i + 1)..]]), depth + 1);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return full;
+            }
+        }
+        return resolved;
     }
 
     /// <summary>

@@ -93,13 +93,19 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
-    /// Gets the method type for a method declaration or invocation.
+    /// Gets the method type for a method, constructor, destructor or operator declaration, or for an invocation.
+    /// A primary constructor is identified by its parameter list and exact declaring syntax.
     /// </summary>
     public JavaType.Method? MethodType(SyntaxNode node)
     {
         ISymbol? symbol = node switch
         {
-            MethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
+            BaseMethodDeclarationSyntax => _model.GetDeclaredSymbol(node),
+            LocalFunctionStatementSyntax => _model.GetDeclaredSymbol(node),
+            ParameterListSyntax { Parent: TypeDeclarationSyntax declaration } =>
+                (_model.GetDeclaredSymbol(declaration) as INamedTypeSymbol)?.InstanceConstructors
+                    .SingleOrDefault(c => c.DeclaringSyntaxReferences.Any(r =>
+                        r.SyntaxTree == declaration.SyntaxTree && r.Span == declaration.Span)),
             InvocationExpressionSyntax => _model.GetSymbolInfo(node).Symbol,
             ObjectCreationExpressionSyntax => _model.GetSymbolInfo(node).Symbol,
             _ => _model.GetSymbolInfo(node).Symbol
@@ -158,7 +164,8 @@ internal class CSharpTypeMapping
         {
             IFieldSymbol f => MapVariable(f, f.Name, MapType(f.ContainingType), MapType(f.Type)),
             ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
-            IParameterSymbol p => MapVariable(p, p.Name, null, MapType(p.Type)),
+            IParameterSymbol p => MapVariable(p, p.Name,
+                p.ContainingSymbol is IMethodSymbol method ? MapMethod(method) : null, MapType(p.Type)),
             IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
             IEventSymbol evt => MapVariable(evt, evt.Name, MapType(evt.ContainingType), MapType(evt.Type)),
             _ => null

@@ -582,6 +582,7 @@ func (r *JavaReceiver) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 	aa = &c
 	aa.Indexed = receiveValue(q, aa.Indexed, func(e java.Expression) any { return r.Visit(e, q) })
 	aa.Dimension = receiveValue(q, aa.Dimension, func(e *java.ArrayDimension) any { return r.Visit(e, q) })
+	aa.Type = r.receiveType(aa.Type, q)
 	return aa
 }
 

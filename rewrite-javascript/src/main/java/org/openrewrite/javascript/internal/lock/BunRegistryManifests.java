@@ -16,11 +16,16 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.bun.ManifestSource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+
+import java.net.URI;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * The packuments a Bun install reads, through the run's {@link NpmRegistryClient}, from the registry Bun's own
@@ -30,16 +35,33 @@ final class BunRegistryManifests implements ManifestSource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
+    private final Map<String, String> hostNetwork;
 
     BunRegistryManifests(NodeRegistries registries, NpmRegistryClient client) {
+        this(registries, client, Collections.emptyMap());
+    }
+
+    BunRegistryManifests(NodeRegistries registries, NpmRegistryClient client, Map<String, String> hostNetwork) {
         this.registries = registries;
         this.client = client;
+        this.hostNetwork = hostNetwork;
+    }
+
+    @Override
+    public ManifestSource withNetworkSettings(Map<String, ?> settings) {
+        NetworkPolicy.requireDirect("Bun", settings);
+        return this;
     }
 
     @Override
     public @Nullable String packument(String registry, String name, boolean extended) {
+        NetworkPolicy.requireDirect("Bun", hostNetwork);
         try {
-            return client.getPackumentText(scope(name, registry), name, extended);
+            NodeRegistry request = scope(name, registry);
+            if (hasAuthorization(request) && hasCredentialPath(registry)) {
+                throw new CannotKnow("Bun registry credential path cannot be safely reconstructed from the host registry configuration");
+            }
+            return client.getPackumentText(request, name, extended);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -48,9 +70,29 @@ final class BunRegistryManifests implements ManifestSource {
         }
     }
 
+    private static boolean hasAuthorization(NodeRegistry registry) {
+        // Match the client's header precedence, including empty credentials.
+        if (registry.getAuthToken() != null) {
+            return !StringUtils.isBlank(registry.getAuthToken());
+        }
+        if (registry.getAuthBase64() != null) {
+            return !StringUtils.isBlank(registry.getAuthBase64());
+        }
+        return !StringUtils.isBlank(registry.getUsername());
+    }
+
+    private static boolean hasCredentialPath(String registry) {
+        try {
+            String path = URI.create(registry).getRawPath();
+            return path != null && !path.isEmpty() && !"/".equals(path);
+        } catch (IllegalArgumentException e) {
+            throw new CannotKnow("Bun registry credential path is invalid");
+        }
+    }
+
     /**
-     * ini.zig loadNpmrc gives each credential of the user's .npmrc to every registry on its host, a later one's over
-     * an earlier one's, whatever their paths: the host's registries are that .npmrc, the default's first.
+     * The host projection exposes credentials by registry host, a later one's over an earlier one's. It does not
+     * retain the native npmrc auth-key path: live requests for a non-root credential path are declined above.
      */
     NodeRegistry scope(String name, String url) {
         String host = host(url);

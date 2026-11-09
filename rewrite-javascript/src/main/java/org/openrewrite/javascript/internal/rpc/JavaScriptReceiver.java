@@ -169,6 +169,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitImportClause(JS.ImportClause importClause, RpcReceiveQueue q) {
         return importClause
                 .withTypeOnly(q.receive(importClause.isTypeOnly()))
+                .withDeferred(q.receive(importClause.isDeferred()))
                 .getPadding().withName(q.receive(importClause.getPadding().getName(), el -> visitRightPadded(el, q)))
                 .withNamedBindings(q.receive(importClause.getNamedBindings(), expr -> (Expression) visitNonNull(expr, q)));
     }

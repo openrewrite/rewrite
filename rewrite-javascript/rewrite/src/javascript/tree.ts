@@ -264,6 +264,7 @@ export namespace JS {
     export interface ImportClause extends JS {
         readonly kind: typeof Kind.ImportClause;
         readonly typeOnly: boolean;
+        readonly deferred: boolean;
         readonly name?: J.RightPadded<J.Identifier>;
         readonly namedBindings?: Expression;
     }

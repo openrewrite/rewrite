@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
@@ -181,6 +182,23 @@ public final class Configuration {
         DEFINITIONS.put("enableTransparentWorkspaces", Definition.of(Type.BOOLEAN, true));
         DEFINITIONS.put("enableHardenedMode", Definition.of(Type.BOOLEAN, false));
         DEFINITIONS.put("enableOfflineMode", Definition.of(Type.BOOLEAN, false));
+        // Configuration.ts coreDefinitions: these request policies must reach the live registry adapter too.
+        DEFINITIONS.put("enableNetwork", Definition.of(Type.BOOLEAN, true));
+        DEFINITIONS.put("enableStrictSsl", Definition.of(Type.BOOLEAN, true));
+        Map<String, Definition> network = new LinkedHashMap<>();
+        for (String key : Arrays.asList("httpProxy", "httpsProxy")) {
+            Definition definition = Definition.of(Type.STRING, null);
+            DEFINITIONS.put(key, definition);
+            network.put(key, definition);
+        }
+        for (String key : Arrays.asList("httpsCaFilePath", "httpsKeyFilePath", "httpsCertFilePath")) {
+            Definition definition = Definition.of(Type.ABSOLUTE_PATH, null);
+            DEFINITIONS.put(key, definition);
+            network.put(key, definition);
+        }
+        network.put("enableNetwork", Definition.of(Type.BOOLEAN, null));
+        DEFINITIONS.put("networkSettings", Definition.map(Definition.shape(network)));
+
         DEFINITIONS.put("checksumBehavior", Definition.of(Type.STRING, "throw"));
 
         Map<String, Definition> peerMeta = new LinkedHashMap<>();
@@ -373,7 +391,25 @@ public final class Configuration {
      * null.
      */
     static Configuration load(Map<String, String> configFiles, HostEnvironment env, @Nullable YarnRelease release) {
+        return load(configFiles, env, release, Collections.emptyMap());
+    }
+
+    static Configuration load(Map<String, String> configFiles, HostEnvironment env, @Nullable YarnRelease release,
+                              Map<String, String> networkEnvironment) {
         Configuration options = new Configuration(env, release);
+        Map<String, String> settingsEnvironment = new LinkedHashMap<>(networkEnvironment);
+        for (Map.Entry<String, String> setting : env.known().entrySet()) {
+            settingsEnvironment.keySet().removeIf(key -> key.equalsIgnoreCase(setting.getKey()));
+            settingsEnvironment.put(setting.getKey(), setting.getValue());
+        }
+        for (Map.Entry<String, String> setting : settingsEnvironment.entrySet()) {
+            String lower = setting.getKey().toLowerCase(Locale.ROOT);
+            String alternate = settingsEnvironment.get(lower);
+            if (alternate != null && !alternate.equals(setting.getValue()) && networkEnvironment.containsKey(setting.getKey())) {
+                throw new CannotKnow(
+                        "conflicting upper- and lower-case Yarn network environment settings");
+            }
+        }
         String rcFilename = getRcFilename(env.known());
         TreeMap<Integer, Object[]> byDepth = new TreeMap<>(Collections.reverseOrder());
         for (Map.Entry<String, String> file : configFiles.entrySet()) {
@@ -410,7 +446,7 @@ public final class Configuration {
         List<Object[]> rcFiles = new ArrayList<>(byDepth.values());
         ConfigUtils.Resolved resolvedRcFile = ConfigUtils.resolveRcFiles(rcFiles);
 
-        Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env.known());
+        Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(settingsEnvironment);
         environmentSettings.remove("rcFilename");
         options.use("<environment>", pickPrimaryCoreFields(environmentSettings));
         if (resolvedRcFile != null) {

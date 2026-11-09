@@ -49,11 +49,17 @@ import {
     TextSpan
 } from "./parser-utils";
 import {JavaScriptTypeMapping} from "./type-mapping";
+import {JavaScriptNameResolver} from "./name-resolver";
 import {TsConfigResolver} from "./tsconfig";
 import {castDraft, create as produce} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
+
+/**
+ * The parse option that attaches a {@link ResolvedNames} marker to each compilation unit.
+ */
+export const RESOLVE_NAMES = "resolveNames";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -95,6 +101,8 @@ type WithInvalidSyntaxSlots<T> = T & {
 interface CompiledProject {
     readonly program: ts.Program;
     readonly typeMapping: JavaScriptTypeMapping;
+    /** Present when the parse asked for {@link RESOLVE_NAMES}. */
+    readonly nameResolver?: JavaScriptNameResolver;
 }
 
 /**
@@ -293,7 +301,7 @@ export class JavaScriptParser extends Parser {
                              inputDirectories: Set<string>): Promise<SourceFile> {
         // Built when the first of a project's inputs comes up and let go with its last, so that the
         // programs alive at any one time are those of the projects still being worked through.
-        const {program, typeMapping} = project.compiled ??=
+        const {program, typeMapping, nameResolver} = project.compiled ??=
             this.compile(project, carryForward, inputFiles, inputDirectories);
         if (--project.unmapped === 0) {
             project.compiled = undefined;
@@ -323,6 +331,9 @@ export class JavaScriptParser extends Parser {
                     if (this.styles) {
                         draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
                     }
+                    if (nameResolver) {
+                        draft.markers = replaceMarkerByKind(draft.markers, nameResolver.resolvedNames(sourceFile));
+                    }
                 }), input, escapeLoneSurrogates(sourceFile.getFullText()));
         } catch (error) {
             return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
@@ -333,8 +344,8 @@ export class JavaScriptParser extends Parser {
                     inputDirectories: Set<string>): CompiledProject {
         // TypeScript carries the previous program's bound files forward when the root paths match,
         // so a parser held across parses of one path costs a fraction of a freshly built one.
-        const program = ts.createProgram(project.rootNames, project.options,
-            this.createCompilerHost(project.options, inputFiles, inputDirectories), this.oldPrograms.get(project.key));
+        const host = this.createCompilerHost(project.options, inputFiles, inputDirectories);
+        const program = ts.createProgram(project.rootNames, project.options, host, this.oldPrograms.get(project.key));
         if (carryForward) {
             this.oldPrograms.set(project.key, program);
         } else {
@@ -343,7 +354,20 @@ export class JavaScriptParser extends Parser {
 
         // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
         // the TypeChecker that issued it, so each program needs its own.
-        return {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)};
+        const typeMapping = new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo);
+        if (!this.ctx.getBoolean(RESOLVE_NAMES, false)) {
+            return {program, typeMapping};
+        }
+        const resolveModule = (specifier: ts.StringLiteralLike) => {
+            const file = specifier.getSourceFile();
+            return host.resolveModuleNameLiterals!([specifier], file.fileName, undefined, project.options, file, undefined)[0]
+                .resolvedModule?.resolvedFileName;
+        };
+        return {
+            program,
+            typeMapping,
+            nameResolver: new JavaScriptNameResolver(program, resolveModule, host.getCurrentDirectory())
+        };
     }
 
     private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
@@ -3873,6 +3897,7 @@ export class JavaScriptParserVisitor {
                 })(),
                 markers: emptyMarkers,
                 typeOnly: node.isTypeOnly,
+                deferred: false,
                 name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
                 namedBindings: undefined
             },
@@ -3908,6 +3933,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             typeOnly: node.isTypeOnly,
+            deferred: node.phaseModifier === ts.SyntaxKind.DeferKeyword,
             name: node.name && this.rightPadded(this.visit(node.name), this.suffix(node.name)),
             namedBindings: node.namedBindings && this.visit(node.namedBindings)
         };

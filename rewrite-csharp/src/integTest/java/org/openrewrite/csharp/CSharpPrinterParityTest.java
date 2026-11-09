@@ -744,6 +744,7 @@ class CSharpPrinterParityTest {
               for (;;) { break; }
               for (x = 0, x++; ; ) break;
               for ( ; x < 3 ; x++ ) continue;
+              for (x = 0 , x++ ; x < 3; ) { }
 
               foreach (var item in xs) { }
               foreach (int item in xs)
@@ -1636,6 +1637,44 @@ class CSharpPrinterParityTest {
             // before closing brace
         }
         // trailing comment at end of file
+        """,
+
+      "spaceBeforeSemicolon", """
+        extern alias Legacy ;
+
+        namespace Block
+        {
+            extern alias Nested ;
+        }
+
+        class Terminators
+        {
+            event Action Changed ;
+            int this[int i] => i ;
+            public static implicit operator int(Terminators t) => 1 ;
+
+            IEnumerable<int> Jumps(int x)
+            {
+                do { x++; } while (x < 5) ;
+                while (true)
+                {
+                    if (x > 9) break ;
+                    continue ;
+                }
+                switch (x)
+                {
+                    case 1: goto case 2 ;
+                    case 2: goto default ;
+                    default: goto done ;
+                }
+                done: x++ ;
+                outer: inner: x++ ;
+                yield return x ;
+                try { } catch { throw ; }
+                if (x < 0) throw new Exception() ;
+                yield break ;
+            }
+        }
         """,
 
       "crlf", STATEMENTS.replace("\n", "\r\n"),

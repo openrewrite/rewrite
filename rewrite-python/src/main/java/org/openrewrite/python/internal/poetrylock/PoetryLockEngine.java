@@ -22,6 +22,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.python.PythonPackageIndex;
+import org.openrewrite.python.internal.GroupedDeclarations;
 import org.openrewrite.python.internal.Hashing;
 import org.openrewrite.python.internal.LockFileRegeneration.Failure;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
@@ -168,6 +169,19 @@ public final class PoetryLockEngine {
         private Result run() {
             packages = new ArrayList<>(lock.getPackages());
             String newHash = PoetryContentHash.hash(pyproject);
+            // a lock whose hash records another manifest than the one before the edit was already out of date, and
+            // poetry relocks that drift too, which the engine does not reproduce; refreshing the hash over it would
+            // also make a stale lock pass `poetry check --lock`
+            if (originalPyproject != null && !PoetryContentHash.hash(originalPyproject).equals(lock.getContentHash())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "poetry.lock is out of date with pyproject.toml before the edit (its content-hash records " +
+                                "another manifest); poetry would relock that drift, which the native engine does not reproduce");
+            }
+
+            if (originalPyproject != null) {
+                requireSameGroups(GroupedDeclarations.poetry(PyprojectData.toNestedMap(originalPyproject)),
+                        GroupedDeclarations.poetry(PyprojectData.toNestedMap(pyproject)));
+            }
 
             Map<String, @Nullable PythonVersionSpecifierSet> declared = collectDirectDeps(pyproject);
             Map<String, @Nullable PythonVersionSpecifierSet> originalDeclared =
@@ -213,6 +227,47 @@ public final class PoetryLockEngine {
 
             PoetryLock updated = lock.withPackages(packages).withContentHash(newHash);
             return Result.success(PoetryLockWriter.write(updated));
+        }
+
+        /**
+         * poetry records each package's groups, and the markers it carries for them, from the groups whose declarations
+         * reach it. An edit that changes a declaration's extras, marker or source, or which groups reach a locked
+         * package, changes entries this engine does not compute.
+         */
+        private void requireSameGroups(GroupedDeclarations before, GroupedDeclarations after) {
+            String reshaped = before.firstReshaped(after);
+            if (reshaped != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, reshaped,
+                        "The edit changes more than the version of " + reshaped + "'s declaration (its extras, marker " +
+                                "or source), which changes the groups and markers poetry records; that requires resolution");
+            }
+            Map<String, Set<String>> was = before.reachableGroups(this::dependencyNames);
+            Map<String, Set<String>> now = after.reachableGroups(this::dependencyNames);
+            for (PoetryLockPackage pkg : packages) {
+                String name = Pep508Requirement.canonicalize(pkg.getName());
+                Set<String> groups = now.get(name);
+                if (groups != null && !groups.equals(was.get(name))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                            "The edit changes the groups that reach " + pkg.getName() + " from " +
+                                    (was.containsKey(name) ? was.get(name) : "none") + " to " + groups +
+                                    ", which changes the groups and markers poetry records; that requires resolution");
+                }
+            }
+        }
+
+        private Collection<String> dependencyNames(String name) {
+            List<String> names = new ArrayList<>();
+            for (PoetryLockPackage pkg : packages) {
+                if (!Pep508Requirement.canonicalize(pkg.getName()).equals(name)) {
+                    continue;
+                }
+                if (pkg.getDependencies() != null) {
+                    for (PoetryLockDependency edge : pkg.getDependencies()) {
+                        names.add(Pep508Requirement.canonicalize(edge.getName()));
+                    }
+                }
+            }
+            return names;
         }
 
         private static @Nullable Set<String> changedNames(

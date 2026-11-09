@@ -461,10 +461,12 @@ Four rules bound it:
 Four limits come from what the model carries, all of them worth knowing
 before a recipe leans on a typed capture as a safety guard:
 
-- **A method promoted from an embedded field is not in the embedding
-  type's method set** (`named.NumMethods` is what a type declares). So
-  `struct{ Inner }` does not answer to an interface `Inner` satisfies,
-  and the capture under-matches.
+- **A method promoted from an embedded field counts only for a type of
+  the package under parse.** Such a type records the interfaces its whole
+  method set satisfies, among those its package can see. A type from
+  another package carries only the methods it declares
+  (`named.NumMethods`), so there `struct{ Inner }` does not answer to an
+  interface `Inner` satisfies, and the capture under-matches.
 - **`*T` and `T` are one attributed type.** A capture declared `error`
   binds a `MyErr{}` whose `Error()` has a pointer receiver, which Go
   would reject — the one direction in which the guard over-matches.

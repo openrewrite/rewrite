@@ -205,6 +205,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         if (jsImportClause.typeOnly) {
             p.append("type");
+        } else if (jsImportClause.deferred) {
+            p.append("defer");
         }
 
         if (jsImportClause.name) {

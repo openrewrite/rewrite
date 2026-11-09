@@ -617,6 +617,8 @@ export interface BaseProjectUpdateInfo {
     packageJsonPath: string;
     /** The package manager used by this project */
     packageManager: PackageManager;
+    /** Selected lock path relative to the source root, when it is shared by workspace members. */
+    lockFilePath?: string;
 }
 
 /**
@@ -690,9 +692,13 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
     // Parse the updated package.json and lock file to create new marker
     const updatedPackageJson = acc.updatedPackageJsons.get(updateInfo.packageJsonPath);
     const lockFileName = getLockFileName(updateInfo.packageManager);
-    const updatedLockFile = acc.updatedLockFiles.get(
-        updateInfo.packageJsonPath.replace('package.json', lockFileName)
-    );
+    // A shared lock root must be supplied by the caller that selected it. Merely
+    // finding an ancestor lock in the accumulator cannot rule out an independent
+    // (unchanged) lock beside this manifest.
+    const manifestDir = path.posix.dirname(updateInfo.packageJsonPath.replace(/\\/g, '/'));
+    const lockPath = updateInfo.lockFilePath?.replace(/\\/g, '/') ?? path.posix.join(manifestDir, lockFileName);
+    const lockDir = path.posix.dirname(lockPath);
+    const updatedLockFile = acc.updatedLockFiles.get(lockPath);
 
     let packageJsonContent: PackageJsonContent;
     let lockContent: PackageLockContent | undefined;
@@ -731,7 +737,8 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         lockContent,
         existingMarker.workspacePackagePaths,
         existingMarker.packageManager,
-        existingMarker.npmrcConfigs
+        existingMarker.npmrcConfigs,
+        updatedLockFile === undefined ? "" : path.posix.relative(lockDir, manifestDir)
     );
 
     // If the new marker is structurally identical to the existing one (ignoring the

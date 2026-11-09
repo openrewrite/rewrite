@@ -361,7 +361,7 @@ final class Install {
         }
         PackageRequester requester = new PackageRequester(opts.getOpts().getStoreController(), files,
                 inputs.getHost(), options.isTrue("engineStrict"), options.isTrue("force"), options.getNodeVersion(),
-                options.getSupportedArchitectures(), registry, options.getNodeDownloadMirrors());
+                options.getSupportedArchitectures(), registry.withOptions(options), options.getNodeDownloadMirrors());
 
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(wantedLockfile,
                 install.getCtx().getLockfileDir(), requester);

@@ -332,7 +332,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -505,7 +505,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -579,7 +579,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(PadStatement(ea));
             }
         }
 
@@ -828,8 +828,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var enumMarkers = Markers.Empty;
         if (node.SemicolonToken.Span.Length > 0)
         {
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
             enumMarkers = Markers.Build([new Semicolon(Tree.RandomId())]);
         }
 
@@ -1075,8 +1075,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // Record types can have both a block body AND a trailing semicolon: `record C { };`
             if (node.SemicolonToken.Span.Length > 0)
             {
-                SkipTo(node.SemicolonToken.SpanStart);
-                SkipToken(node.SemicolonToken);
+                _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+                _cursor = node.SemicolonToken.Span.End;
                 trailingSemicolon = true;
             }
         }
@@ -1588,13 +1588,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var arguments = ParseArgumentList(node.Initializer.ArgumentList);
 
+            var initializerType = _typeMapping?.MethodType(node.Initializer);
             var initInvocation = new MethodInvocation(
                 Tree.RandomId(), kwPrefix, Markers.Empty,
                 null, // select
-                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, null, null),
+                new Identifier(Tree.RandomId(), Space.Empty, Markers.Empty, [], kwName, initializerType, null),
                 null, // typeParameters
                 arguments,
-                null // methodType
+                initializerType
             );
 
             defaultValue = new JLeftPadded<Expression>(colonPrefix, initInvocation);
@@ -1926,8 +1927,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.ExpressionBody.ArrowToken.Span.End;
             var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
             expressionBody = new JLeftPadded<Expression>(arrowSpace, expr);
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
         }
         else if (node.AccessorList != null)
         {
@@ -2131,8 +2132,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.ExpressionBody.ArrowToken.Span.End;
             var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
             expressionBody = new JLeftPadded<Expression>(arrowSpace, expr);
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
         }
         else if (node.Body != null)
         {
@@ -2146,7 +2147,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         return new ConversionOperatorDeclaration(Tree.RandomId(), prefix, Markers.Empty,
             modifiers, kindPadded, interfaceSpecifier, returnTypePadded,
             new JContainer<Statement>(paramsPrefix, parameters, Markers.Empty),
-            expressionBody, body);
+            expressionBody, body, _typeMapping?.MethodType(node));
     }
 
     public override J VisitPropertyDeclaration(PropertyDeclarationSyntax node)
@@ -3424,6 +3425,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             throw new InvalidOperationException($"Expected Statement but got {bodyStmt?.GetType().Name}");
         }
+        // Padded before the loop's own ';' takes the pending slot.
+        var body = PadStatement(bodyStatement);
 
         // Parse 'while' keyword
         var whilePrefix = ExtractSpaceBefore(node.WhileKeyword);
@@ -3449,15 +3452,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             new JRightPadded<Expression>(condExpression, conditionAfter, Markers.Empty)
         );
 
-        // Consume the semicolon
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         return new DoWhileLoop(
             Tree.RandomId(),
             prefix,
             Markers.Empty,
-            PadStatement(bodyStatement),
+            body,
             new JLeftPadded<ControlParentheses<Expression>>(whilePrefix, condition)
         );
     }
@@ -3728,7 +3730,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             expression = e;
         }
 
-        // Skip semicolon
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
 
         return new Yield(
@@ -4027,6 +4029,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var empty = new Empty(Tree.RandomId(), firstSemiPrefix, Markers.Empty);
             init.Add(new JRightPadded<Statement>(empty, Space.Empty, Markers.Empty));
+        }
+        else
+        {
+            init[^1] = init[^1].WithAfter(firstSemiPrefix);
         }
 
         // Parse condition
@@ -4361,9 +4367,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             exception = new Empty(Tree.RandomId(), Space.Empty, Markers.Empty);
         }
 
-        // Consume the semicolon
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         return new Throw(
             Tree.RandomId(),
@@ -4544,9 +4549,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var prefix = ExtractPrefix(node);
         _cursor = node.BreakKeyword.Span.End;
 
-        // Consume the semicolon
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         return new Break(
             Tree.RandomId(),
@@ -4561,9 +4565,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var prefix = ExtractPrefix(node);
         _cursor = node.ContinueKeyword.Span.End;
 
-        // Consume the semicolon
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         return new Continue(
             Tree.RandomId(),
@@ -7669,6 +7672,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// </summary>
     private MethodDeclaration ParsePrimaryConstructor(ParameterListSyntax paramList)
     {
+        var methodType = _typeMapping?.MethodType(paramList);
         var paramsPrefix = ExtractSpaceBefore(paramList.OpenParenToken);
         _cursor = paramList.OpenParenToken.Span.End;
 
@@ -7705,7 +7709,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Build([new Implicit(Tree.RandomId())]),
             [],
             "<constructor>",
-            null,
+            methodType,
             null
         );
 
@@ -7724,7 +7728,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,    // Throws
             null,    // Body
             null,    // DefaultValue
-            null     // MethodType
+            methodType
         );
     }
 
@@ -8282,8 +8286,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             variables.Add(new JRightPadded<NamedVariable>(namedVar, afterSpace, Markers.Empty));
         }
 
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         var varDecl = new VariableDeclarations(
             Tree.RandomId(),
@@ -9636,16 +9640,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     }
 
     /// <summary>
-    /// Wraps an ExternAlias in JRightPadded, consuming any pending semicolon space into After.
-    /// </summary>
-    private JRightPadded<ExternAlias> PadExternAlias(ExternAlias ea)
-    {
-        var after = _pendingSemicolonSpace;
-        _pendingSemicolonSpace = Space.Empty;
-        return new JRightPadded<ExternAlias>(ea, after, Markers.Empty);
-    }
-
-    /// <summary>
     /// A statement in the place of an expression, which takes over the space before the statement.
     /// </summary>
     private static StatementExpression AsExpression(Statement statement) =>
@@ -9793,6 +9787,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             target = (Expression)Visit(node.Expression)!;
         }
 
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
         return new GotoStatement(Tree.RandomId(), prefix, Markers.Empty, caseOrDefaultKeyword, target);
     }
