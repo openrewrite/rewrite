@@ -717,6 +717,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
                   implementation("org.openrewrite:rewrite-core:8.55.0")
                   implementation("org.openrewrite:rewrite-core:8.56.0")
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.1"
               }
               """,
             """
@@ -730,6 +732,34 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
+                  testImplementation group: "org.hamcrest", name: "hamcrest", version: "2.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsDuplicatesWithoutASingleUnconditionalNewest() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1"
+                  if (project.hasProperty("newerHamcrest")) {
+                      testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  }
+
+                  testRuntimeOnly "org.objenesis:objenesis:3.3"
+                  testRuntimeOnly "org.objenesis:objenesis:3.3.0"
               }
               """
           )

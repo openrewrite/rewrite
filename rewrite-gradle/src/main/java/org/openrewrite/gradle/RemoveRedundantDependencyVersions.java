@@ -51,6 +51,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.gradle.RemoveRedundantDependencyVersions.Comparator.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -205,7 +206,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                     if ("dependencies".equals(m.getSimpleName())) {
-                                        statementsToRemove.addAll(redundantDuplicates(m, getCursor(), ctx));
+                                        statementsToRemove.addAll(redundantDuplicates(m, getCursor()));
                                     } else if ("constraints".equals(m.getSimpleName())) {
                                         if (m.getArguments().isEmpty() ||
                                             !(m.getArguments().get(0) instanceof J.Lambda) ||
@@ -441,34 +442,48 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     /**
      * The older declarations of a dependency declared more than once in one configuration, where Gradle resolves the
      * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
-     * Java agent. A dependency is left alone unless every one of its declarations in the configuration is simple.
+     * Java agent. Only the statements of the {@code dependencies} block itself are compared, as a declaration nested
+     * in a condition may not apply. A dependency is left alone unless every one of its declarations in the
+     * configuration is simple and its newest version is written one way only.
      */
-    private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor,
-                                                         ExecutionContext ctx) {
+    private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor) {
         Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
-        new JavaIsoVisitor<ExecutionContext>() {
-            final GradleDependency.Matcher matcher = new GradleDependency.Matcher()
+        Expression block = dependencies.getArguments().get(0);
+        if (block instanceof J.Lambda && ((J.Lambda) block).getBody() instanceof J.Block) {
+            GradleDependency.Matcher matcher = new GradleDependency.Matcher()
                     .groupId(groupPattern)
                     .artifactId(artifactPattern);
-
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                matcher.get(getCursor()).ifPresent(declaration -> declarations.computeIfAbsent(
+            J.Block body = (J.Block) ((J.Lambda) block).getBody();
+            Cursor bodyCursor = new Cursor(new Cursor(cursor, block), body);
+            for (Statement statement : body.getStatements()) {
+                Cursor statementCursor = new Cursor(bodyCursor, statement);
+                Expression returned = statement instanceof J.Return ? ((J.Return) statement).getExpression() : null;
+                if (returned instanceof J.MethodInvocation) {
+                    statementCursor = new Cursor(statementCursor, returned);
+                }
+                matcher.get(statementCursor).ifPresent(declaration -> declarations.computeIfAbsent(
                         Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(),
                                 declaration.getGroupId(), declaration.getArtifactId()),
                         key -> new ArrayList<>()).add(declaration));
-                return m;
             }
-        }.visit(dependencies.getArguments().get(0), ctx, cursor);
+        }
 
         Set<J.MethodInvocation> redundant = new HashSet<>();
         for (List<GradleDependency> sameDependency : declarations.values()) {
             if (sameDependency.stream().anyMatch(declaration -> simpleVersion(declaration) == null)) {
                 continue;
             }
-            sameDependency.stream()
+            List<GradleDependency> newestFirst = sameDependency.stream()
                     .sorted((d1, d2) -> VERSION_COMPARATOR.compare(simpleVersion(d2), simpleVersion(d1)))
+                    .collect(toList());
+            if (newestFirst.size() > 1) {
+                String newest = simpleVersion(newestFirst.get(0));
+                String next = simpleVersion(newestFirst.get(1));
+                if (VERSION_COMPARATOR.compare(newest, next) == 0 && !newest.equals(next)) {
+                    continue;
+                }
+            }
+            newestFirst.stream()
                     .skip(1)
                     .forEach(declaration -> redundant.add(declaration.getTree()));
         }
