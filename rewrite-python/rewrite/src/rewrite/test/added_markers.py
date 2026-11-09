@@ -41,7 +41,6 @@ _ALLOWED = (SearchResult, Markup, RecipesThatMadeChanges)
 _REWRITE_RECIPE_MARKERS = frozenset({
     "org.openrewrite.marker.AlreadyReplaced",
     "org.openrewrite.maven.marker.AlreadyIncremented",
-    "org.openrewrite.yaml.MultilineScalarChanged",
     "org.openrewrite.java.search.UsesMethod$MethodMatch",
 })
 _FIELDS: Dict[type, Tuple[str, ...]] = {}

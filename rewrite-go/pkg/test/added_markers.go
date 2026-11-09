@@ -268,7 +268,6 @@ func (w *placementWalker) walk(v reflect.Value, root bool) {
 var rewriteRecipeMarkers = map[string]bool{
 	"org.openrewrite.marker.AlreadyReplaced":             true,
 	"org.openrewrite.maven.marker.AlreadyIncremented":    true,
-	"org.openrewrite.yaml.MultilineScalarChanged":        true,
 	"org.openrewrite.java.search.UsesMethod$MethodMatch": true,
 }
 

@@ -21,9 +21,11 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Multiline scalars are added directly to the tree, which leads to a wrong ident level.
- */
+/// Tells `IndentsVisitor` how to indent a multiline scalar that was merged into a document.
+///
+/// @deprecated `MergeYamlVisitor` no longer leaves this marker on the tree. `IndentsVisitor` still honours it
+/// for code that adds it, but it will be removed in a future release.
+@Deprecated
 @Value
 @With
 public class MultilineScalarChanged implements Marker {

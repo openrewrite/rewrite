@@ -764,7 +764,6 @@ const reportingMarkerKinds = new Set<string>([
 const rewriteRecipeMarkerKinds = new Set<string>([
     "org.openrewrite.marker.AlreadyReplaced",
     "org.openrewrite.maven.marker.AlreadyIncremented",
-    "org.openrewrite.yaml.MultilineScalarChanged",
     "org.openrewrite.java.search.UsesMethod$MethodMatch",
 ]);
 
