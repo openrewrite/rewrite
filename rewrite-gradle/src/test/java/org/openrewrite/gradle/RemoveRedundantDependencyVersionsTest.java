@@ -715,7 +715,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
-                  implementation("org.openrewrite:rewrite-core:8.55.0@jar")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
                   implementation("org.openrewrite:rewrite-core:8.56.0")
               }
               """,
@@ -751,6 +751,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
               configurations {
                   mockitoAgent
+                  instrumentation
               }
 
               dependencies {
@@ -758,6 +759,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   mockitoAgent("org.mockito:mockito-core:5.24.0") {
                       transitive = false
                   }
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+                  instrumentation "org.hamcrest:hamcrest:2.2"
               }
               """
           )
@@ -765,7 +769,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void keepsSameModuleWithAnotherClassifierOrAsPlatform() {
+    void keepsSameModuleWithAnotherArtifactOrVariant() {
         rewriteRun(
           buildGradle(
             """
@@ -787,6 +791,12 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
                   testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final"
                   testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final:${osdetector.classifier}"
+
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1@jar"
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
+
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm", version: "9.6", configuration: "runtime"
+                  testRuntimeOnly group: "org.ow2.asm", name: "asm", version: "9.7"
 
                   implementation platform("org.junit:junit-bom:5.10.1")
                   implementation "org.junit:junit-bom:5.10.0"
@@ -815,14 +825,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       transitive = false
                   }
 
-                  implementation "org.openrewrite:rewrite-core:8.55.0"
-                  implementation("org.openrewrite:rewrite-core:8.56.0") {
-                      transitive = false
-                  }
-
+                  testRuntimeOnly "org.hamcrest:hamcrest:2.1"
                   testRuntimeOnly "org.hamcrest:hamcrest:2.2"
                   testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
                   testRuntimeOnly "org.hamcrest:hamcrest:[2.0,3.0)"
+
+                  testRuntimeOnly "org.objenesis:objenesis:3.4"
+                  testRuntimeOnly "org.objenesis:objenesis:3.4!!3.3"
               }
               """
           )

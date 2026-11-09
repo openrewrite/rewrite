@@ -441,12 +441,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     /**
      * The older declarations of a dependency declared more than once in one configuration, where Gradle resolves the
      * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
-     * Java agent, and neither are those with a strict version or a range. A dependency with a configuration block on
-     * any of its declarations is left alone, as the block can narrow what is resolved.
+     * Java agent. A dependency is left alone unless every one of its declarations in the configuration is simple.
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor,
                                                          ExecutionContext ctx) {
-        Map<List<@Nullable Object>, List<GradleDependency>> declarations = new HashMap<>();
+        Map<List<Object>, List<GradleDependency>> declarations = new HashMap<>();
         new JavaIsoVisitor<ExecutionContext>() {
             final GradleDependency.Matcher matcher = new GradleDependency.Matcher()
                     .groupId(groupPattern)
@@ -455,25 +454,21 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                matcher.get(getCursor()).ifPresent(declaration -> {
-                    Dependency notation = literalNotation(declaration);
-                    String version = requestedVersion(declaration);
-                    if (notation != null && version != null && !isStrictOrRange(version)) {
-                        declarations.computeIfAbsent(duplicateKey(declaration, notation), key -> new ArrayList<>())
-                                .add(declaration);
-                    }
-                });
+                matcher.get(getCursor()).ifPresent(declaration -> declarations.computeIfAbsent(
+                        Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(),
+                                declaration.getGroupId(), declaration.getArtifactId()),
+                        key -> new ArrayList<>()).add(declaration));
                 return m;
             }
         }.visit(dependencies.getArguments().get(0), ctx, cursor);
 
         Set<J.MethodInvocation> redundant = new HashSet<>();
         for (List<GradleDependency> sameDependency : declarations.values()) {
-            if (sameDependency.stream().anyMatch(RemoveRedundantDependencyVersions::hasConfigurationBlock)) {
+            if (sameDependency.stream().anyMatch(declaration -> simpleVersion(declaration) == null)) {
                 continue;
             }
             sameDependency.stream()
-                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(requestedVersion(d2), requestedVersion(d1)))
+                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(simpleVersion(d2), simpleVersion(d1)))
                     .skip(1)
                     .forEach(declaration -> redundant.add(declaration.getTree()));
         }
@@ -481,69 +476,65 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     /**
-     * The configuration, platform flag and coordinates of a declaration, without its version.
+     * The version of a declaration that names only a group, an artifact and a plain version, as {@code "g:a:v"} or
+     * as named arguments, possibly inside {@code platform(...)}. Anything more can change what is resolved, so it
+     * gives null.
      */
-    private static List<@Nullable Object> duplicateKey(GradleDependency declaration, Dependency notation) {
-        return Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(), declaration.getGroupId(),
-                declaration.getArtifactId(), notation.getClassifier(),
-                notation.getType() == null ? "jar" : notation.getType());
-    }
-
-    /**
-     * A declaration's notation when it is a string, or named arguments, of literals only. The Gradle model records no
-     * classifier or extension, so they are read from here. A template or concatenation can hide either, so any other
-     * notation gives null.
-     */
-    private static @Nullable Dependency literalNotation(GradleDependency declaration) {
+    private static @Nullable String simpleVersion(GradleDependency declaration) {
         List<Expression> arguments = declaration.getTree().getArguments();
-        if (declaration.isPlatform() && arguments.get(0) instanceof J.MethodInvocation) {
+        if (declaration.isPlatform()) {
+            if (arguments.size() != 1 || !(arguments.get(0) instanceof J.MethodInvocation)) {
+                return null;
+            }
             arguments = ((J.MethodInvocation) arguments.get(0)).getArguments();
         }
-        Expression first = arguments.get(0);
-        if (first instanceof J.Literal) {
-            Object notation = ((J.Literal) first).getValue();
-            return notation instanceof String ? DependencyNotation.parse((String) notation) : null;
+        String version = null;
+        if (arguments.size() == 1 && arguments.get(0) instanceof J.Literal) {
+            Object notation = ((J.Literal) arguments.get(0)).getValue();
+            if (notation instanceof String && !((String) notation).contains("@")) {
+                String[] parts = ((String) notation).split(":", -1);
+                if (parts.length == 3 && !parts[0].isEmpty() && !parts[1].isEmpty()) {
+                    version = parts[2];
+                }
+            }
+        } else {
+            Map<String, String> named = namedLiterals(arguments);
+            if (named != null && named.keySet().equals(new HashSet<>(Arrays.asList("group", "name", "version")))) {
+                version = named.get("version");
+            }
+        }
+        if (version == null || version.isEmpty() || version.contains("!!") ||
+                version.startsWith("[") || version.startsWith("]") || version.startsWith("(")) {
+            return null;
+        }
+        return version;
+    }
+
+    private static @Nullable Map<String, String> namedLiterals(List<Expression> arguments) {
+        if (arguments.size() == 1 && arguments.get(0) instanceof G.MapLiteral) {
+            arguments = new ArrayList<>(((G.MapLiteral) arguments.get(0)).getElements());
         }
         Map<String, String> named = new HashMap<>();
-        for (Expression argument : first instanceof G.MapLiteral ? ((G.MapLiteral) first).getElements() : arguments) {
-            String name;
+        for (Expression argument : arguments) {
+            Expression name;
             Expression value;
-            if (argument instanceof J.Lambda) {
-                continue;
-            } else if (argument instanceof G.MapEntry && ((G.MapEntry) argument).getKey() instanceof J.Literal) {
-                name = String.valueOf(((J.Literal) ((G.MapEntry) argument).getKey()).getValue());
+            if (argument instanceof G.MapEntry) {
+                name = ((G.MapEntry) argument).getKey();
                 value = ((G.MapEntry) argument).getValue();
-            } else if (argument instanceof J.Assignment &&
-                       ((J.Assignment) argument).getVariable() instanceof J.Identifier) {
-                name = ((J.Identifier) ((J.Assignment) argument).getVariable()).getSimpleName();
+            } else if (argument instanceof J.Assignment) {
+                name = ((J.Assignment) argument).getVariable();
                 value = ((J.Assignment) argument).getAssignment();
             } else {
                 return null;
             }
-            if (!(value instanceof J.Literal) || !(((J.Literal) value).getValue() instanceof String)) {
+            String key = name instanceof J.Literal ? String.valueOf(((J.Literal) name).getValue()) :
+                    name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : null;
+            if (key == null || !(value instanceof J.Literal) || !(((J.Literal) value).getValue() instanceof String)) {
                 return null;
             }
-            named.put(name, (String) ((J.Literal) value).getValue());
+            named.put(key, (String) ((J.Literal) value).getValue());
         }
-        String artifact = named.get("name");
-        return artifact == null ? null : Dependency.builder()
-                .gav(new GroupArtifactVersion(named.get("group"), artifact, named.get("version")))
-                .classifier(named.get("classifier"))
-                .type(named.get("ext"))
-                .build();
-    }
-
-    private static @Nullable String requestedVersion(GradleDependency declaration) {
-        return declaration.getResolvedDependency().getRequested().getVersion();
-    }
-
-    private static boolean isStrictOrRange(String version) {
-        return version.endsWith("!!") || version.startsWith("[") || version.startsWith("]") || version.startsWith("(");
-    }
-
-    private static boolean hasConfigurationBlock(GradleDependency declaration) {
-        List<Expression> arguments = declaration.getTree().getArguments();
-        return arguments.get(arguments.size() - 1) instanceof J.Lambda;
+        return named;
     }
 
     private Comparator determineComparator() {
