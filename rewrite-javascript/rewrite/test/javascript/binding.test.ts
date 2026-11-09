@@ -1115,6 +1115,47 @@ function installHttpPackages(root: string) {
     });
 }
 
+/** The old and the new name of one API, side by side in one package. */
+function installHttpApi(root: string) {
+    installPackage(root, "http-api", {
+        "package.json": `{"name":"http-api","version":"1.0.0","types":"index.d.ts"}`,
+        "index.d.ts": `
+            export declare class Http { get(url: string): string; }
+            export declare class HttpClient { get(url: string): string; }
+            export declare function request(url: string): string;
+            export declare function send(url: string): string;
+        `
+    });
+}
+
+/** The attribution of `before` once `move` ran on it, and of `after` parsed fresh, beside the packages `install` writes. */
+async function attributionsAfter(
+    move: MaybeRebindOptions,
+    install: (root: string) => void,
+    before: string,
+    after: string
+): Promise<{rebound: string[], parsed: string[]}> {
+    const spec = new RecipeSpec();
+    spec.recipe = rebindEach([move]);
+    const attributions = {rebound: [] as string[], parsed: [] as string[]};
+    await withDir(async (repo) => {
+        install(repo.path);
+        await spec.rewriteRun(npm(repo.path, {
+            ...typescript(before, after),
+            afterRecipe: async (cu: JS.CompilationUnit) => {
+                attributions.rebound = await attributionOf(cu);
+            }
+        } as any, packageJson(`{"name":"t"}`)));
+        await new RecipeSpec().rewriteRun(npm(repo.path, {
+            ...typescript(after),
+            afterRecipe: async (cu: JS.CompilationUnit) => {
+                attributions.parsed = await attributionOf(cu);
+            }
+        } as any, packageJson(`{"name":"t"}`)));
+    }, {unsafeCleanup: true});
+    return attributions;
+}
+
 /** The signature of every type a tree outside the imports of `cu` is attributed to. */
 async function attributionOf(cu: JS.CompilationUnit): Promise<string[]> {
     const render = Type.signature;
@@ -3197,15 +3238,7 @@ describe("maybeRebind and the member's other spellings", () => {
         let rebound: string[] = [];
         let parsed: string[] = [];
         await withDir(async (repo) => {
-            installPackage(repo.path, "http-api", {
-                "package.json": `{"name":"http-api","version":"1.0.0","types":"index.d.ts"}`,
-                "index.d.ts": `
-                    export declare class Http { get(url: string): string; }
-                    export declare class HttpClient { get(url: string): string; }
-                    export declare function request(url: string): string;
-                    export declare function send(url: string): string;
-                `
-            });
+            installHttpApi(repo.path);
             await spec.rewriteRun(npm(repo.path, {
                 ...typescript(`
                     import * as api from 'http-api';
@@ -3225,6 +3258,40 @@ describe("maybeRebind and the member's other spellings", () => {
                 }
             } as any, packageJson(`{"name":"t"}`)));
         }, {unsafeCleanup: true});
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
+    test("an import() type and a re-export moved within their module are typed as a fresh parse of the result types them", async () => {
+        const {rebound, parsed} = await attributionsAfter(
+            {from: {module: "http-api", member: "Http"}, to: {module: "http-api", member: "HttpClient"}},
+            installHttpApi,
+            `
+                declare const client: import('http-api').Http;
+                export {Http} from 'http-api';
+                export {Http as Client} from 'http-api';
+            `,
+            `
+                declare const client: import('http-api').HttpClient;
+                export {HttpClient as Http} from 'http-api';
+                export {HttpClient as Client} from 'http-api';
+            `
+        );
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
+    test("an import() type and a re-export moved to another module are typed as a fresh parse of the result types them", async () => {
+        const {rebound, parsed} = await attributionsAfter(
+            {from: {module: "legacy-http", member: "Http"}, to: {module: "@acme/common/http", member: "HttpClient"}},
+            installHttpPackages,
+            `
+                declare const client: import('legacy-http').Http;
+                export {Http} from 'legacy-http';
+            `,
+            `
+                declare const client: import('@acme/common/http').HttpClient;
+                export {HttpClient as Http} from '@acme/common/http';
+            `
+        );
         expect(rebound).toEqual(parsed);
     }, 60000);
 

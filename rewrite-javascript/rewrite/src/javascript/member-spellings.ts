@@ -261,20 +261,27 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     /**
      * The specifier reading the new member, still exporting the same name: `Old` → `New as Old`,
      * and `Old as X` or `"Old" as X` → `New as X`. Unchanged where only the module moves.
+     * `New` is typed as the specifier is, which the type rename then follows.
      */
     private renamed(element: J.RightPadded<Expression>): J.RightPadded<Expression> {
-        if (this.to.member === this.from.member) {
+        if (this.to.member === this.from.member || element.element.kind !== JS.Kind.ExportSpecifier) {
             return element;
         }
-        return produce(element, draft => {
-            const specifier = draft.element as Draft<JS.ExportSpecifier>;
-            if (specifier.specifier.kind === JS.Kind.Alias) {
-                const name = (specifier.specifier as Draft<JS.Alias>).propertyName;
-                name.element = {...newIdentifier(this.to.member), prefix: name.element.prefix} as Draft<J.Identifier>;
-            } else {
-                specifier.specifier = aliasing(specifier.specifier as J.Identifier, this.to.member) as Draft<JS.Alias>;
-            }
-        });
+        const specifier = element.element as JS.ExportSpecifier;
+        const read = specifier.specifier;
+        const member: J.Identifier = {...newIdentifier(this.to.member), type: specifier.type};
+        let renamed: JS.Alias;
+        if (read.kind === JS.Kind.Alias) {
+            const alias = read as JS.Alias;
+            renamed = {...alias, propertyName: {...alias.propertyName, element: {...member, prefix: alias.propertyName.element.prefix}}};
+        } else if (read.kind === J.Kind.Identifier || read.kind === J.Kind.Literal) {
+            const alias = aliasing(read as J.Identifier | J.Literal, this.to.member);
+            renamed = {...alias, propertyName: {...alias.propertyName, element: member}};
+        } else {
+            return element;
+        }
+        const reading: JS.ExportSpecifier = {...specifier, specifier: renamed};
+        return {...element, element: reading};
     }
 
     /** Whether the entry is `Old`, `Old as X` or `"Old" as X`. */

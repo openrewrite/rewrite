@@ -2197,9 +2197,9 @@ export function existingImportBinding(
  * The `member as local` specifier, for an import binding `member` under `local` or an export
  * publishing `local`'s binding under that name. `local` itself becomes the alias, keeping the type
  * attribution it holds, and the alias takes its prefix: that whitespace separates the specifier
- * from a `type` keyword before it.
+ * from a `type` keyword before it. An export may publish a string literal: `New as "Old"`.
  */
-export function aliasing(local: J.Identifier, member: string): JS.Alias {
+export function aliasing(local: J.Identifier | J.Literal, member: string): JS.Alias {
     const propertyName: J.Identifier = {
         id: randomId(),
         kind: J.Kind.Identifier,
