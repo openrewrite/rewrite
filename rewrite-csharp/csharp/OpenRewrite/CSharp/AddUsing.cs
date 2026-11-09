@@ -36,7 +36,8 @@ namespace OpenRewrite.CSharp;
 /// <para>
 /// A file with <c>#if</c> blocks gets the using at the compilation unit level, above its first
 /// conditional directive. Every branch has the same text there and every configuration compiles
-/// it.
+/// it. Extern aliases must precede every using, so a file with a conditional directive before an
+/// extern alias is left alone.
 /// </para>
 /// </summary>
 public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
@@ -77,6 +78,12 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         // Each branch is the whole file as one set of symbols compiles it.
         if (cu.Members is [{ Element: ConditionalDirective directive } member])
         {
+            if (directive.Branches.Any(branch => branch.Element.Externs.Count > 0
+                    && (IndexOfDirectiveLine(branch.Element.Prefix) >= 0
+                        || branch.Element.Externs.Any(e => IndexOfDirectiveLine(e.Element.Prefix) >= 0))))
+            {
+                return cu;
+            }
             return cu.WithMembers([member.WithElement(directive.WithBranches(directive.Branches
                 .Select(branch => branch.WithElement(Insert(branch.Element, inBranch: true)))
                 .ToList()))]);
@@ -112,7 +119,8 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             return cu.WithUsings(InsertAboveDirectiveLine(cu.Usings, shared, newline));
         }
 
-        // A namespace's usings can sit below a conditional directive.
+        // A branch keeps the using at the compilation unit level, as a namespace's usings can sit
+        // below a conditional directive.
         if (!inBranch)
         {
             foreach (var ns in AddUsing.Namespaces(cu.Members))
@@ -131,11 +139,10 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     }
 
     /// <summary>A branch whose prefix holds a conditional directive gets the using right above it,
-    /// after any file header. Extern aliases have to precede every using, so a branch with extern
-    /// aliases is left to the usual placement.</summary>
+    /// after any file header.</summary>
     private CompilationUnit? InsertAboveOpeningDirective(CompilationUnit cu, string newline)
     {
-        if (IndexOfDirectiveLine(cu.Prefix) < 0 || cu.Externs.Count > 0)
+        if (IndexOfDirectiveLine(cu.Prefix) < 0)
         {
             return null;
         }
@@ -174,8 +181,17 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             new Space(newline, space.Comments.Skip(at).ToList()));
     }
 
-    private static int IndexOfDirectiveLine(Space space) =>
-        space.Comments.ToList().FindIndex(comment => DirectiveBoundaryInjector.DirectiveIndex(comment) != null);
+    private static int IndexOfDirectiveLine(Space space)
+    {
+        for (var i = 0; i < space.Comments.Count; i++)
+        {
+            if (DirectiveBoundaryInjector.DirectiveIndex(space.Comments[i]) != null)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     /// <summary>Inserts among the first <paramref name="count"/> elements of the list. The element
     /// after them, if any, starts with a conditional directive line.</summary>
@@ -481,8 +497,8 @@ public static class AddUsing
             ? directive.Branches.All(branch => branch.Element is { Members.Count: 0, AttributeLists.Count: 0 }
                 || HasNamespaceUsing(branch.Element, ns))
             : UsingLists(cu).SelectMany(list => list).Any(padded =>
-            padded.Element is UsingDirective { IsStatic: false, Alias: null } directive
-            && string.Equals(QualifiedNameOf(directive.NamespaceOrType), ns, StringComparison.Ordinal));
+                padded.Element is UsingDirective { IsStatic: false, Alias: null } directive
+                && string.Equals(QualifiedNameOf(directive.NamespaceOrType), ns, StringComparison.Ordinal));
 
     internal static IEnumerable<IList<JRightPadded<Statement>>> UsingLists(CompilationUnit cu)
     {

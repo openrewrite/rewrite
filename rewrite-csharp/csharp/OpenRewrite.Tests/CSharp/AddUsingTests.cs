@@ -359,6 +359,24 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void ConditionalDirectiveBeforeAnExternAliasLeavesTheFileAlone()
+    {
+        var cu = Parse(
+            """
+            extern alias A;
+            #if FEATURE_X
+            extern alias B;
+            #endif
+
+            public class C
+            {
+            }
+            """);
+
+        Assert.Same(cu, new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0));
+    }
+
+    [Fact]
     public void UsingPresentInEveryConfigurationThatDeclaresSomethingIsANoOp()
     {
         var cu = Parse(
