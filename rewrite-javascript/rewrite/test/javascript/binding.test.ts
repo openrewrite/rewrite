@@ -1887,63 +1887,6 @@ describe("maybeRebind", () => {
         ));
     });
 
-    // Fails for now: scope counts a function declared in a block as a module-scope value, so the import keeps its name
-    test.fails("a type-only import beside a block's function of that name takes the new name", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rebindOldToNew());
-        //language=typescript
-        await spec.rewriteRun(typescript(
-            `
-                import type { Old } from "m";
-                if (c) { function Old() {} }
-                let x: Old;
-            `,
-            `
-                import type { New } from "m2";
-                if (c) { function Old() {} }
-                let x: New;
-            `
-        ));
-    });
-
-    // Fails for now: scope counts a `declare global` variable as a module-scope value, so the import keeps its name
-    test.fails("a type-only import beside a declare global variable of that name takes the new name", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rebindOldToNew());
-        //language=typescript
-        await spec.rewriteRun(typescript(
-            `
-                import type { Old } from "m";
-                declare global { var Old: number }
-                let x: Old;
-            `,
-            `
-                import type { New } from "m2";
-                declare global { var Old: number }
-                let x: New;
-            `
-        ));
-    });
-
-    // Fails for now: scope counts a function declared in a block as a module-scope value, so the import keeps its name
-    test.fails("a value import beside a block's function of that name takes the new name", async () => {
-        const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(rebindOldToNew());
-        //language=typescript
-        await spec.rewriteRun(typescript(
-            `
-                import { Old } from "m";
-                if (c) { function Old() {} }
-                Old();
-            `,
-            `
-                import { New } from "m2";
-                if (c) { function Old() {} }
-                New();
-            `
-        ));
-    });
-
     test("a pinned alias cannot split an import from its same-named exported value", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -2978,6 +2921,69 @@ describe("maybeRebind", () => {
             import {b} from "n";
 
             const x = [a, b];`
+        ));
+    });
+});
+
+// Why test.fails?
+// scope.ts counts a block's function and a `declare global` variable as module-scope names,
+// so we add an unnecessary alias. The code still compiles; these tests are here to make it better.
+// See https://github.com/openrewrite/rewrite/pull/9632
+describe("maybeRebind adds no alias the file doesn't need", () => {
+    // Today: import type { New as Old } from "m2";
+    test.fails("a type-only import beside a block's function of the same name moves without an alias", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+                if (c) { function Old() {} }
+                let x: Old;
+            `,
+            `
+                import type { New } from "m2";
+                if (c) { function Old() {} }
+                let x: New;
+            `
+        ));
+    });
+
+    // Today: import type { New as Old } from "m2";
+    test.fails("a type-only import beside a declare global variable of the same name moves without an alias", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import type { Old } from "m";
+                declare global { var Old: number }
+                let x: Old;
+            `,
+            `
+                import type { New } from "m2";
+                declare global { var Old: number }
+                let x: New;
+            `
+        ));
+    });
+
+    // Today: import { New as Old } from "m2";
+    test.fails("a value import beside a block's function of the same name moves without an alias", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                if (c) { function Old() {} }
+                Old();
+            `,
+            `
+                import { New } from "m2";
+                if (c) { function Old() {} }
+                New();
+            `
         ));
     });
 });
