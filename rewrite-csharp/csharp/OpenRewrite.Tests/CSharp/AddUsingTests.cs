@@ -326,6 +326,35 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void DocCommentAboveAnOpeningDirectiveStaysWithTheDeclaration()
+    {
+        var after = ApplyAddUsing(
+            """
+            /// <summary>Doc.</summary>
+            #if FEATURE_X
+            [System.Obsolete]
+            #endif
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            using System.Threading.Tasks;
+            /// <summary>Doc.</summary>
+            #if FEATURE_X
+            [System.Obsolete]
+            #endif
+            public class C
+            {
+            }
+            """, after);
+    }
+
+    [Fact]
     public void UsingStaysAboveAConditionalBlockAmongTheUsings()
     {
         var after = ApplyAddUsing(

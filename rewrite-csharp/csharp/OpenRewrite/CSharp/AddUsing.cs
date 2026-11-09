@@ -187,10 +187,15 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
     }
 
     /// <summary>Splits a space before its first conditional directive line, which starts the second
-    /// part on a new line.</summary>
+    /// part on a new line. Doc comments right above the directive document the declaration below it,
+    /// so they go with the directive.</summary>
     private static (Space Above, Space From) SplitAtDirectiveLine(Space space, string newline)
     {
         var at = IndexOfDirectiveLine(space);
+        while (at > 0 && space.Comments[at - 1] is CsDocComment)
+        {
+            at--;
+        }
         return (new Space(space.Whitespace, space.Comments.Take(at).ToList()),
             new Space(newline, space.Comments.Skip(at).ToList()));
     }
