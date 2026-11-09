@@ -346,6 +346,26 @@ public class SolutionParserTests : IDisposable
         AssertWidgetExtends("Newtonsoft.Json.JsonException", Assert.IsType<CompilationUnit>(Assert.Single(results)));
     }
 
+    [Fact]
+    public async Task EmptyEntryInTargetFrameworksDoesNotHideTheProject()
+    {
+        // What `$(TargetFrameworks);net10.0` evaluates to when nothing set TargetFrameworks before it.
+        var csproj = WriteFile("Multi.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>;net10.0</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(csproj);
+
+        var results = parser.ParseProject(solution, csproj, _tempDir);
+        AssertWidgetExtendsException(Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
     [Theory]
     [InlineData("TargetFramework", "net99.0")]
     [InlineData("TargetFrameworks", "net99.0")]
