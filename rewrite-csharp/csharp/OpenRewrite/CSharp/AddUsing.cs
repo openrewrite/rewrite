@@ -69,7 +69,18 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             return cu;
         }
 
-        return Insert(cu);
+        // Each branch is the whole file as one set of symbols compiles it, with its own usings. A
+        // branch that declares nothing gets none. Its using would land after its last directive,
+        // on a line that every configuration compiles.
+        if (cu.Members is [{ Element: ConditionalDirective directive } member])
+        {
+            return cu.WithMembers([member.WithElement(directive.WithBranches(directive.Branches
+                .Select(branch => branch.Element is { Members.Count: 0, AttributeLists.Count: 0 }
+                    ? branch
+                    : branch.WithElement(Insert(branch.Element, directive.DirectiveLines)))
+                .ToList()))]);
+        }
+        return Insert(cu, []);
     }
 
     private bool IsReferenced(CompilationUnit cu)
@@ -79,9 +90,14 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         return finder.Found;
     }
 
-    private CompilationUnit Insert(CompilationUnit cu)
+    private CompilationUnit Insert(CompilationUnit cu, IList<DirectiveLine> directives)
     {
         var newline = DetectNewline(cu);
+
+        if (InsertAfterConditionalBlock(cu, newline, directives) is { } afterBlock)
+        {
+            return afterBlock;
+        }
 
         if (cu.Usings.Any(u => u.Element is UsingDirective))
         {
@@ -99,6 +115,36 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         }
 
         return InsertFirstUsing(cu, newline);
+    }
+
+    /// <summary>An <c>#endif</c> right above the first declaration closes a block that only some
+    /// configurations compile. The new using goes on the line after it, so it is compiled wherever
+    /// that declaration is.</summary>
+    private CompilationUnit? InsertAfterConditionalBlock(CompilationUnit cu, string newline,
+        IList<DirectiveLine> directives)
+    {
+        var prefix = cu.AttributeLists.Count > 0 ? cu.AttributeLists[0].Prefix
+            : cu.Members.Count > 0 ? cu.Members[0].Element.Prefix
+            : Space.Empty;
+        var comments = prefix.Comments;
+        var endif = comments.ToList().FindLastIndex(comment =>
+            DirectiveBoundaryInjector.DirectiveIndex(comment) is { } index
+            && directives.ElementAtOrDefault(index)?.Kind == PreprocessorDirectiveKind.Endif);
+        if (endif < 0)
+        {
+            return null;
+        }
+
+        var throughEndif = new Space(prefix.Whitespace,
+            [.. comments.Take(endif), new TextComment(comments[endif].Text, newline, false)]);
+        var afterEndif = new Space(comments[endif].Suffix, comments.Skip(endif + 1).ToList());
+        cu = cu.WithUsings([.. cu.Usings, JRightPadded<Statement>.Build(CreateUsing(throughEndif))]);
+        if (cu.AttributeLists.Count > 0)
+        {
+            return cu.WithAttributeLists([cu.AttributeLists[0].WithPrefix(afterEndif), .. cu.AttributeLists.Skip(1)]);
+        }
+        var first = cu.Members[0];
+        return cu.WithMembers([first.WithElement(J.SetPrefix(first.Element, afterEndif)), .. cu.Members.Skip(1)]);
     }
 
     private List<JRightPadded<Statement>> InsertInto(IList<JRightPadded<Statement>> list, string newline)
@@ -408,6 +454,13 @@ public static class AddUsing
         foreach (var ns in Namespaces(cu.Members))
         {
             yield return ns.Usings;
+        }
+        if (cu.Members is [{ Element: ConditionalDirective directive }])
+        {
+            foreach (var list in directive.Branches.SelectMany(branch => UsingLists(branch.Element)))
+            {
+                yield return list;
+            }
         }
     }
 

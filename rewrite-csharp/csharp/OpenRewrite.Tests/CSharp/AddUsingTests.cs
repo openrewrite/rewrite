@@ -241,6 +241,116 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void FileWithConditionalDirectivesGetsTheUsingAfterALeadingDirective()
+    {
+        var after = ApplyAddUsing(
+            """
+            #nullable enable
+
+            // A comment
+            public static class Some
+            {
+                public static object Fail() => new object();
+            #if FEATURE_X
+                public static int X => 1;
+            #endif
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            #nullable enable
+            using System.Threading.Tasks;
+
+            // A comment
+            public static class Some
+            {
+                public static object Fail() => new object();
+            #if FEATURE_X
+                public static int X => 1;
+            #endif
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void UsingGoesAfterAConditionalBlockOfUsings()
+    {
+        var after = ApplyAddUsing(
+            """
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+
+            public class C
+            {
+            }
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            #if FEATURE_X
+            using System.Diagnostics;
+            #endif
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void ConfigurationThatCompilesNoDeclarationGetsNoUsing()
+    {
+        var after = ApplyAddUsing(
+            """
+            #if !FEATURE_X
+            public class C
+            {
+            }
+            #endif
+            """,
+            "System.Threading.Tasks.Task",
+            onlyIfReferenced: false);
+
+        Assert.Equal(
+            """
+            #if !FEATURE_X
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            }
+            #endif
+            """, after);
+    }
+
+    [Fact]
+    public void UsingAlreadyPresentInAFileWithConditionalDirectivesIsANoOp()
+    {
+        var cu = Parse(
+            """
+            using System.Threading.Tasks;
+
+            public class C
+            {
+            #if FEATURE_X
+                private Task field;
+            #endif
+            }
+            """);
+
+        var result = new AddUsing<int>("System.Threading.Tasks.Task", onlyIfReferenced: false).Visit(cu, 0);
+
+        Assert.Same(cu, result);
+    }
+
+    [Fact]
     public void AlreadyPresentUsingIsReferenceEqualNoOp()
     {
         var cu = Parse(
