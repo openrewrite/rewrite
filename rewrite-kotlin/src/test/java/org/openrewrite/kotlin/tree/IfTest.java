@@ -217,4 +217,62 @@ class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyThenWithElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(b: Boolean) {
+                  if (b) else println()
+                  if (b)else println()
+                  if ( b ) /*c*/ else println()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void semicolonThenWithElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(b: Boolean) {
+                  if (b) ; else println()
+                  if (b); else println()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyThenWithoutElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(b: Boolean) {
+                  if (b) ;
+                  if (b);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(b: Boolean) {
+                  if (b) println() else ;
+                  if (b) println() else;
+                  if (b) println() else /*c*/ ;
+              }
+              """
+          )
+        );
+    }
 }

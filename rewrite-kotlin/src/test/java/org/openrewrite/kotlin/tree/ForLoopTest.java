@@ -203,4 +203,18 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyBody() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  for (i in 1..2);
+                  for (i in 1..2) ;
+              }
+              """
+          )
+        );
+    }
 }

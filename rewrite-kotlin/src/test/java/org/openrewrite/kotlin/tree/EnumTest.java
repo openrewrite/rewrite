@@ -189,4 +189,20 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noEntriesWithSemicolon() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class A { ; fun f() {} }
+              enum class B {
+                  /*c*/ ;
+                  companion object
+              }
+              enum class C { ; }
+              """
+          )
+        );
+    }
 }
