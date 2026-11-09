@@ -449,6 +449,20 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void scopedRecursiveWildcardSelectsEveryDescendant() {
+        assertMatched(
+          "$.a..*",
+          List.of(
+            //language=json
+            """
+              {"a": {"b": 1, "c": {"d": 2}, "l": [{"x": "y"}, "z"]}, "other": 3}
+              """
+          ),
+          List.of("\"b\": 1", "\"d\": 2", "\"c\": {\"d\": 2}", "\"x\": \"y\"", "{\"x\": \"y\"}", "\"z\"", "\"l\": [{\"x\": \"y\"}, \"z\"]")
+        );
+    }
+
+    @Test
     void allPropertiesInKeyFromRoot() {
         assertMatched(
           // This produces two false positives from $.literal and $.list.literal.
