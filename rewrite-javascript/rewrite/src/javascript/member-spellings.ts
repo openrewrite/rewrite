@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {create as produce, Draft} from "mutative";
-import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, J, singleSpace, Statement} from "../java";
+import {ElementRemovalFormatter, emptySpace, Expression, isIdentifier, isStringLiteral, J, singleSpace, Statement} from "../java";
 import {randomId, UUID} from "../uuid";
 import {Cursor} from "../tree";
 import {isObjectBindingPattern, JS, moduleExportName} from "./tree";
@@ -25,7 +25,8 @@ import {sameModule, spelledLike} from "./package-name";
 
 /**
  * Renames a moved member where the file reads it through its module rather than an import of it.
- * `NS` is a module object: `import * as NS from "m"`, `import NS = require("m")` or `const NS = require("m")`.
+ * `NS` is a module object: `import * as NS from "m"`, `import NS = require("m")`, `const NS = require("m")`
+ * or `const NS = await import("m")`.
  *
  *     // m.Old → m.New
  *     NS.Old()                     →  NS.New()
@@ -111,8 +112,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
     override async visitArrayAccess(arrayAccess: J.ArrayAccess, p: P): Promise<J | undefined> {
         const visited = await super.visitArrayAccess(arrayAccess, p);
         const index = arrayAccess.dimension.index.element;
-        if (visited?.kind !== J.Kind.ArrayAccess || index.kind !== J.Kind.Literal || typeof (index as J.Literal).value !== "string" ||
-            !this.readsMovedMember(arrayAccess.indexed, (index as J.Literal).value as string)) {
+        if (visited?.kind !== J.Kind.ArrayAccess || !isStringLiteral(index) || !this.readsMovedMember(arrayAccess.indexed, index.value)) {
             return visited;
         }
         return produce(visited as J.ArrayAccess, draft => {
@@ -154,8 +154,7 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
         const argument = importType.argumentAndAttributes.elements[0]?.element;
         const literal = argument?.kind === JS.Kind.LiteralType ? (argument as JS.LiteralType).literal : undefined;
         const qualifier = rootName(importType.qualifier?.element);
-        if (literal?.kind !== J.Kind.Literal || typeof (literal as J.Literal).value !== "string" ||
-            !sameModule(moduleNameOf(literal as J.Literal), this.from.module) ||
+        if (!isStringLiteral(literal) || !sameModule(moduleNameOf(literal), this.from.module) ||
             qualifier === undefined || !isIdentifier(qualifier) || qualifier.simpleName !== this.from.member) {
             return visited;
         }
@@ -303,8 +302,7 @@ function reExportFrom(statement: J | undefined, module: string): JS.ExportDeclar
     }
     const declaration = statement as JS.ExportDeclaration;
     const source = declaration.moduleSpecifier?.element;
-    return source?.kind === J.Kind.Literal && typeof (source as J.Literal).value === "string" &&
-        sameModule(moduleNameOf(source as J.Literal), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
+    return isStringLiteral(source) && sameModule(moduleNameOf(source), module) && declaration.exportClause?.kind === JS.Kind.NamedExports
         ? declaration : undefined;
 }
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J} from "../java";
+import {isStringLiteral, J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {
@@ -149,8 +149,8 @@ interface ModuleObjectBinding {
     /** A type-only import erases, so the name it binds stands for no value at runtime. */
     typeOnly: boolean;
 
-    /** `let`/`var`: after `NS = other`, `NS.Old` no longer reads the module. */
-    reassignable: boolean;
+    /** `let`/`var`: after `NS = other`, `NS.Old` no longer reads the module. An import never is. */
+    reassignable?: boolean;
 }
 
 /**
@@ -173,9 +173,7 @@ function dynamicallyImportedModule(declaration: J.VariableDeclarations): string 
         return undefined;
     }
     const argument = call.arguments.elements[0]?.element;
-    return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
-        ? moduleNameOf(argument as J.Literal)
-        : undefined;
+    return isStringLiteral(argument) ? moduleNameOf(argument) : undefined;
 }
 
 function isImportIdentifier(expression: J | undefined): boolean {
@@ -199,13 +197,19 @@ function wholeModuleBindingsVia(
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
-                const modifiers = (stmt.element as J.VariableDeclarations | JS.ScopedVariableDeclarations).modifiers;
                 bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false,
-                    reassignable: !modifiers.some(m => m.keyword === "const")});
+                    reassignable: !declaresConst(stmt.element)});
             }
         }
     }
     return bindings;
+}
+
+/** Whether `statement` declares `const`, which a list (`const a = 1, NS = require("m")`) spells on the statement. */
+function declaresConst(statement: J | undefined): boolean {
+    const modifiers = statement?.kind === J.Kind.VariableDeclarations ? (statement as J.VariableDeclarations).modifiers :
+        statement?.kind === JS.Kind.ScopedVariableDeclarations ? (statement as JS.ScopedVariableDeclarations).modifiers : [];
+    return modifiers.some(m => m.keyword === "const");
 }
 
 /**
@@ -227,18 +231,16 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
             ? requiredModuleOf(initializer as J.MethodInvocation)
             : undefined;
         if (required !== undefined && clause?.name?.element?.kind === J.Kind.Identifier) {
-            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module: required, shape: "require", typeOnly,
-                reassignable: false});
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module: required, shape: "require", typeOnly});
             continue;
         }
         const specifier = jsImport.moduleSpecifier?.element;
-        if (specifier?.kind !== J.Kind.Literal || typeof (specifier as J.Literal).value !== "string") {
+        if (!isStringLiteral(specifier)) {
             continue;
         }
-        const module = moduleNameOf(specifier as J.Literal);
+        const module = moduleNameOf(specifier);
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
-            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly,
-                reassignable: false});
+            bindings.push({name: (clause.name.element as J.Identifier).simpleName, module, shape: "default", typeOnly});
         }
         // `namedBindings` is a `JS.Alias` only for `import * as X from "m"`; a renamed
         // named import (`{a as b}`) nests its alias inside `NamedImports` instead.
@@ -246,8 +248,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (named?.kind === JS.Kind.Alias) {
             const alias = (named as JS.Alias).alias;
             if (alias?.kind === J.Kind.Identifier) {
-                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace", typeOnly,
-                    reassignable: false});
+                bindings.push({name: (alias as J.Identifier).simpleName, module, shape: "namespace", typeOnly});
             }
         }
     }
@@ -396,7 +397,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         const bound = moduleScopeBindings(cu).some(b => b.module !== undefined &&
             sameModule(b.module, options.from.module) && b.member === memberName(options.from.member));
         if (!bound) {
-            renameMemberSpellings(visitor, cu, options, true);
+            queueRenameMemberSpellings(visitor, cu, options, {retypes: true});
         }
         return undefined;
     }
@@ -418,7 +419,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         v.localName === existing.localName)) {
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
     }
-    renameMemberSpellings(visitor, cu, options, false);
+    queueRenameMemberSpellings(visitor, cu, options, {retypes: false});
     return boundName;
 }
 
@@ -426,11 +427,11 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
  * Queues one {@link RenameMemberSpellings} per move of a named member. `retypes` where no `RebindImport` runs.
  * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
  */
-function renameMemberSpellings(
+function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
     cu: JS.CompilationUnit,
     options: MaybeRebindOptions,
-    retypes: boolean
+    {retypes}: {retypes: boolean}
 ): void {
     const from = memberName(options.from.member);
     const to = memberName(options.to.member);
