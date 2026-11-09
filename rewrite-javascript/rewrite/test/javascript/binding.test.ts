@@ -3152,19 +3152,29 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
-    test.each([
-        'let NS = require("m");',
-        'var NS = require("m");',
-        'let NS = await import("m");'
-    ])("a reassignable module object is left alone: %s", async declaration => {
+    test("a reassignable module object is left alone", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m", member: "New"}, {});
-        //language=javascript
-        await spec.rewriteRun(javascript(`
-            ${declaration}
-            NS = {Old: () => 1};
-            NS.Old();
-        `));
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(`
+                let NS = require("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                var NS = require("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                let NS = await import("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `)
+        );
     });
 
     test("the types naming a member moved only through a module object name it as a fresh parse of the result would", async () => {
@@ -3521,33 +3531,33 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
-    test.each([
-        [
-            "before another statement",
-            `
-                export { A, Old } from "m"; // note
-                export const x = 1;
-            `,
-            `
-                export { A } from "m"; // note
-                export { New as Old } from "m2";
-                export const x = 1;
-            `
-        ],
-        [
-            "at the end of the file",
-            `
-                export { A, Old } from "m"; // note
-            `,
-            `
-                export { A } from "m"; // note
-                export { New as Old } from "m2";
-            `
-        ]
-    ])("a comment trailing the re-export a moved member leaves stays on its line, %s", async (_, before, after) => {
+    test("a comment trailing the re-export a moved member leaves stays on its line, also at the end of the file", async () => {
         const spec = new RecipeSpec();
         spec.recipe = rebindTo({module: "m2", member: "New"}, {});
-        await spec.rewriteRun(typescript(before, after));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    export { A, Old } from "m"; // note
+                    export const x = 1;
+                `,
+                `
+                    export { A } from "m"; // note
+                    export { New as Old } from "m2";
+                    export const x = 1;
+                `
+            ),
+            //language=typescript
+            typescript(
+                `
+                    export { A, Old } from "m"; // note
+                `,
+                `
+                    export { A } from "m"; // note
+                    export { New as Old } from "m2";
+                `
+            )
+        );
     });
 
     test("a re-export joining an empty re-export of the target takes the place of its empty entry", async () => {
@@ -3579,21 +3589,30 @@ describe("maybeRebind and the member's other spellings", () => {
         ));
     });
 
-    test.each([
-        'const {Old, ...rest} = require("m");',
-        'const {Old}: any = require("m");'
-    ])("a refused require leaves all member spellings unchanged: %s", async declaration => {
+    test("a refused require leaves all member spellings unchanged", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = rebindTo({module: "m", member: "New"}, bound);
-        await spec.rewriteRun(typescript(
-            `${declaration}
-const NS = require("m");
-Old();
-NS.Old();
-type T = import("m").Old;
-export {Old} from "m";`
-        ));
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const {Old, ...rest} = require("m");
+                const NS = require("m");
+                Old();
+                NS.Old();
+                type T = import("m").Old;
+                export {Old} from "m";
+            `),
+            //language=typescript
+            typescript(`
+                const {Old}: any = require("m");
+                const NS = require("m");
+                Old();
+                NS.Old();
+                type T = import("m").Old;
+                export {Old} from "m";
+            `)
+        );
         expect(bound.name).toBeUndefined();
     });
 
