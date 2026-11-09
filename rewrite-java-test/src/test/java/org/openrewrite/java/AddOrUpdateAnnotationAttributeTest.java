@@ -3369,7 +3369,6 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
-
     @Test
     void classAttributeWithSameSimpleNameFromOtherPackageIsUpdated() {
         rewriteRun(
@@ -3514,6 +3513,78 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.data.SomeData;
 
               @Foo(SomeData .class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitPrimitiveClassValueIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "int.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(int.class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitArrayClassValueIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", null, "String[].class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> value();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(String[].class)
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void primitiveClassAttributeIsAlreadySet() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo", "type", "int.class", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Class<?> type();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(type = int.class)
               public class A {}
               """
           )
