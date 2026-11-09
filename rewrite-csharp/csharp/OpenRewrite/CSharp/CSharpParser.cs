@@ -683,21 +683,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
-        var result = VisitTypeDeclaration(node);
-
-        // For record struct, add Struct marker (KindType is already Record)
-        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
-        {
-            return AddClassDeclMarker(result, new Struct(Tree.RandomId()));
-        }
-
-        // For "record class" (explicit class keyword), add RecordClass marker
-        if (node.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword))
-        {
-            return AddClassDeclMarker(result, new RecordClass(Tree.RandomId()));
-        }
-
-        return result;
+        return VisitTypeDeclaration(node);
     }
 
     /// <summary>
@@ -917,12 +903,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var kindPrefix = ExtractSpaceBefore(node.Keyword);
         _cursor = node.Keyword.Span.End;
 
-        // For record declarations, also skip the optional 'class' or 'struct' keyword
-        // (record, record class, record struct)
+        // For "record class" and "record struct", the class/struct keyword is kept as a marker
+        // (KindType is already Record)
+        Marker? recordKeywordMarker = null;
         if (node is RecordDeclarationSyntax recordDecl &&
             !recordDecl.ClassOrStructKeyword.IsKind(SyntaxKind.None))
         {
+            var recordKeywordPrefix = ExtractSpaceBefore(recordDecl.ClassOrStructKeyword);
             _cursor = recordDecl.ClassOrStructKeyword.Span.End;
+            recordKeywordMarker = recordDecl.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword)
+                ? new Struct(Tree.RandomId(), recordKeywordPrefix)
+                : new RecordClass(Tree.RandomId(), recordKeywordPrefix);
         }
 
         var kind = new ClassDeclaration.Kind(
@@ -1084,6 +1075,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var classMarkers = trailingSemicolon
             ? Markers.Build([new Semicolon(Tree.RandomId())])
             : Markers.Empty;
+        if (recordKeywordMarker != null)
+        {
+            classMarkers = classMarkers.Add(recordKeywordMarker);
+        }
 
         // If there's a primary constructor, prepend it as the first statement in the body.
         // The MethodDeclaration already carries a PrimaryConstructor marker to identify it.

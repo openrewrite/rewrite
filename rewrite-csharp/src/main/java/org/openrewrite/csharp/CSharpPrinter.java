@@ -1054,19 +1054,28 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
                statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent();
     }
 
+    private void visitRecordKeywordPrefix(Space prefix, PrintOutputCapture<P> p) {
+        visitSpace(prefix.isEmpty() ? Space.SINGLE_SPACE : prefix, p);
+    }
+
     @Override
     public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
         beforeSyntax(classDecl, p);
         visitModifiers(classDecl.getModifiers(), p);
 
         visitSpace(classDecl.getPadding().getKind().getPrefix(), p);
-        boolean struct = classDecl.getMarkers().findFirst(Struct.class).isPresent();
+        Struct struct = classDecl.getMarkers().findFirst(Struct.class).orElse(null);
+        RecordClass recordClass = classDecl.getMarkers().findFirst(RecordClass.class).orElse(null);
         boolean record = classDecl.getKind() == J.ClassDeclaration.Kind.Type.Record;
-        if (record && struct) {
-            p.append("record struct");
-        } else if (record && classDecl.getMarkers().findFirst(RecordClass.class).isPresent()) {
-            p.append("record class");
-        } else if (struct) {
+        if (record && struct != null) {
+            p.append("record");
+            visitRecordKeywordPrefix(struct.getPrefix(), p);
+            p.append("struct");
+        } else if (record && recordClass != null) {
+            p.append("record");
+            visitRecordKeywordPrefix(recordClass.getPrefix(), p);
+            p.append("class");
+        } else if (struct != null) {
             p.append("struct");
         } else {
             switch (classDecl.getKind()) {
