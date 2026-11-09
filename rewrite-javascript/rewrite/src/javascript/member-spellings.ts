@@ -56,11 +56,8 @@ export class RenameMemberSpellings<P> extends JavaScriptVisitor<P> {
      * Renames the types only in a file this changed.
      */
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
-        const visited = await super.visitJsCompilationUnit(cu, p);
-        if (visited?.kind !== JS.Kind.CompilationUnit) {
-            return visited;
-        }
-        const moved = this.withinModule ? visited as JS.CompilationUnit : this.withReExportsMoved(visited as JS.CompilationUnit);
+        const visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
+        const moved = this.withinModule ? visited : this.withReExportsMoved(visited);
         return moved === cu || !this.retypes ? moved : withMovedTypes(moved, this.from, this.to);
     }
 
