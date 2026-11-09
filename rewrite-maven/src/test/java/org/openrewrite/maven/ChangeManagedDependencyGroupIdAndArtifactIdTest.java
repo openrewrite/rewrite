@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
@@ -321,15 +322,12 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void replaceExistingManagedDependencyWithLowerVersion() {
+    void replaceExistingManagedDependencyWithLowerOrNoVersion() {
+        Recipe toJackson3 = new ChangeManagedDependencyGroupIdAndArtifactId(
+          "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.1.0");
+
         rewriteRun(
-          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-            "com.fasterxml.jackson.core",
-            "jackson-databind",
-            "tools.jackson.core",
-            null,
-            "3.1.0"
-          )),
+          spec -> spec.recipe(toJackson3),
           pomXml(
             """
               <project>
@@ -378,18 +376,67 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+
+        rewriteRun(
+          spec -> spec.recipe(toJackson3),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>com.fasterxml.jackson.core</groupId>
+                                      <artifactId>jackson-annotations</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>3.1.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
     }
 
     @Test
-    void keepExistingManagedDependencyWhenNewVersionMatchesNothing() {
+    void keepExistingManagedDependencyWhenVersionsAreNotComparable() {
+        Recipe toUnpublishedSelector = new ChangeManagedDependencyGroupIdAndArtifactId(
+          "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "9.x");
+        Recipe toJackson3 = new ChangeManagedDependencyGroupIdAndArtifactId(
+          "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.1.0");
+
         rewriteRun(
-          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-            "com.fasterxml.jackson.core",
-            "jackson-databind",
-            "tools.jackson.core",
-            null,
-            "9.x"
-          )),
+          spec -> spec.recipe(toUnpublishedSelector),
           pomXml(
             """
               <project>
@@ -432,10 +479,100 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+
+        rewriteRun(
+          spec -> spec.recipe(toJackson3),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>[3.0,4.0)</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>[3.0,4.0)</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toJackson3),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>${jackson3.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>${jackson3.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
     }
 
     @Test
-    void testJarAndInheritedEntriesAreNotDuplicates() {
+    void inheritedAndOtherTypeOrClassifierEntriesAreNotDuplicates() {
         rewriteRun(
           spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson.core",
@@ -491,6 +628,12 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                                 <version>3.0.0</version>
                                 <type>test-jar</type>
                             </dependency>
+                            <dependency>
+                                <groupId>tools.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>3.0.0</version>
+                                <classifier>sources</classifier>
+                            </dependency>
                         </dependencies>
                     </dependencyManagement>
                 </project>
@@ -516,6 +659,12 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                                 <artifactId>jackson-databind</artifactId>
                                 <version>3.0.0</version>
                                 <type>test-jar</type>
+                            </dependency>
+                            <dependency>
+                                <groupId>tools.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>3.0.0</version>
+                                <classifier>sources</classifier>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>

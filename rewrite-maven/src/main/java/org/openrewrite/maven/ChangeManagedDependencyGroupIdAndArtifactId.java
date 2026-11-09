@@ -207,11 +207,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         for (Xml.Tag sibling : getCursor().getParentTreeCursor().<Xml.Tag>getValue().getChildren("dependency")) {
                             if (sibling != tag && renamedKey.equals(managementKey(sibling))) {
                                 duplicate = sibling;
+                                break;
                             }
                         }
                         if (duplicate != null) {
                             String duplicateVersion = getResolutionResult().getPom().getValue(duplicate.getChildValue("version").orElse(null));
-                            supersededEntries.add(isHigher(renamedVersion, duplicateVersion) ? duplicate : t);
+                            supersededEntries.add(renamedEntryWins(renamedVersion, duplicateVersion) ? duplicate : t);
                         } else if (isManagedElsewhereAtNewVersion(renamedKey)) {
                             supersededEntries.add(t);
                         }
@@ -230,19 +231,26 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * A renamed entry without a new version keeps the old artifact's version, and one whose selector matched
-             * no published version keeps the selector. Neither is comparable, so neither counts as higher.
+             * The renamed entry wins when its version is higher than the duplicate's, or when the duplicate has none.
+             * Only exact versions are compared. Without a new version, or when its selector matched nothing published,
+             * the renamed entry has no exact version, and the duplicate stays.
              */
-            private boolean isHigher(@Nullable String renamedVersion, @Nullable String existingVersion) {
-                return renamedVersion != null && existingVersion != null &&
-                       Semver.validate(renamedVersion, null).getValue() instanceof ExactVersion &&
-                       new Version(renamedVersion).compareTo(new Version(existingVersion)) > 0;
+            private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
+                if (!isExact(renamedVersion)) {
+                    return false;
+                }
+                return duplicateVersion == null ||
+                       isExact(duplicateVersion) && new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
+            }
+
+            private boolean isExact(@Nullable String version) {
+                return version != null && !version.contains("${") &&
+                       Semver.validate(version, null).getValue() instanceof ExactVersion;
             }
 
             private boolean isManagedElsewhereAtNewVersion(GroupArtifactClassifierType key) {
                 for (ResolvedManagedDependency managed : getResolutionResult().getPom().getDependencyManagement()) {
-                    if (key.equals(new GroupArtifactClassifierType(managed.getGroupId(), managed.getArtifactId(),
-                            managed.getClassifier(), managed.getType()))) {
+                    if (managed.matches(key.getGroupId(), key.getArtifactId(), key.getType(), key.getClassifier())) {
                         return compareVersions(newVersion, managed.getVersion());
                     }
                 }
