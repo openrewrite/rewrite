@@ -8880,6 +8880,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             {
                 var commentStart = FindTrailingCommentStart(hashPos, contentEnd);
                 if (commentStart >= 0) contentEnd = commentStart;
+                while (contentEnd > hashPos && (_source[contentEnd - 1] == ' ' || _source[contentEnd - 1] == '\t'))
+                    contentEnd--;
             }
 
             var directiveText = _source[hashPos..contentEnd];
@@ -9099,14 +9101,23 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (afterAction.Length > 0)
         {
             var parts = afterAction.Split(',');
-            foreach (var part in parts)
+            for (var i = 0; i < parts.Length; i++)
             {
-                var trimmed = part.TrimStart();
-                if (trimmed.Length == 0) continue;
-                var spaceLen = part.Length - trimmed.Length;
-                var codePrefix = spaceLen > 0 ? Space.Format(part[..spaceLen]) : Space.Empty;
-                var code = new Identifier(Tree.RandomId(), codePrefix, Markers.Empty, [], trimmed, null, null);
-                codes.Add(new JRightPadded<Expression>(code, Space.Empty, Markers.Empty));
+                var part = parts[i];
+                var nameStart = part.Length - part.TrimStart().Length;
+                if (nameStart == part.Length)
+                {
+                    if (i == parts.Length - 1 && codes.Count > 0)
+                    {
+                        var last = codes[^1];
+                        codes[^1] = last.WithMarkers(last.Markers.Add(new TrailingComma(Tree.RandomId(), Space.Format(part))));
+                    }
+                    continue;
+                }
+                var nameEnd = part.TrimEnd().Length;
+                var code = new Identifier(Tree.RandomId(), Space.Format(part[..nameStart]), Markers.Empty, [],
+                    part[nameStart..nameEnd], null, null);
+                codes.Add(new JRightPadded<Expression>(code, Space.Format(part[nameEnd..]), Markers.Empty));
             }
         }
 
