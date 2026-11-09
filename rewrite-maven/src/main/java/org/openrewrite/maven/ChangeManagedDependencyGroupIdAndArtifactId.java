@@ -169,7 +169,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newArtifactId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
-                    String renamedVersion = getResolutionResult().getPom().getValue(tag.getChildValue("version").orElse(null));
+                    String renamedVersion = null;
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -231,18 +231,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             /**
-             * The renamed entry wins when the duplicate has no version, or when the new version is higher than the
-             * duplicate's. Only exact versions are compared, so a selector that matched nothing published, a range or
-             * an unresolved placeholder keeps the duplicate. Without a new version the renamed entry carries the old
-             * artifact's version, which is never compared with the new artifact's.
+             * The renamed entry wins only when it carries the new version and the duplicate has no version or a lower
+             * one. Only exact versions are compared, so a selector that matched nothing published, a range or an
+             * unresolved placeholder keeps the duplicate.
              */
             private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
                 if (!isExact(renamedVersion)) {
                     return false;
                 }
                 return duplicateVersion == null ||
-                       newVersion != null && isExact(duplicateVersion) &&
-                       new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
+                       isExact(duplicateVersion) && new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
             }
 
             private boolean isExact(@Nullable String version) {

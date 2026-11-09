@@ -325,8 +325,6 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     void replaceExistingManagedDependencyWithLowerOrNoVersion() {
         Recipe toJackson3 = new ChangeManagedDependencyGroupIdAndArtifactId(
           "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.1.0");
-        Recipe toJackson3Group = new ChangeManagedDependencyGroupIdAndArtifactId(
-          "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, null);
 
         rewriteRun(
           spec -> spec.recipe(toJackson3),
@@ -428,56 +426,6 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
-
-        rewriteRun(
-          spec -> spec.recipe(toJackson3Group),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.fasterxml.jackson.core</groupId>
-                              <artifactId>jackson-databind</artifactId>
-                              <version>2.19.0</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>tools.jackson.core</groupId>
-                              <artifactId>jackson-databind</artifactId>
-                              <exclusions>
-                                  <exclusion>
-                                      <groupId>com.fasterxml.jackson.core</groupId>
-                                      <artifactId>jackson-annotations</artifactId>
-                                  </exclusion>
-                              </exclusions>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>tools.jackson.core</groupId>
-                              <artifactId>jackson-databind</artifactId>
-                              <version>2.19.0</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
-          )
-        );
     }
 
     @Test
@@ -486,6 +434,8 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "9.x");
         Recipe toJackson3 = new ChangeManagedDependencyGroupIdAndArtifactId(
           "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, "3.1.0");
+        Recipe toJackson3Group = new ChangeManagedDependencyGroupIdAndArtifactId(
+          "com.fasterxml.jackson.core", "jackson-databind", "tools.jackson.core", null, null);
         Recipe toJakartaWithoutVersion = new ChangeManagedDependencyGroupIdAndArtifactId(
           "javax.activation", "javax.activation-api", "jakarta.activation", "jakarta.activation-api", null);
 
@@ -616,6 +566,61 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                               <groupId>tools.jackson.core</groupId>
                               <artifactId>jackson-databind</artifactId>
                               <version>${jackson3.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toJackson3Group),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <version>2.19.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>com.fasterxml.jackson.core</groupId>
+                                      <artifactId>jackson-annotations</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>tools.jackson.core</groupId>
+                              <artifactId>jackson-databind</artifactId>
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>com.fasterxml.jackson.core</groupId>
+                                      <artifactId>jackson-annotations</artifactId>
+                                  </exclusion>
+                              </exclusions>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
