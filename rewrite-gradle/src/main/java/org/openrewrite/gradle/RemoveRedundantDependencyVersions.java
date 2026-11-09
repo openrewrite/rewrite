@@ -26,6 +26,7 @@ import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -46,7 +47,6 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.trait.Trait;
 
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -111,7 +111,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             "testRuntime" // deprecated
     );
     private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
-    private static final Pattern STRICT_OR_RANGE = Pattern.compile("!!|[\\[\\]()]");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -442,8 +441,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     /**
      * The older declarations of a dependency declared more than once in one configuration, where Gradle resolves the
      * newest. Declarations in other configurations are not compared, as they can serve another purpose, such as a
-     * Java agent. A declaration with a configuration block, a strict version or a range is never removed, and a block
-     * wins over a plain declaration of the same version.
+     * Java agent, and neither are those with a strict version or a range. A dependency with a configuration block on
+     * any of its declarations is left alone, as the block can narrow what is resolved.
      */
     private Set<J.MethodInvocation> redundantDuplicates(J.MethodInvocation dependencies, Cursor cursor,
                                                          ExecutionContext ctx) {
@@ -457,9 +456,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 matcher.get(getCursor()).ifPresent(declaration -> {
+                    Dependency notation = literalNotation(declaration);
                     String version = requestedVersion(declaration);
-                    if (version != null && !STRICT_OR_RANGE.matcher(version).find()) {
-                        declarations.computeIfAbsent(duplicateKey(declaration), key -> new ArrayList<>())
+                    if (notation != null && version != null && !isStrictOrRange(version)) {
+                        declarations.computeIfAbsent(duplicateKey(declaration, notation), key -> new ArrayList<>())
                                 .add(declaration);
                     }
                 });
@@ -469,14 +469,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
         Set<J.MethodInvocation> redundant = new HashSet<>();
         for (List<GradleDependency> sameDependency : declarations.values()) {
+            if (sameDependency.stream().anyMatch(RemoveRedundantDependencyVersions::hasConfigurationBlock)) {
+                continue;
+            }
             sameDependency.stream()
-                    .sorted((d1, d2) -> {
-                        int newestFirst = VERSION_COMPARATOR.compare(requestedVersion(d2), requestedVersion(d1));
-                        return newestFirst != 0 ? newestFirst :
-                                Boolean.compare(hasConfigurationBlock(d2), hasConfigurationBlock(d1));
-                    })
+                    .sorted((d1, d2) -> VERSION_COMPARATOR.compare(requestedVersion(d2), requestedVersion(d1)))
                     .skip(1)
-                    .filter(declaration -> !hasConfigurationBlock(declaration))
                     .forEach(declaration -> redundant.add(declaration.getTree()));
         }
         return redundant;
@@ -484,25 +482,63 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     /**
      * The configuration, platform flag and coordinates of a declaration, without its version.
-     * The Gradle model records no classifier or extension, so these come from string notation.
      */
-    private static List<@Nullable Object> duplicateKey(GradleDependency declaration) {
-        String classifier = null;
-        String extension = null;
-        Expression notation = declaration.getTree().getArguments().get(0);
-        if (notation instanceof J.Literal && ((J.Literal) notation).getValue() instanceof String) {
-            Dependency parsed = DependencyNotation.parse((String) ((J.Literal) notation).getValue());
-            if (parsed != null) {
-                classifier = parsed.getClassifier();
-                extension = parsed.getType();
-            }
-        }
+    private static List<@Nullable Object> duplicateKey(GradleDependency declaration, Dependency notation) {
         return Arrays.asList(declaration.getConfigurationName(), declaration.isPlatform(), declaration.getGroupId(),
-                declaration.getArtifactId(), classifier, extension == null ? "jar" : extension);
+                declaration.getArtifactId(), notation.getClassifier(),
+                notation.getType() == null ? "jar" : notation.getType());
+    }
+
+    /**
+     * A declaration's notation when it is a string, or named arguments, of literals only. The Gradle model records no
+     * classifier or extension, so they are read from here. A template or concatenation can hide either, so any other
+     * notation gives null.
+     */
+    private static @Nullable Dependency literalNotation(GradleDependency declaration) {
+        List<Expression> arguments = declaration.getTree().getArguments();
+        if (declaration.isPlatform() && arguments.get(0) instanceof J.MethodInvocation) {
+            arguments = ((J.MethodInvocation) arguments.get(0)).getArguments();
+        }
+        Expression first = arguments.get(0);
+        if (first instanceof J.Literal) {
+            Object notation = ((J.Literal) first).getValue();
+            return notation instanceof String ? DependencyNotation.parse((String) notation) : null;
+        }
+        Map<String, String> named = new HashMap<>();
+        for (Expression argument : first instanceof G.MapLiteral ? ((G.MapLiteral) first).getElements() : arguments) {
+            String name;
+            Expression value;
+            if (argument instanceof J.Lambda) {
+                continue;
+            } else if (argument instanceof G.MapEntry && ((G.MapEntry) argument).getKey() instanceof J.Literal) {
+                name = String.valueOf(((J.Literal) ((G.MapEntry) argument).getKey()).getValue());
+                value = ((G.MapEntry) argument).getValue();
+            } else if (argument instanceof J.Assignment &&
+                       ((J.Assignment) argument).getVariable() instanceof J.Identifier) {
+                name = ((J.Identifier) ((J.Assignment) argument).getVariable()).getSimpleName();
+                value = ((J.Assignment) argument).getAssignment();
+            } else {
+                return null;
+            }
+            if (!(value instanceof J.Literal) || !(((J.Literal) value).getValue() instanceof String)) {
+                return null;
+            }
+            named.put(name, (String) ((J.Literal) value).getValue());
+        }
+        String artifact = named.get("name");
+        return artifact == null ? null : Dependency.builder()
+                .gav(new GroupArtifactVersion(named.get("group"), artifact, named.get("version")))
+                .classifier(named.get("classifier"))
+                .type(named.get("ext"))
+                .build();
     }
 
     private static @Nullable String requestedVersion(GradleDependency declaration) {
         return declaration.getResolvedDependency().getRequested().getVersion();
+    }
+
+    private static boolean isStrictOrRange(String version) {
+        return version.endsWith("!!") || version.startsWith("[") || version.startsWith("]") || version.startsWith("(");
     }
 
     private static boolean hasConfigurationBlock(GradleDependency declaration) {

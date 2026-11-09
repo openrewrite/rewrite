@@ -777,13 +777,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def nettyVersion = "4.1.115.Final"
+              def osdetector = [classifier: "linux-x86_64"]
               dependencies {
                   runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-x86_64"
                   runtimeOnly "io.netty:netty-transport-native-epoll:4.1.115.Final:linux-aarch_64"
 
-                  testRuntimeOnly "io.netty:netty-transport-native-epoll:${nettyVersion}:linux-x86_64"
-                  testRuntimeOnly "io.netty:netty-transport-native-epoll:${nettyVersion}:linux-aarch_64"
+                  runtimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-linux"
+                  runtimeOnly group: "org.lwjgl", name: "lwjgl", version: "3.3.4", classifier: "natives-windows"
+
+                  testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final"
+                  testRuntimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.69.Final:${osdetector.classifier}"
 
                   implementation platform("org.junit:junit-bom:5.10.1")
                   implementation "org.junit:junit-bom:5.10.0"
@@ -794,7 +797,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
-    void neverRemovesDuplicateWithBlockOrRichVersion() {
+    void keepsDuplicatesWithConfigurationBlockOrRichVersion() {
         rewriteRun(
           buildGradle(
             """
@@ -812,34 +815,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       transitive = false
                   }
 
-                  implementation("org.openrewrite:rewrite-core:8.55.0") {
-                      because "a reason"
-                  }
-                  implementation "org.openrewrite:rewrite-core:8.56.0"
-
-                  testRuntimeOnly "org.hamcrest:hamcrest:2.2"
-                  testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
-                  testRuntimeOnly "org.hamcrest:hamcrest:[2.0,3.0)"
-              }
-              """,
-            """
-              plugins {
-                  id "java"
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              dependencies {
-                  testImplementation("org.mockito:mockito-core:5.24.0") {
+                  implementation "org.openrewrite:rewrite-core:8.55.0"
+                  implementation("org.openrewrite:rewrite-core:8.56.0") {
                       transitive = false
                   }
-
-                  implementation("org.openrewrite:rewrite-core:8.55.0") {
-                      because "a reason"
-                  }
-                  implementation "org.openrewrite:rewrite-core:8.56.0"
 
                   testRuntimeOnly "org.hamcrest:hamcrest:2.2"
                   testRuntimeOnly "org.hamcrest:hamcrest:2.2!!"
