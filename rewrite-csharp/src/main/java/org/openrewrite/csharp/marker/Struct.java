@@ -16,7 +16,7 @@
 package org.openrewrite.csharp.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -35,7 +35,6 @@ import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 @Value
 @With
-@AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
 public class Struct implements Marker, RpcCodec<Struct> {
     UUID id;
 
@@ -44,6 +43,12 @@ public class Struct implements Marker, RpcCodec<Struct> {
      */
     @Nullable
     Space prefix;
+
+    @JsonCreator
+    public Struct(@JsonProperty("id") UUID id, @JsonProperty("prefix") @Nullable Space prefix) {
+        this.id = id;
+        this.prefix = prefix;
+    }
 
     public Struct(UUID id) {
         this(id, Space.EMPTY);
