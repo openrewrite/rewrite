@@ -25,6 +25,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
@@ -324,6 +325,43 @@ class ChangeDependencyTest implements RewriteTest {
                   .endsWith("widget = { module = \"com.acme:widget-a\", version.ref = \"widget\" }");
                 return actual;
             })
+          )
+        );
+    }
+
+    @Test
+    void keepsDependencyWithVersionVariableWhenNewVersionCannotBeDownloaded() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.acme",
+            "widget-a",
+            null,
+            "widget-b",
+            "2.x",
+            null,
+            null,
+            true
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              def widgetVersion = '1.0'
+              dependencies {
+                  implementation "com.acme:widget-a:$widgetVersion"
+              }
+              """,
+            spec -> spec
+              .after(actual -> {
+                  assertThat(actual).contains("~~>*/implementation \"com.acme:widget-a:$widgetVersion\"");
+                  return actual;
+              })
+              .afterRecipe(cu -> assertThat(cu.getMarkers().findFirst(GradleProject.class).orElseThrow()
+                .getConfiguration("implementation").getRequested())
+                .extracting(Dependency::getArtifactId)
+                .containsExactly("widget-a"))
           )
         );
     }
