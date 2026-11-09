@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -68,21 +69,43 @@ class ExpressionTest implements RewriteTest {
     }
 
     @Test
-    void notBindsLooserThanComparison() {
-        assignedFrom("NOT a EQ b", e -> {
-            J.Unary not = (J.Unary) e;
-            assertThat(not.getExpression()).isInstanceOf(J.Binary.class);
+    void precedenceAndAssociativity() {
+        assignedFrom("a * b + c - d ^ e ^ f", e -> {
+            J.Binary minus = (J.Binary) e;
+            J.Binary plus = (J.Binary) minus.getLeft();
+            assertThat(plus.getOperator()).isEqualTo(J.Binary.Type.Addition);
+            assertThat(((J.Binary) plus.getLeft()).getOperator()).isEqualTo(J.Binary.Type.Multiplication);
+            Cf.Binary power = (Cf.Binary) minus.getRight();
+            assertThat(power.getOperator()).isEqualTo(Cf.Binary.Type.Power);
+            assertThat(power.getRight()).isInstanceOfSatisfying(Cf.Binary.class, right ->
+              assertThat(right.getOperator()).isEqualTo(Cf.Binary.Type.Power));
         });
-    }
 
-    @Test
-    void coldFusionOperators() {
-        assignedFrom("a & b ^ 2 \\ c MOD d", e -> {
-            Cf.Binary concat = (Cf.Binary) e;
-            assertThat(concat.getOperator()).isEqualTo(Cf.Binary.Type.Concat);
-            J.Binary mod = (J.Binary) concat.getRight();
-            assertThat(mod.getOperator()).isEqualTo(J.Binary.Type.Modulo);
+        // each operator binds more tightly than the one before it, so they nest along the right
+        assignedFrom("a imp b eqv c xor d or e and not f eq g & h + i mod j \\ k * l ^ m", e -> {
+            List<String> operators = new ArrayList<>();
+            for (Expression right = e; right != null; ) {
+                if (right instanceof Cf.Binary) {
+                    operators.add(((Cf.Binary) right).getOperator().name());
+                    right = ((Cf.Binary) right).getRight();
+                } else if (right instanceof J.Binary) {
+                    operators.add(((J.Binary) right).getOperator().name());
+                    right = ((J.Binary) right).getRight();
+                } else if (right instanceof J.Unary) {
+                    operators.add(((J.Unary) right).getOperator().name());
+                    right = ((J.Unary) right).getExpression();
+                } else {
+                    right = null;
+                }
+            }
+            assertThat(operators).containsExactly("Implication", "Equivalence", "Xor", "Or", "And", "Not", "Equal",
+              "Concat", "Addition", "Modulo", "IntegerDivision", "Multiplication", "Power");
         });
+
+        assignedFrom("not a and !b", e -> assertThat(e).isInstanceOfSatisfying(J.Binary.class, and -> {
+            assertThat(and.getLeft()).isInstanceOf(J.Unary.class);
+            assertThat(and.getRight()).isInstanceOf(J.Unary.class);
+        }));
     }
 
     @Test
