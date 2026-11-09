@@ -204,14 +204,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                         doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                         GroupArtifactClassifierType renamedKey = managementKey(t);
                         Xml.Tag duplicate = null;
-                        for (Xml.Tag sibling : getCursor().getParentTreeCursor().<Xml.Tag>getValue().getChildren("dependency")) {
+                        Xml.Tag block = getCursor().getParentTreeCursor().getValue();
+                        for (Xml.Tag sibling : block.getChildren("dependency")) {
                             if (sibling != tag && renamedKey.equals(managementKey(sibling))) {
                                 duplicate = sibling;
                                 break;
                             }
                         }
                         if (duplicate != null) {
-                            String duplicateVersion = getResolutionResult().getPom().getValue(duplicate.getChildValue("version").orElse(null));
+                            String duplicateVersion = getResolutionResult().getPom()
+                                    .getValue(duplicate.getChildValue("version").orElse(null));
                             supersededEntries.add(renamedEntryWins(renamedVersion, duplicateVersion) ? duplicate : t);
                         } else if (isManagedElsewhereAtNewVersion(renamedKey)) {
                             supersededEntries.add(t);
@@ -235,14 +237,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
              * lower exact one. An exact new version counts even when it is not published. A selector that matched
              * nothing published keeps the duplicate, as does a duplicate version that is a range or placeholder.
              *
-             * @param renamedVersion the resolved new version, or null when no new version was applied to the entry
+             * @param renamedVersion the resolved new version, or null when the recipe has no new version or the
+             *                       entry has no {@code <version>}
              */
             private boolean renamedEntryWins(@Nullable String renamedVersion, @Nullable String duplicateVersion) {
                 if (!isExact(renamedVersion)) {
                     return false;
                 }
                 return duplicateVersion == null ||
-                       isExact(duplicateVersion) && new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
+                       isExact(duplicateVersion) &&
+                       new Version(renamedVersion).compareTo(new Version(duplicateVersion)) > 0;
             }
 
             private boolean isExact(@Nullable String version) {
