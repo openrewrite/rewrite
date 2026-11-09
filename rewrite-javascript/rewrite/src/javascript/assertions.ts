@@ -41,6 +41,12 @@ function pooledParser(relativeTo?: string): JavaScriptParser {
     const key = relativeTo ?? "";
     let parser = parserPool.get(key);
     if (!parser) {
+        // A removed directory, such as a finished test's temporary one, is never parsed again.
+        for (const dir of parserPool.keys()) {
+            if (dir && !fs.existsSync(dir)) {
+                parserPool.delete(dir);
+            }
+        }
         parser = new JavaScriptParser({sourceFileCache, relativeTo});
         parserPool.set(key, parser);
     }
