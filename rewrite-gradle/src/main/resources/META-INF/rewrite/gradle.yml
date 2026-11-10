@@ -21,7 +21,6 @@ description: Apply a set of [Gradle best practices](https://docs.gradle.org/curr
 recipeList:
   - org.openrewrite.gradle.EnableGradleBuildCache
   - org.openrewrite.gradle.EnableGradleParallelExecution
-  - org.openrewrite.gradle.ChangeTaskToTasksRegister
   - org.openrewrite.gradle.RemoveRedundantDependencyVersions
   - org.openrewrite.gradle.RemoveRedundantSecurityResolutionRules
   - org.openrewrite.gradle.SortDependencies
