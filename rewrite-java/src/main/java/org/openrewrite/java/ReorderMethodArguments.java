@@ -25,7 +25,9 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
@@ -204,6 +206,13 @@ public class ReorderMethodArguments extends Recipe {
                     JavaType.Method mt = m.getMethodType()
                             .withParameterNames(reorderedNames)
                             .withParameterTypes(reorderedTypes);
+                    if (mt.hasFlags(Flag.Varargs) && resolvedParamCount > 0 && !paramNames.get(resolvedParamCount - 1)
+                            .equals(newParameterNames[newParameterNames.length - 1])) {
+                        // the varargs parameter moves off the last position
+                        Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
+                        flags.remove(Flag.Varargs);
+                        mt = mt.withFlags(flags);
+                    }
                     m = withPaddedArguments(m, reordered)
                             .withMethodType(mt);
                     if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
