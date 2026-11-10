@@ -74,7 +74,10 @@ class JavaTreeShapeValidationServiceTest {
     }
 
     private static List<String> methods(J.ClassDeclaration a) {
-        return requireNonNull(a.getType()).getMethods().stream().map(JavaType.Method::getName).collect(toList());
+        return requireNonNull(a.getType()).getMethods().stream()
+                .filter(m -> !m.isConstructor())
+                .map(JavaType.Method::getName)
+                .collect(toList());
     }
 
     private static @Nullable JavaType fieldType(J.ClassDeclaration a, int index) {
