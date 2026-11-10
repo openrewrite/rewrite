@@ -398,8 +398,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 }
 
                 resolvedOwner = type instanceof Type.MethodType ?
-                        methodDeclarationType(sym, null) :
-                        type(type);
+                        methodDeclarationType(sym, (JavaType.FullyQualified) declaringClass(type(sym.owner.type))) :
+                        declaringClass(type(type));
                 assert resolvedOwner != null;
             }
 
@@ -409,12 +409,11 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     /**
-     * The type that declares a method. For a method of a generic class this is the class itself, as it is for the
-     * methods the class lists, and not the class parameterized by its own type variables. The method types of a
-     * declaration and of an invocation can share a signature, so they have to agree on it.
+     * The type that declares a member. For a member of a generic class this is the class itself, as it is for the
+     * members the class lists, and not the class parameterized by its own type variables. The types of a declaration
+     * and of a use can share a signature, so they have to agree on it.
      */
-    private JavaType.@Nullable FullyQualified declaringType(Symbol.MethodSymbol methodSymbol) {
-        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+    private static @Nullable JavaType declaringClass(@Nullable JavaType owner) {
         return owner instanceof JavaType.Parameterized ? ((JavaType.Parameterized) owner).getType() : owner;
     }
 
@@ -456,7 +455,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
         // Resolve declaring type before compute so a null result skips inserting an
         // unpopulated stub into the cache.
-        JavaType.FullyQualified resolvedDeclaringType = declaringType(methodSymbol);
+        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(declaringClass(type(methodSymbol.owner.type)));
         if (resolvedDeclaringType == null) {
             return null;
         }
@@ -538,7 +537,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         JavaType.FullyQualified resolvedDeclaringType = declaringType;
         if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol ||
                 methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
-            resolvedDeclaringType = declaringType(methodSymbol);
+            resolvedDeclaringType = TypeUtils.asFullyQualified(declaringClass(type(methodSymbol.owner.type)));
         }
         if (resolvedDeclaringType == null) {
             return null;

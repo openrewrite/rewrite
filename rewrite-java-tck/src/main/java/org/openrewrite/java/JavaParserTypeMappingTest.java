@@ -608,14 +608,22 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     }
 
     @Test
-    void methodOfGenericClassIsDeclaredByTheClassWhateverTheTypeCacheHolds() {
-        // Parsers built from one builder share a type cache, which here holds `A` without its methods.
+    void memberOfGenericClassIsDeclaredByTheClassWhateverTheTypeCacheHolds() {
+        // Parsers built from one builder share a type cache, which here holds `A` without its members.
         JavaParser.Builder<?, ?> builder = JavaParser.fromJavaVersion();
         assertThat(builder.build().parse("class A<T> {}")).hasSize(1);
 
         for (JavaParser parser : new JavaParser[]{JavaParser.fromJavaVersion().build(), builder.build()}) {
-            List<JavaType.FullyQualified> declaringTypes = new ArrayList<>();
+            List<JavaType> declaringTypes = new ArrayList<>();
             new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if (variable.isField(getCursor())) {
+                        declaringTypes.add(requireNonNull(variable.getVariableType()).getOwner());
+                    }
+                    return super.visitVariable(variable, p);
+                }
+
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
                     declaringTypes.add(requireNonNull(method.getMethodType()).getDeclaringType());
@@ -629,17 +637,19 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 }
             }.visit(parser.parse("""
               class A<T> {
-                  T caller() {
+                  T field;
+
+                  T caller(T parameter) {
                       return called();
                   }
 
                   T called() {
-                      return null;
+                      return field;
                   }
               }
               """).findFirst().get(), 0);
 
-            assertThat(declaringTypes).hasSize(3).allSatisfy(declaringType ->
+            assertThat(declaringTypes).hasSize(4).allSatisfy(declaringType ->
               assertThat(declaringType).isInstanceOf(JavaType.Class.class));
         }
     }

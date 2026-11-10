@@ -64,10 +64,10 @@ public interface JavaTypeMappingTest {
     }
 
     @Test
-    default void declaringTypeRefersToParameterizedClass() {
+    default void declaringTypeHasTheTypeParametersOfTheClass() {
         JavaType.FullyQualified declaringType = methodType("nameShadow").getDeclaringType();
         assertThat(declaringType.getTypeParameters())
-                .describedAs("If it points to the raw class, " +
+                .describedAs("Without the type parameters of the class, " +
                              "method level name shadowing of generic " +
                              "type variables cannot be detected.")
                 .isNotEmpty();
