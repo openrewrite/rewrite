@@ -2765,20 +2765,16 @@ class ChangeTypeTest implements RewriteTest {
               import foo.A.Builder;
 
               class Test {
-                A test() {
-                    A.Builder b = A.builder();
-                    return b.build();
-                }
+                A a;
+                A.Builder b;
               }
               """,
                 """
               import foo.A;
 
               class Test {
-                A test() {
-                    bar.A.Builder b = A.builder();
-                    return b.build();
-                }
+                A a;
+                bar.A.Builder b;
               }
               """
           )
