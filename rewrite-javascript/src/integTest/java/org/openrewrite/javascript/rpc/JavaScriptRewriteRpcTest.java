@@ -730,6 +730,31 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void parseProjectKeepsNoTreeOnceItIsReceived(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "data", "version": "1.0.0"}
+          """);
+        StringBuilder items = new StringBuilder("[\n");
+        for (int i = 0; i < 5000; i++) {
+            items.append(i == 0 ? "" : ",\n").append("{\"id\": ").append(i).append(", \"name\": \"item ").append(i)
+              .append("\", \"tags\": [\"a\", \"b\"]}");
+        }
+        items.append("\n]\n");
+        for (int i = 0; i < 16; i++) {
+            Files.writeString(projectDir.resolve("data" + i + ".json"), items);
+        }
+        // Room for the tree of a file or two, not for those of all sixteen
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(tempDir.resolve("rpc.log"))
+          .environment(Map.of("NODE_OPTIONS", "--max-old-space-size=160")));
+
+        assertThat(client().parseProject(projectDir, new InMemoryExecutionContext()).toList())
+          .hasSize(17)
+          .noneMatch(ParseError.class::isInstance);
+    }
+
+    @Test
     void parseProjectLeavesNamesUnresolvedUnlessAsked(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}

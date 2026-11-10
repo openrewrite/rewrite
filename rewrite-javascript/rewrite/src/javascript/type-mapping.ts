@@ -74,7 +74,7 @@ export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
     private readonly typeCache: Map<string | number, Type> = new Map();
-    private readonly methodCache: Map<string, Type.Method> = new Map();
+    private readonly methodCache: Map<ts.Signature, Map<string, Type.Method>> = new Map();
 
     private readonly regExpSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
@@ -961,17 +961,19 @@ export class JavaScriptTypeMapping {
         name: string,
         declaredFormalTypeNames: string[] = []
     ): Type.Method {
-        // Create composite cache key: declaring type + method name + signature
-        // This prevents cache collisions when methods with identical signatures have different names
-        // (e.g., util.isString(): any vs util.isArray(): any)
-        const declaringTypeSig = Type.signature(declaringType);
-        const signatureStr = this.checker.signatureToString(signature);
-        const isStatic = this.isStatic(signature);
-        const cacheKey = `${isStatic ? 'static ' : ''}${declaringTypeSig}#${name}${signatureStr}`;
-        const cached = this.methodCache.get(cacheKey);
+        // Keyed by the signature itself, not by its text. Printing a signature can instantiate a recursive conditional
+        // type until the heap runs out. One signature can also be called by several names (util.isString(): any and
+        // util.isArray(): any), which the declaring type and the name tell apart.
+        let byName = this.methodCache.get(signature);
+        if (!byName) {
+            this.methodCache.set(signature, byName = new Map());
+        }
+        const cacheKey = `${Type.signature(declaringType)}#${name}`;
+        const cached = byName.get(cacheKey);
         if (cached) {
             return cached;
         }
+        const isStatic = this.isStatic(signature);
 
         const returnType = signature.getReturnType();
         const parameters = signature.getParameters();
@@ -1000,7 +1002,7 @@ export class JavaScriptTypeMapping {
             toJSON: typeSignatureToJSON
         } as Type.Method;
 
-        this.methodCache.set(cacheKey, method);
+        byName.set(cacheKey, method);
         return method;
     }
 

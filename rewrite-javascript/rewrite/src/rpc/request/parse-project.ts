@@ -177,63 +177,30 @@ export class ParseProject {
                             relativeTo
                         });
 
-                        // Check if Prettier is available
                         const detection = await prettierLoader.detectPrettier();
+                        const autodetectMarker = detection.available ?
+                            undefined :
+                            await projectParser.autodetectMarker(discovered.jsFiles);
 
-                        if (detection.available) {
-                            // Prettier is available: add per-file PrettierStyle markers
-                            const generator = parser.parse(...discovered.jsFiles);
-
-                            for (const filePath of discovered.jsFiles) {
-                                const id = randomId();
-                                localObjects.set(id, async (id: string) => {
-                                    const sourceFile: SourceFile = (await generator.next()).value;
-                                    // Add PrettierStyle marker if Prettier is available
-                                    const prettierMarker = await prettierLoader.getConfigMarker(filePath);
-                                    return {
-                                        ...sourceFile,
-                                        id,
-                                        markers: prettierMarker
-                                            ? replaceMarkerByKind(sourceFile.markers, prettierMarker)
-                                            : sourceFile.markers
-                                    };
-                                });
-                                resultItems.push({
+                        const generator = parser.parse(...discovered.jsFiles);
+                        for (const filePath of discovered.jsFiles) {
+                            const id = randomId();
+                            localObjects.set(id, async (id: string) => {
+                                const sourceFile: SourceFile = (await generator.next()).value;
+                                const styleMarker = autodetectMarker ?? await prettierLoader.getConfigMarker(filePath);
+                                return {
+                                    ...sourceFile,
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
-                                    sourcePath: path.relative(relativeTo, filePath)
-                                });
-                            }
-                        } else {
-                            // Prettier is NOT available: auto-detect styles from parsed files
-                            // Parse all files first to sample them
-                            const parsedFiles: {id: string, sourceFile: SourceFile, filePath: string}[] = [];
-                            let fileIndex = 0;
-                            for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
-                                const id = randomId();
-                                parsedFiles.push({id, sourceFile, filePath: discovered.jsFiles[fileIndex++]});
-                            }
-
-                            // Sample all parsed files and build Autodetect marker using ProjectParser helper
-                            const autodetectMarker = await projectParser.buildAutodetectMarker(
-                                parsedFiles.map(p => p.sourceFile)
-                            );
-
-                            // Store thunks that add the Autodetect marker
-                            for (const {id, sourceFile, filePath} of parsedFiles) {
-                                localObjects.set(id, async (newId: string) => {
-                                    return {
-                                        ...sourceFile,
-                                        id: newId,
-                                        markers: replaceMarkerByKind(sourceFile.markers, autodetectMarker)
-                                    };
-                                });
-                                resultItems.push({
-                                    id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
-                                    sourcePath: path.relative(relativeTo, filePath)
-                                });
-                            }
+                                    markers: styleMarker
+                                        ? replaceMarkerByKind(sourceFile.markers, styleMarker)
+                                        : sourceFile.markers
+                                };
+                            });
+                            resultItems.push({
+                                id,
+                                sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
+                            });
                         }
                     }
 
