@@ -185,6 +185,45 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceConstantOfItsOwnClassWithConstantOfThatClassElsewhere() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant(
+              "com.constant.Strategy.SNAKE_CASE", "com.constant.Strategies.SNAKE_CASE"))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package com.constant;
+                public class Strategy {
+                    public static final Strategy SNAKE_CASE = new Strategy();
+                }
+                """,
+              """
+                package com.constant;
+                public class Strategies {
+                    public static final Strategy SNAKE_CASE = new Strategy();
+                }
+                """
+            )),
+          java(
+            """
+              import com.constant.Strategy;
+
+              class Test {
+                  Strategy s = Strategy.SNAKE_CASE;
+              }
+              """,
+            """
+              import com.constant.Strategies;
+              import com.constant.Strategy;
+
+              class Test {
+                  Strategy s = Strategies.SNAKE_CASE;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     @Test
     void replaceConstantInCurlyBracesInAnnotation() {

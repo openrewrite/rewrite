@@ -138,10 +138,13 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         }
 
         /**
-         * A constant of its owner's type, such as an enum constant, has the new owner's type.
+         * An enum constant's type is its enum, so the one replacing it has the new enum's type. Other constants keep
+         * theirs, as one of a class's own type may be replaced with one of that type held elsewhere.
          */
         private @Nullable JavaType newType(@Nullable JavaType type) {
-            return TypeUtils.isOfClassType(type, existingOwningType) ? newOwningType : type;
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+            return fq != null && fq.getKind() == JavaType.FullyQualified.Kind.Enum &&
+                   TypeUtils.isOfClassType(type, existingOwningType) ? newOwningType : type;
         }
 
         private boolean isConstant(JavaType.@Nullable Variable varType) {
