@@ -629,7 +629,9 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void replaceAnonymousClassObject() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if ("asList".equals(method.getSimpleName())) {
@@ -1660,7 +1662,8 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void recursiveType() {
         rewriteRun(
-          spec -> spec
+          // a context-sensitive template types a lambda argument by a placeholder method's parameter
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {

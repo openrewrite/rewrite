@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -278,7 +279,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Test
     void constantToMethodOnStaticTarget() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeStaticFieldToMethod(
+          // the recipe doesn't know the return type of the method it calls
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(new ChangeStaticFieldToMethod(
             "constants.Constants",
             "SUCCESS_CODE",
             "io.netty.handler.codec.http.HttpResponseStatus",

@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Objects.requireNonNull;
@@ -643,7 +644,9 @@ class JavaTemplateTest8Test implements RewriteTest {
     @Test
     void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template writes a local or anonymous class as its supertype, so it infers that type
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   method = super.visitMethodInvocation(method, ctx);

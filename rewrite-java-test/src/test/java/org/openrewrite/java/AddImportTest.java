@@ -25,6 +25,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -1109,7 +1110,9 @@ class AddImportTest implements RewriteTest {
     @Test
     void doNotFoldNormalImportWithNamespaceConflict() {
         rewriteRun(
+          // the import of java.util.List shadows the java.awt.List that the field names through the wildcard import
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .beforeRecipe(addTypesToSourceSet("main")),
           srcMainJava(
             java(
