@@ -564,11 +564,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
-                    // The exception is a varargs method, which takes any number of arguments past its fixed ones
+                    // The exception is a varargs method that still takes the new arguments
                     JavaType.Method mt = method.getMethodType();
                     if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS &&
-                        mt.hasFlags(Flag.Varargs) &&
-                        m.getArguments().stream().filter(a -> !(a instanceof J.Empty)).count() >= mt.getParameterTypes().size() - 1) {
+                        varargsTakes(mt, m.getArguments())) {
                         m = m.withMethodType(mt);
                     } else if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
@@ -732,6 +731,22 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 }
             }
         };
+    }
+
+    private static boolean varargsTakes(JavaType.Method method, List<Expression> arguments) {
+        List<JavaType> parameters = method.getParameterTypes();
+        JavaType.Array varargs = parameters.isEmpty() ? null : TypeUtils.asArray(parameters.get(parameters.size() - 1));
+        List<Expression> args = ListUtils.filter(arguments, a -> !(a instanceof J.Empty));
+        if (!method.hasFlags(Flag.Varargs) || varargs == null || args.size() < parameters.size() - 1) {
+            return false;
+        }
+        for (int i = 0; i < args.size(); i++) {
+            JavaType parameter = i < parameters.size() - 1 ? parameters.get(i) : varargs.getElemType();
+            if (!TypeUtils.isAssignableTo(parameter, args.get(i).getType())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {
