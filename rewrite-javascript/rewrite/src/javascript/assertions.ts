@@ -27,7 +27,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {Autodetect} from "./autodetect";
 import {Marker, replaceMarkerByKind} from "../markers";
-import {ParserInput} from "../parser";
+import {Parser, ParserInput} from "../parser";
 import {SourceFile} from "../tree";
 
 /**
@@ -37,9 +37,9 @@ import {SourceFile} from "../tree";
 export const sourceFileCache: Map<string, ts.SourceFile> = new Map();
 
 // Pooled so a spec reuses the program the previous spec left behind; see `JavaScriptParser.parse`.
-const parserPool: Map<string, JavaScriptParser> = new Map();
+const parserPool: Map<string, Parser> = new Map();
 
-function pooledParser(relativeTo?: string, detectStyle = false): JavaScriptParser {
+function pooledParser(relativeTo?: string, detectStyle = false): Parser {
     const key = relativeTo ?? "";
     let parser = parserPool.get(key);
     if (!parser || (parser instanceof StyleDetectingParser) !== detectStyle) {
@@ -49,9 +49,8 @@ function pooledParser(relativeTo?: string, detectStyle = false): JavaScriptParse
                 parserPool.delete(dir);
             }
         }
-        parser = detectStyle ?
-            new StyleDetectingParser({sourceFileCache, relativeTo}) :
-            new JavaScriptParser({sourceFileCache, relativeTo});
+        const javaScriptParser = new JavaScriptParser({sourceFileCache, relativeTo});
+        parser = detectStyle ? new StyleDetectingParser(javaScriptParser) : javaScriptParser;
         parserPool.set(key, parser);
     }
     return parser;
@@ -60,10 +59,16 @@ function pooledParser(relativeTo?: string, detectStyle = false): JavaScriptParse
 /**
  * A parser that gives the files it parses together the style they are written in.
  */
-class StyleDetectingParser extends JavaScriptParser {
-    override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
+class StyleDetectingParser extends Parser {
+    // Wraps `JavaScriptParser` rather than extending it. Loading the package from some of its internal
+    // modules runs this module before `parser.ts` has finished.
+    constructor(private readonly parser: JavaScriptParser) {
+        super();
+    }
+
+    async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const parsed: SourceFile[] = [];
-        for await (const sourceFile of super.parse(...inputs)) {
+        for await (const sourceFile of this.parser.parse(...inputs)) {
             parsed.push(sourceFile);
         }
         const detector = Autodetect.detector();
