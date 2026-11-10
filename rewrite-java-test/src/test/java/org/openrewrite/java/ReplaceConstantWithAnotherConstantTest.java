@@ -142,6 +142,49 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceStaticallyImportedEnumConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.constant.OldValue.A", "com.constant.NewValue.B")),
+          java(
+            """
+              package com.constant;
+              public enum OldValue {
+                  A
+              }
+              """
+          ),
+          java(
+            """
+              package com.constant;
+              public enum NewValue {
+                  B
+              }
+              """
+          ),
+          java(
+            """
+              import static com.constant.OldValue.A;
+
+              class Test {
+                  void foo() {
+                      Object test = A;
+                  }
+              }
+              """,
+            """
+              import static com.constant.NewValue.B;
+
+              class Test {
+                  void foo() {
+                      Object test = B;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     @Test
     void replaceConstantInCurlyBracesInAnnotation() {
