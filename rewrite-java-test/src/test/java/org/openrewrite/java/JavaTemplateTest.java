@@ -1476,9 +1476,7 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void changeFieldToMethod() {
         rewriteRun(
-          // the template's stub declares the method in a class, where it isn't implicitly public and abstract
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   var vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);

@@ -258,7 +258,10 @@ public class BlockStatementTemplateGenerator {
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
                    (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
-            before.insert(0, String.format("class %s {\n", classDeclaration));
+            // javac gives a member of an interface the modifiers the interface implies
+            boolean inInterface = cursor.getParent().getValue() instanceof J.ClassDeclaration &&
+                                  ((J.ClassDeclaration) cursor.getParent().getValue()).getKind() == J.ClassDeclaration.Kind.Type.Interface;
+            before.insert(0, String.format("%s %s {\n", inInterface ? "interface" : "class", classDeclaration));
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
