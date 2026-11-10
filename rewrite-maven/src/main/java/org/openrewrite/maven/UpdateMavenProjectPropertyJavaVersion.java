@@ -63,10 +63,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
     private static final Pattern PROPERTY_REFERENCE = Pattern.compile("\\$\\{([^${}]+)}");
 
     private static final XPathMatcher COMPILER_PLUGIN_CONFIGURATION_MATCHER =
-            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']/configuration/*");
-
-    private static final XPathMatcher COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER =
-            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']/executions/execution/configuration/*");
+            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']//configuration/*");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -186,8 +183,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     if (referenced != null && (isPropertyTag() || isProfilePropertyTag())) {
                         referencingProperties.computeIfAbsent(referenced, k -> new HashSet<>()).add(t.getName());
                     } else if (referenced == null || !COMPILER_LEVEL_CONFIGURATION.contains(t.getName()) ||
-                               !COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor()) &&
-                               !COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER.matches(getCursor())) {
+                               !COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor())) {
                         // Anything but a level of the compiler plugin, or of one of its executions, is another use
                         otherwiseReferencedProperties.addAll(ResolvedPom.placeholderHelper.getPlaceholders(value.get()));
                     }
