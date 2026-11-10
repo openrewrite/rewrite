@@ -776,25 +776,28 @@ public class SolutionParser
     /// <summary>The usings that every target framework of the project imports. A framework this
     /// machine cannot build is still built elsewhere, so it counts with what its documents show.</summary>
     private static List<string> GlobalUsingsOf(IReadOnlyList<Project> variants) =>
-        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).Distinct().ToList();
+        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).ToList();
 
     private static readonly Regex GlobalUsingDirective = new(@"\bglobal\s+using\b", RegexOptions.Compiled);
+
+    private static readonly Regex GlobalAliasQualifier = new(@"\bglobal::", RegexOptions.Compiled);
 
     /// <summary>A variant's documents include the file the SDK generates for its target framework
     /// from implicit usings and <c>&lt;Using&gt;</c> items.</summary>
     private static IEnumerable<string> GlobalUsingsOf(Project variant) =>
         variant.Documents
             .Select(doc => doc.GetTextAsync().Result)
-            .Where(text => GlobalUsingDirective.IsMatch(text.ToString()))
+            .Where(text => text.Length <= MaxParseableSizeBytes && GlobalUsingDirective.IsMatch(text.ToString()))
             .SelectMany(text => CSharpSyntaxTree.ParseText(text, variant.ParseOptions as CSharpParseOptions)
                 .GetCompilationUnitRoot().Usings)
             .Where(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
-            .Select(GlobalUsingText);
+            .Select(GlobalUsingText)
+            .Distinct();
 
     private static string GlobalUsingText(UsingDirectiveSyntax directive)
     {
         // A name can be written global::System.Linq
-        var target = directive.NamespaceOrType.NormalizeWhitespace().ToString().Replace("global::", "");
+        var target = GlobalAliasQualifier.Replace(directive.NamespaceOrType.NormalizeWhitespace().ToString(), "");
         return directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? "static " + target
             : directive.Alias is { } alias ? alias.Name.Identifier.ValueText + " = " + target
             : target;
