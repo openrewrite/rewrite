@@ -206,8 +206,8 @@ public class ReorderMethodArguments extends Recipe {
                     JavaType.Method mt = m.getMethodType()
                             .withParameterNames(reorderedNames)
                             .withParameterTypes(reorderedTypes);
-                    if (mt.hasFlags(Flag.Varargs) && resolvedParamCount > 0 && !paramNames.get(resolvedParamCount - 1)
-                            .equals(newParameterNames[newParameterNames.length - 1])) {
+                    if (mt.hasFlags(Flag.Varargs) && resolvedParamCount > 0 && resolvedParamCount <= paramNames.size() &&
+                        !paramNames.get(resolvedParamCount - 1).equals(newParameterNames[newParameterNames.length - 1])) {
                         // the varargs parameter moves off the last position
                         Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
                         flags.remove(Flag.Varargs);
