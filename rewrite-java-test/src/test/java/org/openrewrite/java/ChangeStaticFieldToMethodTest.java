@@ -279,7 +279,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Test
     void constantToMethodOnStaticTarget() {
         rewriteRun(
-          // the recipe doesn't know the return type of the method it calls
+          // the recipe knows the method it calls and its target only by name, not by type
           spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
             .recipe(new ChangeStaticFieldToMethod(
             "constants.Constants",
@@ -308,7 +308,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                       this.code = code;
                   }
 
-                  String codeAsText() {
+                  public String codeAsText() {
                       return String.valueOf(code);
                   }
               }
