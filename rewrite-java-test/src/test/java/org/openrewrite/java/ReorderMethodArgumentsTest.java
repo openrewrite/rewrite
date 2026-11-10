@@ -143,6 +143,43 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     }
 
     @Test
+    void reorderArgumentsBeforeVarargs() {
+        rewriteRun(
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(Integer,String,..)",
+            new String[]{"s", "n", "o"}, null, null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                 public void foo(Integer n, String s, Object... o) {}
+                 public void foo(String s, Integer n, Object... o) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo(0, "mystring", "a", "b");
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo("mystring", 0, "a", "b");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
