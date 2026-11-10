@@ -54,6 +54,26 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     }
 
     @Test
+    void callsOfAMethodWhoseDeclarationKeepsItsAccessLevelKeepTheirs() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.I run()", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              interface I {
+                  void run();
+
+                  default void caller() {
+                      run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void callsInTheSameFileHaveTheNewAccessLevel() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod()", "public", null)),

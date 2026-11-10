@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
@@ -28,22 +29,25 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
+    private static final String CHANGED_DECLARATIONS = "CHANGED_DECLARATIONS";
+
     private static final Collection<J.Modifier.Type> EXPLICIT_ACCESS_LEVELS = Arrays.asList(J.Modifier.Type.Public,
             J.Modifier.Type.Private, J.Modifier.Type.Protected);
 
@@ -59,11 +63,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
         if (methodMatcher.matches(method, classDecl)) {
-            J.Modifier.Type currentMethodAccessLevel = m.getModifiers().stream()
-                    .map(J.Modifier::getType)
-                    .filter(EXPLICIT_ACCESS_LEVELS::contains)
-                    .findAny()
-                    .orElse(null);
+            J.Modifier.Type currentMethodAccessLevel = accessLevel(m);
 
             if (currentMethodAccessLevel == newAccessLevel) {
                 // No changes required
@@ -159,9 +159,8 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
         J.MethodInvocation retyped = withAccessLevel(m);
-        // withName gives the call the method its name is typed with
-        return retyped == m || m.getName().getType() == null ? retyped :
-                m.withName(m.getName().withType(retyped.getMethodType()));
+        return retyped == m || retyped.getName().getType() == null ? retyped :
+                retyped.withName(retyped.getName().withType(retyped.getMethodType()));
     }
 
     @Override
@@ -177,20 +176,48 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("unchecked")
     private <C extends MethodCall> C withAccessLevel(C call) {
         JavaType.Method methodType = call.getMethodType();
-        return methodType != null && methodMatcher.matches(call) && declaredHere(methodType) ?
+        return methodType != null && methodMatcher.matches(call) && changedDeclarations().contains(key(methodType)) ?
                 (C) call.withMethodType(withAccessLevel(methodType)) : call;
     }
 
     /**
-     * Whether this file declares the method, as the pattern can also match a method declared elsewhere, such as the
-     * one a declaration here overrides, whose access level doesn't change.
+     * The methods whose declarations in this file get the new access level. The pattern can also match a method
+     * declared elsewhere, or one whose declaration keeps its access level, and the calls of those keep theirs.
      */
-    private boolean declaredHere(JavaType.Method methodType) {
-        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-        return sourceFile != null && sourceFile.getTypesInUse().getDeclaredMethods().stream().anyMatch(declared ->
-                declared.getName().equals(methodType.getName()) &&
-                TypeUtils.fullyQualifiedNamesAreEqual(declared.getDeclaringType().getFullyQualifiedName(),
-                        methodType.getDeclaringType().getFullyQualifiedName()));
+    private Set<String> changedDeclarations() {
+        Cursor sourceFile = getCursor()
+                .dropParentUntil(v -> v instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(v));
+        if (!(sourceFile.getValue() instanceof JavaSourceFile)) {
+            return emptySet();
+        }
+        return sourceFile.computeMessageIfAbsent(CHANGED_DECLARATIONS, k -> {
+            Set<String> changed = new HashSet<>();
+            new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Set<String> c) {
+                    J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                    if (classDecl != null && method.getMethodType() != null &&
+                        methodMatcher.matches(method, classDecl) && accessLevel(method) != newAccessLevel) {
+                        c.add(key(method.getMethodType()));
+                    }
+                    return super.visitMethodDeclaration(method, c);
+                }
+            }.visit(sourceFile.<JavaSourceFile>getValue(), changed);
+            return changed;
+        });
+    }
+
+    private static String key(JavaType.Method methodType) {
+        return methodType.getDeclaringType().getFullyQualifiedName() + " " + methodType.getName() + "/" +
+               methodType.getParameterTypes().size();
+    }
+
+    private static J.Modifier.@Nullable Type accessLevel(J.MethodDeclaration method) {
+        return method.getModifiers().stream()
+                .map(J.Modifier::getType)
+                .filter(EXPLICIT_ACCESS_LEVELS::contains)
+                .findAny()
+                .orElse(null);
     }
 
     private JavaType.Method withAccessLevel(JavaType.Method methodType) {
