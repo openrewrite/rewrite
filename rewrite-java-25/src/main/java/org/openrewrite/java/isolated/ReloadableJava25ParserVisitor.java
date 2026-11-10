@@ -873,7 +873,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
         J clazz = convertInstanceOfTree(node);
-        J pattern = getNodePattern(node.getPattern(), type);
+        J pattern = getNodePattern(node.getPattern());
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
@@ -917,7 +917,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
     }
 
-    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern) {
         if (pattern instanceof JCBindingPattern b) {
             String name = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
             Space space = sourceBefore(name);
@@ -926,7 +926,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 vartype = vartype.withName("_");
             }
             return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), name,
-                    type, vartype);
+                    vartype != null ? vartype.getType() : null, vartype);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {

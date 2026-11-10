@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext} from "../../src";
+import {ExecutionContext, findMarker} from "../../src";
 import {Parser} from "../../src/parser";
-import {npm, typescript} from "../../src/javascript";
+import {Autodetect, JS, npm, StyleKind, TabsAndIndentsStyle, typescript} from "../../src/javascript";
+import {RecipeSpec} from "../../src/test";
 import {withDir} from "tmp-promise";
+import * as fs from "fs";
+import * as path from "path";
 
 /** The parser factory `npm(dir, ...)` gives a spec. Each call looks the parser up in the pool again. */
 async function parserIn(dir: string): Promise<() => Parser> {
@@ -44,5 +47,43 @@ describe("npm", () => {
             expect(liveParser()).toBe(pooled);
             expect(removedParser()).not.toBe(removedPooled);
         }, {unsafeCleanup: true});
+    });
+
+    test("stops detecting a directory's style once its project has Prettier", async () => {
+        await withDir(async repo => {
+            const detecting = (await parserIn(repo.path))();
+            const prettier = path.join(repo.path, "node_modules", "prettier");
+            fs.mkdirSync(prettier, {recursive: true});
+            fs.writeFileSync(path.join(prettier, "package.json"), `{"version": "3.7.4"}`);
+
+            expect((await parserIn(repo.path))()).not.toBe(detecting);
+        }, {unsafeCleanup: true});
+    });
+
+    test("detects the style of the dedented text that the recipe runs on", async () => {
+        let indentSize: number | undefined;
+        await withDir(async repo => {
+            await new RecipeSpec().rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...typescript(
+                            `
+                            function f() {
+                              g();
+                            }
+                            `
+                        ),
+                        beforeRecipe: (cu: JS.CompilationUnit) => {
+                            const style = findMarker<Autodetect>(cu, StyleKind.Autodetect)?.styles
+                                .find(s => s.kind === StyleKind.TabsAndIndentsStyle) as TabsAndIndentsStyle | undefined;
+                            indentSize = style?.indentSize;
+                            return cu;
+                        }
+                    }
+                )
+            );
+        }, {unsafeCleanup: true});
+        expect(indentSize).toBe(2);
     });
 });
