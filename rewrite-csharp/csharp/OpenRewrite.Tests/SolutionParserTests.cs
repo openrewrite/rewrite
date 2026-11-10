@@ -592,6 +592,8 @@ public class SolutionParserTests : IDisposable
     // the other target framework does not import it
     [InlineData("""<ItemGroup><Using Include="System.Linq" Condition="'$(TargetFramework)' == 'net9.0'" /></ItemGroup>""")]
     [InlineData("""<ItemGroup><Using Include="System.Linq" Condition="'$(TargetFramework)' == 'net10.0'" /></ItemGroup>""")]
+    // net99.0 needs a newer SDK, so it is not parsed here, but a build with one compiles the file
+    [InlineData("""<PropertyGroup><TargetFrameworks>net99.0;net10.0</TargetFrameworks></PropertyGroup><ItemGroup><Using Include="System.Linq" Condition="'$(TargetFramework)' == 'net10.0'" /></ItemGroup>""")]
     public async Task MaybeAddUsingAddsANamespaceTheProjectDoesNotImport(string projectContent)
     {
         var cu = await ParseCounting(projectContent, null);

@@ -721,10 +721,10 @@ public class SolutionParser
         Log.Debug("ParseProject: starting {ProjectName}", projectName);
 
         var variants = solution.Projects
-            .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
-                        !_unsupportedVariants.Contains(p.Id))
+            .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var project = variants
+            .Where(p => !_unsupportedVariants.Contains(p.Id))
             .OrderByDescending(p => p.MetadataReferences.Any())
             .FirstOrDefault();
 
@@ -773,9 +773,10 @@ public class SolutionParser
             requirePrintEqualsInput);
     }
 
-    /// <summary>The usings that every target framework of the project imports.</summary>
+    /// <summary>The usings that every target framework of the project imports. A framework this
+    /// machine cannot build is still built elsewhere, so it counts with what its documents show.</summary>
     private static List<string> GlobalUsingsOf(IReadOnlyList<Project> variants) =>
-        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).ToList();
+        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).Distinct().ToList();
 
     private static readonly Regex GlobalUsingDirective = new(@"\bglobal\s+using\b", RegexOptions.Compiled);
 
