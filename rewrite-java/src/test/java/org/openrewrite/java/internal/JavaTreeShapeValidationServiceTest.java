@@ -63,13 +63,28 @@ class JavaTreeShapeValidationServiceTest {
 
     @Test
     void comparesTheRestOfAMethodThatThrowsAnExceptionTheParserCannotResolve() {
-        J.MethodDeclaration parsed = (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(),
-                "class A { int m() throws Missing { return 1; } }").getBody().getStatements().get(0);
+        J.MethodDeclaration parsed = method("class A { int m() throws Missing { return 1; } }");
         J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
                 .withReturnType(JavaType.Primitive.Long));
 
         assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed))
                 .contains("the method long A.m() where the parser gives int A.m()");
+    }
+
+    @Test
+    void writesAThrownExceptionTheParserCannotResolveAsUndefined() {
+        J.MethodDeclaration parsed = method("class A { void m() throws Missing, java.io.IOException {} }");
+        JavaType.Method methodType = requireNonNull(parsed.getMethodType());
+        J.MethodDeclaration recipes = parsed.withMethodType(methodType.withThrownExceptions(
+                List.of(methodType.getThrownExceptions().get(0), JavaType.ShallowClass.build("java.lang.Exception"))));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed)).containsExactly(
+                "the method void A.m() throwing {undefined}, java.lang.Exception " +
+                "where the parser gives void A.m() throwing {undefined}, java.io.IOException");
+    }
+
+    private static J.MethodDeclaration method(String source) {
+        return (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(), source).getBody().getStatements().get(0);
     }
 
     private static J.ClassDeclaration parse(Parser.Builder parser) {
