@@ -313,7 +313,7 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void matchesMethodsInClassesThatImplementInterface() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.A count(foo.Sheep)", "Wolf", "wolf", null)),
+          spec -> spec.recipe(new AddMethodParameter("foo.A count(foo.Sheep)", "foo.Wolf", "wolf", null)),
           java(
             """
             package foo;
