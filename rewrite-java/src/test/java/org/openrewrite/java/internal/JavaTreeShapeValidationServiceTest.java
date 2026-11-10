@@ -61,6 +61,17 @@ class JavaTreeShapeValidationServiceTest {
                 .containsExactly("renamed");
     }
 
+    @Test
+    void comparesTheRestOfAMethodThatThrowsAnExceptionTheParserCannotResolve() {
+        J.MethodDeclaration parsed = (J.MethodDeclaration) parse(JavaParser.fromJavaVersion(),
+                "class A { int m() throws Missing { return 1; } }").getBody().getStatements().get(0);
+        J.MethodDeclaration recipes = parsed.withMethodType(requireNonNull(parsed.getMethodType())
+                .withReturnType(JavaType.Primitive.Long));
+
+        assertThat(new JavaTreeShapeValidationService().typeDifferences(recipes, parsed))
+                .contains("the method long A.m() where the parser gives int A.m()");
+    }
+
     private static J.ClassDeclaration parse(Parser.Builder parser) {
         return parse(parser, SOURCE);
     }

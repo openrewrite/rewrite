@@ -216,7 +216,8 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         if (!sameThrown(method.getThrownExceptions(), otherMethod.getThrownExceptions())) {
             StringJoiner thrown = new StringJoiner(", ", " throwing ", "").setEmptyValue(" throwing nothing");
             for (JavaType exception : method.getThrownExceptions()) {
-                thrown.add(String.valueOf(written(exception)));
+                String written = written(exception);
+                thrown.add(written == null ? "{undefined}" : written);
             }
             unwritten.append(thrown);
         }
