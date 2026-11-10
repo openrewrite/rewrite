@@ -103,6 +103,15 @@ public class RecipeQualityValidation {
     private boolean parserShapedTrees = true;
 
     /**
+     * Controls whether the source files the recipe changes are validated to have the types that their parser gives the
+     * text they print, such as a variable's declared type and not its initializer's. Types the parser doesn't resolve,
+     * such as those of a library missing from the test's classpath, aren't compared. Skipped when the test doesn't
+     * validate the type attribution of the recipe's input and output.
+     */
+    @Builder.Default
+    private boolean parserTypedTrees = true;
+
+    /**
      * Controls whether a composite recipe is validated to run each step before the steps that rename what it looks
      * for, such as a ChangeType of a type in a package before a ChangePackage of that package.
      */
@@ -147,6 +156,7 @@ public class RecipeQualityValidation {
                 .importReferencedTypes(quality.importReferencedTypes())
                 .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
+                .parserTypedTrees(quality.parserTypedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .noStaticVisitors(quality.noStaticVisitors())
                 .build();

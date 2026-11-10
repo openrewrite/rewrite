@@ -190,6 +190,21 @@ public class TypeValidation {
         return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
     }
 
+    /**
+     * Whether the test validates the type attribution of the recipe's input and output, which checks that compare
+     * the types of code need.
+     */
+    static boolean validatesTypes(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        return validatesTypes(before(testMethodSpec, testClassSpec)) &&
+               validatesTypes(after(testMethodSpec, testClassSpec));
+    }
+
+    private static boolean validatesTypes(TypeValidation validation) {
+        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
+               validation.variableDeclarations() && validation.methodInvocations() &&
+               validation.constructorInvocations();
+    }
+
     @SuppressWarnings("deprecation")
     private static @Nullable TypeValidation afterOf(RecipeSpec spec) {
         RecipeQualityValidation quality = spec.getRecipeQualityValidation();

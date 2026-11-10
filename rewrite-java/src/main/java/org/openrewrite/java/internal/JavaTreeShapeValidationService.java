@@ -26,9 +26,13 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.TypedTree;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -102,6 +106,57 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 .dependsOn(emptyList())
                 .typeAttribution(false)
                 .typeFactory(null);
+    }
+
+    @Override
+    public Map<String, @Nullable String> types(Tree tree) {
+        Map<String, @Nullable String> types = new LinkedHashMap<>();
+        if (tree instanceof J.VariableDeclarations.NamedVariable) {
+            // its type is its variable's
+            types.put("variable", written(((J.VariableDeclarations.NamedVariable) tree).getVariableType()));
+            return types;
+        }
+        if (tree instanceof TypedTree) {
+            types.put("type", written(((TypedTree) tree).getType()));
+        }
+        if (tree instanceof J.Identifier) {
+            types.put("variable", written(((J.Identifier) tree).getFieldType()));
+        } else if (tree instanceof J.MethodInvocation) {
+            types.put("method", written(((J.MethodInvocation) tree).getMethodType()));
+        } else if (tree instanceof J.MemberReference) {
+            types.put("method", written(((J.MemberReference) tree).getMethodType()));
+            types.put("variable", written(((J.MemberReference) tree).getVariableType()));
+        } else if (tree instanceof J.MethodDeclaration) {
+            types.put("method", written(((J.MethodDeclaration) tree).getMethodType()));
+        } else if (tree instanceof J.NewClass) {
+            types.put("constructor", written(((J.NewClass) tree).getConstructorType()));
+        }
+        return types;
+    }
+
+    /**
+     * {@code type} as text without a variable's owner, which a template doesn't know for the locals it declares. A
+     * {@code $} before a nested class's name is written {@code .}, as TypeUtils.fullyQualifiedNamesAreEqual treats
+     * them alike.
+     */
+    private static @Nullable String written(@Nullable JavaType type) {
+        DefaultJavaTypeSignatureBuilder signatures = new DefaultJavaTypeSignatureBuilder();
+        String written;
+        if (type instanceof JavaType.Variable) {
+            JavaType.Variable variable = (JavaType.Variable) type;
+            written = signatures.signature(variable.getType()) + " " + variable.getName();
+        } else if (type instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            StringJoiner parameters = new StringJoiner(", ", "(", ")");
+            for (JavaType parameter : method.getParameterTypes()) {
+                parameters.add(signatures.signature(parameter));
+            }
+            written = signatures.signature(method.getReturnType()) + " " +
+                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters;
+        } else {
+            written = signatures.signature(type);
+        }
+        return written.contains("{undefined}") ? null : written.replace('$', '.');
     }
 
     @Override

@@ -21,8 +21,10 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * Lets the test framework check that a recipe's output is the tree its parser makes of the text it prints.
@@ -77,11 +79,19 @@ public interface TreeShapeValidationService {
     }
 
     /**
-     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, as the
+     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, for when the
      * check compares no types.
      */
     default Parser.Builder untypedParser(Parser.Builder parser) {
         return parser;
+    }
+
+    /**
+     * @return The types of {@code tree}, keyed by what each is the type of, such as its variable or method, and written
+     * so that two parses of the same text agree. A type that isn't resolved is null.
+     */
+    default Map<String, @Nullable String> types(Tree tree) {
+        return emptyMap();
     }
 
     /**

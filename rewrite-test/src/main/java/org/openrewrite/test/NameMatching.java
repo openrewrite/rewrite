@@ -99,12 +99,6 @@ final class NameMatching {
         this.parseCtx = parseCtx;
     }
 
-    private static boolean validatesTypes(TypeValidation validation) {
-        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
-               validation.variableDeclarations() && validation.methodInvocations() &&
-               validation.constructorInvocations();
-    }
-
     /**
      * @return null when the test turned these checks off or its run can't be repeated faithfully.
      */
@@ -114,9 +108,8 @@ final class NameMatching {
         RecipeSpec methodSpec = context.getTestMethodSpec();
         RecipeSpec classSpec = context.getTestClassSpec();
         // the reruns are on type attributed code, so the test has to attribute what the recipe gets and makes
-        boolean typesValidated = validatesTypes(TypeValidation.before(methodSpec, classSpec)) &&
-                                 validatesTypes(TypeValidation.after(methodSpec, classSpec));
-        if (!RecipeQualityValidation.of(methodSpec, classSpec).matchByTypeNotName() || !typesValidated ||
+        if (!RecipeQualityValidation.of(methodSpec, classSpec).matchByTypeNotName() ||
+            !TypeValidation.validatesTypes(methodSpec, classSpec) ||
             recipe.equals(Recipe.noop()) ||
             runner != RewriteRunner.IN_PROCESS ||
             methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
