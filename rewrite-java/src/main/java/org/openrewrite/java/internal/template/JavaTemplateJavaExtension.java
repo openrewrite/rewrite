@@ -27,8 +27,10 @@ import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -501,7 +503,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     }
                                 }
 
-                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
+                                Statement last = parameters.isEmpty() ? null : parameters.get(parameters.size() - 1);
+                                Set<Flag> flags = EnumSet.noneOf(Flag.class);
+                                flags.addAll(type.getFlags());
+                                if (last instanceof J.VariableDeclarations && ((J.VariableDeclarations) last).getVarargs() != null) {
+                                    flags.add(Flag.Varargs);
+                                } else {
+                                    flags.remove(Flag.Varargs);
+                                }
+                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes).withFlags(flags);
                             }
 
                             return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
@@ -581,6 +591,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 })
                                 .collect(toList());
                         mt = mt.withParameterTypes(argTypes);
+                        if (mt.hasFlags(Flag.Varargs)) {
+                            // the patched method takes a parameter per argument
+                            Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
+                            flags.remove(Flag.Varargs);
+                            mt = mt.withFlags(flags);
+                        }
                         m = m.withMethodType(mt);
                     }
                     if (m.getName().getType() != null) {
