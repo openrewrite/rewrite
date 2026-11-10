@@ -256,13 +256,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
-            return updateTypeOf(getCursor().getValue(), javaType);
-        }
-
-        private @Nullable JavaType updateTypeOf(Object tree, @Nullable JavaType type) {
-            JavaType updated = updateType(type);
-            // a class declaration only takes a class, so a primitive target leaves the declared class as it is
-            return tree instanceof J.ClassDeclaration && !(updated instanceof JavaType.FullyQualified) ? type : updated;
+            return updateType(javaType);
         }
 
         private void addImport(JavaType.FullyQualified owningClass) {
@@ -315,7 +309,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 J.ClassDeclaration cd = (J.ClassDeclaration) j;
                 j = cd.withType(original.getType()).withName(cd.getName().withType(original.getName().getType()));
             } else if (tree instanceof TypedTree) {
-                j = ((TypedTree) tree).withType(updateTypeOf(tree, ((TypedTree) tree).getType()));
+                j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) tree;
                 if (targetType instanceof JavaType.FullyQualified) {
