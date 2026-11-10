@@ -87,8 +87,8 @@ public interface TreeShapeValidationService {
     }
 
     /**
-     * @return A parser that types text the way {@code parser} would if it had parsed nothing before, for when the check
-     * compares types.
+     * @return A parser for when the check compares types, which types text as {@code parser} does. Where it can, it
+     * has a type cache of its own, so it types text as if it had parsed nothing before.
      */
     default Parser.Builder typedParser(Parser.Builder parser) {
         return parser;
