@@ -20,8 +20,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -41,20 +42,20 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
     @Test
     void withThrowsAddsLeadingSpaceWhenMethodHasNoExistingThrowsClause() {
         rewriteRun(
-          // the throws clause is built by hand to test its spacing, leaving the method's type without it
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
-            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (!"target".equals(method.getSimpleName()) || method.getThrows() != null) {
                       return method;
                   }
                   maybeAddImport("java.io.IOException");
+                  JavaType.FullyQualified ioExceptionType = JavaType.ShallowClass.build("java.io.IOException");
                   J.Identifier ioException = new J.Identifier(
                           Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                          emptyList(), "IOException",
-                          JavaType.ShallowClass.build("java.io.IOException"), null);
-                  return method.withThrows(singletonList(ioException));
+                          emptyList(), "IOException", ioExceptionType, null);
+                  J.MethodDeclaration m = method.withThrows(singletonList(ioException));
+                  return m.getMethodType() == null ? m :
+                          m.withMethodType(m.getMethodType().withThrownExceptions(singletonList(ioExceptionType)));
               }
           })),
           //language=java
@@ -221,9 +222,23 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                           JavaType.ShallowClass.build("java.lang.Comparable"), null);
                   return typeParam.withBounds(singletonList(comparable));
               }
-          }))
-            // the bound is built by hand to test its spacing, leaving the class's type without it
-            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                  if (c == classDecl || !(c.getType() instanceof JavaType.Parameterized) ||
+                      !(((JavaType.Parameterized) c.getType()).getType() instanceof JavaType.Class)) {
+                      return c;
+                  }
+                  List<JavaType> typeParameters = singletonList(new JavaType.GenericTypeVariable(null, "T",
+                          JavaType.GenericTypeVariable.Variance.COVARIANT,
+                          singletonList(JavaType.ShallowClass.build("java.lang.Comparable"))));
+                  JavaType.Class classType = (JavaType.Class) ((JavaType.Parameterized) c.getType()).getType();
+                  JavaType.Parameterized type = new JavaType.Parameterized(null,
+                          classType.withTypeParameters(typeParameters), typeParameters);
+                  return c.withType(type).withName(c.getName().withType(type));
+              }
+          })),
           //language=java
           java(
             """
