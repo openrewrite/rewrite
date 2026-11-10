@@ -49,6 +49,40 @@ class RemoveImportTest implements RewriteTest {
         });
     }
 
+    @Test
+    void commentInTypeImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util./*type*/ArrayList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInFunctionImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeMemberImportRecipe("kotlin.collections", "emptyList")),
+          kotlin(
+            """
+              import kotlin.collections./*extension*/emptyList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
     @Test
     void preservesKtlintSuppressionCommentOnLineBeforeRemovedImport() {
