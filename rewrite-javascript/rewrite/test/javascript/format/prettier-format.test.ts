@@ -21,6 +21,9 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     autoFormat,
+    getStyle,
+    StyleKind,
+    TabsAndIndentsStyle,
     AutoformatVisitor,
     JavaScriptParser,
     JavaScriptVisitor,
@@ -495,6 +498,41 @@ describe('Prettier project opt-in', () => {
             if (enabled) {
                 expect(marker!.prettierVersion).toBe('3.0.0');
             }
+        }, {unsafeCleanup: true});
+    });
+
+    test('detects fallback indentation without sampling Prettier files', async () => {
+        await withDir(async repo => {
+            await fsp.mkdir(path.join(repo.path, 'node_modules/prettier'), {recursive: true});
+            await fsp.writeFile(path.join(repo.path, 'node_modules/prettier/package.json'),
+                JSON.stringify({name: 'prettier', version: '3.0.0'}));
+            const spec = new RecipeSpec();
+            await spec.rewriteRun(npm(repo.path,
+                packageJson('{"name":"test-project"}'),
+                {...json('{}'), path: 'formatted/.prettierrc'},
+                {
+                    ...typescript(`function plain() {
+    return 'key';
+}`),
+                    path: 'src/plain.ts',
+                    beforeRecipe: (sourceFile: JS.CompilationUnit) => {
+                        const style = getStyle(StyleKind.TabsAndIndentsStyle, sourceFile) as TabsAndIndentsStyle;
+                        expect(style.indentSize).toBe(4);
+                    }
+                },
+                {
+                    ...typescript(`function formatted() {
+  const a = 1;
+  const b = 2;
+  return a + b;
+}`),
+                    path: 'formatted/app.ts',
+                    beforeRecipe: (sourceFile: JS.CompilationUnit) => {
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === defaultPrettierStyle.kind)).toBe(true);
+                        expect(sourceFile.markers.markers.some(marker => marker.kind === 'org.openrewrite.javascript.style.Autodetect')).toBe(false);
+                    }
+                }
+            ));
         }, {unsafeCleanup: true});
     });
 
