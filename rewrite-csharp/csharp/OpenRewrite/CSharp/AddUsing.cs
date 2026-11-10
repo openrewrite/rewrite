@@ -24,8 +24,9 @@ namespace OpenRewrite.CSharp;
 /// as an after-visitor via <see cref="CSharpVisitor{P}.MaybeAddUsing"/>: the directive is only
 /// added when the type is referenced by its simple name (unless <c>onlyIfReferenced</c> is
 /// false), never duplicated — a textually matching plain or <c>global</c> using anywhere in the
-/// file is a no-op — and declined when the file already binds the simple name to a different
-/// type (the CS0104 risk). <c>using static</c> and alias directives are out of scope.
+/// file, or one of the project's <see cref="DotNetProject.GlobalUsings"/>, is a no-op — and
+/// declined when the file already binds the simple name to a different type (the CS0104 risk).
+/// <c>using static</c> and alias directives are out of scope.
 /// <para>
 /// Placement follows the file: the compilation unit's using list when it has one, otherwise the
 /// first block-scoped namespace that keeps usings, otherwise the compilation unit (file-scoped
@@ -63,6 +64,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         }
 
         if (AddUsing.HasNamespaceUsing(cu, _namespace)
+            || cu.Markers.FindFirst<DotNetProject>()?.GlobalUsings.Contains(_namespace) == true
             || (_onlyIfReferenced && !IsReferenced(cu))
             || AddUsing.IsShadowedInFile(cu, _typeName, _fullyQualifiedTypeName))
         {

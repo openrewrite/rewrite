@@ -16,6 +16,7 @@
 using LibGit2Sharp;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.NuGet;
+using OpenRewrite.Java;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -564,6 +565,66 @@ public class SolutionParserTests : IDisposable
         var results = parser.ParseProject(solution, project.FilePath!, _tempDir);
 
         Assert.Single(results);
+    }
+
+    private const string CountingSource = """
+        class Counting
+        {
+            int Count(int[] values) => Enumerable.Count(values);
+        }
+        """;
+
+    [Theory]
+    [InlineData("<PropertyGroup><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>", null)]
+    [InlineData("", "global using global::System.Linq;")]
+    [InlineData("""<ItemGroup><Using Include="System.Linq" /></ItemGroup>""", null)]
+    public async Task MaybeAddUsingSkipsANamespaceTheProjectImports(string projectContent, string? otherFile)
+    {
+        var cu = await ParseCounting(projectContent, otherFile);
+
+        Assert.Equal(CountingSource, new CSharpPrinter<int>().Print(new LinqUser().Visit(cu, 0)!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    // imports the alias, not the namespace
+    [InlineData("""<ItemGroup><Using Include="System.Linq" Alias="Linq" /></ItemGroup>""")]
+    public async Task MaybeAddUsingAddsANamespaceTheProjectDoesNotImport(string projectContent)
+    {
+        var cu = await ParseCounting(projectContent, null);
+
+        Assert.Equal("using System.Linq;\n\n" + CountingSource,
+            new CSharpPrinter<int>().Print(new LinqUser().Visit(cu, 0)!));
+    }
+
+    private async Task<CompilationUnit> ParseCounting(string projectContent, string? otherFile)
+    {
+        var projectPath = WriteFile("Counting.csproj", $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              {projectContent}
+            </Project>
+            """);
+        if (otherFile != null)
+        {
+            WriteFile("Other.cs", otherFile);
+        }
+        WriteFile("Counting.cs", CountingSource);
+
+        var parser = new SolutionParser();
+        var results = parser.ParseProject(await parser.LoadAsync(projectPath), projectPath, _tempDir);
+        return results.OfType<CompilationUnit>().Single(cu => cu.SourcePath == "Counting.cs");
+    }
+
+    private sealed class LinqUser : CSharpVisitor<int>
+    {
+        public override J VisitCompilationUnit(CompilationUnit compilationUnit, int p)
+        {
+            MaybeAddUsing("System.Linq.Enumerable");
+            return base.VisitCompilationUnit(compilationUnit, p);
+        }
     }
 
     private sealed class CollectingSink(List<string> messages) : ILogEventSink

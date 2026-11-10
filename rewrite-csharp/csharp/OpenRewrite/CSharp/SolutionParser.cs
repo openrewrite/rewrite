@@ -16,6 +16,8 @@
 using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
 using NuGet.Frameworks;
 using NuGet.ProjectModel;
@@ -764,7 +766,29 @@ public class SolutionParser
                 }))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput);
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, GlobalUsingsOf(compilation),
+            requirePrintEqualsInput);
+    }
+
+    /// <summary>The compilation includes the file the SDK generates from implicit usings and
+    /// <c>&lt;Using&gt;</c> items.</summary>
+    private static List<string> GlobalUsingsOf(Compilation? compilation) =>
+        compilation?.SyntaxTrees
+            .Select(tree => tree.GetRoot())
+            .OfType<CompilationUnitSyntax>()
+            .SelectMany(root => root.Usings)
+            .Where(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
+            .Select(GlobalUsingText)
+            .Distinct()
+            .ToList() ?? [];
+
+    private static string GlobalUsingText(UsingDirectiveSyntax directive)
+    {
+        // A name can be written global::System.Linq
+        var target = directive.NamespaceOrType.NormalizeWhitespace().ToString().Replace("global::", "");
+        return directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? "static " + target
+            : directive.Alias is { } alias ? alias.Name.Identifier.ValueText + " = " + target
+            : target;
     }
 
     /// <summary>
@@ -799,7 +823,7 @@ public class SolutionParser
             .Select(filePath => new ParseUnit(filePath, () => ReadSource(filePath), () => null))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, new List<HashSet<string>> { new() },
+        return ParseUnits(projectPath, rootDir, units, new List<HashSet<string>> { new() }, [],
             requirePrintEqualsInput);
     }
 
@@ -827,7 +851,7 @@ public class SolutionParser
 
     private List<SourceFile> ParseUnits(
         string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
-        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput)
+        List<HashSet<string>> configSymbolSets, IList<string> globalUsings, bool requirePrintEqualsInput)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
 
@@ -836,7 +860,7 @@ public class SolutionParser
         // the same CSharpFormatStyle marker instance.
         var editorConfigResolver = new EditorConfigResolver(rootDir);
 
-        var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
+        var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName, globalUsings);
 
         // One shared symbol→JavaType cache for the whole project. Roslyn interns symbols
         // per Compilation, so every document in this project resolves a given type to the
@@ -1149,7 +1173,8 @@ public class SolutionParser
     /// <summary>
     /// Creates a DotNetProject marker by reading TFM and SDK from the .csproj XML.
     /// </summary>
-    private static DotNetProject CreateDotNetProjectMarker(string projectPath, string projectName)
+    private static DotNetProject CreateDotNetProjectMarker(string projectPath, string projectName,
+        IList<string> globalUsings)
     {
         string? sdk = null;
         var tfms = new List<string>();
@@ -1180,7 +1205,7 @@ public class SolutionParser
             Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
         }
 
-        return new DotNetProject(Tree.RandomId(), projectName, tfms, sdk);
+        return new DotNetProject(Tree.RandomId(), projectName, tfms, sdk, globalUsings);
     }
 
     /// <summary>

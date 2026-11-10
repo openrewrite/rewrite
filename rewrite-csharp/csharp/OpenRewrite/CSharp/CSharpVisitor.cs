@@ -149,10 +149,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// Registers an <see cref="AddUsing{P}"/> after-visitor (once per type) that adds
     /// <c>using &lt;namespace&gt;;</c> for the namespace of
     /// <paramref name="fullyQualifiedTypeName"/> when the current source file has been fully
-    /// visited — the C# counterpart of Java's <c>maybeAddImport</c>. No-op when the using is
-    /// already present, when the type is not referenced by its simple name (unless
-    /// <paramref name="onlyIfReferenced"/> is false), or when the file already binds the simple
-    /// name to a different type.
+    /// visited — the C# counterpart of Java's <c>maybeAddImport</c>. No-op when the file or its
+    /// project already imports the namespace, when the type is not referenced by its simple name
+    /// (unless <paramref name="onlyIfReferenced"/> is false), or when the file already binds the
+    /// simple name to a different type.
     /// </summary>
     public void MaybeAddUsing(string fullyQualifiedTypeName, bool onlyIfReferenced = true)
     {

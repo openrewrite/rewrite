@@ -233,6 +233,6 @@ class ModuleHasDependencyTest implements RewriteTest {
     }
 
     private static DotNetProject dotNetProject(String name) {
-        return new DotNetProject(randomId(), name, singletonList("net8.0"), "Microsoft.NET.Sdk");
+        return new DotNetProject(randomId(), name, singletonList("net8.0"), "Microsoft.NET.Sdk", null);
     }
 }
