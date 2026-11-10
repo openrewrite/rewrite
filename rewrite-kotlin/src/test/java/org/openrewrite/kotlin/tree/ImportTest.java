@@ -111,6 +111,25 @@ class ImportTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "import kotlin.*",
+      "import /* prefix */kotlin.*",
+      "import   kotlin /* before dot */ . /* after dot */ *"
+    })
+    void rootPackageWildcardImport(String source) {
+        rewriteRun(
+          kotlin(
+            source,
+            spec -> spec.afterRecipe(cu -> {
+                J.Import anImport = cu.getImports().getFirst();
+                assertThat(anImport.getQualid().getSimpleName()).isEqualTo("*");
+                assertThat(anImport.getPackageName()).isEqualTo("kotlin");
+            })
+          )
+        );
+    }
+
     @Test
     void wildCard() {
         rewriteRun(

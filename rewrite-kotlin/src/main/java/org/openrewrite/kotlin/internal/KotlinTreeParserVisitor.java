@@ -2587,7 +2587,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    (Expression) reference,
+                    (Expression) reference.withPrefix(Space.EMPTY),
                     padLeft(suffix(importedReference), createIdentifier(star, null)),
                     null
             );
