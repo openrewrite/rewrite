@@ -3948,6 +3948,30 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void projectPropertyTakesPrecedenceOverJvmDefinedProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <java.version>11</java.version>
+                </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var pom = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getValue("${java.version}")).isEqualTo("11");
+                  assertThat(pom.getValue("${java.home}")).isEqualTo(System.getProperty("java.home"));
+              }
+            )
+          )
+        );
+    }
+
+    @Test
     void propertyFromMavenConfig() {
         rewriteRun(
           spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
