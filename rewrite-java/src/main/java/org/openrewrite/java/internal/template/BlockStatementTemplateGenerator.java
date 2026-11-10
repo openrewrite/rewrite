@@ -461,7 +461,9 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
+                // a `var` the loop declares takes the iterable's element type
+                before.insert(0, "for (");
+                after.append(" : /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor)).append(") {}");
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
