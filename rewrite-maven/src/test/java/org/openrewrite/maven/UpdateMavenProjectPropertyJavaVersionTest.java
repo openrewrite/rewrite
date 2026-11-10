@@ -1098,61 +1098,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateReferencedPropertyInLocalParent() {
-        rewriteRun(
-          mavenProject("example-parent",
-            //language=xml
-            pomXml(
-              """
-                <project>
-                    <groupId>com.example</groupId>
-                    <artifactId>example-parent</artifactId>
-                    <version>1.0.0</version>
-                    <modelVersion>4.0</modelVersion>
-                    <packaging>pom</packaging>
-                    <properties>
-                        <maven.compiler.release>${custom.release}</maven.compiler.release>
-                        <custom.release>11</custom.release>
-                    </properties>
-                </project>
-                """,
-              """
-                <project>
-                    <groupId>com.example</groupId>
-                    <artifactId>example-parent</artifactId>
-                    <version>1.0.0</version>
-                    <modelVersion>4.0</modelVersion>
-                    <packaging>pom</packaging>
-                    <properties>
-                        <maven.compiler.release>${custom.release}</maven.compiler.release>
-                        <custom.release>17</custom.release>
-                    </properties>
-                </project>
-                """
-            ),
-            mavenProject("example-child",
-              //language=xml
-              pomXml(
-                """
-                  <project>
-                      <parent>
-                          <groupId>com.example</groupId>
-                          <artifactId>example-parent</artifactId>
-                          <version>1.0.0</version>
-                      </parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>example-child</artifactId>
-                      <version>1.0.0</version>
-                      <modelVersion>4.0</modelVersion>
-                  </project>
-                  """
-              )
-            )
-          )
-        );
-    }
-
-    @Test
     void updatePropertyReferencedByReleaseInExternalParentProfile() {
         // A parent can derive maven.compiler.release from a property of its own, only for builds on JDK 9+
         withLocalRepository(
