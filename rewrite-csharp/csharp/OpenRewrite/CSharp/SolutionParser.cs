@@ -775,8 +775,23 @@ public class SolutionParser
 
     /// <summary>The usings that every target framework of the project imports. A framework this
     /// machine cannot build is still built elsewhere, so it counts with what its documents show.</summary>
-    private static List<string> GlobalUsingsOf(IReadOnlyList<Project> variants) =>
-        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).ToList();
+    private static List<string> GlobalUsingsOf(IReadOnlyList<Project> variants)
+    {
+        // The workspace holds every text it loads for as long as the solution lives, so these come from disk
+        var declaring = variants
+            .SelectMany(variant => variant.Documents)
+            .Select(doc => doc.FilePath)
+            .OfType<string>()
+            .Distinct()
+            .Where(path => new FileInfo(path) is { Exists: true, Length: <= MaxParseableSizeBytes })
+            .Select(path => (Path: path, Text: ReadSource(path)))
+            .Where(file => file.Text != null && GlobalUsingDirective.IsMatch(file.Text))
+            .ToDictionary(file => file.Path, file => file.Text!);
+        return variants
+            .Select(variant => GlobalUsingsDeclaredIn(variant, declaring))
+            .Aggregate((common, next) => common.Intersect(next))
+            .ToList();
+    }
 
     private static readonly Regex GlobalUsingDirective = new(@"\bglobal\s+using\b", RegexOptions.Compiled);
 
@@ -784,10 +799,11 @@ public class SolutionParser
 
     /// <summary>A variant's documents include the file the SDK generates for its target framework
     /// from implicit usings and <c>&lt;Using&gt;</c> items.</summary>
-    private static IEnumerable<string> GlobalUsingsOf(Project variant) =>
+    private static IEnumerable<string> GlobalUsingsDeclaredIn(Project variant,
+        IReadOnlyDictionary<string, string> declaring) =>
         variant.Documents
-            .Select(doc => doc.GetTextAsync().Result)
-            .Where(text => text.Length <= MaxParseableSizeBytes && GlobalUsingDirective.IsMatch(text.ToString()))
+            .Select(doc => doc.FilePath is { } path && declaring.TryGetValue(path, out var text) ? text : null)
+            .OfType<string>()
             .SelectMany(text => CSharpSyntaxTree.ParseText(text, variant.ParseOptions as CSharpParseOptions)
                 .GetCompilationUnitRoot().Usings)
             .Where(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
