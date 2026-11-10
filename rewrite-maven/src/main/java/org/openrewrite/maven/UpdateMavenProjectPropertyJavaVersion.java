@@ -26,14 +26,11 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -51,11 +48,6 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             "maven.compiler.testTarget",
             "maven.compiler.testRelease",
             "release.version");
-
-    private static final List<XPathMatcher> JAVA_VERSION_XPATH_MATCHERS =
-            JAVA_VERSION_PROPERTIES.stream()
-                    .map(property -> "/project/properties/" + property)
-                    .map(XPathMatcher::new).collect(toList());
 
     // The test levels default to the main ones, so only those configure the level of the compiler plugin
     private static final List<String> MAIN_COMPILER_LEVEL_CONFIGURATION = Arrays.asList("source", "target", "release");
