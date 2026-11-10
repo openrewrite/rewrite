@@ -115,7 +115,8 @@ class ReorderMethodArgumentsTest implements RewriteTest {
               package a;
               public class A {
                  public void foo(String s, Integer n, Object... o) {}
-                 public void foo(String s, Object... o) {}
+                 // what the reordered call invokes, as no method takes varargs before another parameter
+                 public void foo(String s, Object o1, Object o2, Integer n) {}
               }
               """
           ),
