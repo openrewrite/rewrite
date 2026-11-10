@@ -709,4 +709,49 @@ class JavaTemplateGenericsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void contextSensitiveTemplateKeepsEnclosingMethodTypeVariable() {
+        //noinspection unchecked
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("List<T> list = (List<T>) #{any()};")
+                .contextSensitive()
+                .imports("java.util.List")
+                .build();
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.Block body = method.getBody();
+                  if (body == null || !body.getStatements().isEmpty()) {
+                      return method;
+                  }
+                  J.Identifier collection = ((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getName();
+                  return template.apply(getCursor(), body.getCoordinates().firstStatement(), collection);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  <T> void test(Collection<T> collection) {
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  <T> void test(Collection<T> collection) {
+                      List<T> list = (List<T>) collection;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor
@@ -51,6 +52,7 @@ public class Substitutions {
             "#{", "}", null);
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
+    private Collection<JavaType.GenericTypeVariable> genericTypeVariables = emptyList();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
 
     /**
@@ -75,6 +77,7 @@ public class Substitutions {
 
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
+        genericTypeVariables = generics.values();
         typeVariables.addAll(generics.values());
         AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
@@ -377,12 +380,14 @@ public class Substitutions {
     }
 
     /**
-     * Resolve generic type variable identifiers in the template AST to their erasure.
+     * Resolve identifiers of the type variables declared with {@code genericTypes()} to their erasure.
      * E.g., an identifier "T" with type GenericTypeVariable("T") becomes "Object"
      * when T is unbounded, or the first bound's simple name when bounded.
+     * Type variables taken from a parameter's type belong to the code the template is applied to,
+     * so a template naming one keeps it.
      */
     public <J2 extends J> @Nullable J2 resolveTypeVariables(J2 j) {
-        if (typeVariables.isEmpty()) {
+        if (genericTypeVariables.isEmpty()) {
             return j;
         }
         //noinspection unchecked
@@ -391,7 +396,7 @@ public class Substitutions {
             public J visitIdentifier(J.Identifier ident, Integer integer) {
                 if (ident.getType() instanceof JavaType.GenericTypeVariable) {
                     JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) ident.getType();
-                    for (JavaType.GenericTypeVariable tv : typeVariables) {
+                    for (JavaType.GenericTypeVariable tv : genericTypeVariables) {
                         // Only resolve when the identifier name matches the type variable name,
                         // i.e. the identifier IS the type reference (like T in T::toString),
                         // not a variable that happens to have type T (like e in e -> e.toString())
