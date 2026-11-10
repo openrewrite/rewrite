@@ -175,11 +175,44 @@ describe("NodeRuntime", () => {
             expect(findNodeRuntime(again[0])).toBe(runtime);
             expect(runs(count)).toBe(1);
 
-            // another parser asks again
+            // another parser asks again, since an npm that is a script may be a shim that decides per project
             await withPath([bin], () => parse(new PackageJsonParser({relativeTo: dir.path}), a));
             expect(runs(count)).toBe(2);
         }, {unsafeCleanup: true});
     });
+
+    test.skipIf(process.platform === "win32")(
+        "npm's own entry point is asked once for every root, and again once it changes", async () => {
+            await withDir(async dir => {
+                const [a, b] = ["a", "b"].map(name => {
+                    write(dir.path, `${name}/package-lock.json`, lock(name));
+                    return write(dir.path, `${name}/package.json`, {name, version: "1.0.0"});
+                });
+                const count = path.join(dir.path, "runs");
+                // laid out as Debian's npm package installs it, keeping the archive's modification time
+                const cli = (answer: string) => {
+                    const at = write(dir.path, "prefix/share/nodejs/npm/bin/npm-cli.js",
+                        `#!/bin/sh\necho run >> "${count}"\necho ${answer}\n`);
+                    fs.chmodSync(at, 0o755);
+                    fs.utimesSync(at, new Date("2025-07-30"), new Date("2025-07-30"));
+                };
+                cli("11.17.0");
+                fs.mkdirSync(path.join(dir.path, "prefix/bin"));
+                fs.symlinkSync("../share/nodejs/npm/bin/npm-cli.js", path.join(dir.path, "prefix/bin/npm"));
+                // relative directories, such as an unexpanded ~, are resolved in each root, as the spawn resolves them
+                const version = async (pkg: string) => findNodeRuntime((await withPath(["~/.absent", "../prefix/bin"],
+                    () => parse(new PackageJsonParser({relativeTo: dir.path}), pkg)))[0]
+                )!.packageManagerVersion;
+
+                expect([await version(a), await version(b)]).toEqual(["11.17.0", "11.17.0"]);
+                expect(runs(count)).toBe(1);
+
+                // upgraded in place
+                cli("11.18.0");
+                expect(await version(a)).toBe("11.18.0");
+                expect(runs(count)).toBe(2);
+            }, {unsafeCleanup: true});
+        });
 
     test("a package.json the parser gives no NodeResolutionResult still gets a NodeRuntime", async () => {
         await withDir(async dir => {
