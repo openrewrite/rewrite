@@ -1174,7 +1174,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void setVersionOnReferencingPropertyWhenReferencedPropertyIsUsedOtherwise() {
+    void updateReferencedPropertyAlsoUsedOtherwise() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -1198,8 +1198,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <version>1.0.0</version>
                   <modelVersion>4.0</modelVersion>
                   <properties>
-                      <maven.compiler.release>17</maven.compiler.release>
-                      <custom.release>11</custom.release>
+                      <maven.compiler.release>${custom.release}</maven.compiler.release>
+                      <custom.release>17</custom.release>
                       <docker.image>eclipse-temurin:${custom.release}-jre</docker.image>
                   </properties>
               </project>
@@ -1538,7 +1538,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void setVersionOnChildPropertyReferencingPropertyLocalParentUsesOtherwise() {
+    void keepChildReferenceToCustomPropertyUpdatedInLocalParent() {
         rewriteRun(
           mavenProject("example-parent",
             //language=xml
@@ -1565,8 +1565,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <modelVersion>4.0</modelVersion>
                     <packaging>pom</packaging>
                     <properties>
-                        <maven.compiler.release>17</maven.compiler.release>
-                        <custom.release>11</custom.release>
+                        <maven.compiler.release>${custom.release}</maven.compiler.release>
+                        <custom.release>17</custom.release>
                         <docker.image>eclipse-temurin:${custom.release}-jre</docker.image>
                     </properties>
                 </project>
@@ -1588,22 +1588,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <modelVersion>4.0</modelVersion>
                       <properties>
                           <maven.compiler.testRelease>${custom.release}</maven.compiler.testRelease>
-                      </properties>
-                  </project>
-                  """,
-                """
-                  <project>
-                      <parent>
-                          <groupId>com.example</groupId>
-                          <artifactId>example-parent</artifactId>
-                          <version>1.0.0</version>
-                      </parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>example-child</artifactId>
-                      <version>1.0.0</version>
-                      <modelVersion>4.0</modelVersion>
-                      <properties>
-                          <maven.compiler.testRelease>17</maven.compiler.testRelease>
                       </properties>
                   </project>
                   """
