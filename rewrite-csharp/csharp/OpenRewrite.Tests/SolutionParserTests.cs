@@ -578,6 +578,11 @@ public class SolutionParserTests : IDisposable
     [InlineData("<PropertyGroup><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>", null)]
     [InlineData("", "global using global::System.Linq;")]
     [InlineData("""<ItemGroup><Using Include="System.Linq" /></ItemGroup>""", null)]
+    // a file generated at build time is not there yet
+    [InlineData("""
+        <PropertyGroup><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+        <ItemGroup><Compile Include="Generated.cs" /></ItemGroup>
+        """, null)]
     public async Task MaybeAddUsingSkipsANamespaceTheProjectImports(string projectContent, string? otherFile)
     {
         var cu = await ParseCounting(projectContent, otherFile);
