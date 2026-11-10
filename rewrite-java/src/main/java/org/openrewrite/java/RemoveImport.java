@@ -347,7 +347,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
                 if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
-                    return fq;
+                    // an import names the raw type, not the parameterization of it that the source uses
+                    return fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq;
                 }
             }
         }
