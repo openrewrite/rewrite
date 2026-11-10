@@ -205,7 +205,21 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
                         ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
-                        cu = (JavaSourceFile) changeClassDefinition.visitNonNull(cu, ctx);
+                        JavaSourceFile changed = (JavaSourceFile) changeClassDefinition.visitNonNull(cu, ctx);
+                        String oldPackage = packageName(cu);
+                        String newPackage = packageName(changed);
+                        if (!oldPackage.equals(newPackage)) {
+                            // the other types the file declares move to its new package too
+                            for (J.ClassDeclaration other : changed.getClasses()) {
+                                JavaType.FullyQualified otherType = other.getType();
+                                if (otherType != null && oldPackage.equals(otherType.getPackageName())) {
+                                    changed = (JavaSourceFile) new JavaChangeTypeVisitor(otherType.getFullyQualifiedName(),
+                                            (newPackage.isEmpty() ? "" : newPackage + ".") + otherType.getClassName(), false)
+                                            .visitNonNull(changed, ctx);
+                                }
+                            }
+                        }
+                        cu = changed;
                     }
                 }
                 return super.visit(cu, ctx);
@@ -535,6 +549,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
             }
             return super.visitMethodInvocation(method, ctx);
+        }
+
+        private static String packageName(JavaSourceFile cu) {
+            J.Package pkg = cu.getPackageDeclaration();
+            return pkg == null ? "" : PackageNameUtils.getPackageName(pkg);
         }
 
         private static boolean hasParameterizedTarget(J.FieldAccess fieldAccess) {
