@@ -86,6 +86,11 @@ public class SimplifyMethodChain extends Recipe {
                 if (select instanceof J.MethodInvocation) {
                     assert m.getMethodType() != null;
                     JavaType.Method mt = m.getMethodType().withName(newMethodName);
+                    // the new method is called on what the chain's first method is called on
+                    JavaType.Method first = ((J.MethodInvocation) select).getMethodType();
+                    if (first != null) {
+                        mt = mt.withDeclaringType(first.getDeclaringType());
+                    }
                     return m.withSelect(((J.MethodInvocation) select).getSelect())
                             .withName(m.getName().withSimpleName(newMethodName).withType(mt))
                             .withMethodType(mt);
