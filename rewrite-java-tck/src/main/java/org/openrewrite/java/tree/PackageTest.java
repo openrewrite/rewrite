@@ -16,8 +16,11 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class PackageTest implements RewriteTest {
@@ -28,7 +31,25 @@ class PackageTest implements RewriteTest {
             """
               /*comment*/package a ;
               class A {}
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName()).isEqualTo("a"))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "org.company.service.web",
+      "org . company\t. service . web",
+      "org.company /* legacy */ .service.web",
+      "org /* before dot */ . /* after dot */ company. // line comment\nservice.web"
+    })
+    void packageName(String packageExpression) {
+        rewriteRun(
+          java(
+            "package " + packageExpression + "; class A {}",
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName())
+              .isEqualTo("org.company.service.web"))
           )
         );
     }
