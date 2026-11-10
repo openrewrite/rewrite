@@ -1138,6 +1138,27 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void declaredClassToPrimitive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Id", "long", true)),
+          java(
+            """
+              package a;
+              public class Id {
+                  Id next;
+              }
+              """,
+            """
+              package a;
+              public class Id {
+                  long next;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void classToStringKeyword() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
