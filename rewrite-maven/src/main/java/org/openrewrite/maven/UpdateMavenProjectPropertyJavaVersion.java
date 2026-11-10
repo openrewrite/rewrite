@@ -123,7 +123,15 @@ public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Map<Pa
                 Xml.Document d = document;
                 // Recipes that ran before this one in the same cycle may have changed the values the scan saw
                 ResolvedPom pom = getResolutionResult().getPom();
-                for (String property : propertiesToUpdateByPom.getOrDefault(document.getSourcePath(), emptySet())) {
+                Set<String> properties = new LinkedHashSet<>(
+                        propertiesToUpdateByPom.getOrDefault(document.getSourcePath(), emptySet()));
+                // or added properties the scan could not see yet, such as an earlier migration to a lower version
+                for (String property : javaVersionProperties(pom)) {
+                    if (pom.getRequested().getProperties().containsKey(property)) {
+                        properties.add(property);
+                    }
+                }
+                for (String property : properties) {
                     if (isBelowTargetVersion(resolvedValue(pom, property))) {
                         d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
                                 .visitNonNull(d, ctx);
