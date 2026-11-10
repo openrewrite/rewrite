@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -120,11 +119,9 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(mv.getTypeExpression()));
                 }
                 return mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
-                    JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
-                    if (varType != null && !varType.equals(newType)) {
-                        return var.withType(newType).withName(var.getName().withType(newType));
-                    }
-                    return var;
+                    J.VariableDeclarations.NamedVariable retyped = var.withType(newType);
+                    return retyped.withName(retyped.getName().withType(newType)
+                            .withFieldType(retyped.getVariableType()));
                 }));
             }
 
