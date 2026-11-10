@@ -564,8 +564,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
+                    // The exception is a varargs method, which takes any number of arguments past its fixed ones
                     JavaType.Method mt = method.getMethodType();
-                    if (m.getMethodType() == null && mt != null) {
+                    if (m.getMethodType() == null && mt != null && loc == METHOD_INVOCATION_ARGUMENTS &&
+                        mt.hasFlags(Flag.Varargs) &&
+                        m.getArguments().stream().filter(a -> !(a instanceof J.Empty)).count() >= mt.getParameterTypes().size() - 1) {
+                        m = m.withMethodType(mt);
+                    } else if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
