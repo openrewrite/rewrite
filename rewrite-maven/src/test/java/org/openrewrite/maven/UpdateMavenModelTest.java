@@ -79,4 +79,116 @@ class UpdateMavenModelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void refreshActiveProfileProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("level", "25", false, false)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <unrelated.level>31</unrelated.level>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>optional</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <level>8</level>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <unrelated.level>31</unrelated.level>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>optional</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <level>25</level>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            spec -> spec.afterRecipe(document -> {
+                var pom = document.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                assertThat(pom.getRequested().getProfiles().get(0).getProperties()).containsEntry("level", "25");
+                assertThat(pom.getValue("${level}")).isEqualTo("25");
+            })
+          )
+        );
+    }
+
+    @Test
+    void refreshInactiveProfileProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("level", "25", false, false)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <unrelated.level>31</unrelated.level>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>optional</id>
+                    <properties>
+                      <level>8</level>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0</version>
+                <properties>
+                  <unrelated.level>31</unrelated.level>
+                </properties>
+                <profiles>
+                  <profile>
+                    <id>optional</id>
+                    <properties>
+                      <level>25</level>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            spec -> spec.afterRecipe(document -> {
+                var pom = document.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                assertThat(pom.getRequested().getProfiles().get(0).getProperties()).containsEntry("level", "25");
+                assertThat(pom.getProperties()).doesNotContainKey("level");
+            })
+          )
+        );
+    }
 }

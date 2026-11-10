@@ -25,6 +25,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,19 +46,14 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
         requested.getProperties().clear();
-
-        Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
-        if (properties.isPresent()) {
-            for (final Xml.Tag propertyTag : properties.get().getChildren()) {
-                requested.getProperties().put(propertyTag.getName(),
-                        propertyTag.getValue().orElse(""));
-            }
-        }
+        requested.getProperties().putAll(mapProperties(document.getRoot()));
         // for backwards compatibility with ASTs that were serialized before userProperties was added
         //noinspection ConstantValue
         if (resolutionResult.getUserProperties() != null) {
             requested.getProperties().putAll(resolutionResult.getUserProperties());
         }
+
+        requested = requested.withProfiles(mapProfileProperties(document.getRoot(), requested.getProfiles()));
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
         if (parent.isPresent()) {
@@ -152,6 +149,31 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
         }
+    }
+
+    private static Map<String, String> mapProperties(Xml.Tag container) {
+        Map<String, String> properties = new LinkedHashMap<>();
+        container.getChild("properties").ifPresent(propertiesTag -> {
+            for (Xml.Tag property : propertiesTag.getChildren()) {
+                properties.put(property.getName(), property.getValue().orElse(""));
+            }
+        });
+        return properties;
+    }
+
+    private static List<Profile> mapProfileProperties(Xml.Tag root, List<Profile> profiles) {
+        Map<String, Map<String, String>> propertiesByProfile = new HashMap<>();
+        root.getChild("profiles").ifPresent(profilesTag -> {
+            for (Xml.Tag profile : profilesTag.getChildren("profile")) {
+                profile.getChildValue("id").ifPresent(id ->
+                        propertiesByProfile.putIfAbsent(id, mapProperties(profile)));
+            }
+        });
+        return ListUtils.map(profiles, profile -> {
+            Map<String, String> properties = propertiesByProfile.get(profile.getId());
+            return properties == null || properties.equals(profile.getProperties()) ?
+                    profile : profile.withProperties(properties);
+        });
     }
 
     /**
