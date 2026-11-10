@@ -286,7 +286,32 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
-                            return classDecl.withTypeParameters(typeParameters);
+                            J.ClassDeclaration c = classDecl.withTypeParameters(typeParameters);
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            // A type parameter's name is untyped, so its variable is built from its bounds, without
+                            // an Object bound as the parser leaves that out
+                            List<JavaType> typeVariables = typeParameters.stream()
+                                    .filter(tp -> tp.getName() instanceof J.Identifier)
+                                    .map(tp -> {
+                                        List<JavaType> bounds = tp.getBounds() == null ? emptyList() :
+                                                tp.getBounds().stream().map(TypedTree::getType)
+                                                        .filter(b -> b != null && !TypeUtils.isObject(b))
+                                                        .collect(toList());
+                                        return new JavaType.GenericTypeVariable(null,
+                                                ((J.Identifier) tp.getName()).getSimpleName(), bounds.isEmpty() ?
+                                                JavaType.GenericTypeVariable.Variance.INVARIANT :
+                                                JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                                    })
+                                    .collect(toList());
+                            if (classType != null && typeVariables.size() == typeParameters.size()) {
+                                // a generic class is typed with its type variables as its own type arguments
+                                classType = classType.withTypeParameters(typeVariables);
+                                JavaType.FullyQualified type = typeVariables.isEmpty() ? classType :
+                                        new JavaType.Parameterized(null, classType, typeVariables);
+                                c = c.withType(type).withName(c.getName().withType(type));
+                            }
+                            return c;
                         }
                     }
                 }
