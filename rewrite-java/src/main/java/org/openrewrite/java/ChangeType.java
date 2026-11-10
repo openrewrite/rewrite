@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -746,7 +745,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
                 JavaType.FullyQualified changedType = pt.getType();
                 if (isTargetFullyQualifiedType(pt)) {
-                    changedType = updateFullyQualified(pt.getType());
+                    changedType = (JavaType.FullyQualified) updateType(pt.getType());
                 } else if (isNestedTypeOfOriginal(pt)) {
                     changedType = updateNestedType(pt.getType());
                 }
@@ -775,8 +774,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     return primitive;
                 } else if (oldType instanceof JavaType.Class) {
                     JavaType.Class clazz = ((JavaType.Class) oldType)
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), this::updateFullyQualified))
-                            .withSupertype(updateFullyQualified(original.getSupertype()));
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
                     oldNameToChangedType.put(oldType, clazz);
                     oldNameToChangedType.put(clazz, clazz);
                     return clazz;
@@ -824,16 +823,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             return oldType;
         }
 
-        /**
-         * A primitive target is no class, so a type that has to be one, such as a method's declaring type or a
-         * supertype, keeps the original class.
-         */
-        @Contract("null -> null; !null -> !null")
-        private JavaType.@Nullable FullyQualified updateFullyQualified(JavaType.@Nullable FullyQualified type) {
-            JavaType updated = updateType(type);
-            return updated instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) updated : type;
-        }
-
         private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
             if (oldMethodType != null) {
                 JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
@@ -842,7 +831,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
 
                 method = oldMethodType;
-                method = method.withDeclaringType(updateFullyQualified(method.getDeclaringType()))
+                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
                         .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
                 oldNameToChangedType.put(oldMethodType, method);

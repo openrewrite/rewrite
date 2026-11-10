@@ -1117,9 +1117,6 @@ class ChangeTypeTest implements RewriteTest {
                   Integer getFoo() {
                       return foo;
                   }
-                  int value() {
-                      return foo.intValue();
-                  }
               }
               """,
             """
@@ -1127,9 +1124,6 @@ class ChangeTypeTest implements RewriteTest {
                   int foo = 5;
                   int getFoo() {
                       return foo;
-                  }
-                  int value() {
-                      return foo.intValue();
                   }
               }
               """
