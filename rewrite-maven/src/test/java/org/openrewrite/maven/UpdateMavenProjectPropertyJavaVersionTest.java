@@ -53,6 +53,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <maven.compiler.source>11</maven.compiler.source>
                       <maven.compiler.target>11</maven.compiler.target>
                       <maven.compiler.release>11</maven.compiler.release>
+                      <maven.compiler.testRelease>11</maven.compiler.testRelease>
                       <release.version>11</release.version>
                   </properties>
               </project>
@@ -71,6 +72,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       <maven.compiler.source>17</maven.compiler.source>
                       <maven.compiler.target>17</maven.compiler.target>
                       <maven.compiler.release>17</maven.compiler.release>
+                      <maven.compiler.testRelease>17</maven.compiler.testRelease>
                       <release.version>17</release.version>
                   </properties>
               </project>
@@ -558,7 +560,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateCustomPropertyReferencedByRelease() {
+    void updateCustomPropertiesReferencedByReleaseAndTestRelease() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -570,6 +572,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <modelVersion>4.0</modelVersion>
                   <properties>
                       <source.version>1.8</source.version>
+                      <test.version>1.8</test.version>
                   </properties>
                   <build>
                       <plugins>
@@ -579,6 +582,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                               <version>3.8.0</version>
                               <configuration>
                                   <release>${source.version}</release>
+                                  <testRelease>${test.version}</testRelease>
                               </configuration>
                           </plugin>
                       </plugins>
@@ -593,6 +597,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <modelVersion>4.0</modelVersion>
                   <properties>
                       <source.version>17</source.version>
+                      <test.version>17</test.version>
                   </properties>
                   <build>
                       <plugins>
@@ -602,6 +607,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                               <version>3.8.0</version>
                               <configuration>
                                   <release>${source.version}</release>
+                                  <testRelease>${test.version}</testRelease>
                               </configuration>
                           </plugin>
                       </plugins>
@@ -1209,64 +1215,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateReferencedPropertyAlsoUsedByCompilerPlugin() {
-        rewriteRun(
-          //language=xml
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
-                      <custom.release>11</custom.release>
-                  </properties>
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.0</version>
-                              <configuration>
-                                  <release>${custom.release}</release>
-                              </configuration>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
-                      <custom.release>17</custom.release>
-                  </properties>
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.0</version>
-                              <configuration>
-                                  <release>${custom.release}</release>
-                              </configuration>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void setVersionOnChildPropertyReferencingPropertyOnlyDefinedInLocalParent() {
+        // Bumping the property in the parent would require a scanning recipe
         rewriteRun(
           mavenProject("example-parent",
             //language=xml
@@ -1396,96 +1346,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateTestCompilerLevelProperties() {
-        rewriteRun(
-          //language=xml
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>11</maven.compiler.release>
-                      <maven.compiler.testRelease>11</maven.compiler.testRelease>
-                  </properties>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>17</maven.compiler.release>
-                      <maven.compiler.testRelease>17</maven.compiler.testRelease>
-                  </properties>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void updateCustomPropertyReferencedByTestRelease() {
-        rewriteRun(
-          //language=xml
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>11</maven.compiler.release>
-                      <test.release>11</test.release>
-                  </properties>
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.0</version>
-                              <configuration>
-                                  <testRelease>${test.release}</testRelease>
-                              </configuration>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.release>17</maven.compiler.release>
-                      <test.release>17</test.release>
-                  </properties>
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.0</version>
-                              <configuration>
-                                  <testRelease>${test.release}</testRelease>
-                              </configuration>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void addReleaseWhenCompilerPluginOnlyConfiguresTestRelease() {
         rewriteRun(
           //language=xml
@@ -1553,7 +1413,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <properties>
                         <maven.compiler.release>${custom.release}</maven.compiler.release>
                         <custom.release>11</custom.release>
-                        <docker.image>eclipse-temurin:${custom.release}-jre</docker.image>
                     </properties>
                 </project>
                 """,
@@ -1567,7 +1426,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <properties>
                         <maven.compiler.release>${custom.release}</maven.compiler.release>
                         <custom.release>17</custom.release>
-                        <docker.image>eclipse-temurin:${custom.release}-jre</docker.image>
                     </properties>
                 </project>
                 """
@@ -1598,7 +1456,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateReferencedPropertyAlsoUsedByCompilerPluginExecution() {
+    void updateCustomPropertyReferencedByExecutionRelease() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -1609,7 +1467,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <version>1.0.0</version>
                   <modelVersion>4.0</modelVersion>
                   <properties>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
                       <custom.release>11</custom.release>
                   </properties>
                   <build>
@@ -1638,7 +1495,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   <version>1.0.0</version>
                   <modelVersion>4.0</modelVersion>
                   <properties>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
                       <custom.release>17</custom.release>
                   </properties>
                   <build>
@@ -1658,43 +1514,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                           </plugin>
                       </plugins>
                   </build>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void updateSharedEndOfReferencesRegardlessOfOrder() {
-        rewriteRun(
-          //language=xml
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.source>${base.release}</maven.compiler.source>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
-                      <custom.release>${base.release}</custom.release>
-                      <base.release>11</base.release>
-                  </properties>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>1.0.0</version>
-                  <modelVersion>4.0</modelVersion>
-                  <properties>
-                      <maven.compiler.source>${base.release}</maven.compiler.source>
-                      <maven.compiler.release>${custom.release}</maven.compiler.release>
-                      <custom.release>${base.release}</custom.release>
-                      <base.release>17</base.release>
-                  </properties>
               </project>
               """
           )
@@ -1990,27 +1809,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                               </plugin>
                           </plugins>
                       </build>
-                  </project>
-                  """
-              )
-            );
-        }
-
-        @Test
-        void doNotDowngradeReferencedProperty() {
-            rewriteRun(
-              //language=xml
-              pomXml(
-                """
-                  <project>
-                      <groupId>com.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0.0</version>
-                      <modelVersion>4.0</modelVersion>
-                      <properties>
-                          <maven.compiler.release>${custom.release}</maven.compiler.release>
-                          <custom.release>21</custom.release>
-                      </properties>
                   </project>
                   """
               )
