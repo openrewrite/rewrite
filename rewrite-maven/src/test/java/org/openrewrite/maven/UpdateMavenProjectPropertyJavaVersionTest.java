@@ -1230,7 +1230,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <packaging>pom</packaging>
                     <properties>
                         <maven.compiler.release>11</maven.compiler.release>
-                        <custom.release>11</custom.release>
+                        <custom.release>${base.release}</custom.release>
+                        <base.release>11</base.release>
                     </properties>
                 </project>
                 """,
@@ -1243,7 +1244,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <packaging>pom</packaging>
                     <properties>
                         <maven.compiler.release>17</maven.compiler.release>
-                        <custom.release>11</custom.release>
+                        <custom.release>${base.release}</custom.release>
+                        <base.release>11</base.release>
                     </properties>
                 </project>
                 """
@@ -1393,6 +1395,64 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                   </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void keepChildReferenceToPropertyReferencingJavaVersionPropertyOfLocalParent() {
+        rewriteRun(
+          mavenProject("example-parent",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-parent</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <java.version>11</java.version>
+                        <custom.release>${java.version}</custom.release>
+                    </properties>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-parent</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <java.version>17</java.version>
+                        <custom.release>${java.version}</custom.release>
+                    </properties>
+                </project>
+                """
+            ),
+            mavenProject("example-child",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>example-parent</artifactId>
+                          <version>1.0.0</version>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>example-child</artifactId>
+                      <version>1.0.0</version>
+                      <modelVersion>4.0</modelVersion>
+                      <properties>
+                          <maven.compiler.release>${custom.release}</maven.compiler.release>
+                      </properties>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }

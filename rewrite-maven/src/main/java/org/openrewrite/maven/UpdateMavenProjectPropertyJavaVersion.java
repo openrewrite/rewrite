@@ -106,12 +106,14 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 if (parent != null && getResolutionResult().parentPomIsProjectPom()) {
                     // Unless this pom redefines a property itself, as that value shadows whatever the parent defines
                     Map<String, String> requestedProperties = pom.getRequested().getProperties();
+                    Map<String, String> parentProperties = parent.getPom().getProperties();
+                    Set<String> updatedByParent = javaVersionProperties(
+                            compilerLevelProperties(compilerPluginConfigurations(parent.getPom())), parentProperties);
                     for (String property : javaVersionProperties) {
                         if (!requestedProperties.containsKey(property)) {
                             continue;
                         }
-                        boolean pinned = referencesPropertyLeftToParent(property, requestedProperties, parent.getPom().getProperties(),
-                                javaVersionProperties, compilerLevels);
+                        boolean pinned = referencesPropertyLeftToParent(property, requestedProperties, parentProperties, updatedByParent);
                         if (isBelowTargetVersion(comparedValue(property, pom, pinned))) {
                             d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
                                     .visitNonNull(d, ctx);
@@ -170,18 +172,17 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             }
 
             // A property of this pom that only references a property of a parent in the project, which that parent does not
-            // update, would keep the old version, so it gets the Java version itself
+            // update, directly or through the properties it references in turn, would keep the old version, so it gets the
+            // Java version itself
             private boolean referencesPropertyLeftToParent(String property, Map<String, String> requestedProperties,
-                                                           Map<String, String> parentProperties, Set<String> javaVersionProperties,
-                                                           Set<String> compilerLevels) {
+                                                           Map<String, String> parentProperties, Set<String> updatedByParent) {
                 String referenced = referencedProperty(requestedProperties.get(property));
-                if (referenced == null || requestedProperties.containsKey(referenced) || !parentProperties.containsKey(referenced) ||
-                    JAVA_VERSION_PROPERTIES.contains(referenced) || compilerLevels.contains(referenced)) {
+                if (referenced == null || requestedProperties.containsKey(referenced) || !parentProperties.containsKey(referenced)) {
                     return false;
                 }
-                for (Map.Entry<String, String> parentProperty : parentProperties.entrySet()) {
-                    if (javaVersionProperties.contains(parentProperty.getKey()) &&
-                        referenced.equals(referencedProperty(parentProperty.getValue()))) {
+                Set<String> followed = new HashSet<>();
+                for (String link = referenced; link != null && followed.add(link); link = referencedProperty(parentProperties.get(link))) {
+                    if (updatedByParent.contains(link)) {
                         return false;
                     }
                 }
