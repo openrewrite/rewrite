@@ -62,10 +62,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
     private static final Pattern PROPERTY_REFERENCE = Pattern.compile("\\$\\{([^${}]+)}");
 
     private static final XPathMatcher COMPILER_PLUGIN_CONFIGURATION_MATCHER =
-            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']/configuration/*");
-
-    private static final XPathMatcher COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER =
-            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']/executions/execution/configuration/*");
+            new XPathMatcher("//plugin[artifactId='maven-compiler-plugin']//configuration/*");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -162,15 +159,12 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (COMPILER_LEVEL_CONFIGURATION.contains(t.getName())) {
-                    boolean ofPlugin = COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor());
-                    if (ofPlugin || COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER.matches(getCursor())) {
-                        t.getValue().ifPresent(compilerLevel -> {
-                            // The test levels default to the main ones, so only those configure the level of the compiler plugin
-                            compilerPluginConfiguredExplicitly |= ofPlugin && !t.getName().startsWith("test");
-                            addCompilerLevelProperty(compilerLevel, localCompilerLevelProperties);
-                        });
-                    }
+                if (COMPILER_LEVEL_CONFIGURATION.contains(t.getName()) && COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor())) {
+                    t.getValue().ifPresent(compilerLevel -> {
+                        // The test levels default to the main ones, so only those configure the level of the compiler plugin
+                        compilerPluginConfiguredExplicitly |= !t.getName().startsWith("test");
+                        addCompilerLevelProperty(compilerLevel, localCompilerLevelProperties);
+                    });
                 }
                 return t;
             }

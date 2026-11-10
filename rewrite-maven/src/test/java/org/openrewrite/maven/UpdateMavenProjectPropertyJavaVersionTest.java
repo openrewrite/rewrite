@@ -1931,6 +1931,40 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         }
 
         @Test
+        void doNothingForExplicitExecutionConfiguration() {
+            rewriteRun(
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.example</groupId>
+                      <artifactId>foo</artifactId>
+                      <version>1.0.0</version>
+                      <modelVersion>4.0</modelVersion>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.8.0</version>
+                                  <executions>
+                                      <execution>
+                                          <id>compile-generated</id>
+                                          <configuration>
+                                              <release>11</release>
+                                          </configuration>
+                                      </execution>
+                                  </executions>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
         void doNotDowngradeCustomPropertyReferencedByCompilerPlugin() {
             rewriteRun(
               //language=xml
