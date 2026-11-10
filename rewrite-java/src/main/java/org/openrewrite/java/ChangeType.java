@@ -280,8 +280,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         ((J.MethodDeclaration) getCursor().getValue()).getMethodType() : null;
                 if (mt != null && declared != null && Boolean.TRUE.equals(ignoreDefinition) &&
                     TypeUtils.isOfClassType(declared.getDeclaringType(), originalType.getFullyQualifiedName())) {
-                    // the definition is left as it is, so it still declares its methods
+                    // the definition is left as it is, so it still declares its methods and constructs itself
                     mt = mt.withDeclaringType(declared.getDeclaringType());
+                    if (declared.isConstructor()) {
+                        mt = mt.withReturnType(declared.getReturnType());
+                    }
                 }
                 j = method.withMethodType(mt)
                         .withName(method.getName().withType(mt));

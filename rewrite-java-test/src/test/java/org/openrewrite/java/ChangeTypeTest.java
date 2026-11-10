@@ -2319,6 +2319,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               public class Test {
                   private class InnerA {
+                      InnerA() {}
                       void m() {}
                       class Nested {}
                   }
@@ -2334,6 +2335,7 @@ class ChangeTypeTest implements RewriteTest {
             """
               public class Test {
                   private class InnerA {
+                      InnerA() {}
                       void m() {}
                       class Nested {}
                   }
