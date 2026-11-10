@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -210,6 +211,45 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  A a;
                  public void test() {
                      a.foo("mystring", 0, "a", "b");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reorderWithFewerOldParameterNamesThanTheVarargsMethodHas() {
+        rewriteRun(
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(Integer,String,..)",
+              new String[]{"s", "n"}, new String[]{"n", "s"}, null, null))
+            // the reordered call's type leaves out the parameter that the old parameter names don't name
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
+          java(
+            """
+              package a;
+              public class A {
+                 public void foo(Integer n, String s, Object... o) {}
+                 public void foo(String s, Integer n, Object... o) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo(0, "mystring");
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 A a;
+                 public void test() {
+                     a.foo("mystring", 0);
                  }
               }
               """
