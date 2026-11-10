@@ -206,8 +206,8 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private static String key(JavaType.Method methodType) {
-        return methodType.getDeclaringType().getFullyQualifiedName().replace('$', '.') + " " + methodType.getName() +
-               "/" + methodType.getParameterTypes().size();
+        return methodType.getDeclaringType().getFullyQualifiedName() + " " + methodType.getName() + "/" +
+               methodType.getParameterTypes().size();
     }
 
     private static J.Modifier.@Nullable Type accessLevel(J.MethodDeclaration method) {

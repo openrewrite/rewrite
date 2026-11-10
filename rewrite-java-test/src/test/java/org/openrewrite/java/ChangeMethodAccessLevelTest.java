@@ -16,11 +16,15 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
 
@@ -66,6 +70,56 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
 
                   default void caller() {
                       run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visitorsUnderOneCursorEachRetypeTheCallsOfTheirOwnMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  Cursor parent = getCursor().getParentOrThrow();
+                  J.ClassDeclaration c = (J.ClassDeclaration) new ChangeMethodAccessLevelVisitor<ExecutionContext>(
+                    new MethodMatcher("com.abc.A a()"), J.Modifier.Type.Public).visitNonNull(classDecl, ctx, parent);
+                  return (J.ClassDeclaration) new ChangeMethodAccessLevelVisitor<ExecutionContext>(
+                    new MethodMatcher("com.abc.A b()"), J.Modifier.Type.Public).visitNonNull(c, ctx, parent);
+              }
+          })),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private void a() {
+                  }
+
+                  private void b() {
+                  }
+
+                  void caller() {
+                      a();
+                      b();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public void a() {
+                  }
+
+                  public void b() {
+                  }
+
+                  void caller() {
+                      a();
+                      b();
                   }
               }
               """
