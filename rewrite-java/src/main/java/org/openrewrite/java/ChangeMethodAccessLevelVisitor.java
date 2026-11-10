@@ -58,17 +58,8 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
-        if(classDecl == null) {
-            return m;
-        }
-        if (methodMatcher.matches(method, classDecl)) {
+        if (changes(method, getCursor().firstEnclosing(J.ClassDeclaration.class))) {
             J.Modifier.Type currentMethodAccessLevel = accessLevel(m);
-
-            if (currentMethodAccessLevel == newAccessLevel) {
-                // No changes required
-                return m;
-            }
 
             // Replace former modifier by new modifier if package-private is not involved
             if (EXPLICIT_ACCESS_LEVELS.contains(currentMethodAccessLevel) && EXPLICIT_ACCESS_LEVELS.contains(newAccessLevel)) {
@@ -185,31 +176,38 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
      * declared elsewhere, or one whose declaration keeps its access level, and the calls of those keep theirs.
      */
     private Set<String> changedDeclarations() {
-        Cursor sourceFile = getCursor()
-                .dropParentUntil(v -> v instanceof JavaSourceFile || Cursor.ROOT_VALUE.equals(v));
-        if (!(sourceFile.getValue() instanceof JavaSourceFile)) {
+        Cursor cursor = getCursor();
+        while (cursor != null && !(cursor.getValue() instanceof JavaSourceFile)) {
+            cursor = cursor.getParent();
+        }
+        if (cursor == null) {
             return emptySet();
         }
-        return sourceFile.computeMessageIfAbsent(CHANGED_DECLARATIONS, k -> {
+        JavaSourceFile sourceFile = cursor.getValue();
+        // a recipe can run several of these visitors under one cursor
+        return cursor.computeMessageIfAbsent(CHANGED_DECLARATIONS + System.identityHashCode(this), k -> {
             Set<String> changed = new HashSet<>();
             new JavaIsoVisitor<Set<String>>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Set<String> c) {
-                    J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                    if (classDecl != null && method.getMethodType() != null &&
-                        methodMatcher.matches(method, classDecl) && accessLevel(method) != newAccessLevel) {
+                    if (method.getMethodType() != null &&
+                        changes(method, getCursor().firstEnclosing(J.ClassDeclaration.class))) {
                         c.add(key(method.getMethodType()));
                     }
                     return super.visitMethodDeclaration(method, c);
                 }
-            }.visit(sourceFile.<JavaSourceFile>getValue(), changed);
+            }.visit(sourceFile, changed);
             return changed;
         });
     }
 
+    private boolean changes(J.MethodDeclaration method, J.@Nullable ClassDeclaration classDecl) {
+        return classDecl != null && methodMatcher.matches(method, classDecl) && accessLevel(method) != newAccessLevel;
+    }
+
     private static String key(JavaType.Method methodType) {
-        return methodType.getDeclaringType().getFullyQualifiedName() + " " + methodType.getName() + "/" +
-               methodType.getParameterTypes().size();
+        return methodType.getDeclaringType().getFullyQualifiedName().replace('$', '.') + " " + methodType.getName() +
+               "/" + methodType.getParameterTypes().size();
     }
 
     private static J.Modifier.@Nullable Type accessLevel(J.MethodDeclaration method) {
