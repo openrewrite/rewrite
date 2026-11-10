@@ -115,7 +115,9 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
 
                 ResolvedPom pom = getResolutionResult().getPom();
                 Map<String, String> resolvedProperties = pom.getProperties();
-                Set<String> compilerLevels = allCompilerLevelProperties(pom);
+                Set<String> compilerLevels = new LinkedHashSet<>(localCompilerLevelProperties);
+                addCompilerLevelProperties(pom.getPlugins(), compilerLevels);
+                addCompilerLevelProperties(pom.getPluginManagement(), compilerLevels);
                 // Properties set to the Java version themselves, instead of the property they reference
                 Set<String> pinnedProperties = new HashSet<>();
                 Set<String> javaVersionProperties = javaVersionProperties(compilerLevels, resolvedProperties, pinnedProperties);
@@ -178,7 +180,18 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                         }
                     });
                 }
-                t.getValue().ifPresent(value -> collectPropertyReferences(t, value));
+                Optional<String> value = t.getValue();
+                if (value.isPresent()) {
+                    String referenced = referencedProperty(value.get());
+                    if (referenced != null && (isPropertyTag() || isProfilePropertyTag())) {
+                        referencingProperties.computeIfAbsent(referenced, k -> new HashSet<>()).add(t.getName());
+                    } else if (referenced == null || !COMPILER_LEVEL_CONFIGURATION.contains(t.getName()) ||
+                               !COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor()) &&
+                               !COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER.matches(getCursor())) {
+                        // Anything but a level of the compiler plugin, or of one of its executions, is another use
+                        otherwiseReferencedProperties.addAll(ResolvedPom.placeholderHelper.getPlaceholders(value.get()));
+                    }
+                }
                 return t;
             }
 
@@ -190,29 +203,6 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                         addCompilerLevelProperty(compilerLevel, localCompilerLevelProperties);
                     });
                 }
-            }
-
-            private void collectPropertyReferences(Xml.Tag tag, String value) {
-                String referenced = referencedProperty(value);
-                if (referenced != null && (isPropertyTag() || isProfilePropertyTag())) {
-                    referencingProperties.computeIfAbsent(referenced, k -> new HashSet<>()).add(tag.getName());
-                } else if (referenced == null || !isCompilerLevelConfiguration(tag)) {
-                    otherwiseReferencedProperties.addAll(ResolvedPom.placeholderHelper.getPlaceholders(value));
-                }
-            }
-
-            // A level in the configuration of the compiler plugin, or of one of its executions
-            private boolean isCompilerLevelConfiguration(Xml.Tag tag) {
-                return COMPILER_LEVEL_CONFIGURATION.contains(tag.getName()) &&
-                       (COMPILER_PLUGIN_CONFIGURATION_MATCHER.matches(getCursor()) ||
-                        COMPILER_PLUGIN_EXECUTION_CONFIGURATION_MATCHER.matches(getCursor()));
-            }
-
-            private Set<String> allCompilerLevelProperties(ResolvedPom pom) {
-                Set<String> properties = new LinkedHashSet<>(localCompilerLevelProperties);
-                addCompilerLevelProperties(pom.getPlugins(), properties);
-                addCompilerLevelProperties(pom.getPluginManagement(), properties);
-                return properties;
             }
 
             // Whatever the compiler plugin routes its levels through is a Java version property, regardless of its name
