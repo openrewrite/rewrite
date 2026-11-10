@@ -126,6 +126,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
             if (!methodType.hasFlags(Flag.Static)) {
                 Set<Flag> flags = new LinkedHashSet<>(methodType.getFlags());
                 flags.add(Flag.Static);
+                // a static method is neither abstract nor an interface's default method
+                flags.remove(Flag.Abstract);
+                flags.remove(Flag.Default);
                 transformedType = transformedType.withFlags(flags);
             }
             if (returnType != null) {

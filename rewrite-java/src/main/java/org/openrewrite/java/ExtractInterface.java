@@ -30,6 +30,8 @@ import java.text.ParseException;
 import java.text.RuleBasedCollator;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -98,8 +100,16 @@ public class ExtractInterface {
                             m.getType() == J.Modifier.Type.Final ||
                             m.getType() == J.Modifier.Type.Native)))
                     .withBody(null)
-                    .withMethodType(method.getMethodType() == null ? null :
-                            method.getMethodType().withDeclaringType(interfaceType()));
+                    .withMethodType(method.getMethodType() == null ? null : interfaceMethodType(method.getMethodType()));
+        }
+
+        private JavaType.Method interfaceMethodType(JavaType.Method methodType) {
+            // without its body and the modifiers an interface method can't have, it is abstract
+            Set<Flag> flags = EnumSet.noneOf(Flag.class);
+            flags.addAll(methodType.getFlags());
+            flags.removeAll(Arrays.asList(Flag.Final, Flag.Native));
+            flags.add(Flag.Abstract);
+            return methodType.withDeclaringType(interfaceType()).withFlags(flags);
         }
 
         private JavaType.FullyQualified interfaceType() {
