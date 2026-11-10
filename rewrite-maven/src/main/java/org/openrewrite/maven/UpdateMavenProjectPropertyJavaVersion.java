@@ -57,6 +57,9 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     .map(property -> "/project/properties/" + property)
                     .map(XPathMatcher::new).collect(toList());
 
+    // The test levels default to the main ones, so only those configure the level of the compiler plugin
+    private static final List<String> MAIN_COMPILER_LEVEL_CONFIGURATION = Arrays.asList("source", "target", "release");
+
     private static final List<String> COMPILER_LEVEL_CONFIGURATION = Arrays.asList("source", "target", "release",
             "testSource", "testTarget", "testRelease");
 
@@ -93,13 +96,11 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Document d = super.visitDocument(document, ctx);
+                Xml.Document d = document;
 
                 ResolvedPom pom = getResolutionResult().getPom();
                 Map<String, String> resolvedProperties = pom.getProperties();
-                List<JsonNode> compilerConfigurations = compilerPluginConfigurations(pom);
-                Set<String> compilerLevels = compilerLevelProperties(compilerConfigurations);
-                Set<String> javaVersionProperties = javaVersionProperties(compilerLevels, resolvedProperties);
+                Set<String> javaVersionProperties = javaVersionProperties(pom);
 
                 // Return early if the parent is within the current repository, as properties defined there will be updated
                 MavenResolutionResult parent = getResolutionResult().getParent();
@@ -107,13 +108,13 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     // Unless this pom redefines a property itself, as that value shadows whatever the parent defines
                     Map<String, String> requestedProperties = pom.getRequested().getProperties();
                     Map<String, String> parentProperties = parent.getPom().getProperties();
-                    Set<String> updatedByParent = javaVersionProperties(
-                            compilerLevelProperties(compilerPluginConfigurations(parent.getPom())), parentProperties);
+                    Set<String> updatedByParent = javaVersionProperties(parent.getPom());
                     for (String property : javaVersionProperties) {
                         if (!requestedProperties.containsKey(property)) {
                             continue;
                         }
-                        boolean pinned = referencesPropertyLeftToParent(property, requestedProperties, parentProperties, updatedByParent);
+                        boolean pinned = referencesPropertyLeftToParent(property, requestedProperties, parentProperties,
+                                updatedByParent);
                         if (isBelowTargetVersion(comparedValue(property, pom, pinned))) {
                             d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
                                     .visitNonNull(d, ctx);
@@ -140,7 +141,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // When none of the relevant properties are explicitly configured Maven defaults to Java 8
                 // The release option was added in 9
                 // If no properties have yet been updated then set release explicitly
-                if (!foundProperty && version >= 9 && !configuresCompilerLevel(compilerConfigurations)) {
+                if (!foundProperty && version >= 9 && !configuresCompilerLevel(compilerPluginConfigurations(pom))) {
                     d = (Xml.Document) new AddProperty("maven.compiler.release", String.valueOf(version), null, false)
                             .getVisitor()
                             .visitNonNull(d, ctx);
@@ -151,7 +152,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
             }
 
             // Whatever the compiler plugin routes its levels through is a Java version property, regardless of its name
-            private Set<String> javaVersionProperties(Set<String> compilerLevels, Map<String, String> pomProperties) {
+            private Set<String> javaVersionProperties(ResolvedPom pom) {
+                Set<String> compilerLevels = compilerLevelProperties(compilerPluginConfigurations(pom));
                 Set<String> properties = new LinkedHashSet<>(JAVA_VERSION_PROPERTIES);
                 properties.addAll(compilerLevels);
                 Deque<String> toFollow = new ArrayDeque<>(properties);
@@ -163,7 +165,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // A property that only references another one, such as `maven.compiler.release` set to
                 // `${custom.release}` by a parent, takes its value from that one, possibly over several levels
                 while (!toFollow.isEmpty()) {
-                    String referenced = referencedProperty(pomProperties.get(toFollow.poll()));
+                    String referenced = referencedProperty(pom.getProperties().get(toFollow.poll()));
                     if (referenced != null && properties.add(referenced)) {
                         toFollow.add(referenced);
                     }
@@ -171,9 +173,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 return properties;
             }
 
-            // A property of this pom that only references a property of a parent in the project, which that parent does not
-            // update, directly or through the properties it references in turn, would keep the old version, so it gets the
-            // Java version itself
+            // Referencing a parent property the parent does not update, directly or further down the references,
+            // would keep the old version
             private boolean referencesPropertyLeftToParent(String property, Map<String, String> requestedProperties,
                                                            Map<String, String> parentProperties, Set<String> updatedByParent) {
                 String referenced = referencedProperty(requestedProperties.get(property));
@@ -181,7 +182,8 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     return false;
                 }
                 Set<String> followed = new HashSet<>();
-                for (String link = referenced; link != null && followed.add(link); link = referencedProperty(parentProperties.get(link))) {
+                for (String link = referenced; link != null && followed.add(link);
+                     link = referencedProperty(parentProperties.get(link))) {
                     if (updatedByParent.contains(link)) {
                         return false;
                     }
@@ -205,12 +207,11 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 try {
                     return Float.parseFloat(value) < version;
                 } catch (NumberFormatException ex) {
-                    // either an expression or something else, don't touch
                     return false;
                 }
             }
 
-            // The configuration of the compiler plugin and of each of its executions, whether declared here or inherited
+            // Includes configuration inherited from parents
             private List<JsonNode> compilerPluginConfigurations(ResolvedPom pom) {
                 List<JsonNode> configurations = new ArrayList<>();
                 for (List<Plugin> plugins : Arrays.asList(pom.getPlugins(), pom.getPluginManagement())) {
@@ -244,11 +245,10 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 return properties;
             }
 
-            // The test levels default to the main ones, so only those configure the level of the compiler plugin
             private boolean configuresCompilerLevel(List<JsonNode> compilerConfigurations) {
                 for (JsonNode configuration : compilerConfigurations) {
-                    for (String level : COMPILER_LEVEL_CONFIGURATION) {
-                        if (!level.startsWith("test") && configuration.hasNonNull(level)) {
+                    for (String level : MAIN_COMPILER_LEVEL_CONFIGURATION) {
+                        if (configuration.hasNonNull(level)) {
                             return true;
                         }
                     }
@@ -256,7 +256,6 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 return false;
             }
 
-            // The name of the property a value consists of, if the value is nothing but a reference to it
             private @Nullable String referencedProperty(@Nullable String value) {
                 if (value == null) {
                     return null;
