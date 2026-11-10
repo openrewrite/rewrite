@@ -148,9 +148,15 @@ public class ReorderMethodArguments extends Recipe {
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
+                // a single argument in the varargs position is a varargs element unless it is the array itself
+                boolean varargsElements = originalArgs.size() > resolvedParamCount ||
+                        resolvedParamCount > 0 && originalArgs.size() == resolvedParamCount &&
+                        m.getMethodType().hasFlags(Flag.Varargs) &&
+                        !(originalArgs.get(resolvedParamCount - 1).getElement().getType() instanceof JavaType.Array);
+
                 for (String name : newParameterNames) {
                     int fromPos = paramNames.indexOf(name);
-                    if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
+                    if (varargsElements && fromPos == resolvedParamCount - 1) {
                         // this is a varargs argument
                         List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
                         reordered.addAll(varargs);
