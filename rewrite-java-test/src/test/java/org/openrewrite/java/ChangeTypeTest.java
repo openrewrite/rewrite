@@ -1599,6 +1599,17 @@ class ChangeTypeTest implements RewriteTest {
           ),
           java(
             """
+              package com.acme.product.factory;
+
+              public class V1FactoryA {
+                  public static String getItem() {
+                      return "V1FactoryA";
+                  }
+              }
+              """
+          ),
+          java(
+            """
               import com.acme.product.factory.V1Factory;
 
               import static com.acme.product.factory.V2Factory.getItem;
