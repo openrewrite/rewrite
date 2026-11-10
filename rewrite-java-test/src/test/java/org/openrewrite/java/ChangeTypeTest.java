@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -1109,7 +1110,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classToPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
+          // ChangeType keeps the original class as the type of what it changes to a primitive or `String`
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               class A {
@@ -1134,7 +1137,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classToStringKeyword() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
+          // ChangeType keeps the original class as the type of what it changes to a primitive or `String`
+          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               class A {
