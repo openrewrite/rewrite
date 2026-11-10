@@ -612,7 +612,10 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                 //noinspection DataFlowIssue
                 method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
+                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e ->
+                                // the exception itself, without the supertypes that updateType walks
+                                isTargetFullyQualifiedType(TypeUtils.asFullyQualified(e)) ? updateType(e) : e));
                 oldNameToChangedType.put(oldMethodType, method);
                 oldNameToChangedType.put(method, method);
                 return method;

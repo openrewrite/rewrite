@@ -293,6 +293,29 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void updateThrownExceptionType() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void updateVariableType() {
         rewriteRun(
           java(testClassBefore, testClassAfter),

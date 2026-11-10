@@ -826,7 +826,12 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 method = oldMethodType;
                 method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
+                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e -> {
+                            // the exception itself, without the supertypes that updateType walks
+                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(e);
+                            return isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq) ? updateType(e) : e;
+                        }));
                 oldNameToChangedType.put(oldMethodType, method);
                 oldNameToChangedType.put(method, method);
                 return method;
@@ -1159,7 +1164,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
                         .withReturnType(updateType(mt.getReturnType()))
-                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
+                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType))
+                        .withThrownExceptions(ListUtils.map(mt.getThrownExceptions(), this::updateType));
             }
             return null;
         }
