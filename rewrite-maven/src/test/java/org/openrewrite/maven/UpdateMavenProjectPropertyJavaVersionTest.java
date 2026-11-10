@@ -1784,6 +1784,53 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         }
 
         @Test
+        void doNothingForExplicitPluginConfigurationOfExternalParent() {
+            withLocalRepository(
+                //language=xml
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.company</groupId>
+                    <artifactId>company-parent</artifactId>
+                    <version>2.0.0</version>
+                    <packaging>pom</packaging>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.11.0</version>
+                          <configuration>
+                            <release>11</release>
+                          </configuration>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </project>
+                  """,
+                () -> rewriteRun(
+                    pomXml(
+                        //language=xml
+                        """
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <parent>
+                              <groupId>com.company</groupId>
+                              <artifactId>company-parent</artifactId>
+                              <version>2.0.0</version>
+                              <relativePath/>
+                            </parent>
+                            <groupId>com.company.app</groupId>
+                            <artifactId>my-service</artifactId>
+                            <version>1.0.0</version>
+                          </project>
+                          """
+                    )
+                )
+            );
+        }
+
+        @Test
         void doNotDowngradeCustomPropertyReferencedByCompilerPlugin() {
             rewriteRun(
               //language=xml
