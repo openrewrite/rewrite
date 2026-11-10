@@ -131,8 +131,8 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             // A type the parser can't resolve has nothing to compare with. One the recipe leaves out is
             // TypeValidation's to report.
             if (written != null && parsedWritten != null && !same(type, parsedType)) {
-                differences.add("the " + of + " " + written + flags(type, parsedType) +
-                                " where the parser gives " + parsedWritten + flags(parsedType, type));
+                differences.add("the " + of + " " + written + unwritten(type, parsedType) +
+                                " where the parser gives " + parsedWritten + unwritten(parsedType, type));
             }
         });
         return differences;
@@ -172,21 +172,60 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             return variable.getName().equals(parsedVariable.getName()) &&
                    TypeUtils.isOfType(variable.getType(), parsedVariable.getType());
         }
+        if (type instanceof JavaType.Method && parsed instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            JavaType.Method parsedMethod = (JavaType.Method) parsed;
+            return TypeUtils.isOfType(method.withThrownExceptions(emptyList()),
+                    parsedMethod.withThrownExceptions(emptyList())) &&
+                   sameThrown(method.getThrownExceptions(), parsedMethod.getThrownExceptions());
+        }
         return TypeUtils.isOfType(type, parsed);
     }
 
     /**
-     * The flags of {@code type}, which {@link #written} leaves out, where they differ from those of {@code other}.
+     * An exception that either side doesn't resolve isn't compared, so it doesn't keep the rest of the method from
+     * being compared.
      */
-    private static String flags(@Nullable JavaType type, @Nullable JavaType other) {
-        return type instanceof JavaType.Method && other instanceof JavaType.Method &&
-               ((JavaType.Method) type).getFlagsBitMap() != ((JavaType.Method) other).getFlagsBitMap() ?
-                " with the flags " + ((JavaType.Method) type).getFlags() : "";
+    private static boolean sameThrown(List<JavaType> thrown, List<JavaType> parsedThrown) {
+        if (thrown.size() != parsedThrown.size()) {
+            return false;
+        }
+        for (int i = 0; i < thrown.size(); i++) {
+            if (written(thrown.get(i)) != null && written(parsedThrown.get(i)) != null &&
+                !TypeUtils.isOfType(thrown.get(i), parsedThrown.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
-     * {@code type} as text, without a variable's owner or a method's flags, and with a {@code .} before a nested
-     * class's name. A type that isn't resolved is null.
+     * The flags and thrown exceptions of {@code type}, which {@link #written} leaves out, where they differ from those
+     * of {@code other}.
+     */
+    private static String unwritten(@Nullable JavaType type, @Nullable JavaType other) {
+        if (!(type instanceof JavaType.Method) || !(other instanceof JavaType.Method)) {
+            return "";
+        }
+        JavaType.Method method = (JavaType.Method) type;
+        JavaType.Method otherMethod = (JavaType.Method) other;
+        StringBuilder unwritten = new StringBuilder();
+        if (method.getFlagsBitMap() != otherMethod.getFlagsBitMap()) {
+            unwritten.append(" with the flags ").append(method.getFlags());
+        }
+        if (!sameThrown(method.getThrownExceptions(), otherMethod.getThrownExceptions())) {
+            StringJoiner thrown = new StringJoiner(", ", " throwing ", "").setEmptyValue(" throwing nothing");
+            for (JavaType exception : method.getThrownExceptions()) {
+                thrown.add(String.valueOf(written(exception)));
+            }
+            unwritten.append(thrown);
+        }
+        return unwritten.toString();
+    }
+
+    /**
+     * {@code type} as text, without a variable's owner or a method's flags and thrown exceptions, and with a {@code .}
+     * before a nested class's name. A type that isn't resolved is null.
      */
     private static @Nullable String written(@Nullable JavaType type) {
         DefaultJavaTypeSignatureBuilder signatures = new DefaultJavaTypeSignatureBuilder();
@@ -200,12 +239,8 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             for (JavaType parameter : method.getParameterTypes()) {
                 parameters.add(signatures.signature(parameter));
             }
-            StringJoiner thrown = new StringJoiner(", ", " throws ", "").setEmptyValue("");
-            for (JavaType exception : method.getThrownExceptions()) {
-                thrown.add(signatures.signature(exception));
-            }
             written = signatures.signature(method.getReturnType()) + " " +
-                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters + thrown;
+                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters;
         } else {
             written = signatures.signature(type);
         }
