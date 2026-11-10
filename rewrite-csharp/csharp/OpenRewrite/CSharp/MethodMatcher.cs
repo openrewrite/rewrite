@@ -97,7 +97,7 @@ public class MethodMatcher
             return Matches(mi.MethodType);
 
         // Fallback: name-only matching when type info is unavailable
-        return _methodNamePattern.IsMatch(mi.Name.SimpleName);
+        return _methodNamePattern.IsMatch(Cs.GetValueText(mi.Name));
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public class MethodMatcher
         if (md.MethodType != null)
             return Matches(md.MethodType);
 
-        return _methodNamePattern.IsMatch(md.Name.SimpleName);
+        return _methodNamePattern.IsMatch(Cs.GetValueText(md.Name));
     }
 
     private bool MatchesDeclaringType(JavaType.Method methodType)

@@ -41,6 +41,18 @@ public class PatternMatchTests : RewriteTest
     }
 
     [Fact]
+    public void MatchesVerbatimIdentifierAgainstPlainName()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("Console.WriteLine(value)")),
+            CSharp(
+                "class C { void M(string value) { Console.WriteLine(@value); } }",
+                "class C { void M(string value) { /*~~>*/Console.WriteLine(@value); } }"
+            )
+        );
+    }
+
+    [Fact]
     public void DoesNotMatchDifferentMethodName()
     {
         RewriteRun(
