@@ -211,7 +211,6 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
     // Detect Prettier configuration for the project
     const prettierLoader = new PrettierConfigLoader(relativeTo);
     const detection = await prettierLoader.detectPrettier();
-    const detectStyle = !detection.available;
 
     for (const spec of sourceSpecs) {
         const isPackageJson = spec.path?.endsWith('package.json');
@@ -228,7 +227,7 @@ export async function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]
 
                 yield {
                     ...spec,
-                    parser: () => pooledParser(relativeTo, detectStyle),
+                    parser: () => pooledParser(relativeTo, true),
                     // Add style marker before recipe runs if available
                     // Compose with existing beforeRecipe if present
                     beforeRecipe: styleMarker ? (sf: JS.CompilationUnit) => {
