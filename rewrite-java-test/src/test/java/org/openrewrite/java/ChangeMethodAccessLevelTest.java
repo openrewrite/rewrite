@@ -26,6 +26,74 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
 
     @DocumentExample
     @Test
+    void callsInTheSameFileHaveTheNewAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod()", "public", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private void aMethod() {
+                  }
+
+                  void caller() {
+                      aMethod();
+                      Runnable r = this::aMethod;
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public void aMethod() {
+                  }
+
+                  void caller() {
+                      aMethod();
+                      Runnable r = this::aMethod;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorCallsInTheSameFileHaveTheNewAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A <constructor>()", "public", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  private A() {
+                  }
+
+                  static A create() {
+                      return new A();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  public A() {
+                  }
+
+                  static A create() {
+                      return new A();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void publicToPrivate() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null)),

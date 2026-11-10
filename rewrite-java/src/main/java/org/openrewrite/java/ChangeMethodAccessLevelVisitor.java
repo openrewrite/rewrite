@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
@@ -145,18 +146,44 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                 m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
             }
 
-            JavaType.Method methodType = m.getMethodType();
-            if (methodType != null) {
-                Set<Flag> flags = EnumSet.noneOf(Flag.class);
-                flags.addAll(methodType.getFlags());
-                flags.removeAll(Arrays.asList(Flag.Public, Flag.Protected, Flag.Private));
-                if (newAccessLevel != null) {
-                    flags.add(newAccessLevel == J.Modifier.Type.Public ? Flag.Public :
-                            newAccessLevel == J.Modifier.Type.Protected ? Flag.Protected : Flag.Private);
-                }
-                m = m.withMethodType(methodType.withFlags(flags));
+            if (m.getMethodType() != null) {
+                m = m.withMethodType(withAccessLevel(m.getMethodType()));
             }
         }
         return m;
+    }
+
+    @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        J.MethodInvocation m = withAccessLevel(super.visitMethodInvocation(method, p));
+        return m.getName().getType() == null ? m : m.withName(m.getName().withType(m.getMethodType()));
+    }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        return withAccessLevel(super.visitNewClass(newClass, p));
+    }
+
+    @Override
+    public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
+        return withAccessLevel(super.visitMemberReference(memberRef, p));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <C extends MethodCall> C withAccessLevel(C call) {
+        JavaType.Method methodType = call.getMethodType();
+        return methodType != null && methodMatcher.matches(call) ?
+                (C) call.withMethodType(withAccessLevel(methodType)) : call;
+    }
+
+    private JavaType.Method withAccessLevel(JavaType.Method methodType) {
+        Set<Flag> flags = EnumSet.noneOf(Flag.class);
+        flags.addAll(methodType.getFlags());
+        flags.removeAll(Arrays.asList(Flag.Public, Flag.Protected, Flag.Private));
+        if (newAccessLevel != null) {
+            flags.add(newAccessLevel == J.Modifier.Type.Public ? Flag.Public :
+                    newAccessLevel == J.Modifier.Type.Protected ? Flag.Protected : Flag.Private);
+        }
+        return methodType.withFlags(flags);
     }
 }
