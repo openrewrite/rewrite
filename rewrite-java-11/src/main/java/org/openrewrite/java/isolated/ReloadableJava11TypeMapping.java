@@ -407,7 +407,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 }
 
                 resolvedOwner = type instanceof Type.MethodType ?
-                        methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
+                        methodDeclarationType(sym, null) :
                         type(type);
                 assert resolvedOwner != null;
             }
@@ -415,6 +415,16 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
             return variable;
         });
+    }
+
+    /**
+     * The type that declares a method. For a method of a generic class this is the class itself, as it is for the
+     * methods the class lists, and not the class parameterized by its own type variables. The method types of a
+     * declaration and of an invocation can share a signature, so they have to agree on it.
+     */
+    private JavaType.@Nullable FullyQualified declaringType(Symbol.MethodSymbol methodSymbol) {
+        JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+        return owner instanceof JavaType.Parameterized ? ((JavaType.Parameterized) owner).getType() : owner;
     }
 
     /**
@@ -443,7 +453,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
 
         String signature = signatureBuilder.methodSignature(selectType, methodSymbol);
 
-        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+        JavaType.FullyQualified resolvedDeclaringType = declaringType(methodSymbol);
         if (resolvedDeclaringType == null) {
             return null;
         }
@@ -523,7 +533,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
             if (declaringType == null) {
                 if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
-                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+                    resolvedDeclaringType = declaringType(methodSymbol);
                 }
             }
 

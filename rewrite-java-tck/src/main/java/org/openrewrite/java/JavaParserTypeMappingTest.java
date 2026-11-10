@@ -607,6 +607,43 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         assertThat(returnTypeOf(holder, "rec").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Record);
     }
 
+    @Test
+    void methodOfGenericClassIsDeclaredByTheClassWhateverTheTypeCacheHolds() {
+        // Parsers built from one builder share a type cache, which here holds `A` without its methods.
+        JavaParser.Builder<?, ?> builder = JavaParser.fromJavaVersion();
+        assertThat(builder.build().parse("class A<T> {}")).hasSize(1);
+
+        for (JavaParser parser : new JavaParser[]{JavaParser.fromJavaVersion().build(), builder.build()}) {
+            List<JavaType.FullyQualified> declaringTypes = new ArrayList<>();
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                    declaringTypes.add(requireNonNull(method.getMethodType()).getDeclaringType());
+                    return super.visitMethodDeclaration(method, p);
+                }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    declaringTypes.add(requireNonNull(method.getMethodType()).getDeclaringType());
+                    return super.visitMethodInvocation(method, p);
+                }
+            }.visit(parser.parse("""
+              class A<T> {
+                  T caller() {
+                      return called();
+                  }
+
+                  T called() {
+                      return null;
+                  }
+              }
+              """).findFirst().get(), 0);
+
+            assertThat(declaringTypes).hasSize(3).allSatisfy(declaringType ->
+              assertThat(declaringType).isInstanceOf(JavaType.Class.class));
+        }
+    }
+
     private JavaType.Class parseClasspathHolder(@Language("java") String fixture) throws Exception {
         Path source = fixtureClasses.resolve("Holder.java");
         Files.write(source, fixture.getBytes(StandardCharsets.UTF_8));
