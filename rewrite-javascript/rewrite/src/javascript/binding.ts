@@ -150,7 +150,7 @@ interface ModuleObjectBinding {
     /** A type-only import erases, so the name it binds stands for no value at runtime. */
     typeOnly: boolean;
 
-    /** A `let`/`var` the file assigns to: after `NS = other`, `NS.Old` may not read the module. Never an import. */
+    /** Whether a `let` or `var` declares it, which the file may assign another value to. Never an import. */
     reassignable?: boolean;
 }
 
@@ -193,16 +193,13 @@ function wholeModuleBindingsVia(
     shape: ModuleObjectBinding["shape"]
 ): ModuleObjectBinding[] {
     const bindings: ModuleObjectBinding[] = [];
-    const root = new Cursor(cu);
     for (const stmt of cu.statements) {
         for (const declaration of declarationsOf(stmt.element)) {
             const module = moduleOf(declaration);
             const name = declaration.variables[0]?.element?.name;
             if (module !== undefined && name?.kind === J.Kind.Identifier) {
-                const simpleName = (name as J.Identifier).simpleName;
-                bindings.push({name: simpleName, module, shape, typeOnly: false,
-                    reassignable: !declaresConst(stmt.element) &&
-                        referencesOf(root, simpleName).some(r => r.writes)});
+                bindings.push({name: (name as J.Identifier).simpleName, module, shape, typeOnly: false,
+                    reassignable: !declaresConst(stmt.element)});
             }
         }
     }
@@ -430,6 +427,8 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
 /**
  * Queues one {@link RenameMemberSpellings} per move of a named member, after any `RebindImport` of the move.
  * Skips `import D from "m"`: `D.Old` reads the default export, which is the module only with `export =`.
+ * Skips a `let` or `var` `NS` of the module that the file assigns to: after `NS = other`, `NS.Old` may not
+ * read the module. Only those are looked for, since finding an assignment reads the whole file.
  */
 function queueRenameMemberSpellings(
     visitor: JavaScriptVisitor<any>,
@@ -443,8 +442,10 @@ function queueRenameMemberSpellings(
             sameModule(v.from.module, options.from.module) && v.to.member === to && sameModule(v.to.module, options.to.module))) {
         return;
     }
+    const root = new Cursor(cu);
     const moduleObjects = new Set(moduleObjectBindings(cu)
-        .filter(b => b.shape !== "default" && !b.reassignable && sameModule(b.module, options.from.module))
+        .filter(b => b.shape !== "default" && sameModule(b.module, options.from.module) &&
+            !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
         .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
         {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));
