@@ -24,7 +24,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.List;
+
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTreeShapeValidationServiceTest {
@@ -46,12 +49,32 @@ class JavaTreeShapeValidationServiceTest {
         assertThat(TypeUtils.isOfClassType(fieldType(parse(typed), 0), "org.jspecify.annotations.NullMarked")).isTrue();
     }
 
+    @Test
+    void typedParserTypesTheTextAloneAndKeepsItsTypesOutOfTheParserItCopies() {
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion();
+        JavaTreeShapeValidationService service = new JavaTreeShapeValidationService();
+
+        parse(service.typedParser(typed), "class A { void renamed() {} }");
+        assertThat(methods(parse(typed, "class A { void m() {} }"))).containsExactly("m");
+
+        assertThat(methods(parse(service.typedParser(typed), "class A { void renamed() {} }")))
+                .containsExactly("renamed");
+    }
+
     private static J.ClassDeclaration parse(Parser.Builder parser) {
+        return parse(parser, SOURCE);
+    }
+
+    private static J.ClassDeclaration parse(Parser.Builder parser, String source) {
         J.CompilationUnit cu = (J.CompilationUnit) parser.build()
-                .parse(new InMemoryExecutionContext(), SOURCE)
+                .parse(new InMemoryExecutionContext(), source)
                 .findFirst()
                 .orElseThrow(IllegalStateException::new);
         return cu.getClasses().get(0);
+    }
+
+    private static List<String> methods(J.ClassDeclaration a) {
+        return requireNonNull(a.getType()).getMethods().stream().map(JavaType.Method::getName).collect(toList());
     }
 
     private static @Nullable JavaType fieldType(J.ClassDeclaration a, int index) {

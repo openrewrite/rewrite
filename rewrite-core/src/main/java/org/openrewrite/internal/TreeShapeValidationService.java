@@ -87,6 +87,14 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @return A parser that types text the way {@code parser} would if it had parsed nothing before, for when the check
+     * compares types.
+     */
+    default Parser.Builder typedParser(Parser.Builder parser) {
+        return parser;
+    }
+
+    /**
      * @return The types of {@code tree}, keyed by what each is the type of, such as its variable or method, and written
      * so that two parses of the same text agree. A type that isn't resolved is null.
      */

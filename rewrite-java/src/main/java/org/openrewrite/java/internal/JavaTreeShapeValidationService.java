@@ -109,6 +109,17 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
+    public Parser.Builder typedParser(Parser.Builder parser) {
+        if (!(parser instanceof JavaParser.Builder)) {
+            return parser;
+        }
+        // The test's cache holds its classes as they were before the recipe ran, such as with a method it renamed.
+        // A cache of its own also keeps the types of the reparse out of the test's later parses.
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .typeFactory(new DefaultJavaTypeFactory(new JavaTypeCache()));
+    }
+
+    @Override
     public Map<String, @Nullable String> types(Tree tree) {
         Map<String, @Nullable String> types = new LinkedHashMap<>();
         if (tree instanceof J.VariableDeclarations.NamedVariable) {

@@ -269,8 +269,9 @@ final class TreeShapes {
         List<Throwable> errors = new ArrayList<>();
         TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
         // types need the test's own parser, with its classpath, and shapes alone parse faster without types
-        List<SourceFile> parsed = parse(service == null || types ? builder : service.untypedParser(builder), inputs,
-                errors);
+        Parser.Builder reparser = service == null ? builder :
+                types ? service.typedParser(builder) : service.untypedParser(builder);
+        List<SourceFile> parsed = parse(reparser, inputs, errors);
         if (parsed == null) {
             return reparsed;
         }
