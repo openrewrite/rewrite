@@ -1454,6 +1454,83 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
+    void successiveMigrationsInTheSameRun() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpdateMavenProjectPropertyJavaVersion(11),
+            new UpdateMavenProjectPropertyJavaVersion(17),
+            new UpdateMavenProjectPropertyJavaVersion(21)
+          ),
+          mavenProject("example-parent",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-parent</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <java.version>1.8</java.version>
+                        <maven.compiler.source>${java.version}</maven.compiler.source>
+                        <maven.compiler.target>${java.version}</maven.compiler.target>
+                    </properties>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-parent</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <java.version>21</java.version>
+                        <maven.compiler.source>${java.version}</maven.compiler.source>
+                        <maven.compiler.target>${java.version}</maven.compiler.target>
+                    </properties>
+                </project>
+                """
+            ),
+            mavenProject("example-child",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>example-parent</artifactId>
+                          <version>1.0.0</version>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>example-child</artifactId>
+                      <version>1.0.0</version>
+                      <modelVersion>4.0</modelVersion>
+                      <properties>
+                          <test.release>${java.version}</test.release>
+                      </properties>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.8.0</version>
+                                  <configuration>
+                                      <testRelease>${test.release}</testRelease>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void keepChildReferenceToJavaVersionPropertyUpdatedInLocalParent() {
         rewriteRun(
           mavenProject("example-parent",
