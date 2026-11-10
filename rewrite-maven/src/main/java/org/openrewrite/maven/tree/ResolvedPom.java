@@ -58,6 +58,16 @@ public class ResolvedPom implements Heavyweight {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
+    // Defined by every JVM, so unlike a `-D` user property they are no reason to override the pom's own properties
+    private static final Set<String> JVM_PROPERTIES = new HashSet<>(Arrays.asList(
+            "java.version", "java.version.date", "java.vendor", "java.vendor.url", "java.vendor.version", "java.home",
+            "java.vm.specification.version", "java.vm.specification.vendor", "java.vm.specification.name",
+            "java.vm.version", "java.vm.vendor", "java.vm.name",
+            "java.specification.version", "java.specification.vendor", "java.specification.name",
+            "java.class.version", "java.class.path", "java.library.path", "java.io.tmpdir",
+            "os.name", "os.arch", "os.version", "file.separator", "path.separator", "line.separator",
+            "user.name", "user.home", "user.dir", "file.encoding", "native.encoding", "stdout.encoding", "stderr.encoding"));
+
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final ResolvedPom SUPER_POM = ResolvedPom.builder()
             .repositories(singletonList(MavenRepository.MAVEN_CENTRAL))
@@ -321,7 +331,9 @@ public class ResolvedPom implements Heavyweight {
         }
         // Maven allows system properties to override project properties
         // This facilitates the usage of "-D" arguments on the command line to customize builds
-        String propVal = System.getProperty(property, properties.get(property));
+        String propVal = JVM_PROPERTIES.contains(property) ?
+                properties.get(property) :
+                System.getProperty(property, properties.get(property));
         if (propVal != null) {
             // Check if this would create a circular reference
             // e.g., <project.version>${project.version}</project.version>
