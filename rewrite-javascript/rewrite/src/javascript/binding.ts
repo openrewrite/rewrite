@@ -188,7 +188,7 @@ export function moduleBindings(
                     {module: named.module, member: named.member!, typeOnly: named.typeOnly ?? false, via: {kind: "named", name}};
             },
             name => {
-                const object = bound.find(b => b.name === name && !b.reassignable);
+                const object = bound.find(b => b.name === name && !isReassigned(cu, b));
                 return object === undefined || object.shape === "default" && !defaultIsModule(object, options) ? undefined :
                     {module: object.module, kind: object.shape, typeOnly: object.typeOnly};
             },
@@ -283,6 +283,14 @@ interface ModuleObjectBinding {
 
     /** Whether a `let` or `var` declares it, which the file may assign another value to. Never an import. */
     reassignable?: boolean;
+}
+
+/**
+ * Whether the file assigns another value to the module object, so reads through it may not read the module.
+ * `let R = require("m"); R = other` → true; `let R = require("m")` alone → false.
+ */
+function isReassigned(cu: JS.CompilationUnit, binding: ModuleObjectBinding): boolean {
+    return binding.reassignable === true && referencesOf(new Cursor(cu), binding.name).some(r => r.writes);
 }
 
 /**
@@ -582,10 +590,8 @@ function queueRenameMemberSpellings(
             sameModule(v.from.module, options.from.module) && v.to.member === to && sameModule(v.to.module, options.to.module))) {
         return;
     }
-    const root = new Cursor(cu);
     const moduleObjects = new Set(moduleObjectBindings(cu)
-        .filter(b => b.shape !== "default" && sameModule(b.module, options.from.module) &&
-            !(b.reassignable && referencesOf(root, b.name).some(r => r.writes)))
+        .filter(b => b.shape !== "default" && sameModule(b.module, options.from.module) && !isReassigned(cu, b))
         .map(b => b.name));
     visitor.afterVisit.push(new RenameMemberSpellings(
         {module: options.from.module, member: from}, {module: options.to.module, member: to}, moduleObjects));

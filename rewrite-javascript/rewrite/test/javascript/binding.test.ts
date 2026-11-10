@@ -287,6 +287,9 @@ describe("exportOf", () => {
         ["a value of the same name does not hide the global namespace a type reads",
             `const React = {}; let a: React.SFC<{}>;`, "React.SFC", {globals: {React: "react"}},
             react("SFC", false, "global", "React")],
+        ["a member through a let require the file never reassigns",
+            `let React = require("react"); React.createElement("div");`, `React.createElement("div")`, undefined,
+            react("createElement", false, "require", "React")],
     ] as [string, string, string, ExportOfOptions | undefined, ModuleExport | undefined][])(
         "%s", async (_rule, source, reference, options, expected) => {
             expect(await exportOfIn(source, reference, options)).toEqual(expected);
@@ -308,7 +311,8 @@ describe("exportOf", () => {
         ["a name the file declares", `type FC = number; let a: FC;`, "FC", undefined],
         ["the name an import declares", `import {FC} from "react";`, "FC", undefined],
         ["a property that reads like an import", `import {FC} from "react"; o.FC;`, "o.FC", undefined],
-        ["a reassignable require", `let React = require("react"); React.createElement("div");`, `React.createElement("div")`,
+        ["a member through a let require the file reassigns",
+            `let React = require("react"); React = other; React.createElement("div");`, `React.createElement("div")`,
             undefined],
     ] as [string, string, string, ExportOfOptions | undefined][])(
         "no export: %s", async (_rule, source, reference, options) => {
