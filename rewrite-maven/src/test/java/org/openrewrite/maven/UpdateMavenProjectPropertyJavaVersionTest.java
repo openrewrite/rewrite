@@ -1391,9 +1391,6 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <artifactId>example-parent</artifactId>
                     <modelVersion>4.0</modelVersion>
                     <packaging>pom</packaging>
-                    <properties>
-                        <maven.compiler.source>${custom.release}</maven.compiler.source>
-                    </properties>
                 </project>
                 """
             )
