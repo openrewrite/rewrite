@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptyList;
@@ -218,7 +219,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
                           JavaType.ShallowClass.build("java.lang.Comparable"), null);
                   return typeParam.withBounds(singletonList(comparable));
               }
-          })),
+          }))
+            // the bound is built by hand to test its spacing, leaving the class's type without it
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           //language=java
           java(
             """
