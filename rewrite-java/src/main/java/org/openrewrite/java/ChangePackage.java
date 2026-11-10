@@ -614,7 +614,9 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
                         .withReturnType(updateType(method.getReturnType()))
                         .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType))
                         .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), e ->
-                                // the exception itself, without the supertypes that updateType walks
+                                // the exception itself or a type variable's bound, without the supertypes that
+                                // updateType walks
+                                e instanceof JavaType.GenericTypeVariable ||
                                 isTargetFullyQualifiedType(TypeUtils.asFullyQualified(e)) ? updateType(e) : e));
                 oldNameToChangedType.put(oldMethodType, method);
                 oldNameToChangedType.put(method, method);

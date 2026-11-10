@@ -2317,6 +2317,45 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void thrownTypeVariableBoundedByTheChangedType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.OldException", "b.NewException", true)),
+          java(
+            """
+              package a;
+              public class OldException extends Exception {
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class NewException extends Exception {
+              }
+              """
+          ),
+          java(
+            """
+              import a.OldException;
+
+              class A {
+                  <E extends OldException> void m() throws E {
+                  }
+              }
+              """,
+            """
+              import b.NewException;
+
+              class A {
+                  <E extends NewException> void m() throws E {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
