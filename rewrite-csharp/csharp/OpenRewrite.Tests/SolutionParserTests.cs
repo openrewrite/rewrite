@@ -589,6 +589,9 @@ public class SolutionParserTests : IDisposable
     [InlineData("")]
     // imports the alias, not the namespace
     [InlineData("""<ItemGroup><Using Include="System.Linq" Alias="Linq" /></ItemGroup>""")]
+    // the other target framework does not import it
+    [InlineData("""<ItemGroup><Using Include="System.Linq" Condition="'$(TargetFramework)' == 'net9.0'" /></ItemGroup>""")]
+    [InlineData("""<ItemGroup><Using Include="System.Linq" Condition="'$(TargetFramework)' == 'net10.0'" /></ItemGroup>""")]
     public async Task MaybeAddUsingAddsANamespaceTheProjectDoesNotImport(string projectContent)
     {
         var cu = await ParseCounting(projectContent, null);
@@ -602,7 +605,7 @@ public class SolutionParserTests : IDisposable
         var projectPath = WriteFile("Counting.csproj", $"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
+                <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
               </PropertyGroup>
               {projectContent}
             </Project>

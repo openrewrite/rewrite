@@ -53,10 +53,11 @@ public class DotNetProject implements Marker, RpcCodec<DotNetProject> {
     String sdk;
 
     /**
-     * The usings that apply to every file of the project, each as it reads after
-     * {@code global using}, such as {@code static System.Math}. They come from implicit usings,
-     * {@code <Using>} items and the project's {@code global using} directives at parse time.
-     * Empty when MSBuild could not evaluate the project, and null in LSTs that predate it.
+     * The usings that apply to every file of the project in every target framework, each as it
+     * reads after {@code global using}, such as {@code static System.Math}. They come from
+     * implicit usings, {@code <Using>} items and the project's {@code global using} directives at
+     * parse time. Empty when MSBuild could not evaluate the project, and null in LSTs that
+     * predate it.
      */
     @Nullable
     List<String> globalUsings;

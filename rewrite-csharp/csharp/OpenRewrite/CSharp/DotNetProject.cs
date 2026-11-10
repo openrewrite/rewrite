@@ -31,10 +31,11 @@ public sealed class DotNetProject : Marker, IRpcCodec<DotNetProject>, IEquatable
     public string? Sdk { get; }
 
     /// <summary>
-    /// The usings that apply to every file of the project, each as it reads after
-    /// <c>global using</c>, such as <c>static System.Math</c>. They come from implicit usings,
-    /// <c>&lt;Using&gt;</c> items and the project's <c>global using</c> directives at parse time.
-    /// Empty when MSBuild could not evaluate the project, or the tree predates this property.
+    /// The usings that apply to every file of the project in every target framework, each as it
+    /// reads after <c>global using</c>, such as <c>static System.Math</c>. They come from
+    /// implicit usings, <c>&lt;Using&gt;</c> items and the project's <c>global using</c>
+    /// directives at parse time. Empty when MSBuild could not evaluate the project, or the tree
+    /// predates this property.
     /// </summary>
     public IList<string> GlobalUsings { get; }
 
@@ -55,13 +56,17 @@ public sealed class DotNetProject : Marker, IRpcCodec<DotNetProject>, IEquatable
         projectName == ProjectName ? this : new(Id, projectName, TargetFrameworks, Sdk, GlobalUsings);
 
     public DotNetProject WithTargetFrameworks(IList<string> targetFrameworks) =>
-        ReferenceEquals(targetFrameworks, TargetFrameworks) ? this : new(Id, ProjectName, targetFrameworks, Sdk, GlobalUsings);
+        ReferenceEquals(targetFrameworks, TargetFrameworks)
+            ? this
+            : new(Id, ProjectName, targetFrameworks, Sdk, GlobalUsings);
 
     public DotNetProject WithSdk(string? sdk) =>
         sdk == Sdk ? this : new(Id, ProjectName, TargetFrameworks, sdk, GlobalUsings);
 
     public DotNetProject WithGlobalUsings(IList<string> globalUsings) =>
-        ReferenceEquals(globalUsings, GlobalUsings) ? this : new(Id, ProjectName, TargetFrameworks, Sdk, globalUsings);
+        ReferenceEquals(globalUsings, GlobalUsings)
+            ? this
+            : new(Id, ProjectName, TargetFrameworks, Sdk, globalUsings);
 
     public void RpcSend(DotNetProject after, RpcSendQueue q)
     {

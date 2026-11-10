@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -719,9 +720,11 @@ public class SolutionParser
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
         Log.Debug("ParseProject: starting {ProjectName}", projectName);
 
-        var project = solution.Projects
+        var variants = solution.Projects
             .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
                         !_unsupportedVariants.Contains(p.Id))
+            .ToList();
+        var project = variants
             .OrderByDescending(p => p.MetadataReferences.Any())
             .FirstOrDefault();
 
@@ -766,21 +769,26 @@ public class SolutionParser
                 }))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, GlobalUsingsOf(compilation),
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, GlobalUsingsOf(variants),
             requirePrintEqualsInput);
     }
 
-    /// <summary>The compilation includes the file the SDK generates from implicit usings and
-    /// <c>&lt;Using&gt;</c> items.</summary>
-    private static List<string> GlobalUsingsOf(Compilation? compilation) =>
-        compilation?.SyntaxTrees
-            .Select(tree => tree.GetRoot())
-            .OfType<CompilationUnitSyntax>()
-            .SelectMany(root => root.Usings)
+    /// <summary>The usings that every target framework of the project imports.</summary>
+    private static List<string> GlobalUsingsOf(IReadOnlyList<Project> variants) =>
+        variants.Select(GlobalUsingsOf).Aggregate((common, next) => common.Intersect(next)).ToList();
+
+    private static readonly Regex GlobalUsingDirective = new(@"\bglobal\s+using\b", RegexOptions.Compiled);
+
+    /// <summary>A variant's documents include the file the SDK generates for its target framework
+    /// from implicit usings and <c>&lt;Using&gt;</c> items.</summary>
+    private static IEnumerable<string> GlobalUsingsOf(Project variant) =>
+        variant.Documents
+            .Select(doc => doc.GetTextAsync().Result)
+            .Where(text => GlobalUsingDirective.IsMatch(text.ToString()))
+            .SelectMany(text => CSharpSyntaxTree.ParseText(text, variant.ParseOptions as CSharpParseOptions)
+                .GetCompilationUnitRoot().Usings)
             .Where(directive => directive.GlobalKeyword.IsKind(SyntaxKind.GlobalKeyword))
-            .Select(GlobalUsingText)
-            .Distinct()
-            .ToList() ?? [];
+            .Select(GlobalUsingText);
 
     private static string GlobalUsingText(UsingDirectiveSyntax directive)
     {
