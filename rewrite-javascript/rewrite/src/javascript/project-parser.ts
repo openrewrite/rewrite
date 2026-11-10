@@ -339,57 +339,24 @@ export class ProjectParser {
                 relativeTo: this.relativeTo
             });
 
-            // Check if Prettier is available
-            const detection = await prettierLoader.detectPrettier();
-
-            if (detection.available) {
-                // Prettier is available: add per-file PrettierStyle markers
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-
-                    const prettierMarker = await prettierLoader.getConfigMarker(
-                        path.join(this.relativeTo, sf.sourcePath)
-                    );
-                    if (prettierMarker) {
-                        yield produce(sf, draft => {
-                            draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
-                        });
-                    } else {
-                        yield sf;
-                    }
+            const fallbackFiles: SourceFile[] = [];
+            for await (const sf of parser.parse(...discovered.jsFiles)) {
+                current++;
+                this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
+                const prettierMarker = await prettierLoader.getConfigMarker(
+                    path.join(this.relativeTo, sf.sourcePath)
+                );
+                if (prettierMarker) {
+                    yield produce(sf, draft => {
+                        draft.markers = replaceMarkerByKind(draft.markers, prettierMarker);
+                    });
+                } else {
+                    fallbackFiles.push(sf);
                 }
-            } else {
-                // Prettier is NOT available: auto-detect styles from parsed files
-                this.log("Prettier not found, auto-detecting styles...");
-
-                // Dynamic import to break circular dependency at module load time
-                // (see buildAutodetectMarker for explanation)
-                const {Autodetect} = await import("./autodetect.js");
-                const {JS} = await import("./tree.js");
-
-                const parsedFiles: SourceFile[] = [];
-
-                // Parse all JS files and collect them for sampling
-                for await (const sf of parser.parse(...discovered.jsFiles)) {
-                    current++;
-                    this.onProgress?.("parsing", current, totalFiles, sf.sourcePath);
-                    if (sf.kind === JS.Kind.CompilationUnit) {
-                        parsedFiles.push(sf);
-                    }
-                }
-
-                // Sample all parsed files and build Autodetect marker
-                const detector = Autodetect.detector();
-                for (const sf of parsedFiles) {
-                    await detector.sample(sf);
-                }
-                const autodetectMarker = detector.build();
-                this.log(`Auto-detected styles: indent=${detector.getTabsAndIndentsStyle().indentSize}, ` +
-                    `useTabs=${detector.getTabsAndIndentsStyle().useTabCharacter}`);
-
-                // Yield all files with the Autodetect marker
-                for (const sf of parsedFiles) {
+            }
+            if (fallbackFiles.length > 0) {
+                const autodetectMarker = await this.buildAutodetectMarker(fallbackFiles);
+                for (const sf of fallbackFiles) {
                     yield produce(sf, draft => {
                         draft.markers = replaceMarkerByKind(draft.markers, autodetectMarker);
                     });
