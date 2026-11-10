@@ -275,6 +275,14 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             } else if (j instanceof MethodCall) {
                 MethodCall call = (MethodCall) j;
                 j = (J) call.withMethodType(updateType(call.getMethodType()));
+            } else if (j instanceof J.ClassDeclaration && Boolean.TRUE.equals(ignoreDefinition) &&
+                       getCursor().getValue() instanceof J.ClassDeclaration &&
+                       TypeUtils.isOfClassType(((J.ClassDeclaration) getCursor().getValue()).getType(),
+                               originalType.getFullyQualifiedName())) {
+                // the definition is left as it is, and so is its type
+                J.ClassDeclaration original = getCursor().getValue();
+                J.ClassDeclaration cd = (J.ClassDeclaration) j;
+                j = cd.withType(original.getType()).withName(cd.getName().withType(original.getName().getType()));
             } else if (tree instanceof TypedTree) {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
