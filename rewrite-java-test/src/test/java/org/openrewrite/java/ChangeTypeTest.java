@@ -652,6 +652,47 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Node", "a.Node2", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public interface Node<T extends Node<T>> {
+                }
+                """,
+              """
+                package a;
+                public interface Node2<T extends Node2<T>> {
+                }
+                """
+            )),
+          java(
+            """
+              import a.Node;
+
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import a.Node2;
+
+              import java.util.List;
+
+              class Test {
+                  <T extends Node2<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"EmptyTryBlock", "CatchMayIgnoreException"})
     @Test
     void multiCatch() {

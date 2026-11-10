@@ -689,24 +689,36 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
             if (oldType instanceof JavaType.Parameterized) {
                 JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
-                pt = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), tp -> {
+                // in the map before its arguments change, so that a bound referring back to it, as in
+                // `Node<T extends Node<T>>`, refers to the changed type
+                JavaType.Parameterized changed = new JavaType.Parameterized(null, null, emptyList());
+                oldNameToChangedType.put(oldType, changed);
+                List<JavaType> typeParameters = pt.getTypeParameters();
+                List<JavaType> changedTypeParameters = ListUtils.map(typeParameters, tp -> {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
                         if (isTargetFullyQualifiedType(tpFq) || isNestedTypeOfOriginal(tpFq)) {
                             return updateType(tpFq);
                         }
+                    } else if (tp instanceof JavaType.GenericTypeVariable) {
+                        return updateType(tp);
                     }
                     return tp;
-                }));
+                });
 
+                JavaType.FullyQualified changedType = pt.getType();
                 if (isTargetFullyQualifiedType(pt)) {
-                    pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
+                    changedType = (JavaType.FullyQualified) updateType(pt.getType());
                 } else if (isNestedTypeOfOriginal(pt)) {
-                    pt = pt.withType(updateNestedType(pt.getType()));
+                    changedType = updateNestedType(pt.getType());
                 }
-                oldNameToChangedType.put(oldType, pt);
-                oldNameToChangedType.put(pt, pt);
-                return pt;
+                if (changedTypeParameters == typeParameters && changedType == pt.getType()) {
+                    oldNameToChangedType.put(oldType, oldType);
+                    return oldType;
+                }
+                changed.unsafeSet(changedType, changedTypeParameters);
+                oldNameToChangedType.put(changed, changed);
+                return changed;
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
@@ -726,7 +738,12 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
-                gtv = gtv.withBounds(ListUtils.map(gtv.getBounds(), b -> {
+                // in the map before its bounds change, for a bound that refers back to it
+                JavaType.GenericTypeVariable changed = new JavaType.GenericTypeVariable(null, gtv.getName(),
+                        gtv.getVariance(), emptyList());
+                oldNameToChangedType.put(oldType, changed);
+                List<JavaType> bounds = gtv.getBounds();
+                List<JavaType> changedBounds = ListUtils.map(bounds, b -> {
                     if (b instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified fq = (JavaType.FullyQualified) b;
                         if (isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq)) {
@@ -734,11 +751,14 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         }
                     }
                     return b;
-                }));
-
-                oldNameToChangedType.put(oldType, gtv);
-                oldNameToChangedType.put(gtv, gtv);
-                return gtv;
+                });
+                if (changedBounds == bounds) {
+                    oldNameToChangedType.put(oldType, oldType);
+                    return oldType;
+                }
+                changed.unsafeSet(gtv.getName(), gtv.getVariance(), changedBounds);
+                oldNameToChangedType.put(changed, changed);
+                return changed;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
                 variable = variable.withOwner(updateType(variable.getOwner()));

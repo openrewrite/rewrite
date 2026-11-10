@@ -1528,6 +1528,44 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+              public class Node<T extends Node<T>> {
+              }
+              """,
+            """
+              package org.openrewrite.test;
+              public class Node<T extends Node<T>> {
+              }
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiCatch() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
