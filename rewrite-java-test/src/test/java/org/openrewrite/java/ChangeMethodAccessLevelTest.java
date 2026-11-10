@@ -24,7 +24,35 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
 
-    @DocumentExample
+    @Test
+    void callsOfAMethodDeclaredElsewhereKeepItsAccessLevel() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("*..* run()", "private", null)),
+          java(
+            """
+              class A {
+                  public void run() {
+                  }
+
+                  void caller(Thread t) {
+                      t.run();
+                  }
+              }
+              """,
+            """
+              class A {
+                  private void run() {
+                  }
+
+                  void caller(Thread t) {
+                      t.run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void callsInTheSameFileHaveTheNewAccessLevel() {
         rewriteRun(
@@ -93,6 +121,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void publicToPrivate() {
         rewriteRun(

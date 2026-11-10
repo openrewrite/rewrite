@@ -23,10 +23,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -155,8 +157,11 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        J.MethodInvocation m = withAccessLevel(super.visitMethodInvocation(method, p));
-        return m.getName().getType() == null ? m : m.withName(m.getName().withType(m.getMethodType()));
+        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+        J.MethodInvocation retyped = withAccessLevel(m);
+        // withName gives the call the method its name is typed with
+        return retyped == m || m.getName().getType() == null ? retyped :
+                m.withName(m.getName().withType(retyped.getMethodType()));
     }
 
     @Override
@@ -172,8 +177,20 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     @SuppressWarnings("unchecked")
     private <C extends MethodCall> C withAccessLevel(C call) {
         JavaType.Method methodType = call.getMethodType();
-        return methodType != null && methodMatcher.matches(call) ?
+        return methodType != null && methodMatcher.matches(call) && declaredHere(methodType) ?
                 (C) call.withMethodType(withAccessLevel(methodType)) : call;
+    }
+
+    /**
+     * Whether this file declares the method, as the pattern can also match a method declared elsewhere, such as the
+     * one a declaration here overrides, whose access level doesn't change.
+     */
+    private boolean declaredHere(JavaType.Method methodType) {
+        JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+        return sourceFile != null && sourceFile.getTypesInUse().getDeclaredMethods().stream().anyMatch(declared ->
+                declared.getName().equals(methodType.getName()) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(declared.getDeclaringType().getFullyQualifiedName(),
+                        methodType.getDeclaringType().getFullyQualifiedName()));
     }
 
     private JavaType.Method withAccessLevel(JavaType.Method methodType) {
