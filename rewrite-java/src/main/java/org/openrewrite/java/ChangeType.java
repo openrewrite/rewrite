@@ -728,6 +728,13 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     JavaType.FullyQualified updatedNestedType = updateNestedType(original);
                     oldNameToChangedType.put(oldType, updatedNestedType);
                     return updatedNestedType;
+                } else if (targetType instanceof JavaType.Primitive &&
+                           TypeUtils.isOfClassType(original, originalType.getFullyQualifiedName())) {
+                    // the parser types the name `String` as the class, and only a string literal as the primitive
+                    JavaType primitive = targetType == JavaType.Primitive.String ?
+                            JavaType.ShallowClass.build("java.lang.String") : targetType;
+                    oldNameToChangedType.put(oldType, primitive);
+                    return primitive;
                 } else if (oldType instanceof JavaType.Class) {
                     JavaType.Class clazz = ((JavaType.Class) oldType)
                             .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
