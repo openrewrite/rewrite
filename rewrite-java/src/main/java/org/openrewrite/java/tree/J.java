@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
@@ -5026,14 +5027,7 @@ public interface J extends Tree {
 
 
         public String getPackageName() {
-            StringBuilder packageName = new StringBuilder();
-            Expression part = expression;
-            while (part instanceof FieldAccess) {
-                FieldAccess fieldAccess = (FieldAccess) part;
-                packageName.insert(0, "." + fieldAccess.getSimpleName());
-                part = fieldAccess.getTarget();
-            }
-            return packageName.insert(0, ((Identifier) part).getSimpleName()).toString();
+            return PackageNameUtils.getPackageName(this);
         }
 
         @Override

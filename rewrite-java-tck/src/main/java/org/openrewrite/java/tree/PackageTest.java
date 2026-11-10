@@ -18,12 +18,29 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 
 class PackageTest implements RewriteTest {
+    @Test
+    void packageNameOfUnknownExpression() {
+        // given
+        J.Unknown expression = new J.Unknown(randomId(), Space.EMPTY, Markers.EMPTY,
+          new J.Unknown.Source(randomId(), Space.EMPTY, Markers.EMPTY, "org.company.service.web"));
+        J.Package pkg = new J.Package(randomId(), Space.EMPTY, Markers.EMPTY, expression, emptyList());
+
+        // when
+        String packageName = pkg.getPackageName();
+
+        // then
+        assertThat(packageName).isEqualTo("org.company.service.web");
+    }
+
     @Test
     void packageFormatting() {
         rewriteRun(
@@ -47,7 +64,7 @@ class PackageTest implements RewriteTest {
     void packageName(String packageExpression) {
         rewriteRun(
           java(
-            "package " + packageExpression + "; class A {}",
+            String.format("package %s; class A {}", packageExpression),
             spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName())
               .isEqualTo("org.company.service.web"))
           )
