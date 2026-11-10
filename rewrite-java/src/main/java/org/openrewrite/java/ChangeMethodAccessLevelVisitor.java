@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
@@ -29,7 +31,9 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -139,6 +143,18 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                     m = m.withComments(ListUtils.concatAll(m.getComments(), modifierComments));
                 }
                 m = maybeAutoFormat(m, m.withModifiers(modifiers), p).withBody(m.getBody());
+            }
+
+            JavaType.Method methodType = m.getMethodType();
+            if (methodType != null) {
+                Set<Flag> flags = EnumSet.noneOf(Flag.class);
+                flags.addAll(methodType.getFlags());
+                flags.removeAll(Arrays.asList(Flag.Public, Flag.Protected, Flag.Private));
+                if (newAccessLevel != null) {
+                    flags.add(newAccessLevel == J.Modifier.Type.Public ? Flag.Public :
+                            newAccessLevel == J.Modifier.Type.Protected ? Flag.Protected : Flag.Private);
+                }
+                m = m.withMethodType(methodType.withFlags(flags));
             }
         }
         return m;
