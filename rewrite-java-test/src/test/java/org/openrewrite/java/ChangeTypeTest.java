@@ -2330,6 +2330,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
 
                   private class InnerB {
+                      InnerB() {}
                   }
 
                   public void test(String s) {
@@ -2346,6 +2347,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
 
                   private class InnerB {
+                      InnerB() {}
                   }
 
                   public void test(String s) {

@@ -26,6 +26,7 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.java.tree.TypedTree;
 
 import java.util.ArrayList;
@@ -120,35 +121,72 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
-    public Map<String, @Nullable String> types(Tree tree) {
-        Map<String, @Nullable String> types = new LinkedHashMap<>();
+    public List<String> typeDifferences(Tree tree, Tree parsed) {
+        Map<String, @Nullable JavaType> parsedTypes = types(parsed);
+        List<String> differences = new ArrayList<>();
+        types(tree).forEach((of, type) -> {
+            JavaType parsedType = parsedTypes.get(of);
+            String written = written(type);
+            String parsedWritten = written(parsedType);
+            // A type the parser can't resolve has nothing to compare with. One the recipe leaves out is
+            // TypeValidation's to report.
+            if (written != null && parsedWritten != null && !same(type, parsedType)) {
+                differences.add("the " + of + " " + written + flags(type, parsedType) +
+                                " where the parser gives " + parsedWritten + flags(parsedType, type));
+            }
+        });
+        return differences;
+    }
+
+    private static Map<String, @Nullable JavaType> types(Tree tree) {
+        Map<String, @Nullable JavaType> types = new LinkedHashMap<>();
         if (tree instanceof J.VariableDeclarations.NamedVariable) {
             // its type is its variable's
-            types.put("variable", written(((J.VariableDeclarations.NamedVariable) tree).getVariableType()));
+            types.put("variable", ((J.VariableDeclarations.NamedVariable) tree).getVariableType());
             return types;
         }
         if (tree instanceof TypedTree) {
-            types.put("type", written(((TypedTree) tree).getType()));
+            types.put("type", ((TypedTree) tree).getType());
         }
         if (tree instanceof J.Identifier) {
-            types.put("variable", written(((J.Identifier) tree).getFieldType()));
+            types.put("variable", ((J.Identifier) tree).getFieldType());
         } else if (tree instanceof J.MethodInvocation) {
-            types.put("method", written(((J.MethodInvocation) tree).getMethodType()));
+            types.put("method", ((J.MethodInvocation) tree).getMethodType());
         } else if (tree instanceof J.MemberReference) {
-            types.put("method", written(((J.MemberReference) tree).getMethodType()));
-            types.put("variable", written(((J.MemberReference) tree).getVariableType()));
+            types.put("method", ((J.MemberReference) tree).getMethodType());
+            types.put("variable", ((J.MemberReference) tree).getVariableType());
         } else if (tree instanceof J.MethodDeclaration) {
-            types.put("method", written(((J.MethodDeclaration) tree).getMethodType()));
+            types.put("method", ((J.MethodDeclaration) tree).getMethodType());
         } else if (tree instanceof J.NewClass) {
-            types.put("constructor", written(((J.NewClass) tree).getConstructorType()));
+            types.put("constructor", ((J.NewClass) tree).getConstructorType());
         }
         return types;
     }
 
+    private static boolean same(@Nullable JavaType type, @Nullable JavaType parsed) {
+        if (type instanceof JavaType.Variable && parsed instanceof JavaType.Variable) {
+            // A variable's owner isn't compared, as a recipe that changes a method's type leaves its parameters and
+            // locals owned by the method's old type.
+            JavaType.Variable variable = (JavaType.Variable) type;
+            JavaType.Variable parsedVariable = (JavaType.Variable) parsed;
+            return variable.getName().equals(parsedVariable.getName()) &&
+                   TypeUtils.isOfType(variable.getType(), parsedVariable.getType());
+        }
+        return TypeUtils.isOfType(type, parsed);
+    }
+
     /**
-     * {@code type} as text without a variable's owner, which a template doesn't know for the locals it declares. A
-     * {@code $} before a nested class's name is written {@code .}, as TypeUtils.fullyQualifiedNamesAreEqual treats
-     * them alike.
+     * The flags of {@code type}, which {@link #written} leaves out, where they differ from those of {@code other}.
+     */
+    private static String flags(@Nullable JavaType type, @Nullable JavaType other) {
+        return type instanceof JavaType.Method && other instanceof JavaType.Method &&
+               ((JavaType.Method) type).getFlagsBitMap() != ((JavaType.Method) other).getFlagsBitMap() ?
+                " with the flags " + ((JavaType.Method) type).getFlags() : "";
+    }
+
+    /**
+     * {@code type} as text, without a variable's owner or a method's flags, and with a {@code .} before a nested
+     * class's name. A type that isn't resolved is null.
      */
     private static @Nullable String written(@Nullable JavaType type) {
         DefaultJavaTypeSignatureBuilder signatures = new DefaultJavaTypeSignatureBuilder();
@@ -162,8 +200,12 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
             for (JavaType parameter : method.getParameterTypes()) {
                 parameters.add(signatures.signature(parameter));
             }
+            StringJoiner thrown = new StringJoiner(", ", " throws ", "").setEmptyValue("");
+            for (JavaType exception : method.getThrownExceptions()) {
+                thrown.add(signatures.signature(exception));
+            }
             written = signatures.signature(method.getReturnType()) + " " +
-                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters;
+                      signatures.signature(method.getDeclaringType()) + "." + method.getName() + parameters + thrown;
         } else {
             written = signatures.signature(type);
         }

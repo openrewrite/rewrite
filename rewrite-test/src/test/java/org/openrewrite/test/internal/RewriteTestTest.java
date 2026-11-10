@@ -2166,6 +2166,29 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void acceptStringTypedAsThePrimitiveString() {
+            rewriteRun(
+              spec -> spec.recipe(new DeclareStringAsPrimitiveByHand()),
+              java(
+                """
+                  class A {
+                      void f() {
+                          Object o = null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void f() {
+                          String o = null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void skipTypeTheParserCannotResolve() {
             // a recipe can write code that uses a library the test's parser doesn't have on its classpath
             rewriteRun(
@@ -2894,6 +2917,39 @@ class DeclareLongByHand extends Recipe {
                 return primitive.getType() == JavaType.Primitive.Int &&
                        getCursor().getParentTreeCursor().getValue() instanceof J.VariableDeclarations ?
                   primitive.withType(JavaType.Primitive.Long) : primitive;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class DeclareStringAsPrimitiveByHand extends Recipe {
+
+    String displayName = "Declare `String`";
+
+    String description = "Replaces the `Object` of a variable declaration by `String`, typed as the primitive `String`, " +
+                         "which `TypeUtils.isOfType` takes to be the class `java.lang.String`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    ExecutionContext ctx) {
+                TypeTree type = multiVariable.getTypeExpression();
+                if (type == null || !TypeUtils.isOfClassType(type.getType(), "java.lang.Object")) {
+                    return multiVariable;
+                }
+                return multiVariable
+                  .withTypeExpression(new J.Identifier(Tree.randomId(), type.getPrefix(), Markers.EMPTY, emptyList(),
+                    "String", JavaType.Primitive.String, null))
+                  .withVariables(ListUtils.map(multiVariable.getVariables(), v -> {
+                      J.VariableDeclarations.NamedVariable typed = v.withType(JavaType.Primitive.String);
+                      return typed.withName(typed.getName().withType(JavaType.Primitive.String)
+                        .withFieldType(typed.getVariableType()));
+                  }));
             }
         };
     }

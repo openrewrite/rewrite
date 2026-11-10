@@ -41,7 +41,9 @@ class AddKeywordContainerSpacingTest implements RewriteTest {
     @Test
     void withThrowsAddsLeadingSpaceWhenMethodHasNoExistingThrowsClause() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
+          // the throws clause is built by hand to test its spacing, leaving the method's type without it
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (!"target".equals(method.getSimpleName()) || method.getThrows() != null) {

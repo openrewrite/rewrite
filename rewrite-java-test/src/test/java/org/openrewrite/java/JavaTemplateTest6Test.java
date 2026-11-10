@@ -490,7 +490,9 @@ class JavaTemplateTest6Test implements RewriteTest {
     @Test
     void replaceMissingBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the test removes the abstract modifier by hand, leaving the method's type abstract
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (!method.isAbstract()) {

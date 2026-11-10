@@ -203,7 +203,9 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
+          // the test calls A's instance method as if it were static
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build()),
           java(
             """
               package a;

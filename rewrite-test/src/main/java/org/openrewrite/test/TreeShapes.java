@@ -179,16 +179,11 @@ final class TreeShapes {
             shapeProblems.add(node + " has " + value + " where the parser makes " + parsedValue);
         }
         if (!full(typeProblems)) {
-            Map<String, @Nullable String> parsedTypes = service.types(parsed.tree);
-            for (Map.Entry<String, @Nullable String> type : service.types(node.tree).entrySet()) {
-                String parsedType = parsedTypes.get(type.getKey());
-                // A type the parser can't resolve has nothing to compare with. One the recipe leaves out is
-                // TypeValidation's to report.
-                if (type.getValue() != null && parsedType != null && !type.getValue().equals(parsedType) &&
-                    !full(typeProblems)) {
-                    typeProblems.add(node + " has the " + type.getKey() + " " + type.getValue() +
-                                     " where the parser gives " + parsedType);
+            for (String difference : service.typeDifferences(node.tree, parsed.tree)) {
+                if (full(typeProblems)) {
+                    break;
                 }
+                typeProblems.add(node + " has " + difference);
             }
         }
         if (node.children.size() != parsed.children.size()) {
