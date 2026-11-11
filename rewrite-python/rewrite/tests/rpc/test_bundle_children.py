@@ -40,7 +40,7 @@ def test_install_marketplace_owner_route_uninstall_and_shutdown(tmp_path):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = _fake_is_usable_venv
     ops.create_venv = lambda py, d, clear=False: (ops.created.append((py, d)), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False: ops.installed.append((d, spec, force))
+    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append((d, spec, force))
     ops.installed_version = lambda d, dist: f"{dist}-1.0"
     ops.remove_venv = lambda d: ops.removed.append(d)
 
@@ -89,9 +89,11 @@ def _ops_recording(created, installed):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = _fake_is_usable_venv
     ops.create_venv = lambda py, d, clear=False: (created.append(d), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False: installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, prefer=None: installed.append(d)
     ops.installed_version = lambda d, dist: "1.0.0"
     ops.built_by_running_interpreter = lambda d: True
+    ops.installed_distributions = lambda d: {}
+    ops.shared_distributions = lambda exclude: set()
     ops.remove_venv = lambda d: None
     return ops
 
@@ -176,7 +178,7 @@ def test_install_rebuilds_a_venv_orphaned_by_a_python_upgrade(tmp_path):
     ops.venv_python = _fake_venv_python
     ops.is_usable_venv = lambda d: False          # base interpreter pruned away
     ops.create_venv = lambda py, d, clear=False: (ops.created.append((d, clear)), _make_venv(d))
-    ops.install_into_venv = lambda d, spec, force=False: ops.installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "2.0"
 
     def fake_spawn(cmd, upstream=None, exclude_paths=()):
@@ -244,7 +246,7 @@ def test_install_normalizes_distribution_name_so_spellings_dedup(tmp_path):
         _make_venv(d)  # so the second install sees a real venv and skips creation
 
     ops.create_venv = _create
-    ops.install_into_venv = lambda d, spec, force=False: ops.installed.append(d)
+    ops.install_into_venv = lambda d, spec, force=False, prefer=None: ops.installed.append(d)
     ops.installed_version = lambda d, dist: "9.9"
 
     spawned = []
@@ -432,23 +434,46 @@ def test_a_lone_bundle_runs_in_the_facades_own_process(tmp_path):
     assert bc.hosts_every_bundle()           # ...but to this process, so nothing is routed
 
 
-def test_a_second_bundle_runs_behind_a_child_beside_the_hosted_one(tmp_path):
-    spawned = {}
+def _versioned(versions, prefers=None):
+    """Recording ops whose venvs hold ``versions[bundle]``. The facade provides ``parso`` itself."""
+    ops = _ops_recording([], [])
+    ops.installed_distributions = lambda d: dict(versions[d.name])
+    ops.shared_distributions = lambda exclude: {"parso"}
+    if prefers is not None:
+        ops.install_into_venv = lambda d, spec, force=False, prefer=None: prefers.append((d.name, prefer))
+    return ops
 
-    def fake_spawn(cmd, upstream=None, exclude_paths=()):
-        bundle = cmd[cmd.index("--child-bundle") + 1]
-        spawned[bundle] = _FakeChild([{"descriptor": {"name": f"{bundle}.R"}}])
-        return spawned[bundle]
 
-    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None,
-                        spawn=fake_spawn, venv_ops=_ops_recording([], []),
-                        activate=_hosting(lambda d: [{"descriptor": {"name": f"{d}.R"}}], []))
+def test_bundles_agreeing_on_every_version_they_share_are_hosted_together(tmp_path):
+    prefers = []
+    ops = _versioned({"pkga": {"pkga": "1", "attrs": "23.1", "idna": "3.4", "parso": "0.7"},
+                      "pkgb": {"pkgb": "1", "attrs": "23.1", "parso": "0.8"}}, prefers)
+    spawned = []
+    bc = _hosting_then_spawning(tmp_path, spawned, venv_ops=ops)
+
+    bc.install("pkga", "pkga")
+    bc.install("pkgb", "pkgb")
+
+    assert spawned == [] and bc.hosts("pkga") and bc.hosts("pkgb")
+    assert bc.hosts_every_bundle()
+    # the facade's own parso shadows either venv's, so only what the venvs supply is preferred
+    assert prefers == [("pkga", {}), ("pkgb", {"pkga": "1", "attrs": "23.1", "idna": "3.4"})]
+
+    bc.install("pkga", "pkga")
+    assert prefers[-1] == ("pkga", {"pkgb": "1", "attrs": "23.1"})   # never its own earlier versions
+
+
+def test_a_bundle_disagreeing_on_a_shared_version_runs_behind_a_child(tmp_path):
+    ops = _versioned({"pkga": {"pkga": "1", "attrs": "23.1"},
+                      "pkgb": {"pkgb": "1", "attrs": "24.2"}})
+    spawned = []
+    bc = _hosting_then_spawning(tmp_path, spawned, venv_ops=ops)
 
     bc.install("pkga", "pkga")
     bc.install("pkgb", "pkgb")
     bc.install("pkga", "pkga")   # a re-install finds it where its modules already are
 
-    assert set(spawned) == {"pkgb"}           # pkga's recipes may already be prepared here
+    assert spawned == ["pkgb"]   # pkga's recipes may already be prepared here
     assert bc.hosts("pkga") and not bc.hosts("pkgb")
     assert not bc.hosts_every_bundle()
     assert bc.request("pkgb", "Visit", {}) == {"ran": "Visit"}
@@ -481,16 +506,18 @@ def _hosting_then_spawning(tmp_path, spawned, activate=None, venv_ops=None):
                           activate=activate or (lambda venv, dist, name: [{"descriptor": {"name": f"{dist}.R"}}]))
 
 
-def test_a_process_hosts_one_bundles_packages_once(tmp_path):
+def test_uninstalling_a_hosted_bundle_does_not_unimport_it(tmp_path):
+    ops = _versioned({"pkga": {"pkga": "1", "attrs": "23.1"},
+                      "pkgb": {"pkgb": "1", "attrs": "24.2"}})
     spawned = []
-    bc = _hosting_then_spawning(tmp_path, spawned)
+    bc = _hosting_then_spawning(tmp_path, spawned, venv_ops=ops)
 
     bc.install("pkga", "pkga")
     bc.uninstall("pkga")
     bc.install("pkga", "pkga")
     bc.install("pkgb", "pkgb")
 
-    assert spawned == ["pkga", "pkgb"]   # uninstalling pkga does not un-import it
+    assert spawned == ["pkga", "pkgb"]   # pkga's attrs is still the one imported here
 
 
 def test_a_hosted_bundle_whose_modules_may_be_stale_goes_to_a_child(tmp_path):
@@ -506,6 +533,20 @@ def test_a_hosted_bundle_whose_modules_may_be_stale_goes_to_a_child(tmp_path):
     shutil.rmtree(tmp_path / "rebuilt" / "venvs" / "pkga")
     bc.install("pkga", "pkga")
     assert spawned == ["pkga"] and not bc.hosts("pkga")
+
+    spawned = []
+    versions = {"pkga": {"pkga": "1"}}
+    bc = _hosting_then_spawning(tmp_path / "upgraded", spawned, venv_ops=_versioned(versions))
+    bc.install("pkga", "pkga==1")
+    versions["pkga"] = {"pkga": "2"}
+    bc.install("pkga", "pkga==2")
+    assert spawned == ["pkga"] and not bc.hosts("pkga")
+
+    spawned = []
+    bc = _hosting_then_spawning(tmp_path / "recopied", spawned)
+    bc.install("pkga", "/src/pkga", force=True, attribution_name="/src/pkga")
+    bc.install("pkga", "/src/pkga", force=True, attribution_name="/src/pkga")
+    assert spawned == ["pkga"]   # its version may be unchanged while its files are not
 
 
 def test_a_bundle_that_fails_to_activate_here_is_retried_behind_a_child(tmp_path):
@@ -533,7 +574,7 @@ def test_every_installed_bundle_must_be_hosted_for_this_process_to_serve_them_it
     ops.create_venv = lambda py, d, clear=False: (_ for _ in ()).throw(OSError("disk full"))
     with pytest.raises(OSError):
         bc.install("pkgb", "pkgb")
-    assert not bc.hosts_every_bundle()   # pkgb is still installed though its child is gone
+    assert not bc.hosts_every_bundle()   # pkgb is still installed though no longer hosted
 
     bc.uninstall("pkgb")
     bc.uninstall("pkga")

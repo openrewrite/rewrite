@@ -1,6 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from rewrite.rpc import venv_manager
 
@@ -49,6 +50,20 @@ def test_install_into_venv_force_reinstalls_mutable_local_sources(monkeypatch, t
     venv_manager.install_into_venv(venv_dir, "./local-recipes", force=True)
     py = str(venv_manager.venv_python(venv_dir))
     assert calls == [[py, "-m", "pip", "install", "--upgrade", "--force-reinstall", "./local-recipes"]]
+
+
+def test_install_into_venv_prefers_versions_it_drops_when_they_cannot_all_hold(monkeypatch, tmp_path):
+    runs = []
+
+    def fake_run(cmd, capture_output=False, text=False):
+        constraints = cmd[cmd.index("--constraint") + 1] if "--constraint" in cmd else None
+        runs.append((cmd[-1], Path(constraints).read_text() if constraints else None))
+        return SimpleNamespace(returncode=1 if constraints else 0, stdout="", stderr="ResolutionImpossible")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    venv_manager.install_into_venv(tmp_path / "b1", "pkgb", prefer={"attrs": "23.1"})
+
+    assert runs == [("pkgb", "attrs==23.1\n"), ("pkgb", None)]
 
 
 def test_remove_venv_deletes_the_directory(tmp_path):
@@ -130,6 +145,16 @@ def test_installed_version_is_none_for_an_absent_dist_or_missing_venv(tmp_path):
     _write_dist_info(venv, "openrewrite-migrate-python", "0.9.3")
     assert venv_manager.installed_version(venv, "some-other-package") is None
     assert venv_manager.installed_version(tmp_path / "nope", "openrewrite-migrate-python") is None
+
+
+def test_shared_distributions_leave_out_what_lies_under_an_excluded_root(monkeypatch, tmp_path):
+    own, venvs = tmp_path / "own", tmp_path / "venvs"
+    _write_dist_info(own, "Shared_Dep", "1.0")
+    _write_dist_info(venvs / "pkga", "attrs", "23.1")
+    joined = venvs / "pkga" / "lib" / "python3.12" / "site-packages"
+    monkeypatch.setattr(sys, "path", [str(own / "lib" / "python3.12" / "site-packages"), str(joined)])
+
+    assert venv_manager.shared_distributions(exclude=(str(venvs),)) == {"shared_dep"}
 
 
 def test_purge_keeps_venvs_and_removes_pre_venv_target_debris(tmp_path):
