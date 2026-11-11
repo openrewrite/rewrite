@@ -618,11 +618,15 @@ class JavaTemplateGenericsTest implements RewriteTest {
                 final JavaTemplate both = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(T)})")
                   .genericTypes("T")
                   .build();
+                final JavaTemplate first = JavaTemplate.builder("java.util.Arrays.asList(#{any(T)}, #{any(java.util.List<T>)}.get(0))")
+                  .genericTypes("T")
+                  .build();
 
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if ("of".equals(method.getSimpleName())) {
-                        return both.apply(getCursor(), method.getCoordinates().replace(),
+                        JavaTemplate template = method.getArguments().get(1).getType() instanceof JavaType.Parameterized ? first : both;
+                        return template.apply(getCursor(), method.getCoordinates().replace(),
                           method.getArguments().get(0), method.getArguments().get(1));
                     }
                     return super.visitMethodInvocation(method, ctx);
@@ -641,6 +645,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   List<?> literal(Integer i) {
                       return List.of("a", i);
                   }
+
+                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
+                      return List.of(i, numbers);
+                  }
               }
               """,
             """
@@ -653,6 +661,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
 
                   List<?> literal(Integer i) {
                       return java.util.Arrays.asList("a", i);
+                  }
+
+                  List<?> subtype(Integer i, java.util.ArrayList<Number> numbers) {
+                      return java.util.Arrays.asList(i, numbers.get(0));
                   }
               }
               """,

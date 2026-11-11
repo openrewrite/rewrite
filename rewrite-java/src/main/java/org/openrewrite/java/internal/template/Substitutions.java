@@ -343,20 +343,39 @@ public class Substitutions {
             // The variable stays unbound where javac infers its type, such as from a primitive, a wildcard or
             // arguments of different types.
             typeVariableBindings.put(name, sure ? actual : null);
-        } else if (declared instanceof JavaType.Parameterized && actual instanceof JavaType.Parameterized) {
+        } else if (declared instanceof JavaType.Parameterized) {
             JavaType.Parameterized declaredParameterized = (JavaType.Parameterized) declared;
-            JavaType.Parameterized actualParameterized = (JavaType.Parameterized) actual;
             List<JavaType> declaredArguments = declaredParameterized.getTypeParameters();
-            List<JavaType> actualArguments = actualParameterized.getTypeParameters();
-            if (TypeUtils.fullyQualifiedNamesAreEqual(declaredParameterized.getFullyQualifiedName(),
-                    actualParameterized.getFullyQualifiedName()) &&
-                declaredArguments.size() == actualArguments.size()) {
+            List<JavaType> actualArguments = actual instanceof JavaType.Parameterized &&
+                    TypeUtils.fullyQualifiedNamesAreEqual(declaredParameterized.getFullyQualifiedName(),
+                            ((JavaType.Parameterized) actual).getFullyQualifiedName()) ?
+                    ((JavaType.Parameterized) actual).getTypeParameters() : emptyList();
+            if (declaredArguments.size() == actualArguments.size()) {
                 for (int i = 0; i < declaredArguments.size(); i++) {
                     bindTypeVariables(declaredArguments.get(i), actualArguments.get(i));
                 }
+            } else {
+                unbindTypeVariables(declared);
             }
         } else if (declared instanceof JavaType.Array && actual instanceof JavaType.Array) {
             bindTypeVariables(((JavaType.Array) declared).getElemType(), ((JavaType.Array) actual).getElemType());
+        }
+    }
+
+    /**
+     * Leaves the variables in a type unbound where its argument is of another class, which javac matches through
+     * supertypes that this doesn't follow.
+     */
+    private void unbindTypeVariables(JavaType declared) {
+        if (declared instanceof JavaType.GenericTypeVariable) {
+            String name = ((JavaType.GenericTypeVariable) declared).getName();
+            if (generics.get(name) == declared) {
+                typeVariableBindings.put(name, null);
+            }
+        } else if (declared instanceof JavaType.Parameterized) {
+            ((JavaType.Parameterized) declared).getTypeParameters().forEach(this::unbindTypeVariables);
+        } else if (declared instanceof JavaType.Array) {
+            unbindTypeVariables(((JavaType.Array) declared).getElemType());
         }
     }
 
