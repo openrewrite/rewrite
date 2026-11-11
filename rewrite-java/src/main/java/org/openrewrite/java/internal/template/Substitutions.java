@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.ParenthesizeVisitor;
@@ -492,6 +493,28 @@ public class Substitutions {
         if (generics.isEmpty()) {
             return j;
         }
+        // A variable the template names as a type prints as its erasure, which javac types the code with, except as
+        // a member reference's qualifier, which javac types from its target.
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                // a placeholder names the variable in the type it declares, which its parameter replaces
+                return parameterIndex(method.getName().getPrefix()) == null ?
+                        super.visitMethodInvocation(method, p) : method;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                if (ident.getType() instanceof JavaType.GenericTypeVariable &&
+                    ident.getSimpleName().equals(((JavaType.GenericTypeVariable) ident.getType()).getName()) &&
+                    generics.containsKey(ident.getSimpleName()) &&
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.MemberReference)) {
+                    typeVariableBindings.put(ident.getSimpleName(), null);
+                }
+                return ident;
+            }
+        }.visit(j, 0);
+
         Set<JavaType> visiting = newSetFromMap(new IdentityHashMap<>());
         //noinspection unchecked
         return (J2) new JavaVisitor<Integer>() {
@@ -635,18 +658,18 @@ public class Substitutions {
                 }
                 return null;
             }
-
-            private @Nullable Integer parameterIndex(Space space) {
-                for (Comment comment : space.getComments()) {
-                    if (comment instanceof TextComment) {
-                        Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
-                        if (matcher.matches()) {
-                            return Integer.valueOf(matcher.group(1));
-                        }
-                    }
-                }
-                return null;
-            }
         }.visitNonNull(j, 0);
+    }
+
+    private static @Nullable Integer parameterIndex(Space space) {
+        for (Comment comment : space.getComments()) {
+            if (comment instanceof TextComment) {
+                Matcher matcher = PATTERN_COMMENT.matcher(((TextComment) comment).getText());
+                if (matcher.matches()) {
+                    return Integer.valueOf(matcher.group(1));
+                }
+            }
+        }
+        return null;
     }
 }

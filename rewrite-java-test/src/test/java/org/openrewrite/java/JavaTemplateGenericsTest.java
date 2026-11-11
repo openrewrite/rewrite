@@ -803,6 +803,55 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableTheTemplateNamesAsATypeStaysUnbound() {
+        rewriteRun(
+          spec -> spec
+            // the template prints its variable as its erasure, which the parser types the code with
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate copy = JavaTemplate.builder("new java.util.ArrayList<T>(#{any(java.util.List<T>)})")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("copyOf".equals(method.getSimpleName())) {
+                        return copy.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> copy(List<String> list) {
+                      return List.copyOf(list);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  List<?> copy(List<String> list) {
+                      return new java.util.ArrayList<Object>(list);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration copy = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.Return arrayList = (J.Return) Objects.requireNonNull(copy.getBody()).getStatements().get(0);
+                JavaType.Parameterized type = (JavaType.Parameterized) ((J.NewClass) Objects.requireNonNull(arrayList.getExpression())).getType();
+                assertThat(Objects.requireNonNull(type).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+            })
+          )
+        );
+    }
+
+    @Test
     void typeVariableOfAMethodTheTemplateReferencesKeepsItsOwnType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
