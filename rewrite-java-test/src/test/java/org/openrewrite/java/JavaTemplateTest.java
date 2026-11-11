@@ -1654,6 +1654,101 @@ class JavaTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceVarargsArgumentsWithAFixedArityOverloadsArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Loader using(Object...)").matches(mi) && mi.getArguments().size() == 2) {
+                      maybeAddImport("java.util.Map");
+                      return JavaTemplate.builder("Map.of(#{any()}, #{any()})")
+                        .imports("java.util.Map")
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                          mi.getArguments().toArray());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.util.Map;
+
+              interface Loader<T> {
+                  Loader<T> using(Object... values);
+                  Loader<T> using(Map<String, ?> values);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Loader<Integer> loader) {
+                      loader.using("a", "x");
+                      loader.using(1, 2);
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class Test {
+                  void test(Loader<Integer> loader) {
+                      loader.using(Map.of("a", "x"));
+                      loader.using(Map.of(1, 2));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVarargsArgumentsWithTheMostSpecificFixedArityOverloadsArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Log debug(String, Object...)").matches(mi) && mi.getArguments().size() == 3) {
+                      return JavaTemplate.apply("\"failed\", #{any(java.lang.RuntimeException)}",
+                        new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments(),
+                        mi.getArguments().getLast());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              interface Log {
+                  void debug(String format, Object arg);
+                  void debug(String message, Exception e);
+                  void debug(String message, Throwable t);
+                  void debug(String format, Object... args);
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  void test(Log log, RuntimeException e) {
+                      log.debug("{} {}", "a", e);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(Log log, RuntimeException e) {
+                      log.debug("failed", e);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableDeclarationWithFinalVar() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

@@ -644,9 +644,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     void changeVarargsToList() {
         rewriteRun(
           // Mimics what a Refaster template would generate for varargs
-          // the template leaves its own type variables where the parser infers the call site's types
-          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation elem, ExecutionContext ctx) {
                   JavaTemplate.Matcher matcher;
