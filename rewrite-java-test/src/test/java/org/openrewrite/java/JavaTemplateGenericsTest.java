@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
@@ -636,6 +637,10 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   List<?> both(Integer i, Long l) {
                       return List.of(i, l);
                   }
+
+                  List<?> literal(Integer i) {
+                      return List.of("a", i);
+                  }
               }
               """,
             """
@@ -645,14 +650,62 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   List<?> both(Integer i, Long l) {
                       return java.util.Arrays.asList(i, l);
                   }
+
+                  List<?> literal(Integer i) {
+                      return java.util.Arrays.asList("a", i);
+                  }
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration both = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.Return asList = (J.Return) Objects.requireNonNull(both.getBody()).getStatements().get(0);
-                JavaType.Parameterized list = (JavaType.Parameterized) ((J.MethodInvocation) asList.getExpression()).getType();
-                assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                for (Statement method : cu.getClasses().get(0).getBody().getStatements()) {
+                    J.Return asList = (J.Return) Objects.requireNonNull(((J.MethodDeclaration) method).getBody()).getStatements().get(0);
+                    JavaType.Parameterized list = (JavaType.Parameterized) ((J.MethodInvocation) asList.getExpression()).getType();
+                    assertThat(Objects.requireNonNull(list).getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                }
             })
+          )
+        );
+    }
+
+    @Test
+    void typeVariableTakesTheTypeOfAnExceptionTheMethodThrows() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate orElseThrow = JavaTemplate.builder(
+                  "java.util.Objects.requireNonNull(#{any(java.util.OptionalInt)}).orElseThrow(#{any(java.util.function.Supplier<X>)})")
+                .genericTypes("X extends java.lang.Throwable")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orElseThrow".equals(method.getSimpleName()) && method.getSelect() instanceof J.Identifier) {
+                      return orElseThrow.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.OptionalInt;
+              import java.util.function.Supplier;
+
+              class Test {
+                  int get(OptionalInt optional, Supplier<IllegalStateException> error) {
+                      return optional.orElseThrow(error);
+                  }
+              }
+              """,
+            """
+              import java.util.OptionalInt;
+              import java.util.function.Supplier;
+
+              class Test {
+                  int get(OptionalInt optional, Supplier<IllegalStateException> error) {
+                      return java.util.Objects.requireNonNull(optional).orElseThrow(error);
+                  }
+              }
+              """
           )
         );
     }

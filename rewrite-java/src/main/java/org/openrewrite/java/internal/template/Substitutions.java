@@ -321,23 +321,18 @@ public class Substitutions {
     }
 
     private void bindTypeVariables(@Nullable JavaType declared, @Nullable JavaType actual) {
-        if (declared == null || actual == null || actual instanceof JavaType.Unknown || actual instanceof JavaType.Primitive) {
-            return;
-        }
         if (declared instanceof JavaType.GenericTypeVariable) {
             String name = ((JavaType.GenericTypeVariable) declared).getName();
-            boolean wildcard = actual instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) actual).getName());
-            // A wildcard binds nothing, since javac captures it. A matched template parameter can carry the matcher
-            // template's own variable, which is this one and binds nothing either.
-            if (generics.get(name) != declared || wildcard || TypeUtils.isOfType(declared, actual)) {
+            // A matched template parameter can carry the matcher template's own variable, which is this one.
+            if (generics.get(name) != declared || TypeUtils.isOfType(declared, actual)) {
                 return;
             }
-            if (!typeVariableBindings.containsKey(name)) {
-                typeVariableBindings.put(name, actual);
-            } else if (!TypeUtils.isOfType(typeVariableBindings.get(name), actual)) {
-                // javac infers a common supertype of arguments that differ, so the variable stays unbound
-                typeVariableBindings.put(name, null);
-            }
+            boolean wildcard = actual instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) actual).getName());
+            boolean sure = actual != null && !(actual instanceof JavaType.Unknown) && !(actual instanceof JavaType.Primitive) && !wildcard &&
+                           (!typeVariableBindings.containsKey(name) || TypeUtils.isOfType(typeVariableBindings.get(name), actual));
+            // The variable stays unbound where javac infers its type, such as from a primitive, a wildcard or
+            // arguments of different types.
+            typeVariableBindings.put(name, sure ? actual : null);
         } else if (declared instanceof JavaType.Parameterized && actual instanceof JavaType.Parameterized) {
             JavaType.Parameterized declaredParameterized = (JavaType.Parameterized) declared;
             JavaType.Parameterized actualParameterized = (JavaType.Parameterized) actual;
@@ -379,7 +374,8 @@ public class Substitutions {
             } else if (type instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) type;
                 return method.withReturnType(withBoundTypeVariables(method.getReturnType(), visiting))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), t -> withBoundTypeVariables(t, visiting)));
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), t -> withBoundTypeVariables(t, visiting)))
+                        .withThrownExceptions(ListUtils.map(method.getThrownExceptions(), t -> withBoundTypeVariables(t, visiting)));
             } else if (type instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) type;
                 return variable.withType(withBoundTypeVariables(variable.getType(), visiting));
@@ -481,6 +477,7 @@ public class Substitutions {
         if (generics.isEmpty()) {
             return j;
         }
+        Set<JavaType> visiting = newSetFromMap(new IdentityHashMap<>());
         //noinspection unchecked
         return (J2) new JavaVisitor<Integer>() {
             @Override
@@ -513,7 +510,7 @@ public class Substitutions {
 
             @Override
             public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
-                return typeVariableBindings.isEmpty() ? javaType : withBoundTypeVariables(javaType, newSetFromMap(new IdentityHashMap<>()));
+                return typeVariableBindings.isEmpty() ? javaType : withBoundTypeVariables(javaType, visiting);
             }
         }.visitNonNull(j, 0);
     }
