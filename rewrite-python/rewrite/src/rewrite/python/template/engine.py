@@ -41,22 +41,6 @@ from .replacement import substitution_marker
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 
-# A recipe bundle hosted in this process keeps its packages in its own venv, while ty resolves a
-# template that declares no dependencies against the running interpreter's.
-_installed_packages_venv: Optional[str] = None
-
-
-def use_installed_packages_of(venv: str) -> None:
-    """Resolve templates that declare no dependencies against ``venv``."""
-    global _installed_packages_venv
-    _installed_packages_venv = venv
-
-
-def _installed_packages() -> Optional[str]:
-    venv = _installed_packages_venv
-    # ty fails to start on a VIRTUAL_ENV without a pyvenv.cfg, as an uninstalled bundle leaves it.
-    return venv if venv and os.path.isfile(os.path.join(venv, 'pyvenv.cfg')) else None
-
 
 @dataclass(frozen=True)
 class TemplateOptions:
@@ -340,16 +324,14 @@ class TemplateEngine:
                 import tempfile as _tmpmod
                 from rewrite.python.ty_client import TyTypesClient
 
-                virtual_env = None
                 if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
                 else:
                     workspace = _tmpmod.mkdtemp()
                     owns_workspace = True
-                    virtual_env = _installed_packages()
 
-                ty_client = TyTypesClient(virtual_env=virtual_env)
+                ty_client = TyTypesClient()
                 ty_client.initialize(workspace)
 
                 # ty needs a real file path for type resolution
