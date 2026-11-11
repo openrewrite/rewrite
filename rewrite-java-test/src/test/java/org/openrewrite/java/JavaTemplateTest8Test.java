@@ -27,7 +27,11 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -953,6 +957,44 @@ class JavaTemplateTest8Test implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void contextSensitiveTemplateStubDeclaresVarargsParameterAsArray() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  if ("unused".equals(literal.getValue())) {
+                      return JavaTemplate.builder("\"all\"")
+                        .contextSensitive()
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), literal.getCoordinates().replace());
+                  }
+                  return literal;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test(@SuppressWarnings("unused") String... args) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(@SuppressWarnings("all") String... args) {
+                  }
+              }
+              """
+          )
+        );
+        // an annotation argument cannot refer to the parameter, so only the stub shows the type it is declared with
+        assertThat(stubs)
+          .isNotEmpty()
+          .allSatisfy(stub -> assertThat(stub).contains("String[] args"));
     }
 
 }

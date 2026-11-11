@@ -851,6 +851,9 @@ public class BlockStatementTemplateGenerator {
                 if (variable.getTypeExpression() != null) {
                     varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
+                if (variable.getVarargs() != null) {
+                    varBuilder.append("[]");
+                }
                 varBuilder.append(" ");
             }
 
