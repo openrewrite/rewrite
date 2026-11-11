@@ -426,6 +426,80 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedThroughVariable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.Node", null, true))),
+          java(
+            """
+              package a;
+
+              public class Node {
+                  public Node next;
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  protected Node node;
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              class B extends a.Base {
+                  Object next() {
+                      return node.next;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddImportIfOnlyReferencedByVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.Node", null, true))),
+          java(
+            """
+              package a;
+
+              public class Node {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              public class Base {
+                  public Node node() {
+                      return new Node();
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              class B {
+                  Object node(a.Base base) {
+                      var node = base.node();
+                      return node;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addImportInsertsNewMiddleBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),

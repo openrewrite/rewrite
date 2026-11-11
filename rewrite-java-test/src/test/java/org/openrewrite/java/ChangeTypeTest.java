@@ -341,6 +341,35 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceWithNestedTypeQualifyingStaticMember() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "a.Holder$New", true)),
+          java(
+            """
+              package a;
+              public enum Old { X }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+
+              class A {
+                  Object o = Old.X;
+              }
+              """,
+            """
+              import a.Holder;
+
+              class A {
+                  Object o = Holder.New.X;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2521")
     @Test
     void replacePrivateNestedType() {
