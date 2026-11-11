@@ -1745,16 +1745,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-
     @ParameterizedTest
     @ValueSource(strings = {
       "${property(\"guavaVersion\")}",
       "${project.property(\"guavaVersion\")}",
-      "${findProperty(\"guavaVersion\")}"
+      "${findProperty(\"guavaVersion\")}",
+      "${project.findProperty(\"guavaVersion\")}"
     })
-    void kotlinDslVersionInPropertiesFileUsingPropertyMethod(
-      String propertyNotation
-    ) {
+    void kotlinDslVersionInPropertiesFileUsingPropertyMethod(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -1774,15 +1772,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-    
+
               dependencies {
-                  implementation("com.google.guava:guava:${property("guavaVersion")}")
+                  implementation("com.google.guava:guava:%s")
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
-
 
     @Test
     void versionInPropertiesFileNotUpdatedIfNoDependencyVariable() {
